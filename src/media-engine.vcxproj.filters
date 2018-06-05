@@ -1,0 +1,196 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="media">
+      <UniqueIdentifier>{531df363-8c48-434c-a6e4-0bca1c14604c}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="helper">
+      <UniqueIdentifier>{6848d33a-bf28-4d5c-984e-75774898ecbd}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="audio">
+      <UniqueIdentifier>{2f7b9757-6023-46f5-874a-402f72213ad7}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="engine\helper\HL_AsyncCommand.cpp">
+      <Filter>helper</Filter>
+    </ClCompile>
+    <ClCompile Include="engine\helper\HL_Log.cpp">
+      <Filter>helper</Filter>
+    </ClCompile>
+    <ClCompile Include="engine\helper\HL_NetworkSocket.cpp">
+      <Filter>helper</Filter>
+    </ClCompile>
+    <ClCompile Include="engine\helper\HL_OsVersion.cpp">
+      <Filter>helper</Filter>
+    </ClCompile>
+    <ClCompile Include="engine\helper\HL_Pointer.cpp">
+      <Filter>helper</Filter>
+    </ClCompile>
+    <ClCompile Include="engine\helper\HL_Rtp.cpp">
+      <Filter>helper</Filter>
+    </ClCompile>
+    <ClCompile Include="engine\helper\HL_SocketHeap.cpp">
+      <Filter>helper</Filter>
+    </ClCompile>
+    <ClCompile Include="engine\helper\HL_String.cpp">
+      <Filter>helper</Filter>
+    </ClCompile>
+    <ClCompile Include="engine\helper\HL_Sync.cpp">
+      <Filter>helper</Filter>
+    </ClCompile>
+    <ClCompile Include="engine\helper\HL_Usb.cpp">
+      <Filter>helper</Filter>
+    </ClCompile>
+    <ClCompile Include="engine\helper\HL_VariantMap.cpp">
+      <Filter>helper</Filter>
+    </ClCompile>
+    <ClCompile Include="engine\helper\HL_WavFile.cpp">
+      <Filter>helper</Filter>
+    </ClCompile>
+    <ClCompile Include="engine\media\MT_AudioCodec.cpp">
+      <Filter>media</Filter>
+    </ClCompile>
+    <ClCompile Include="engine\media\MT_AudioReceiver.cpp">
+      <Filter>media</Filter>
+    </ClCompile>
+    <ClCompile Include="engine\media\MT_AudioStream.cpp">
+      <Filter>media</Filter>
+    </ClCompile>
+    <ClCompile Include="engine\media\MT_Box.cpp">
+      <Filter>media</Filter>
+    </ClCompile>
+    <ClCompile Include="engine\media\MT_Codec.cpp">
+      <Filter>media</Filter>
+    </ClCompile>
+    <ClCompile Include="engine\media\MT_CodecList.cpp">
+      <Filter>media</Filter>
+    </ClCompile>
+    <ClCompile Include="engine\media\MT_Dtmf.cpp">
+      <Filter>media</Filter>
+    </ClCompile>
+    <ClCompile Include="engine\media\MT_NativeRtpSender.cpp">
+      <Filter>media</Filter>
+    </ClCompile>
+    <ClCompile Include="engine\media\MT_SingleAudioStream.cpp">
+      <Filter>media</Filter>
+    </ClCompile>
+    <ClCompile Include="engine\media\MT_SrtpHelper.cpp">
+      <Filter>media</Filter>
+    </ClCompile>
+    <ClCompile Include="engine\media\MT_Stream.cpp">
+      <Filter>media</Filter>
+    </ClCompile>
+    <ClCompile Include="engine\media\MT_WebRtc.cpp">
+      <Filter>media</Filter>
+    </ClCompile>
+    <ClCompile Include="engine\audio\Audio_DataWindow.cpp">
+      <Filter>audio</Filter>
+    </ClCompile>
+    <ClCompile Include="engine\audio\Audio_Resampler.cpp">
+      <Filter>audio</Filter>
+    </ClCompile>
+    <ClCompile Include="engine\helper\HL_NetworkFrame.cpp">
+      <Filter>helper</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="engine\helper\HL_AsyncCommand.h">
+      <Filter>helper</Filter>
+    </ClInclude>
+    <ClInclude Include="engine\helper\HL_ByteBuffer.h">
+      <Filter>helper</Filter>
+    </ClInclude>
+    <ClInclude Include="engine\helper\HL_Exception.h">
+      <Filter>helper</Filter>
+    </ClInclude>
+    <ClInclude Include="engine\helper\HL_InternetAddress.h">
+      <Filter>helper</Filter>
+    </ClInclude>
+    <ClInclude Include="engine\helper\HL_Log.h">
+      <Filter>helper</Filter>
+    </ClInclude>
+    <ClInclude Include="engine\helper\HL_NetworkSocket.h">
+      <Filter>helper</Filter>
+    </ClInclude>
+    <ClInclude Include="engine\helper\HL_OsVersion.h">
+      <Filter>helper</Filter>
+    </ClInclude>
+    <ClInclude Include="engine\helper\HL_Pointer.h">
+      <Filter>helper</Filter>
+    </ClInclude>
+    <ClInclude Include="engine\helper\HL_Rtp.h">
+      <Filter>helper</Filter>
+    </ClInclude>
+    <ClInclude Include="engine\helper\HL_SocketHeap.h">
+      <Filter>helper</Filter>
+    </ClInclude>
+    <ClInclude Include="engine\helper\HL_StreamState.h">
+      <Filter>helper</Filter>
+    </ClInclude>
+    <ClInclude Include="engine\helper\HL_String.h">
+      <Filter>helper</Filter>
+    </ClInclude>
+    <ClInclude Include="engine\helper\HL_Sync.h">
+      <Filter>helper</Filter>
+    </ClInclude>
+    <ClInclude Include="engine\helper\HL_Types.h">
+      <Filter>helper</Filter>
+    </ClInclude>
+    <ClInclude Include="engine\helper\HL_Usb.h">
+      <Filter>helper</Filter>
+    </ClInclude>
+    <ClInclude Include="engine\helper\HL_VariantMap.h">
+      <Filter>helper</Filter>
+    </ClInclude>
+    <ClInclude Include="engine\helper\HL_WavFile.h">
+      <Filter>helper</Filter>
+    </ClInclude>
+    <ClInclude Include="engine\media\MT_AudioCodec.h">
+      <Filter>media</Filter>
+    </ClInclude>
+    <ClInclude Include="engine\media\MT_AudioReceiver.h">
+      <Filter>media</Filter>
+    </ClInclude>
+    <ClInclude Include="engine\media\MT_AudioStream.h">
+      <Filter>media</Filter>
+    </ClInclude>
+    <ClInclude Include="engine\media\MT_Box.h">
+      <Filter>media</Filter>
+    </ClInclude>
+    <ClInclude Include="engine\media\MT_Codec.h">
+      <Filter>media</Filter>
+    </ClInclude>
+    <ClInclude Include="engine\media\MT_CodecList.h">
+      <Filter>media</Filter>
+    </ClInclude>
+    <ClInclude Include="engine\media\MT_Dtmf.h">
+      <Filter>media</Filter>
+    </ClInclude>
+    <ClInclude Include="engine\media\MT_NativeRtpSender.h">
+      <Filter>media</Filter>
+    </ClInclude>
+    <ClInclude Include="engine\media\MT_SingleAudioStream.h">
+      <Filter>media</Filter>
+    </ClInclude>
+    <ClInclude Include="engine\media\MT_SrtpHelper.h">
+      <Filter>media</Filter>
+    </ClInclude>
+    <ClInclude Include="engine\media\MT_Stream.h">
+      <Filter>media</Filter>
+    </ClInclude>
+    <ClInclude Include="engine\media\MT_WebRtc.h">
+      <Filter>media</Filter>
+    </ClInclude>
+    <ClInclude Include="engine\audio\Audio_DataWindow.h">
+      <Filter>audio</Filter>
+    </ClInclude>
+    <ClInclude Include="engine\audio\Audio_Resampler.h">
+      <Filter>audio</Filter>
+    </ClInclude>
+    <ClInclude Include="engine\helper\HL_NetworkFrame.h">
+      <Filter>helper</Filter>
+    </ClInclude>
+    <ClInclude Include="engine\config.h" />
+  </ItemGroup>
+</Project>

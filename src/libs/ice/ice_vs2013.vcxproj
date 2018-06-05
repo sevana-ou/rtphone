@@ -1,0 +1,154 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" ToolsVersion="12.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|Win32">
+      <Configuration>Debug</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|Win32">
+      <Configuration>Release</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <ProjectName>ice</ProjectName>
+    <ProjectGuid>{5E483901-D5B2-40EE-B9ED-35F8D64AC04E}</ProjectGuid>
+    <RootNamespace>ICEImpl</RootNamespace>
+    <Keyword>Win32Proj</Keyword>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <PlatformToolset>v120_xp</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+    <WholeProgramOptimization>false</WholeProgramOptimization>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <PlatformToolset>v120_xp</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+  </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup>
+    <_ProjectFileVersion>12.0.21005.1</_ProjectFileVersion>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <OutDir>$(Configuration)\</OutDir>
+    <IntDir>$(Configuration)\</IntDir>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <OutDir>$(Configuration)\</OutDir>
+    <IntDir>$(Configuration)\</IntDir>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <ClCompile>
+      <Optimization>Disabled</Optimization>
+      <AdditionalIncludeDirectories>../openssl/include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>WIN32;_DEBUG;_LIB;_CRT_SECURE_NO_WARNINGS;USE_OPENSSL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <MinimalRebuild>true</MinimalRebuild>
+      <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
+      <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
+      <TreatWChar_tAsBuiltInType>false</TreatWChar_tAsBuiltInType>
+      <PrecompiledHeader />
+      <WarningLevel>Level3</WarningLevel>
+      <DebugInformationFormat>EditAndContinue</DebugInformationFormat>
+    </ClCompile>
+    <Lib>
+      <OutputFile>$(OutDir)$(TargetName)$(TargetExt)</OutputFile>
+    </Lib>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <ClCompile>
+      <Optimization>MinSpace</Optimization>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <AdditionalIncludeDirectories>../openssl/include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>WIN32;NDEBUG;_LIB;_CRT_SECURE_NO_WARNINGS;USE_OPENSSL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <TreatWChar_tAsBuiltInType>false</TreatWChar_tAsBuiltInType>
+      <PrecompiledHeader />
+      <WarningLevel>Level3</WarningLevel>
+      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
+    </ClCompile>
+    <Lib>
+      <OutputFile>$(OutDir)$(TargetName)$(TargetExt)</OutputFile>
+    </Lib>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClInclude Include="ICEAction.h" />
+    <ClInclude Include="ICEAddress.h" />
+    <ClInclude Include="ICEAuthTransaction.h" />
+    <ClInclude Include="ICEBinding.h" />
+    <ClInclude Include="ICEBox.h" />
+    <ClInclude Include="ICEBoxImpl.h" />
+    <ClInclude Include="ICEByteBuffer.h" />
+    <ClInclude Include="ICECandidate.h" />
+    <ClInclude Include="ICECandidatePair.h" />
+    <ClInclude Include="ICECheckList.h" />
+    <ClInclude Include="ICECRC32.h" />
+    <ClInclude Include="ICEError.h" />
+    <ClInclude Include="ICEEvent.h" />
+    <ClInclude Include="ICELog.h" />
+    <ClInclude Include="ICEMD5.h" />
+    <ClInclude Include="ICENetworkHelper.h" />
+    <ClInclude Include="ICEPacketTimer.h" />
+    <ClInclude Include="ICEPlatform.h" />
+    <ClInclude Include="ICERelaying.h" />
+    <ClInclude Include="ICEReliableTransport.h" />
+    <ClInclude Include="ICESession.h" />
+    <ClInclude Include="ICESHA1.h" />
+    <ClInclude Include="ICESmartCount.h" />
+    <ClInclude Include="ICESmartPtr.h" />
+    <ClInclude Include="ICESocket.h" />
+    <ClInclude Include="ICEStream.h" />
+    <ClInclude Include="ICEStunAttributes.h" />
+    <ClInclude Include="ICEStunConfig.h" />
+    <ClInclude Include="ICEStunMessage.h" />
+    <ClInclude Include="ICEStunTransaction.h" />
+    <ClInclude Include="ICESync.h" />
+    <ClInclude Include="ICETime.h" />
+    <ClInclude Include="ICETransactionList.h" />
+    <ClInclude Include="ICETypes.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="ICEAddress.cpp" />
+    <ClCompile Include="ICEAuthTransaction.cpp" />
+    <ClCompile Include="ICEBinding.cpp" />
+    <ClCompile Include="ICEBox.cpp" />
+    <ClCompile Include="ICEBoxImpl.cpp" />
+    <ClCompile Include="ICEByteBuffer.cpp" />
+    <ClCompile Include="ICECandidate.cpp" />
+    <ClCompile Include="ICECandidatePair.cpp" />
+    <ClCompile Include="ICECheckList.cpp" />
+    <ClCompile Include="ICECRC32.cpp" />
+    <ClCompile Include="ICEError.cpp" />
+    <ClCompile Include="ICELog.cpp" />
+    <ClCompile Include="ICEMD5.cpp" />
+    <ClCompile Include="ICENetworkHelper.cpp" />
+    <ClCompile Include="ICEPacketTimer.cpp" />
+    <ClCompile Include="ICERelaying.cpp" />
+    <ClCompile Include="ICEReliableTransport.cpp" />
+    <ClCompile Include="ICESession.cpp" />
+    <ClCompile Include="ICESHA1.cpp" />
+    <ClCompile Include="ICEStream.cpp" />
+    <ClCompile Include="ICEStunAttributes.cpp" />
+    <ClCompile Include="ICEStunConfig.cpp" />
+    <ClCompile Include="ICEStunMessage.cpp" />
+    <ClCompile Include="ICEStunTransaction.cpp" />
+    <ClCompile Include="ICESync.cpp" />
+    <ClCompile Include="ICETime.cpp" />
+    <ClCompile Include="ICETransactionList.cpp" />
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+  </ImportGroup>
+</Project>

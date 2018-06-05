@@ -1,0 +1,1196 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="vad">
+      <UniqueIdentifier>{2ad8fa9f-4ef9-4657-a8cf-fc245d40c665}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="ns">
+      <UniqueIdentifier>{6048fbf6-1f8a-414b-817b-f3379d7b251c}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="aec">
+      <UniqueIdentifier>{f4614564-3c5c-4d77-bcc6-c09b47f6ebcb}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="aecm">
+      <UniqueIdentifier>{a5e859ec-621d-466b-acc6-b0dd5671e52d}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="agc">
+      <UniqueIdentifier>{c5f3a672-913e-4ce5-81db-a462db1dbedd}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="utility">
+      <UniqueIdentifier>{97dd2a01-db7e-4e3d-a569-318782404cf6}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="system_wrappers">
+      <UniqueIdentifier>{85a910e6-6810-4048-8731-47a78144d450}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="neteq">
+      <UniqueIdentifier>{e6ca5506-f0e8-4fbe-a270-4772c81799ff}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="cng">
+      <UniqueIdentifier>{9561d225-853b-433b-b4cf-842dfda8ac87}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="signal_processing_library">
+      <UniqueIdentifier>{85f7210d-7eef-4413-ad98-9ceb1f22c024}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="isac">
+      <UniqueIdentifier>{20d51533-0fc5-4f5f-9a6b-ca1bed458f0b}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="ilbc">
+      <UniqueIdentifier>{7d154d7a-4c42-4b59-aaa0-1fe681383f60}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="g711">
+      <UniqueIdentifier>{d40ee663-b254-470e-b0a7-4a35b274892a}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="vad\vad_const.c">
+      <Filter>vad</Filter>
+    </ClCompile>
+    <ClCompile Include="vad\vad_core.c">
+      <Filter>vad</Filter>
+    </ClCompile>
+    <ClCompile Include="vad\vad_filterbank.c">
+      <Filter>vad</Filter>
+    </ClCompile>
+    <ClCompile Include="vad\vad_gmm.c">
+      <Filter>vad</Filter>
+    </ClCompile>
+    <ClCompile Include="vad\vad_sp.c">
+      <Filter>vad</Filter>
+    </ClCompile>
+    <ClCompile Include="vad\webrtc_vad.c">
+      <Filter>vad</Filter>
+    </ClCompile>
+    <ClCompile Include="ns\noise_suppression.c">
+      <Filter>ns</Filter>
+    </ClCompile>
+    <ClCompile Include="ns\noise_suppression_x.c">
+      <Filter>ns</Filter>
+    </ClCompile>
+    <ClCompile Include="ns\ns_core.c">
+      <Filter>ns</Filter>
+    </ClCompile>
+    <ClCompile Include="ns\nsx_core.c">
+      <Filter>ns</Filter>
+    </ClCompile>
+    <ClCompile Include="aec\aec_core.c">
+      <Filter>aec</Filter>
+    </ClCompile>
+    <ClCompile Include="aec\aec_core_rdft.c">
+      <Filter>aec</Filter>
+    </ClCompile>
+    <ClCompile Include="aec\aec_core_sse2.c">
+      <Filter>aec</Filter>
+    </ClCompile>
+    <ClCompile Include="aec\echo_cancellation.c">
+      <Filter>aec</Filter>
+    </ClCompile>
+    <ClCompile Include="aec\resampler.c">
+      <Filter>aec</Filter>
+    </ClCompile>
+    <ClCompile Include="aecm\aecm_core.c">
+      <Filter>aecm</Filter>
+    </ClCompile>
+    <ClCompile Include="aecm\echo_control_mobile.c">
+      <Filter>aecm</Filter>
+    </ClCompile>
+    <ClCompile Include="agc\analog_agc.c">
+      <Filter>agc</Filter>
+    </ClCompile>
+    <ClCompile Include="agc\digital_agc.c">
+      <Filter>agc</Filter>
+    </ClCompile>
+    <ClCompile Include="utility\fft4g.c">
+      <Filter>utility</Filter>
+    </ClCompile>
+    <ClCompile Include="utility\ring_buffer.c">
+      <Filter>utility</Filter>
+    </ClCompile>
+    <ClCompile Include="system_wrappers\atomic32.cc">
+      <Filter>system_wrappers</Filter>
+    </ClCompile>
+    <ClCompile Include="system_wrappers\condition_variable.cc">
+      <Filter>system_wrappers</Filter>
+    </ClCompile>
+    <ClCompile Include="system_wrappers\condition_variable_windows.cc">
+      <Filter>system_wrappers</Filter>
+    </ClCompile>
+    <ClCompile Include="system_wrappers\cpu.cc">
+      <Filter>system_wrappers</Filter>
+    </ClCompile>
+    <ClCompile Include="system_wrappers\cpu_features.cc">
+      <Filter>system_wrappers</Filter>
+    </ClCompile>
+    <ClCompile Include="system_wrappers\cpu_windows.cc">
+      <Filter>system_wrappers</Filter>
+    </ClCompile>
+    <ClCompile Include="system_wrappers\critical_section.cc">
+      <Filter>system_wrappers</Filter>
+    </ClCompile>
+    <ClCompile Include="system_wrappers\critical_section_windows.cc">
+      <Filter>system_wrappers</Filter>
+    </ClCompile>
+    <ClCompile Include="system_wrappers\event.cc">
+      <Filter>system_wrappers</Filter>
+    </ClCompile>
+    <ClCompile Include="system_wrappers\event_windows.cc">
+      <Filter>system_wrappers</Filter>
+    </ClCompile>
+    <ClCompile Include="system_wrappers\file_impl.cc">
+      <Filter>system_wrappers</Filter>
+    </ClCompile>
+    <ClCompile Include="system_wrappers\rw_lock.cc">
+      <Filter>system_wrappers</Filter>
+    </ClCompile>
+    <ClCompile Include="system_wrappers\rw_lock_generic.cc">
+      <Filter>system_wrappers</Filter>
+    </ClCompile>
+    <ClCompile Include="system_wrappers\rw_lock_windows.cc">
+      <Filter>system_wrappers</Filter>
+    </ClCompile>
+    <ClCompile Include="system_wrappers\sort.cc">
+      <Filter>system_wrappers</Filter>
+    </ClCompile>
+    <ClCompile Include="system_wrappers\thread.cc">
+      <Filter>system_wrappers</Filter>
+    </ClCompile>
+    <ClCompile Include="system_wrappers\thread_windows.cc">
+      <Filter>system_wrappers</Filter>
+    </ClCompile>
+    <ClCompile Include="system_wrappers\trace_impl.cc">
+      <Filter>system_wrappers</Filter>
+    </ClCompile>
+    <ClCompile Include="system_wrappers\trace_windows.cc">
+      <Filter>system_wrappers</Filter>
+    </ClCompile>
+    <ClCompile Include="neteq\accelerate.c">
+      <Filter>neteq</Filter>
+    </ClCompile>
+    <ClCompile Include="neteq\automode.c">
+      <Filter>neteq</Filter>
+    </ClCompile>
+    <ClCompile Include="neteq\bgn_update.c">
+      <Filter>neteq</Filter>
+    </ClCompile>
+    <ClCompile Include="neteq\bufstats_decision.c">
+      <Filter>neteq</Filter>
+    </ClCompile>
+    <ClCompile Include="neteq\cng_internal.c">
+      <Filter>neteq</Filter>
+    </ClCompile>
+    <ClCompile Include="neteq\codec_db.c">
+      <Filter>neteq</Filter>
+    </ClCompile>
+    <ClCompile Include="neteq\correlator.c">
+      <Filter>neteq</Filter>
+    </ClCompile>
+    <ClCompile Include="neteq\dsp.c">
+      <Filter>neteq</Filter>
+    </ClCompile>
+    <ClCompile Include="neteq\dsp_helpfunctions.c">
+      <Filter>neteq</Filter>
+    </ClCompile>
+    <ClCompile Include="neteq\dtmf_buffer.c">
+      <Filter>neteq</Filter>
+    </ClCompile>
+    <ClCompile Include="neteq\dtmf_tonegen.c">
+      <Filter>neteq</Filter>
+    </ClCompile>
+    <ClCompile Include="neteq\expand.c">
+      <Filter>neteq</Filter>
+    </ClCompile>
+    <ClCompile Include="neteq\mcu_address_init.c">
+      <Filter>neteq</Filter>
+    </ClCompile>
+    <ClCompile Include="neteq\mcu_dsp_common.c">
+      <Filter>neteq</Filter>
+    </ClCompile>
+    <ClCompile Include="neteq\mcu_reset.c">
+      <Filter>neteq</Filter>
+    </ClCompile>
+    <ClCompile Include="neteq\merge.c">
+      <Filter>neteq</Filter>
+    </ClCompile>
+    <ClCompile Include="neteq\min_distortion.c">
+      <Filter>neteq</Filter>
+    </ClCompile>
+    <ClCompile Include="neteq\mix_voice_unvoice.c">
+      <Filter>neteq</Filter>
+    </ClCompile>
+    <ClCompile Include="neteq\mute_signal.c">
+      <Filter>neteq</Filter>
+    </ClCompile>
+    <ClCompile Include="neteq\normal.c">
+      <Filter>neteq</Filter>
+    </ClCompile>
+    <ClCompile Include="neteq\packet_buffer.c">
+      <Filter>neteq</Filter>
+    </ClCompile>
+    <ClCompile Include="neteq\peak_detection.c">
+      <Filter>neteq</Filter>
+    </ClCompile>
+    <ClCompile Include="neteq\preemptive_expand.c">
+      <Filter>neteq</Filter>
+    </ClCompile>
+    <ClCompile Include="neteq\random_vector.c">
+      <Filter>neteq</Filter>
+    </ClCompile>
+    <ClCompile Include="neteq\recin.c">
+      <Filter>neteq</Filter>
+    </ClCompile>
+    <ClCompile Include="neteq\recout.c">
+      <Filter>neteq</Filter>
+    </ClCompile>
+    <ClCompile Include="neteq\rtcp.c">
+      <Filter>neteq</Filter>
+    </ClCompile>
+    <ClCompile Include="neteq\rtp.c">
+      <Filter>neteq</Filter>
+    </ClCompile>
+    <ClCompile Include="neteq\set_fs.c">
+      <Filter>neteq</Filter>
+    </ClCompile>
+    <ClCompile Include="neteq\signal_mcu.c">
+      <Filter>neteq</Filter>
+    </ClCompile>
+    <ClCompile Include="neteq\split_and_insert.c">
+      <Filter>neteq</Filter>
+    </ClCompile>
+    <ClCompile Include="neteq\unmute_signal.c">
+      <Filter>neteq</Filter>
+    </ClCompile>
+    <ClCompile Include="neteq\webrtc_neteq.c">
+      <Filter>neteq</Filter>
+    </ClCompile>
+    <ClCompile Include="cng\cng_helpfuns.c">
+      <Filter>cng</Filter>
+    </ClCompile>
+    <ClCompile Include="cng\webrtc_cng.c">
+      <Filter>cng</Filter>
+    </ClCompile>
+    <ClCompile Include="signal_processing_library\add_sat_w16.c">
+      <Filter>signal_processing_library</Filter>
+    </ClCompile>
+    <ClCompile Include="signal_processing_library\add_sat_w32.c">
+      <Filter>signal_processing_library</Filter>
+    </ClCompile>
+    <ClCompile Include="signal_processing_library\auto_corr_to_refl_coef.c">
+      <Filter>signal_processing_library</Filter>
+    </ClCompile>
+    <ClCompile Include="signal_processing_library\auto_correlation.c">
+      <Filter>signal_processing_library</Filter>
+    </ClCompile>
+    <ClCompile Include="signal_processing_library\complex_bit_reverse.c">
+      <Filter>signal_processing_library</Filter>
+    </ClCompile>
+    <ClCompile Include="signal_processing_library\complex_fft.c">
+      <Filter>signal_processing_library</Filter>
+    </ClCompile>
+    <ClCompile Include="signal_processing_library\complex_ifft.c">
+      <Filter>signal_processing_library</Filter>
+    </ClCompile>
+    <ClCompile Include="signal_processing_library\copy_set_operations.c">
+      <Filter>signal_processing_library</Filter>
+    </ClCompile>
+    <ClCompile Include="signal_processing_library\cos_table.c">
+      <Filter>signal_processing_library</Filter>
+    </ClCompile>
+    <ClCompile Include="signal_processing_library\cross_correlation.c">
+      <Filter>signal_processing_library</Filter>
+    </ClCompile>
+    <ClCompile Include="signal_processing_library\division_operations.c">
+      <Filter>signal_processing_library</Filter>
+    </ClCompile>
+    <ClCompile Include="signal_processing_library\dot_product_with_scale.c">
+      <Filter>signal_processing_library</Filter>
+    </ClCompile>
+    <ClCompile Include="signal_processing_library\downsample_fast.c">
+      <Filter>signal_processing_library</Filter>
+    </ClCompile>
+    <ClCompile Include="signal_processing_library\energy.c">
+      <Filter>signal_processing_library</Filter>
+    </ClCompile>
+    <ClCompile Include="signal_processing_library\filter_ar.c">
+      <Filter>signal_processing_library</Filter>
+    </ClCompile>
+    <ClCompile Include="signal_processing_library\filter_ar_fast_q12.c">
+      <Filter>signal_processing_library</Filter>
+    </ClCompile>
+    <ClCompile Include="signal_processing_library\filter_ma_fast_q12.c">
+      <Filter>signal_processing_library</Filter>
+    </ClCompile>
+    <ClCompile Include="signal_processing_library\get_hanning_window.c">
+      <Filter>signal_processing_library</Filter>
+    </ClCompile>
+    <ClCompile Include="signal_processing_library\get_scaling_square.c">
+      <Filter>signal_processing_library</Filter>
+    </ClCompile>
+    <ClCompile Include="signal_processing_library\get_size_in_bits.c">
+      <Filter>signal_processing_library</Filter>
+    </ClCompile>
+    <ClCompile Include="signal_processing_library\hanning_table.c">
+      <Filter>signal_processing_library</Filter>
+    </ClCompile>
+    <ClCompile Include="signal_processing_library\ilbc_specific_functions.c">
+      <Filter>signal_processing_library</Filter>
+    </ClCompile>
+    <ClCompile Include="signal_processing_library\levinson_durbin.c">
+      <Filter>signal_processing_library</Filter>
+    </ClCompile>
+    <ClCompile Include="signal_processing_library\lpc_to_refl_coef.c">
+      <Filter>signal_processing_library</Filter>
+    </ClCompile>
+    <ClCompile Include="signal_processing_library\min_max_operations.c">
+      <Filter>signal_processing_library</Filter>
+    </ClCompile>
+    <ClCompile Include="signal_processing_library\norm_u32.c">
+      <Filter>signal_processing_library</Filter>
+    </ClCompile>
+    <ClCompile Include="signal_processing_library\norm_w16.c">
+      <Filter>signal_processing_library</Filter>
+    </ClCompile>
+    <ClCompile Include="signal_processing_library\norm_w32.c">
+      <Filter>signal_processing_library</Filter>
+    </ClCompile>
+    <ClCompile Include="signal_processing_library\randn_table.c">
+      <Filter>signal_processing_library</Filter>
+    </ClCompile>
+    <ClCompile Include="signal_processing_library\randomization_functions.c">
+      <Filter>signal_processing_library</Filter>
+    </ClCompile>
+    <ClCompile Include="signal_processing_library\refl_coef_to_lpc.c">
+      <Filter>signal_processing_library</Filter>
+    </ClCompile>
+    <ClCompile Include="signal_processing_library\resample.c">
+      <Filter>signal_processing_library</Filter>
+    </ClCompile>
+    <ClCompile Include="signal_processing_library\resample_48khz.c">
+      <Filter>signal_processing_library</Filter>
+    </ClCompile>
+    <ClCompile Include="signal_processing_library\resample_by_2.c">
+      <Filter>signal_processing_library</Filter>
+    </ClCompile>
+    <ClCompile Include="signal_processing_library\resample_by_2_internal.c">
+      <Filter>signal_processing_library</Filter>
+    </ClCompile>
+    <ClCompile Include="signal_processing_library\resample_fractional.c">
+      <Filter>signal_processing_library</Filter>
+    </ClCompile>
+    <ClCompile Include="signal_processing_library\sin_table.c">
+      <Filter>signal_processing_library</Filter>
+    </ClCompile>
+    <ClCompile Include="signal_processing_library\sin_table_1024.c">
+      <Filter>signal_processing_library</Filter>
+    </ClCompile>
+    <ClCompile Include="signal_processing_library\spl_sqrt.c">
+      <Filter>signal_processing_library</Filter>
+    </ClCompile>
+    <ClCompile Include="signal_processing_library\spl_version.c">
+      <Filter>signal_processing_library</Filter>
+    </ClCompile>
+    <ClCompile Include="signal_processing_library\splitting_filter.c">
+      <Filter>signal_processing_library</Filter>
+    </ClCompile>
+    <ClCompile Include="signal_processing_library\sqrt_of_one_minus_x_squared.c">
+      <Filter>signal_processing_library</Filter>
+    </ClCompile>
+    <ClCompile Include="signal_processing_library\sub_sat_w16.c">
+      <Filter>signal_processing_library</Filter>
+    </ClCompile>
+    <ClCompile Include="signal_processing_library\sub_sat_w32.c">
+      <Filter>signal_processing_library</Filter>
+    </ClCompile>
+    <ClCompile Include="signal_processing_library\vector_scaling_operations.c">
+      <Filter>signal_processing_library</Filter>
+    </ClCompile>
+    <ClCompile Include="signal_processing_library\webrtc_fft_t_1024_8.c">
+      <Filter>signal_processing_library</Filter>
+    </ClCompile>
+    <ClCompile Include="signal_processing_library\webrtc_fft_t_rad.c">
+      <Filter>signal_processing_library</Filter>
+    </ClCompile>
+    <ClCompile Include="isac\arith_routines.c">
+      <Filter>isac</Filter>
+    </ClCompile>
+    <ClCompile Include="isac\arith_routines_hist.c">
+      <Filter>isac</Filter>
+    </ClCompile>
+    <ClCompile Include="isac\arith_routines_logist.c">
+      <Filter>isac</Filter>
+    </ClCompile>
+    <ClCompile Include="isac\bandwidth_estimator.c">
+      <Filter>isac</Filter>
+    </ClCompile>
+    <ClCompile Include="isac\decode_bwe.c">
+      <Filter>isac</Filter>
+    </ClCompile>
+    <ClCompile Include="isac\decode_plc.c">
+      <Filter>isac</Filter>
+    </ClCompile>
+    <ClCompile Include="isac\encode.c">
+      <Filter>isac</Filter>
+    </ClCompile>
+    <ClCompile Include="isac\entropy_coding.c">
+      <Filter>isac</Filter>
+    </ClCompile>
+    <ClCompile Include="isac\fft.c">
+      <Filter>isac</Filter>
+    </ClCompile>
+    <ClCompile Include="isac\filterbank_tables.c">
+      <Filter>isac</Filter>
+    </ClCompile>
+    <ClCompile Include="isac\filterbanks.c">
+      <Filter>isac</Filter>
+    </ClCompile>
+    <ClCompile Include="isac\initialize.c">
+      <Filter>isac</Filter>
+    </ClCompile>
+    <ClCompile Include="isac\isac_decode.c">
+      <Filter>isac</Filter>
+    </ClCompile>
+    <ClCompile Include="isac\isac_filters.c">
+      <Filter>isac</Filter>
+    </ClCompile>
+    <ClCompile Include="isac\isacfix.c">
+      <Filter>isac</Filter>
+    </ClCompile>
+    <ClCompile Include="isac\lattice.c">
+      <Filter>isac</Filter>
+    </ClCompile>
+    <ClCompile Include="isac\lpc_masking_model.c">
+      <Filter>isac</Filter>
+    </ClCompile>
+    <ClCompile Include="isac\lpc_tables.c">
+      <Filter>isac</Filter>
+    </ClCompile>
+    <ClCompile Include="isac\pitch_estimator.c">
+      <Filter>isac</Filter>
+    </ClCompile>
+    <ClCompile Include="isac\pitch_filter.c">
+      <Filter>isac</Filter>
+    </ClCompile>
+    <ClCompile Include="isac\pitch_gain_tables.c">
+      <Filter>isac</Filter>
+    </ClCompile>
+    <ClCompile Include="isac\pitch_lag_tables.c">
+      <Filter>isac</Filter>
+    </ClCompile>
+    <ClCompile Include="isac\spectrum_ar_model_tables.c">
+      <Filter>isac</Filter>
+    </ClCompile>
+    <ClCompile Include="isac\transform.c">
+      <Filter>isac</Filter>
+    </ClCompile>
+    <ClCompile Include="ilbcfix\abs_quant.c">
+      <Filter>ilbc</Filter>
+    </ClCompile>
+    <ClCompile Include="ilbcfix\abs_quant_loop.c">
+      <Filter>ilbc</Filter>
+    </ClCompile>
+    <ClCompile Include="ilbcfix\augmented_cb_corr.c">
+      <Filter>ilbc</Filter>
+    </ClCompile>
+    <ClCompile Include="ilbcfix\bw_expand.c">
+      <Filter>ilbc</Filter>
+    </ClCompile>
+    <ClCompile Include="ilbcfix\cb_construct.c">
+      <Filter>ilbc</Filter>
+    </ClCompile>
+    <ClCompile Include="ilbcfix\cb_mem_energy.c">
+      <Filter>ilbc</Filter>
+    </ClCompile>
+    <ClCompile Include="ilbcfix\cb_mem_energy_augmentation.c">
+      <Filter>ilbc</Filter>
+    </ClCompile>
+    <ClCompile Include="ilbcfix\cb_mem_energy_calc.c">
+      <Filter>ilbc</Filter>
+    </ClCompile>
+    <ClCompile Include="ilbcfix\cb_search_core.c">
+      <Filter>ilbc</Filter>
+    </ClCompile>
+    <ClCompile Include="ilbcfix\cb_update_best_index.c">
+      <Filter>ilbc</Filter>
+    </ClCompile>
+    <ClCompile Include="ilbcfix\chebyshev.c">
+      <Filter>ilbc</Filter>
+    </ClCompile>
+    <ClCompile Include="ilbcfix\comp_corr.c">
+      <Filter>ilbc</Filter>
+    </ClCompile>
+    <ClCompile Include="ilbcfix\create_augmented_vec.c">
+      <Filter>ilbc</Filter>
+    </ClCompile>
+    <ClCompile Include="ilbcfix\decode_residual.c">
+      <Filter>ilbc</Filter>
+    </ClCompile>
+    <ClCompile Include="ilbcfix\decoder_interpolate_lsf.c">
+      <Filter>ilbc</Filter>
+    </ClCompile>
+    <ClCompile Include="ilbcfix\do_plc.c">
+      <Filter>ilbc</Filter>
+    </ClCompile>
+    <ClCompile Include="ilbcfix\energy_inverse.c">
+      <Filter>ilbc</Filter>
+    </ClCompile>
+    <ClCompile Include="ilbcfix\enh_upsample.c">
+      <Filter>ilbc</Filter>
+    </ClCompile>
+    <ClCompile Include="ilbcfix\enhancer.c">
+      <Filter>ilbc</Filter>
+    </ClCompile>
+    <ClCompile Include="ilbcfix\enhancer_interface.c">
+      <Filter>ilbc</Filter>
+    </ClCompile>
+    <ClCompile Include="ilbcfix\filtered_cb_vecs.c">
+      <Filter>ilbc</Filter>
+    </ClCompile>
+    <ClCompile Include="ilbcfix\frame_classify.c">
+      <Filter>ilbc</Filter>
+    </ClCompile>
+    <ClCompile Include="ilbcfix\gain_dequant.c">
+      <Filter>ilbc</Filter>
+    </ClCompile>
+    <ClCompile Include="ilbcfix\gain_quant.c">
+      <Filter>ilbc</Filter>
+    </ClCompile>
+    <ClCompile Include="ilbcfix\get_cd_vec.c">
+      <Filter>ilbc</Filter>
+    </ClCompile>
+    <ClCompile Include="ilbcfix\get_lsp_poly.c">
+      <Filter>ilbc</Filter>
+    </ClCompile>
+    <ClCompile Include="ilbcfix\get_sync_seq.c">
+      <Filter>ilbc</Filter>
+    </ClCompile>
+    <ClCompile Include="ilbcfix\hp_input.c">
+      <Filter>ilbc</Filter>
+    </ClCompile>
+    <ClCompile Include="ilbcfix\hp_output.c">
+      <Filter>ilbc</Filter>
+    </ClCompile>
+    <ClCompile Include="ilbcfix\ilbc.c">
+      <Filter>ilbc</Filter>
+    </ClCompile>
+    <ClCompile Include="ilbcfix\ilbc_cb_search.c">
+      <Filter>ilbc</Filter>
+    </ClCompile>
+    <ClCompile Include="ilbcfix\ilbc_constants.c">
+      <Filter>ilbc</Filter>
+    </ClCompile>
+    <ClCompile Include="ilbcfix\ilbc_decode.c">
+      <Filter>ilbc</Filter>
+    </ClCompile>
+    <ClCompile Include="ilbcfix\ilbc_encode.c">
+      <Filter>ilbc</Filter>
+    </ClCompile>
+    <ClCompile Include="ilbcfix\index_conv_dec.c">
+      <Filter>ilbc</Filter>
+    </ClCompile>
+    <ClCompile Include="ilbcfix\index_conv_enc.c">
+      <Filter>ilbc</Filter>
+    </ClCompile>
+    <ClCompile Include="ilbcfix\init_decode.c">
+      <Filter>ilbc</Filter>
+    </ClCompile>
+    <ClCompile Include="ilbcfix\init_encode.c">
+      <Filter>ilbc</Filter>
+    </ClCompile>
+    <ClCompile Include="ilbcfix\interpolate.c">
+      <Filter>ilbc</Filter>
+    </ClCompile>
+    <ClCompile Include="ilbcfix\interpolate_samples.c">
+      <Filter>ilbc</Filter>
+    </ClCompile>
+    <ClCompile Include="ilbcfix\lpc_encode.c">
+      <Filter>ilbc</Filter>
+    </ClCompile>
+    <ClCompile Include="ilbcfix\lsf_check.c">
+      <Filter>ilbc</Filter>
+    </ClCompile>
+    <ClCompile Include="ilbcfix\lsf_interpolate_to_poly_dec.c">
+      <Filter>ilbc</Filter>
+    </ClCompile>
+    <ClCompile Include="ilbcfix\lsf_interpolate_to_poly_enc.c">
+      <Filter>ilbc</Filter>
+    </ClCompile>
+    <ClCompile Include="ilbcfix\lsf_to_lsp.c">
+      <Filter>ilbc</Filter>
+    </ClCompile>
+    <ClCompile Include="ilbcfix\lsf_to_poly.c">
+      <Filter>ilbc</Filter>
+    </ClCompile>
+    <ClCompile Include="ilbcfix\lsp_to_lsf.c">
+      <Filter>ilbc</Filter>
+    </ClCompile>
+    <ClCompile Include="ilbcfix\my_corr.c">
+      <Filter>ilbc</Filter>
+    </ClCompile>
+    <ClCompile Include="ilbcfix\nearest_neighbor.c">
+      <Filter>ilbc</Filter>
+    </ClCompile>
+    <ClCompile Include="ilbcfix\pack_bits.c">
+      <Filter>ilbc</Filter>
+    </ClCompile>
+    <ClCompile Include="ilbcfix\poly_to_lsf.c">
+      <Filter>ilbc</Filter>
+    </ClCompile>
+    <ClCompile Include="ilbcfix\poly_to_lsp.c">
+      <Filter>ilbc</Filter>
+    </ClCompile>
+    <ClCompile Include="ilbcfix\refiner.c">
+      <Filter>ilbc</Filter>
+    </ClCompile>
+    <ClCompile Include="ilbcfix\simple_interpolate_lsf.c">
+      <Filter>ilbc</Filter>
+    </ClCompile>
+    <ClCompile Include="ilbcfix\simple_lpc_analysis.c">
+      <Filter>ilbc</Filter>
+    </ClCompile>
+    <ClCompile Include="ilbcfix\simple_lsf_dequant.c">
+      <Filter>ilbc</Filter>
+    </ClCompile>
+    <ClCompile Include="ilbcfix\simple_lsf_quant.c">
+      <Filter>ilbc</Filter>
+    </ClCompile>
+    <ClCompile Include="ilbcfix\smooth.c">
+      <Filter>ilbc</Filter>
+    </ClCompile>
+    <ClCompile Include="ilbcfix\smooth_out_data.c">
+      <Filter>ilbc</Filter>
+    </ClCompile>
+    <ClCompile Include="ilbcfix\sort_sq.c">
+      <Filter>ilbc</Filter>
+    </ClCompile>
+    <ClCompile Include="ilbcfix\split_vq.c">
+      <Filter>ilbc</Filter>
+    </ClCompile>
+    <ClCompile Include="ilbcfix\state_construct.c">
+      <Filter>ilbc</Filter>
+    </ClCompile>
+    <ClCompile Include="ilbcfix\state_search.c">
+      <Filter>ilbc</Filter>
+    </ClCompile>
+    <ClCompile Include="ilbcfix\swap_bytes.c">
+      <Filter>ilbc</Filter>
+    </ClCompile>
+    <ClCompile Include="ilbcfix\unpack_bits.c">
+      <Filter>ilbc</Filter>
+    </ClCompile>
+    <ClCompile Include="ilbcfix\vq3.c">
+      <Filter>ilbc</Filter>
+    </ClCompile>
+    <ClCompile Include="ilbcfix\vq4.c">
+      <Filter>ilbc</Filter>
+    </ClCompile>
+    <ClCompile Include="ilbcfix\window32_w32.c">
+      <Filter>ilbc</Filter>
+    </ClCompile>
+    <ClCompile Include="ilbcfix\xcorr_coef.c">
+      <Filter>ilbc</Filter>
+    </ClCompile>
+    <ClCompile Include="g711\g711.c">
+      <Filter>g711</Filter>
+    </ClCompile>
+    <ClCompile Include="g711\g711_interface.c">
+      <Filter>g711</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="vad\vad_const.h">
+      <Filter>vad</Filter>
+    </ClInclude>
+    <ClInclude Include="vad\vad_core.h">
+      <Filter>vad</Filter>
+    </ClInclude>
+    <ClInclude Include="vad\vad_defines.h">
+      <Filter>vad</Filter>
+    </ClInclude>
+    <ClInclude Include="vad\vad_filterbank.h">
+      <Filter>vad</Filter>
+    </ClInclude>
+    <ClInclude Include="vad\vad_gmm.h">
+      <Filter>vad</Filter>
+    </ClInclude>
+    <ClInclude Include="vad\vad_sp.h">
+      <Filter>vad</Filter>
+    </ClInclude>
+    <ClInclude Include="vad\webrtc_vad.h">
+      <Filter>vad</Filter>
+    </ClInclude>
+    <ClInclude Include="ns\defines.h">
+      <Filter>ns</Filter>
+    </ClInclude>
+    <ClInclude Include="ns\noise_suppression.h">
+      <Filter>ns</Filter>
+    </ClInclude>
+    <ClInclude Include="ns\noise_suppression_x.h">
+      <Filter>ns</Filter>
+    </ClInclude>
+    <ClInclude Include="ns\ns_core.h">
+      <Filter>ns</Filter>
+    </ClInclude>
+    <ClInclude Include="ns\nsx_core.h">
+      <Filter>ns</Filter>
+    </ClInclude>
+    <ClInclude Include="ns\nsx_defines.h">
+      <Filter>ns</Filter>
+    </ClInclude>
+    <ClInclude Include="ns\windows_private.h">
+      <Filter>ns</Filter>
+    </ClInclude>
+    <ClInclude Include="aec\aec_core.h">
+      <Filter>aec</Filter>
+    </ClInclude>
+    <ClInclude Include="aec\echo_cancellation.h">
+      <Filter>aec</Filter>
+    </ClInclude>
+    <ClInclude Include="aec\resampler.h">
+      <Filter>aec</Filter>
+    </ClInclude>
+    <ClInclude Include="aecm\aecm_core.h">
+      <Filter>aecm</Filter>
+    </ClInclude>
+    <ClInclude Include="aecm\echo_control_mobile.h">
+      <Filter>aecm</Filter>
+    </ClInclude>
+    <ClInclude Include="agc\analog_agc.h">
+      <Filter>agc</Filter>
+    </ClInclude>
+    <ClInclude Include="agc\digital_agc.h">
+      <Filter>agc</Filter>
+    </ClInclude>
+    <ClInclude Include="agc\gain_control.h">
+      <Filter>agc</Filter>
+    </ClInclude>
+    <ClInclude Include="utility\fft4g.h">
+      <Filter>utility</Filter>
+    </ClInclude>
+    <ClInclude Include="utility\ring_buffer.h">
+      <Filter>utility</Filter>
+    </ClInclude>
+    <ClInclude Include="system_wrappers\aligned_malloc.h">
+      <Filter>system_wrappers</Filter>
+    </ClInclude>
+    <ClInclude Include="system_wrappers\atomic32_windows.h">
+      <Filter>system_wrappers</Filter>
+    </ClInclude>
+    <ClInclude Include="system_wrappers\atomic32_wrapper.h">
+      <Filter>system_wrappers</Filter>
+    </ClInclude>
+    <ClInclude Include="system_wrappers\condition_variable_windows.h">
+      <Filter>system_wrappers</Filter>
+    </ClInclude>
+    <ClInclude Include="system_wrappers\condition_variable_wrapper.h">
+      <Filter>system_wrappers</Filter>
+    </ClInclude>
+    <ClInclude Include="system_wrappers\constructor_magic.h">
+      <Filter>system_wrappers</Filter>
+    </ClInclude>
+    <ClInclude Include="system_wrappers\cpu_features_wrapper.h">
+      <Filter>system_wrappers</Filter>
+    </ClInclude>
+    <ClInclude Include="system_wrappers\cpu_windows.h">
+      <Filter>system_wrappers</Filter>
+    </ClInclude>
+    <ClInclude Include="system_wrappers\cpu_wrapper.h">
+      <Filter>system_wrappers</Filter>
+    </ClInclude>
+    <ClInclude Include="system_wrappers\critical_section_windows.h">
+      <Filter>system_wrappers</Filter>
+    </ClInclude>
+    <ClInclude Include="system_wrappers\critical_section_wrapper.h">
+      <Filter>system_wrappers</Filter>
+    </ClInclude>
+    <ClInclude Include="system_wrappers\event_windows.h">
+      <Filter>system_wrappers</Filter>
+    </ClInclude>
+    <ClInclude Include="system_wrappers\event_wrapper.h">
+      <Filter>system_wrappers</Filter>
+    </ClInclude>
+    <ClInclude Include="system_wrappers\file_impl.h">
+      <Filter>system_wrappers</Filter>
+    </ClInclude>
+    <ClInclude Include="system_wrappers\file_wrapper.h">
+      <Filter>system_wrappers</Filter>
+    </ClInclude>
+    <ClInclude Include="system_wrappers\fix_interlocked_exchange_pointer_windows.h">
+      <Filter>system_wrappers</Filter>
+    </ClInclude>
+    <ClInclude Include="system_wrappers\rw_lock_generic.h">
+      <Filter>system_wrappers</Filter>
+    </ClInclude>
+    <ClInclude Include="system_wrappers\rw_lock_windows.h">
+      <Filter>system_wrappers</Filter>
+    </ClInclude>
+    <ClInclude Include="system_wrappers\rw_lock_wrapper.h">
+      <Filter>system_wrappers</Filter>
+    </ClInclude>
+    <ClInclude Include="system_wrappers\sort.h">
+      <Filter>system_wrappers</Filter>
+    </ClInclude>
+    <ClInclude Include="system_wrappers\thread_windows.h">
+      <Filter>system_wrappers</Filter>
+    </ClInclude>
+    <ClInclude Include="system_wrappers\thread_windows_set_name.h">
+      <Filter>system_wrappers</Filter>
+    </ClInclude>
+    <ClInclude Include="system_wrappers\thread_wrapper.h">
+      <Filter>system_wrappers</Filter>
+    </ClInclude>
+    <ClInclude Include="system_wrappers\tick_util.h">
+      <Filter>system_wrappers</Filter>
+    </ClInclude>
+    <ClInclude Include="system_wrappers\trace.h">
+      <Filter>system_wrappers</Filter>
+    </ClInclude>
+    <ClInclude Include="system_wrappers\trace_impl.h">
+      <Filter>system_wrappers</Filter>
+    </ClInclude>
+    <ClInclude Include="system_wrappers\trace_windows.h">
+      <Filter>system_wrappers</Filter>
+    </ClInclude>
+    <ClInclude Include="neteq\automode.h">
+      <Filter>neteq</Filter>
+    </ClInclude>
+    <ClInclude Include="neteq\buffer_stats.h">
+      <Filter>neteq</Filter>
+    </ClInclude>
+    <ClInclude Include="neteq\codec_db.h">
+      <Filter>neteq</Filter>
+    </ClInclude>
+    <ClInclude Include="neteq\codec_db_defines.h">
+      <Filter>neteq</Filter>
+    </ClInclude>
+    <ClInclude Include="neteq\delay_logging.h">
+      <Filter>neteq</Filter>
+    </ClInclude>
+    <ClInclude Include="neteq\dsp.h">
+      <Filter>neteq</Filter>
+    </ClInclude>
+    <ClInclude Include="neteq\dsp_helpfunctions.h">
+      <Filter>neteq</Filter>
+    </ClInclude>
+    <ClInclude Include="neteq\dtmf_buffer.h">
+      <Filter>neteq</Filter>
+    </ClInclude>
+    <ClInclude Include="neteq\dtmf_tonegen.h">
+      <Filter>neteq</Filter>
+    </ClInclude>
+    <ClInclude Include="neteq\mcu.h">
+      <Filter>neteq</Filter>
+    </ClInclude>
+    <ClInclude Include="neteq\mcu_dsp_common.h">
+      <Filter>neteq</Filter>
+    </ClInclude>
+    <ClInclude Include="neteq\neteq_defines.h">
+      <Filter>neteq</Filter>
+    </ClInclude>
+    <ClInclude Include="neteq\neteq_error_codes.h">
+      <Filter>neteq</Filter>
+    </ClInclude>
+    <ClInclude Include="neteq\neteq_statistics.h">
+      <Filter>neteq</Filter>
+    </ClInclude>
+    <ClInclude Include="neteq\packet_buffer.h">
+      <Filter>neteq</Filter>
+    </ClInclude>
+    <ClInclude Include="neteq\rtcp.h">
+      <Filter>neteq</Filter>
+    </ClInclude>
+    <ClInclude Include="neteq\rtp.h">
+      <Filter>neteq</Filter>
+    </ClInclude>
+    <ClInclude Include="neteq\webrtc_neteq.h">
+      <Filter>neteq</Filter>
+    </ClInclude>
+    <ClInclude Include="neteq\webrtc_neteq_help_macros.h">
+      <Filter>neteq</Filter>
+    </ClInclude>
+    <ClInclude Include="neteq\webrtc_neteq_internal.h">
+      <Filter>neteq</Filter>
+    </ClInclude>
+    <ClInclude Include="cng\cng_helpfuns.h">
+      <Filter>cng</Filter>
+    </ClInclude>
+    <ClInclude Include="cng\webrtc_cng.h">
+      <Filter>cng</Filter>
+    </ClInclude>
+    <ClInclude Include="signal_processing_library\resample_by_2_internal.h">
+      <Filter>signal_processing_library</Filter>
+    </ClInclude>
+    <ClInclude Include="signal_processing_library\signal_processing_library.h">
+      <Filter>signal_processing_library</Filter>
+    </ClInclude>
+    <ClInclude Include="signal_processing_library\spl_inl.h">
+      <Filter>signal_processing_library</Filter>
+    </ClInclude>
+    <ClInclude Include="isac\arith_routins.h">
+      <Filter>isac</Filter>
+    </ClInclude>
+    <ClInclude Include="isac\bandwidth_estimator.h">
+      <Filter>isac</Filter>
+    </ClInclude>
+    <ClInclude Include="isac\codec.h">
+      <Filter>isac</Filter>
+    </ClInclude>
+    <ClInclude Include="isac\entropy_coding.h">
+      <Filter>isac</Filter>
+    </ClInclude>
+    <ClInclude Include="isac\fft.h">
+      <Filter>isac</Filter>
+    </ClInclude>
+    <ClInclude Include="isac\filterbank_tables.h">
+      <Filter>isac</Filter>
+    </ClInclude>
+    <ClInclude Include="isac\isacfix.h">
+      <Filter>isac</Filter>
+    </ClInclude>
+    <ClInclude Include="isac\lpc_masking_model.h">
+      <Filter>isac</Filter>
+    </ClInclude>
+    <ClInclude Include="isac\lpc_tables.h">
+      <Filter>isac</Filter>
+    </ClInclude>
+    <ClInclude Include="isac\pitch_estimator.h">
+      <Filter>isac</Filter>
+    </ClInclude>
+    <ClInclude Include="isac\pitch_gain_tables.h">
+      <Filter>isac</Filter>
+    </ClInclude>
+    <ClInclude Include="isac\pitch_lag_tables.h">
+      <Filter>isac</Filter>
+    </ClInclude>
+    <ClInclude Include="isac\settings.h">
+      <Filter>isac</Filter>
+    </ClInclude>
+    <ClInclude Include="isac\spectrum_ar_model_tables.h">
+      <Filter>isac</Filter>
+    </ClInclude>
+    <ClInclude Include="isac\structs.h">
+      <Filter>isac</Filter>
+    </ClInclude>
+    <ClInclude Include="ilbcfix\abs_quant.h">
+      <Filter>ilbc</Filter>
+    </ClInclude>
+    <ClInclude Include="ilbcfix\abs_quant_loop.h">
+      <Filter>ilbc</Filter>
+    </ClInclude>
+    <ClInclude Include="ilbcfix\augmented_cb_corr.h">
+      <Filter>ilbc</Filter>
+    </ClInclude>
+    <ClInclude Include="ilbcfix\bw_expand.h">
+      <Filter>ilbc</Filter>
+    </ClInclude>
+    <ClInclude Include="ilbcfix\cb_construct.h">
+      <Filter>ilbc</Filter>
+    </ClInclude>
+    <ClInclude Include="ilbcfix\cb_mem_energy.h">
+      <Filter>ilbc</Filter>
+    </ClInclude>
+    <ClInclude Include="ilbcfix\cb_mem_energy_augmentation.h">
+      <Filter>ilbc</Filter>
+    </ClInclude>
+    <ClInclude Include="ilbcfix\cb_mem_energy_calc.h">
+      <Filter>ilbc</Filter>
+    </ClInclude>
+    <ClInclude Include="ilbcfix\cb_search.h">
+      <Filter>ilbc</Filter>
+    </ClInclude>
+    <ClInclude Include="ilbcfix\cb_search_core.h">
+      <Filter>ilbc</Filter>
+    </ClInclude>
+    <ClInclude Include="ilbcfix\cb_update_best_index.h">
+      <Filter>ilbc</Filter>
+    </ClInclude>
+    <ClInclude Include="ilbcfix\chebyshev.h">
+      <Filter>ilbc</Filter>
+    </ClInclude>
+    <ClInclude Include="ilbcfix\comp_corr.h">
+      <Filter>ilbc</Filter>
+    </ClInclude>
+    <ClInclude Include="ilbcfix\constants.h">
+      <Filter>ilbc</Filter>
+    </ClInclude>
+    <ClInclude Include="ilbcfix\create_augmented_vec.h">
+      <Filter>ilbc</Filter>
+    </ClInclude>
+    <ClInclude Include="ilbcfix\decode.h">
+      <Filter>ilbc</Filter>
+    </ClInclude>
+    <ClInclude Include="ilbcfix\decode_residual.h">
+      <Filter>ilbc</Filter>
+    </ClInclude>
+    <ClInclude Include="ilbcfix\decoder_interpolate_lsf.h">
+      <Filter>ilbc</Filter>
+    </ClInclude>
+    <ClInclude Include="ilbcfix\defines.h">
+      <Filter>ilbc</Filter>
+    </ClInclude>
+    <ClInclude Include="ilbcfix\do_plc.h">
+      <Filter>ilbc</Filter>
+    </ClInclude>
+    <ClInclude Include="ilbcfix\encode.h">
+      <Filter>ilbc</Filter>
+    </ClInclude>
+    <ClInclude Include="ilbcfix\energy_inverse.h">
+      <Filter>ilbc</Filter>
+    </ClInclude>
+    <ClInclude Include="ilbcfix\enh_upsample.h">
+      <Filter>ilbc</Filter>
+    </ClInclude>
+    <ClInclude Include="ilbcfix\enhancer.h">
+      <Filter>ilbc</Filter>
+    </ClInclude>
+    <ClInclude Include="ilbcfix\enhancer_interface.h">
+      <Filter>ilbc</Filter>
+    </ClInclude>
+    <ClInclude Include="ilbcfix\filtered_cb_vecs.h">
+      <Filter>ilbc</Filter>
+    </ClInclude>
+    <ClInclude Include="ilbcfix\frame_classify.h">
+      <Filter>ilbc</Filter>
+    </ClInclude>
+    <ClInclude Include="ilbcfix\gain_dequant.h">
+      <Filter>ilbc</Filter>
+    </ClInclude>
+    <ClInclude Include="ilbcfix\gain_quant.h">
+      <Filter>ilbc</Filter>
+    </ClInclude>
+    <ClInclude Include="ilbcfix\get_cd_vec.h">
+      <Filter>ilbc</Filter>
+    </ClInclude>
+    <ClInclude Include="ilbcfix\get_lsp_poly.h">
+      <Filter>ilbc</Filter>
+    </ClInclude>
+    <ClInclude Include="ilbcfix\get_sync_seq.h">
+      <Filter>ilbc</Filter>
+    </ClInclude>
+    <ClInclude Include="ilbcfix\hp_input.h">
+      <Filter>ilbc</Filter>
+    </ClInclude>
+    <ClInclude Include="ilbcfix\hp_output.h">
+      <Filter>ilbc</Filter>
+    </ClInclude>
+    <ClInclude Include="ilbcfix\ilbc.h">
+      <Filter>ilbc</Filter>
+    </ClInclude>
+    <ClInclude Include="ilbcfix\index_conv_dec.h">
+      <Filter>ilbc</Filter>
+    </ClInclude>
+    <ClInclude Include="ilbcfix\index_conv_enc.h">
+      <Filter>ilbc</Filter>
+    </ClInclude>
+    <ClInclude Include="ilbcfix\init_decode.h">
+      <Filter>ilbc</Filter>
+    </ClInclude>
+    <ClInclude Include="ilbcfix\init_encode.h">
+      <Filter>ilbc</Filter>
+    </ClInclude>
+    <ClInclude Include="ilbcfix\interpolate.h">
+      <Filter>ilbc</Filter>
+    </ClInclude>
+    <ClInclude Include="ilbcfix\interpolate_samples.h">
+      <Filter>ilbc</Filter>
+    </ClInclude>
+    <ClInclude Include="ilbcfix\lpc_encode.h">
+      <Filter>ilbc</Filter>
+    </ClInclude>
+    <ClInclude Include="ilbcfix\lsf_check.h">
+      <Filter>ilbc</Filter>
+    </ClInclude>
+    <ClInclude Include="ilbcfix\lsf_interpolate_to_poly_dec.h">
+      <Filter>ilbc</Filter>
+    </ClInclude>
+    <ClInclude Include="ilbcfix\lsf_interpolate_to_poly_enc.h">
+      <Filter>ilbc</Filter>
+    </ClInclude>
+    <ClInclude Include="ilbcfix\lsf_to_lsp.h">
+      <Filter>ilbc</Filter>
+    </ClInclude>
+    <ClInclude Include="ilbcfix\lsf_to_poly.h">
+      <Filter>ilbc</Filter>
+    </ClInclude>
+    <ClInclude Include="ilbcfix\lsp_to_lsf.h">
+      <Filter>ilbc</Filter>
+    </ClInclude>
+    <ClInclude Include="ilbcfix\my_corr.h">
+      <Filter>ilbc</Filter>
+    </ClInclude>
+    <ClInclude Include="ilbcfix\nearest_neighbor.h">
+      <Filter>ilbc</Filter>
+    </ClInclude>
+    <ClInclude Include="ilbcfix\pack_bits.h">
+      <Filter>ilbc</Filter>
+    </ClInclude>
+    <ClInclude Include="ilbcfix\poly_to_lsf.h">
+      <Filter>ilbc</Filter>
+    </ClInclude>
+    <ClInclude Include="ilbcfix\poly_to_lsp.h">
+      <Filter>ilbc</Filter>
+    </ClInclude>
+    <ClInclude Include="ilbcfix\refiner.h">
+      <Filter>ilbc</Filter>
+    </ClInclude>
+    <ClInclude Include="ilbcfix\simple_interpolate_lsf.h">
+      <Filter>ilbc</Filter>
+    </ClInclude>
+    <ClInclude Include="ilbcfix\simple_lpc_analysis.h">
+      <Filter>ilbc</Filter>
+    </ClInclude>
+    <ClInclude Include="ilbcfix\simple_lsf_dequant.h">
+      <Filter>ilbc</Filter>
+    </ClInclude>
+    <ClInclude Include="ilbcfix\simple_lsf_quant.h">
+      <Filter>ilbc</Filter>
+    </ClInclude>
+    <ClInclude Include="ilbcfix\smooth.h">
+      <Filter>ilbc</Filter>
+    </ClInclude>
+    <ClInclude Include="ilbcfix\smooth_out_data.h">
+      <Filter>ilbc</Filter>
+    </ClInclude>
+    <ClInclude Include="ilbcfix\sort_sq.h">
+      <Filter>ilbc</Filter>
+    </ClInclude>
+    <ClInclude Include="ilbcfix\split_vq.h">
+      <Filter>ilbc</Filter>
+    </ClInclude>
+    <ClInclude Include="ilbcfix\state_construct.h">
+      <Filter>ilbc</Filter>
+    </ClInclude>
+    <ClInclude Include="ilbcfix\state_search.h">
+      <Filter>ilbc</Filter>
+    </ClInclude>
+    <ClInclude Include="ilbcfix\swap_bytes.h">
+      <Filter>ilbc</Filter>
+    </ClInclude>
+    <ClInclude Include="ilbcfix\unpack_bits.h">
+      <Filter>ilbc</Filter>
+    </ClInclude>
+    <ClInclude Include="ilbcfix\vq3.h">
+      <Filter>ilbc</Filter>
+    </ClInclude>
+    <ClInclude Include="ilbcfix\vq4.h">
+      <Filter>ilbc</Filter>
+    </ClInclude>
+    <ClInclude Include="ilbcfix\window32_w32.h">
+      <Filter>ilbc</Filter>
+    </ClInclude>
+    <ClInclude Include="ilbcfix\xcorr_coef.h">
+      <Filter>ilbc</Filter>
+    </ClInclude>
+    <ClInclude Include="g711\g711.h">
+      <Filter>g711</Filter>
+    </ClInclude>
+    <ClInclude Include="g711\g711_interface.h">
+      <Filter>g711</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="ilbcfix\complexityMeasures.m">
+      <Filter>ilbc</Filter>
+    </None>
+    <None Include="ilbcfix\ilbc.gyp">
+      <Filter>ilbc</Filter>
+    </None>
+  </ItemGroup>
+</Project>

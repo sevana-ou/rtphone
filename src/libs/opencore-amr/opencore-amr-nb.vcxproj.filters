@@ -1,0 +1,1011 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
+      <Extensions>cpp;c;cc;cxx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
+    </Filter>
+    <Filter Include="Source Files\common">
+      <UniqueIdentifier>{87f25e6e-58a8-46be-8508-6ceac49905c5}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\decode">
+      <UniqueIdentifier>{47af1a32-d39f-457b-827c-3867b2783661}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\encode">
+      <UniqueIdentifier>{f1921e5e-f831-4f10-8b47-9c554d624689}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files">
+      <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
+      <Extensions>h;hpp;hxx;hm;inl;inc;xsd</Extensions>
+    </Filter>
+    <Filter Include="Header Files\common">
+      <UniqueIdentifier>{98d8ba93-b6d5-4942-9c17-ecceb01214a4}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\encode">
+      <UniqueIdentifier>{e0046d61-c95c-4b56-8b40-2e6a08901c02}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\decode">
+      <UniqueIdentifier>{85f3c922-8bb8-4449-b478-171877536d5e}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\interface">
+      <UniqueIdentifier>{0254d84b-abde-47d9-8f86-db51fc79a3c0}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\oscl">
+      <UniqueIdentifier>{ca5f3b48-b9de-415f-a09e-947965f2963e}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Resource Files">
+      <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
+      <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav</Extensions>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\common\src\add.cpp">
+      <Filter>Source Files\common</Filter>
+    </ClCompile>
+    <ClCompile Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\common\src\az_lsp.cpp">
+      <Filter>Source Files\common</Filter>
+    </ClCompile>
+    <ClCompile Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\common\src\bitno_tab.cpp">
+      <Filter>Source Files\common</Filter>
+    </ClCompile>
+    <ClCompile Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\common\src\bitreorder_tab.cpp">
+      <Filter>Source Files\common</Filter>
+    </ClCompile>
+    <ClCompile Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\common\src\bits2prm.cpp">
+      <Filter>Source Files\common</Filter>
+    </ClCompile>
+    <ClCompile Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\common\src\c2_9pf_tab.cpp">
+      <Filter>Source Files\common</Filter>
+    </ClCompile>
+    <ClCompile Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\common\src\copy.cpp">
+      <Filter>Source Files\common</Filter>
+    </ClCompile>
+    <ClCompile Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\common\src\div_s.cpp">
+      <Filter>Source Files\common</Filter>
+    </ClCompile>
+    <ClCompile Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\common\src\extract_h.cpp">
+      <Filter>Source Files\common</Filter>
+    </ClCompile>
+    <ClCompile Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\common\src\extract_l.cpp">
+      <Filter>Source Files\common</Filter>
+    </ClCompile>
+    <ClCompile Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\common\src\gains_tbl.cpp">
+      <Filter>Source Files\common</Filter>
+    </ClCompile>
+    <ClCompile Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\common\src\gc_pred.cpp">
+      <Filter>Source Files\common</Filter>
+    </ClCompile>
+    <ClCompile Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\common\src\get_const_tbls.cpp">
+      <Filter>Source Files\common</Filter>
+    </ClCompile>
+    <ClCompile Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\common\src\gmed_n.cpp">
+      <Filter>Source Files\common</Filter>
+    </ClCompile>
+    <ClCompile Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\common\src\gray_tbl.cpp">
+      <Filter>Source Files\common</Filter>
+    </ClCompile>
+    <ClCompile Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\common\src\grid_tbl.cpp">
+      <Filter>Source Files\common</Filter>
+    </ClCompile>
+    <ClCompile Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\common\src\int_lpc.cpp">
+      <Filter>Source Files\common</Filter>
+    </ClCompile>
+    <ClCompile Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\common\src\inv_sqrt.cpp">
+      <Filter>Source Files\common</Filter>
+    </ClCompile>
+    <ClCompile Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\common\src\inv_sqrt_tbl.cpp">
+      <Filter>Source Files\common</Filter>
+    </ClCompile>
+    <ClCompile Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\common\src\l_deposit_h.cpp">
+      <Filter>Source Files\common</Filter>
+    </ClCompile>
+    <ClCompile Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\common\src\l_deposit_l.cpp">
+      <Filter>Source Files\common</Filter>
+    </ClCompile>
+    <ClCompile Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\common\src\l_shr_r.cpp">
+      <Filter>Source Files\common</Filter>
+    </ClCompile>
+    <ClCompile Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\common\src\log2.cpp">
+      <Filter>Source Files\common</Filter>
+    </ClCompile>
+    <ClCompile Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\common\src\log2_norm.cpp">
+      <Filter>Source Files\common</Filter>
+    </ClCompile>
+    <ClCompile Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\common\src\log2_tbl.cpp">
+      <Filter>Source Files\common</Filter>
+    </ClCompile>
+    <ClCompile Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\common\src\lsfwt.cpp">
+      <Filter>Source Files\common</Filter>
+    </ClCompile>
+    <ClCompile Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\common\src\lsp.cpp">
+      <Filter>Source Files\common</Filter>
+    </ClCompile>
+    <ClCompile Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\common\src\lsp_az.cpp">
+      <Filter>Source Files\common</Filter>
+    </ClCompile>
+    <ClCompile Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\common\src\lsp_lsf.cpp">
+      <Filter>Source Files\common</Filter>
+    </ClCompile>
+    <ClCompile Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\common\src\lsp_lsf_tbl.cpp">
+      <Filter>Source Files\common</Filter>
+    </ClCompile>
+    <ClCompile Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\common\src\lsp_tab.cpp">
+      <Filter>Source Files\common</Filter>
+    </ClCompile>
+    <ClCompile Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\common\src\mult_r.cpp">
+      <Filter>Source Files\common</Filter>
+    </ClCompile>
+    <ClCompile Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\common\src\negate.cpp">
+      <Filter>Source Files\common</Filter>
+    </ClCompile>
+    <ClCompile Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\common\src\norm_l.cpp">
+      <Filter>Source Files\common</Filter>
+    </ClCompile>
+    <ClCompile Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\common\src\norm_s.cpp">
+      <Filter>Source Files\common</Filter>
+    </ClCompile>
+    <ClCompile Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\common\src\overflow_tbl.cpp">
+      <Filter>Source Files\common</Filter>
+    </ClCompile>
+    <ClCompile Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\common\src\ph_disp_tab.cpp">
+      <Filter>Source Files\common</Filter>
+    </ClCompile>
+    <ClCompile Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\common\src\pow2.cpp">
+      <Filter>Source Files\common</Filter>
+    </ClCompile>
+    <ClCompile Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\common\src\pow2_tbl.cpp">
+      <Filter>Source Files\common</Filter>
+    </ClCompile>
+    <ClCompile Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\common\src\pred_lt.cpp">
+      <Filter>Source Files\common</Filter>
+    </ClCompile>
+    <ClCompile Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\common\src\q_plsf.cpp">
+      <Filter>Source Files\common</Filter>
+    </ClCompile>
+    <ClCompile Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\common\src\q_plsf_3.cpp">
+      <Filter>Source Files\common</Filter>
+    </ClCompile>
+    <ClCompile Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\common\src\q_plsf_3_tbl.cpp">
+      <Filter>Source Files\common</Filter>
+    </ClCompile>
+    <ClCompile Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\common\src\q_plsf_5.cpp">
+      <Filter>Source Files\common</Filter>
+    </ClCompile>
+    <ClCompile Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\common\src\q_plsf_5_tbl.cpp">
+      <Filter>Source Files\common</Filter>
+    </ClCompile>
+    <ClCompile Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\common\src\qua_gain_tbl.cpp">
+      <Filter>Source Files\common</Filter>
+    </ClCompile>
+    <ClCompile Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\common\src\r_fft.cpp">
+      <Filter>Source Files\common</Filter>
+    </ClCompile>
+    <ClCompile Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\common\src\reorder.cpp">
+      <Filter>Source Files\common</Filter>
+    </ClCompile>
+    <ClCompile Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\common\src\residu.cpp">
+      <Filter>Source Files\common</Filter>
+    </ClCompile>
+    <ClCompile Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\common\src\round.cpp">
+      <Filter>Source Files\common</Filter>
+    </ClCompile>
+    <ClCompile Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\common\src\set_zero.cpp">
+      <Filter>Source Files\common</Filter>
+    </ClCompile>
+    <ClCompile Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\common\src\shr.cpp">
+      <Filter>Source Files\common</Filter>
+    </ClCompile>
+    <ClCompile Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\common\src\shr_r.cpp">
+      <Filter>Source Files\common</Filter>
+    </ClCompile>
+    <ClCompile Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\common\src\sqrt_l.cpp">
+      <Filter>Source Files\common</Filter>
+    </ClCompile>
+    <ClCompile Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\common\src\sqrt_l_tbl.cpp">
+      <Filter>Source Files\common</Filter>
+    </ClCompile>
+    <ClCompile Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\common\src\sub.cpp">
+      <Filter>Source Files\common</Filter>
+    </ClCompile>
+    <ClCompile Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\common\src\syn_filt.cpp">
+      <Filter>Source Files\common</Filter>
+    </ClCompile>
+    <ClCompile Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\common\src\vad1.cpp">
+      <Filter>Source Files\common</Filter>
+    </ClCompile>
+    <ClCompile Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\common\src\vad2.cpp">
+      <Filter>Source Files\common</Filter>
+    </ClCompile>
+    <ClCompile Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\common\src\weight_a.cpp">
+      <Filter>Source Files\common</Filter>
+    </ClCompile>
+    <ClCompile Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\common\src\window_tab.cpp">
+      <Filter>Source Files\common</Filter>
+    </ClCompile>
+    <ClCompile Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\dec\src\a_refl.cpp">
+      <Filter>Source Files\decode</Filter>
+    </ClCompile>
+    <ClCompile Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\dec\src\agc.cpp">
+      <Filter>Source Files\decode</Filter>
+    </ClCompile>
+    <ClCompile Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\dec\src\amrdecode.cpp">
+      <Filter>Source Files\decode</Filter>
+    </ClCompile>
+    <ClCompile Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\dec\src\b_cn_cod.cpp">
+      <Filter>Source Files\decode</Filter>
+    </ClCompile>
+    <ClCompile Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\dec\src\bgnscd.cpp">
+      <Filter>Source Files\decode</Filter>
+    </ClCompile>
+    <ClCompile Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\dec\src\c_g_aver.cpp">
+      <Filter>Source Files\decode</Filter>
+    </ClCompile>
+    <ClCompile Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\dec\src\d1035pf.cpp">
+      <Filter>Source Files\decode</Filter>
+    </ClCompile>
+    <ClCompile Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\dec\src\d2_11pf.cpp">
+      <Filter>Source Files\decode</Filter>
+    </ClCompile>
+    <ClCompile Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\dec\src\d2_9pf.cpp">
+      <Filter>Source Files\decode</Filter>
+    </ClCompile>
+    <ClCompile Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\dec\src\d3_14pf.cpp">
+      <Filter>Source Files\decode</Filter>
+    </ClCompile>
+    <ClCompile Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\dec\src\d4_17pf.cpp">
+      <Filter>Source Files\decode</Filter>
+    </ClCompile>
+    <ClCompile Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\dec\src\d8_31pf.cpp">
+      <Filter>Source Files\decode</Filter>
+    </ClCompile>
+    <ClCompile Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\dec\src\d_gain_c.cpp">
+      <Filter>Source Files\decode</Filter>
+    </ClCompile>
+    <ClCompile Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\dec\src\d_gain_p.cpp">
+      <Filter>Source Files\decode</Filter>
+    </ClCompile>
+    <ClCompile Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\dec\src\d_plsf.cpp">
+      <Filter>Source Files\decode</Filter>
+    </ClCompile>
+    <ClCompile Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\dec\src\d_plsf_3.cpp">
+      <Filter>Source Files\decode</Filter>
+    </ClCompile>
+    <ClCompile Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\dec\src\d_plsf_5.cpp">
+      <Filter>Source Files\decode</Filter>
+    </ClCompile>
+    <ClCompile Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\dec\src\dec_amr.cpp">
+      <Filter>Source Files\decode</Filter>
+    </ClCompile>
+    <ClCompile Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\dec\src\dec_gain.cpp">
+      <Filter>Source Files\decode</Filter>
+    </ClCompile>
+    <ClCompile Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\dec\src\dec_input_format_tab.cpp">
+      <Filter>Source Files\decode</Filter>
+    </ClCompile>
+    <ClCompile Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\dec\src\dec_lag3.cpp">
+      <Filter>Source Files\decode</Filter>
+    </ClCompile>
+    <ClCompile Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\dec\src\dec_lag6.cpp">
+      <Filter>Source Files\decode</Filter>
+    </ClCompile>
+    <ClCompile Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\dec\src\dtx_dec.cpp">
+      <Filter>Source Files\decode</Filter>
+    </ClCompile>
+    <ClCompile Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\dec\src\ec_gains.cpp">
+      <Filter>Source Files\decode</Filter>
+    </ClCompile>
+    <ClCompile Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\dec\src\ex_ctrl.cpp">
+      <Filter>Source Files\decode</Filter>
+    </ClCompile>
+    <ClCompile Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\dec\src\if2_to_ets.cpp">
+      <Filter>Source Files\decode</Filter>
+    </ClCompile>
+    <ClCompile Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\dec\src\int_lsf.cpp">
+      <Filter>Source Files\decode</Filter>
+    </ClCompile>
+    <ClCompile Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\dec\src\lsp_avg.cpp">
+      <Filter>Source Files\decode</Filter>
+    </ClCompile>
+    <ClCompile Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\dec\src\ph_disp.cpp">
+      <Filter>Source Files\decode</Filter>
+    </ClCompile>
+    <ClCompile Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\dec\src\post_pro.cpp">
+      <Filter>Source Files\decode</Filter>
+    </ClCompile>
+    <ClCompile Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\dec\src\preemph.cpp">
+      <Filter>Source Files\decode</Filter>
+    </ClCompile>
+    <ClCompile Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\dec\src\pstfilt.cpp">
+      <Filter>Source Files\decode</Filter>
+    </ClCompile>
+    <ClCompile Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\dec\src\qgain475_tab.cpp">
+      <Filter>Source Files\decode</Filter>
+    </ClCompile>
+    <ClCompile Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\dec\src\sp_dec.cpp">
+      <Filter>Source Files\decode</Filter>
+    </ClCompile>
+    <ClCompile Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\dec\src\wmf_to_ets.cpp">
+      <Filter>Source Files\decode</Filter>
+    </ClCompile>
+    <ClCompile Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\enc\src\amrencode.cpp">
+      <Filter>Source Files\encode</Filter>
+    </ClCompile>
+    <ClCompile Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\enc\src\autocorr.cpp">
+      <Filter>Source Files\encode</Filter>
+    </ClCompile>
+    <ClCompile Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\enc\src\c1035pf.cpp">
+      <Filter>Source Files\encode</Filter>
+    </ClCompile>
+    <ClCompile Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\enc\src\c2_11pf.cpp">
+      <Filter>Source Files\encode</Filter>
+    </ClCompile>
+    <ClCompile Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\enc\src\c2_9pf.cpp">
+      <Filter>Source Files\encode</Filter>
+    </ClCompile>
+    <ClCompile Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\enc\src\c3_14pf.cpp">
+      <Filter>Source Files\encode</Filter>
+    </ClCompile>
+    <ClCompile Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\enc\src\c4_17pf.cpp">
+      <Filter>Source Files\encode</Filter>
+    </ClCompile>
+    <ClCompile Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\enc\src\c8_31pf.cpp">
+      <Filter>Source Files\encode</Filter>
+    </ClCompile>
+    <ClCompile Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\enc\src\calc_cor.cpp">
+      <Filter>Source Files\encode</Filter>
+    </ClCompile>
+    <ClCompile Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\enc\src\calc_en.cpp">
+      <Filter>Source Files\encode</Filter>
+    </ClCompile>
+    <ClCompile Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\enc\src\cbsearch.cpp">
+      <Filter>Source Files\encode</Filter>
+    </ClCompile>
+    <ClCompile Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\enc\src\cl_ltp.cpp">
+      <Filter>Source Files\encode</Filter>
+    </ClCompile>
+    <ClCompile Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\enc\src\cod_amr.cpp">
+      <Filter>Source Files\encode</Filter>
+    </ClCompile>
+    <ClCompile Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\enc\src\convolve.cpp">
+      <Filter>Source Files\encode</Filter>
+    </ClCompile>
+    <ClCompile Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\enc\src\cor_h.cpp">
+      <Filter>Source Files\encode</Filter>
+    </ClCompile>
+    <ClCompile Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\enc\src\cor_h_x.cpp">
+      <Filter>Source Files\encode</Filter>
+    </ClCompile>
+    <ClCompile Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\enc\src\cor_h_x2.cpp">
+      <Filter>Source Files\encode</Filter>
+    </ClCompile>
+    <ClCompile Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\enc\src\corrwght_tab.cpp">
+      <Filter>Source Files\encode</Filter>
+    </ClCompile>
+    <ClCompile Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\enc\src\div_32.cpp">
+      <Filter>Source Files\encode</Filter>
+    </ClCompile>
+    <ClCompile Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\enc\src\dtx_enc.cpp">
+      <Filter>Source Files\encode</Filter>
+    </ClCompile>
+    <ClCompile Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\enc\src\enc_lag3.cpp">
+      <Filter>Source Files\encode</Filter>
+    </ClCompile>
+    <ClCompile Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\enc\src\enc_lag6.cpp">
+      <Filter>Source Files\encode</Filter>
+    </ClCompile>
+    <ClCompile Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\enc\src\enc_output_format_tab.cpp">
+      <Filter>Source Files\encode</Filter>
+    </ClCompile>
+    <ClCompile Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\enc\src\ets_to_if2.cpp">
+      <Filter>Source Files\encode</Filter>
+    </ClCompile>
+    <ClCompile Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\enc\src\ets_to_wmf.cpp">
+      <Filter>Source Files\encode</Filter>
+    </ClCompile>
+    <ClCompile Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\enc\src\g_adapt.cpp">
+      <Filter>Source Files\encode</Filter>
+    </ClCompile>
+    <ClCompile Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\enc\src\g_code.cpp">
+      <Filter>Source Files\encode</Filter>
+    </ClCompile>
+    <ClCompile Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\enc\src\g_pitch.cpp">
+      <Filter>Source Files\encode</Filter>
+    </ClCompile>
+    <ClCompile Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\enc\src\gain_q.cpp">
+      <Filter>Source Files\encode</Filter>
+    </ClCompile>
+    <ClCompile Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\enc\src\gsmamr_encoder_wrapper.cpp">
+      <Filter>Source Files\encode</Filter>
+    </ClCompile>
+    <ClCompile Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\enc\src\hp_max.cpp">
+      <Filter>Source Files\encode</Filter>
+    </ClCompile>
+    <ClCompile Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\enc\src\inter_36.cpp">
+      <Filter>Source Files\encode</Filter>
+    </ClCompile>
+    <ClCompile Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\enc\src\inter_36_tab.cpp">
+      <Filter>Source Files\encode</Filter>
+    </ClCompile>
+    <ClCompile Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\enc\src\l_abs.cpp">
+      <Filter>Source Files\encode</Filter>
+    </ClCompile>
+    <ClCompile Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\enc\src\l_comp.cpp">
+      <Filter>Source Files\encode</Filter>
+    </ClCompile>
+    <ClCompile Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\enc\src\l_extract.cpp">
+      <Filter>Source Files\encode</Filter>
+    </ClCompile>
+    <ClCompile Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\enc\src\l_negate.cpp">
+      <Filter>Source Files\encode</Filter>
+    </ClCompile>
+    <ClCompile Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\enc\src\lag_wind.cpp">
+      <Filter>Source Files\encode</Filter>
+    </ClCompile>
+    <ClCompile Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\enc\src\lag_wind_tab.cpp">
+      <Filter>Source Files\encode</Filter>
+    </ClCompile>
+    <ClCompile Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\enc\src\levinson.cpp">
+      <Filter>Source Files\encode</Filter>
+    </ClCompile>
+    <ClCompile Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\enc\src\lflg_upd.cpp">
+      <Filter>Source Files\encode</Filter>
+    </ClCompile>
+    <ClCompile Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\enc\src\lpc.cpp">
+      <Filter>Source Files\encode</Filter>
+    </ClCompile>
+    <ClCompile Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\enc\src\ol_ltp.cpp">
+      <Filter>Source Files\encode</Filter>
+    </ClCompile>
+    <ClCompile Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\enc\src\p_ol_wgh.cpp">
+      <Filter>Source Files\encode</Filter>
+    </ClCompile>
+    <ClCompile Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\enc\src\pitch_fr.cpp">
+      <Filter>Source Files\encode</Filter>
+    </ClCompile>
+    <ClCompile Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\enc\src\pitch_ol.cpp">
+      <Filter>Source Files\encode</Filter>
+    </ClCompile>
+    <ClCompile Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\enc\src\pre_big.cpp">
+      <Filter>Source Files\encode</Filter>
+    </ClCompile>
+    <ClCompile Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\enc\src\pre_proc.cpp">
+      <Filter>Source Files\encode</Filter>
+    </ClCompile>
+    <ClCompile Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\enc\src\prm2bits.cpp">
+      <Filter>Source Files\encode</Filter>
+    </ClCompile>
+    <ClCompile Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\enc\src\q_gain_c.cpp">
+      <Filter>Source Files\encode</Filter>
+    </ClCompile>
+    <ClCompile Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\enc\src\q_gain_p.cpp">
+      <Filter>Source Files\encode</Filter>
+    </ClCompile>
+    <ClCompile Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\enc\src\qgain475.cpp">
+      <Filter>Source Files\encode</Filter>
+    </ClCompile>
+    <ClCompile Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\enc\src\qgain795.cpp">
+      <Filter>Source Files\encode</Filter>
+    </ClCompile>
+    <ClCompile Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\enc\src\qua_gain.cpp">
+      <Filter>Source Files\encode</Filter>
+    </ClCompile>
+    <ClCompile Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\enc\src\s10_8pf.cpp">
+      <Filter>Source Files\encode</Filter>
+    </ClCompile>
+    <ClCompile Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\enc\src\set_sign.cpp">
+      <Filter>Source Files\encode</Filter>
+    </ClCompile>
+    <ClCompile Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\enc\src\sid_sync.cpp">
+      <Filter>Source Files\encode</Filter>
+    </ClCompile>
+    <ClCompile Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\enc\src\sp_enc.cpp">
+      <Filter>Source Files\encode</Filter>
+    </ClCompile>
+    <ClCompile Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\enc\src\spreproc.cpp">
+      <Filter>Source Files\encode</Filter>
+    </ClCompile>
+    <ClCompile Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\enc\src\spstproc.cpp">
+      <Filter>Source Files\encode</Filter>
+    </ClCompile>
+    <ClCompile Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\enc\src\ton_stab.cpp">
+      <Filter>Source Files\encode</Filter>
+    </ClCompile>
+    <ClCompile Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\enc\src\vad1.cpp">
+      <Filter>Source Files\encode</Filter>
+    </ClCompile>
+    <ClCompile Include="amrnb\amrnb_wrapper.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\dec\src\a_refl.h">
+      <Filter>Source Files\decode</Filter>
+    </ClInclude>
+    <ClInclude Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\dec\src\agc.h">
+      <Filter>Source Files\decode</Filter>
+    </ClInclude>
+    <ClInclude Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\dec\src\amrdecode.h">
+      <Filter>Source Files\decode</Filter>
+    </ClInclude>
+    <ClInclude Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\dec\src\b_cn_cod.h">
+      <Filter>Source Files\decode</Filter>
+    </ClInclude>
+    <ClInclude Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\dec\src\bgnscd.h">
+      <Filter>Source Files\decode</Filter>
+    </ClInclude>
+    <ClInclude Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\dec\src\c_g_aver.h">
+      <Filter>Source Files\decode</Filter>
+    </ClInclude>
+    <ClInclude Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\dec\src\d1035pf.h">
+      <Filter>Source Files\decode</Filter>
+    </ClInclude>
+    <ClInclude Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\dec\src\d2_11pf.h">
+      <Filter>Source Files\decode</Filter>
+    </ClInclude>
+    <ClInclude Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\dec\src\d2_9pf.h">
+      <Filter>Source Files\decode</Filter>
+    </ClInclude>
+    <ClInclude Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\dec\src\d3_14pf.h">
+      <Filter>Source Files\decode</Filter>
+    </ClInclude>
+    <ClInclude Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\dec\src\d4_17pf.h">
+      <Filter>Source Files\decode</Filter>
+    </ClInclude>
+    <ClInclude Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\dec\src\d8_31pf.h">
+      <Filter>Source Files\decode</Filter>
+    </ClInclude>
+    <ClInclude Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\dec\src\dec_amr.h">
+      <Filter>Source Files\decode</Filter>
+    </ClInclude>
+    <ClInclude Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\dec\src\dec_gain.h">
+      <Filter>Source Files\decode</Filter>
+    </ClInclude>
+    <ClInclude Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\dec\src\dec_lag3.h">
+      <Filter>Source Files\decode</Filter>
+    </ClInclude>
+    <ClInclude Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\dec\src\dec_lag6.h">
+      <Filter>Source Files\decode</Filter>
+    </ClInclude>
+    <ClInclude Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\dec\src\dtx_dec.h">
+      <Filter>Source Files\decode</Filter>
+    </ClInclude>
+    <ClInclude Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\dec\src\ec_gains.h">
+      <Filter>Source Files\decode</Filter>
+    </ClInclude>
+    <ClInclude Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\dec\src\ex_ctrl.h">
+      <Filter>Source Files\decode</Filter>
+    </ClInclude>
+    <ClInclude Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\dec\src\gsmamr_dec.h">
+      <Filter>Source Files\decode</Filter>
+    </ClInclude>
+    <ClInclude Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\dec\src\if2_to_ets.h">
+      <Filter>Source Files\decode</Filter>
+    </ClInclude>
+    <ClInclude Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\dec\src\lsp_avg.h">
+      <Filter>Source Files\decode</Filter>
+    </ClInclude>
+    <ClInclude Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\dec\src\ph_disp.h">
+      <Filter>Source Files\decode</Filter>
+    </ClInclude>
+    <ClInclude Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\dec\src\post_pro.h">
+      <Filter>Source Files\decode</Filter>
+    </ClInclude>
+    <ClInclude Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\dec\src\preemph.h">
+      <Filter>Source Files\decode</Filter>
+    </ClInclude>
+    <ClInclude Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\dec\src\pstfilt.h">
+      <Filter>Source Files\decode</Filter>
+    </ClInclude>
+    <ClInclude Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\dec\src\sp_dec.h">
+      <Filter>Source Files\decode</Filter>
+    </ClInclude>
+    <ClInclude Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\enc\src\amrencode.h">
+      <Filter>Source Files\encode</Filter>
+    </ClInclude>
+    <ClInclude Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\enc\src\autocorr.h">
+      <Filter>Source Files\encode</Filter>
+    </ClInclude>
+    <ClInclude Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\enc\src\c1035pf.h">
+      <Filter>Source Files\encode</Filter>
+    </ClInclude>
+    <ClInclude Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\enc\src\c2_11pf.h">
+      <Filter>Source Files\encode</Filter>
+    </ClInclude>
+    <ClInclude Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\enc\src\c2_9pf.h">
+      <Filter>Source Files\encode</Filter>
+    </ClInclude>
+    <ClInclude Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\enc\src\c3_14pf.h">
+      <Filter>Source Files\encode</Filter>
+    </ClInclude>
+    <ClInclude Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\enc\src\c4_17pf.h">
+      <Filter>Source Files\encode</Filter>
+    </ClInclude>
+    <ClInclude Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\enc\src\c8_31pf.h">
+      <Filter>Source Files\encode</Filter>
+    </ClInclude>
+    <ClInclude Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\enc\src\calc_cor.h">
+      <Filter>Source Files\encode</Filter>
+    </ClInclude>
+    <ClInclude Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\enc\src\calc_en.h">
+      <Filter>Source Files\encode</Filter>
+    </ClInclude>
+    <ClInclude Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\enc\src\cbsearch.h">
+      <Filter>Source Files\encode</Filter>
+    </ClInclude>
+    <ClInclude Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\enc\src\cl_ltp.h">
+      <Filter>Source Files\encode</Filter>
+    </ClInclude>
+    <ClInclude Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\enc\src\cod_amr.h">
+      <Filter>Source Files\encode</Filter>
+    </ClInclude>
+    <ClInclude Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\enc\src\convolve.h">
+      <Filter>Source Files\encode</Filter>
+    </ClInclude>
+    <ClInclude Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\enc\src\cor_h.h">
+      <Filter>Source Files\encode</Filter>
+    </ClInclude>
+    <ClInclude Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\enc\src\cor_h_x.h">
+      <Filter>Source Files\encode</Filter>
+    </ClInclude>
+    <ClInclude Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\enc\src\cor_h_x2.h">
+      <Filter>Source Files\encode</Filter>
+    </ClInclude>
+    <ClInclude Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\enc\src\div_32.h">
+      <Filter>Source Files\encode</Filter>
+    </ClInclude>
+    <ClInclude Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\enc\src\dtx_enc.h">
+      <Filter>Source Files\encode</Filter>
+    </ClInclude>
+    <ClInclude Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\enc\src\enc_lag3.h">
+      <Filter>Source Files\encode</Filter>
+    </ClInclude>
+    <ClInclude Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\enc\src\enc_lag6.h">
+      <Filter>Source Files\encode</Filter>
+    </ClInclude>
+    <ClInclude Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\enc\src\ets_to_if2.h">
+      <Filter>Source Files\encode</Filter>
+    </ClInclude>
+    <ClInclude Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\enc\src\ets_to_wmf.h">
+      <Filter>Source Files\encode</Filter>
+    </ClInclude>
+    <ClInclude Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\enc\src\g_adapt.h">
+      <Filter>Source Files\encode</Filter>
+    </ClInclude>
+    <ClInclude Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\enc\src\g_code.h">
+      <Filter>Source Files\encode</Filter>
+    </ClInclude>
+    <ClInclude Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\enc\src\g_pitch.h">
+      <Filter>Source Files\encode</Filter>
+    </ClInclude>
+    <ClInclude Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\enc\src\gain_q.h">
+      <Filter>Source Files\encode</Filter>
+    </ClInclude>
+    <ClInclude Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\enc\src\gsmamr_enc.h">
+      <Filter>Source Files\encode</Filter>
+    </ClInclude>
+    <ClInclude Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\enc\src\hp_max.h">
+      <Filter>Source Files\encode</Filter>
+    </ClInclude>
+    <ClInclude Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\enc\src\inter_36.h">
+      <Filter>Source Files\encode</Filter>
+    </ClInclude>
+    <ClInclude Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\enc\src\inter_36_tab.h">
+      <Filter>Source Files\encode</Filter>
+    </ClInclude>
+    <ClInclude Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\enc\src\l_abs.h">
+      <Filter>Source Files\encode</Filter>
+    </ClInclude>
+    <ClInclude Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\enc\src\lag_wind.h">
+      <Filter>Source Files\encode</Filter>
+    </ClInclude>
+    <ClInclude Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\enc\src\lag_wind_tab.h">
+      <Filter>Source Files\encode</Filter>
+    </ClInclude>
+    <ClInclude Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\enc\src\levinson.h">
+      <Filter>Source Files\encode</Filter>
+    </ClInclude>
+    <ClInclude Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\enc\src\lpc.h">
+      <Filter>Source Files\encode</Filter>
+    </ClInclude>
+    <ClInclude Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\enc\src\ol_ltp.h">
+      <Filter>Source Files\encode</Filter>
+    </ClInclude>
+    <ClInclude Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\enc\src\pitch_fr.h">
+      <Filter>Source Files\encode</Filter>
+    </ClInclude>
+    <ClInclude Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\enc\src\pitch_ol.h">
+      <Filter>Source Files\encode</Filter>
+    </ClInclude>
+    <ClInclude Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\enc\src\pre_big.h">
+      <Filter>Source Files\encode</Filter>
+    </ClInclude>
+    <ClInclude Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\enc\src\pre_proc.h">
+      <Filter>Source Files\encode</Filter>
+    </ClInclude>
+    <ClInclude Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\enc\src\prm2bits.h">
+      <Filter>Source Files\encode</Filter>
+    </ClInclude>
+    <ClInclude Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\enc\src\q_gain_c.h">
+      <Filter>Source Files\encode</Filter>
+    </ClInclude>
+    <ClInclude Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\enc\src\q_gain_p.h">
+      <Filter>Source Files\encode</Filter>
+    </ClInclude>
+    <ClInclude Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\enc\src\qgain475.h">
+      <Filter>Source Files\encode</Filter>
+    </ClInclude>
+    <ClInclude Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\enc\src\qgain795.h">
+      <Filter>Source Files\encode</Filter>
+    </ClInclude>
+    <ClInclude Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\enc\src\s10_8pf.h">
+      <Filter>Source Files\encode</Filter>
+    </ClInclude>
+    <ClInclude Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\enc\src\set_sign.h">
+      <Filter>Source Files\encode</Filter>
+    </ClInclude>
+    <ClInclude Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\enc\src\sid_sync.h">
+      <Filter>Source Files\encode</Filter>
+    </ClInclude>
+    <ClInclude Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\enc\src\sp_enc.h">
+      <Filter>Source Files\encode</Filter>
+    </ClInclude>
+    <ClInclude Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\enc\src\spreproc.h">
+      <Filter>Source Files\encode</Filter>
+    </ClInclude>
+    <ClInclude Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\enc\src\spstproc.h">
+      <Filter>Source Files\encode</Filter>
+    </ClInclude>
+    <ClInclude Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\enc\src\ton_stab.h">
+      <Filter>Source Files\encode</Filter>
+    </ClInclude>
+    <ClInclude Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\enc\src\vad1.h">
+      <Filter>Source Files\encode</Filter>
+    </ClInclude>
+    <ClInclude Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\enc\src\vad2.h">
+      <Filter>Source Files\encode</Filter>
+    </ClInclude>
+    <ClInclude Include="opencore\codecs_v2\audio\gsm_amr\common\dec\include\pvgsmamrdecoderinterface.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\common\include\add.h">
+      <Filter>Header Files\common</Filter>
+    </ClInclude>
+    <ClInclude Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\common\include\az_lsp.h">
+      <Filter>Header Files\common</Filter>
+    </ClInclude>
+    <ClInclude Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\common\include\bitno_tab.h">
+      <Filter>Header Files\common</Filter>
+    </ClInclude>
+    <ClInclude Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\common\include\bitreorder_tab.h">
+      <Filter>Header Files\common</Filter>
+    </ClInclude>
+    <ClInclude Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\common\include\cnst.h">
+      <Filter>Header Files\common</Filter>
+    </ClInclude>
+    <ClInclude Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\common\include\d_gain_p.h">
+      <Filter>Header Files\common</Filter>
+    </ClInclude>
+    <ClInclude Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\common\include\d_plsf.h">
+      <Filter>Header Files\common</Filter>
+    </ClInclude>
+    <ClInclude Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\common\include\div_s.h">
+      <Filter>Header Files\common</Filter>
+    </ClInclude>
+    <ClInclude Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\common\include\dtx_common_def.h">
+      <Filter>Header Files\common</Filter>
+    </ClInclude>
+    <ClInclude Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\common\include\frame.h">
+      <Filter>Header Files\common</Filter>
+    </ClInclude>
+    <ClInclude Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\common\include\frame_type_3gpp.h">
+      <Filter>Header Files\common</Filter>
+    </ClInclude>
+    <ClInclude Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\common\include\gc_pred.h">
+      <Filter>Header Files\common</Filter>
+    </ClInclude>
+    <ClInclude Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\common\include\get_const_tbls.h">
+      <Filter>Header Files\common</Filter>
+    </ClInclude>
+    <ClInclude Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\common\include\gmed_n.h">
+      <Filter>Header Files\common</Filter>
+    </ClInclude>
+    <ClInclude Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\common\include\gsm_amr_typedefs.h">
+      <Filter>Header Files\common</Filter>
+    </ClInclude>
+    <ClInclude Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\common\include\int_lpc.h">
+      <Filter>Header Files\common</Filter>
+    </ClInclude>
+    <ClInclude Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\common\include\int_lsf.h">
+      <Filter>Header Files\common</Filter>
+    </ClInclude>
+    <ClInclude Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\common\include\inv_sqrt.h">
+      <Filter>Header Files\common</Filter>
+    </ClInclude>
+    <ClInclude Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\common\include\l_add.h">
+      <Filter>Header Files\common</Filter>
+    </ClInclude>
+    <ClInclude Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\common\include\l_add_c.h">
+      <Filter>Header Files\common</Filter>
+    </ClInclude>
+    <ClInclude Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\common\include\l_comp.h">
+      <Filter>Header Files\common</Filter>
+    </ClInclude>
+    <ClInclude Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\common\include\l_extract.h">
+      <Filter>Header Files\common</Filter>
+    </ClInclude>
+    <ClInclude Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\common\include\l_negate.h">
+      <Filter>Header Files\common</Filter>
+    </ClInclude>
+    <ClInclude Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\common\include\l_shl.h">
+      <Filter>Header Files\common</Filter>
+    </ClInclude>
+    <ClInclude Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\common\include\l_shr.h">
+      <Filter>Header Files\common</Filter>
+    </ClInclude>
+    <ClInclude Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\common\include\l_shr_r.h">
+      <Filter>Header Files\common</Filter>
+    </ClInclude>
+    <ClInclude Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\common\include\log2.h">
+      <Filter>Header Files\common</Filter>
+    </ClInclude>
+    <ClInclude Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\common\include\log2_norm.h">
+      <Filter>Header Files\common</Filter>
+    </ClInclude>
+    <ClInclude Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\common\include\lsfwt.h">
+      <Filter>Header Files\common</Filter>
+    </ClInclude>
+    <ClInclude Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\common\include\lsp.h">
+      <Filter>Header Files\common</Filter>
+    </ClInclude>
+    <ClInclude Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\common\include\lsp_az.h">
+      <Filter>Header Files\common</Filter>
+    </ClInclude>
+    <ClInclude Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\common\include\lsp_lsf.h">
+      <Filter>Header Files\common</Filter>
+    </ClInclude>
+    <ClInclude Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\common\include\lsp_tab.h">
+      <Filter>Header Files\common</Filter>
+    </ClInclude>
+    <ClInclude Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\common\include\mode.h">
+      <Filter>Header Files\common</Filter>
+    </ClInclude>
+    <ClInclude Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\common\include\mpy_32.h">
+      <Filter>Header Files\common</Filter>
+    </ClInclude>
+    <ClInclude Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\common\include\mult.h">
+      <Filter>Header Files\common</Filter>
+    </ClInclude>
+    <ClInclude Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\common\include\mult_r.h">
+      <Filter>Header Files\common</Filter>
+    </ClInclude>
+    <ClInclude Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\common\include\n_proc.h">
+      <Filter>Header Files\common</Filter>
+    </ClInclude>
+    <ClInclude Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\common\include\negate.h">
+      <Filter>Header Files\common</Filter>
+    </ClInclude>
+    <ClInclude Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\common\include\norm_l.h">
+      <Filter>Header Files\common</Filter>
+    </ClInclude>
+    <ClInclude Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\common\include\norm_s.h">
+      <Filter>Header Files\common</Filter>
+    </ClInclude>
+    <ClInclude Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\common\include\oper_32b.h">
+      <Filter>Header Files\common</Filter>
+    </ClInclude>
+    <ClInclude Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\common\include\p_ol_wgh.h">
+      <Filter>Header Files\common</Filter>
+    </ClInclude>
+    <ClInclude Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\common\include\pow2.h">
+      <Filter>Header Files\common</Filter>
+    </ClInclude>
+    <ClInclude Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\common\include\pred_lt.h">
+      <Filter>Header Files\common</Filter>
+    </ClInclude>
+    <ClInclude Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\common\include\pvgsmamr.h">
+      <Filter>Header Files\common</Filter>
+    </ClInclude>
+    <ClInclude Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\common\include\q_plsf.h">
+      <Filter>Header Files\common</Filter>
+    </ClInclude>
+    <ClInclude Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\common\include\q_plsf_3_tbl.h">
+      <Filter>Header Files\common</Filter>
+    </ClInclude>
+    <ClInclude Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\common\include\q_plsf_5_tbl.h">
+      <Filter>Header Files\common</Filter>
+    </ClInclude>
+    <ClInclude Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\common\include\qgain475_tab.h">
+      <Filter>Header Files\common</Filter>
+    </ClInclude>
+    <ClInclude Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\common\include\qua_gain.h">
+      <Filter>Header Files\common</Filter>
+    </ClInclude>
+    <ClInclude Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\common\include\qua_gain_tbl.h">
+      <Filter>Header Files\common</Filter>
+    </ClInclude>
+    <ClInclude Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\common\include\reorder.h">
+      <Filter>Header Files\common</Filter>
+    </ClInclude>
+    <ClInclude Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\common\include\residu.h">
+      <Filter>Header Files\common</Filter>
+    </ClInclude>
+    <ClInclude Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\common\include\reverse_bits.h">
+      <Filter>Header Files\common</Filter>
+    </ClInclude>
+    <ClInclude Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\common\include\round.h">
+      <Filter>Header Files\common</Filter>
+    </ClInclude>
+    <ClInclude Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\common\include\set_zero.h">
+      <Filter>Header Files\common</Filter>
+    </ClInclude>
+    <ClInclude Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\common\include\shl.h">
+      <Filter>Header Files\common</Filter>
+    </ClInclude>
+    <ClInclude Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\common\include\shr.h">
+      <Filter>Header Files\common</Filter>
+    </ClInclude>
+    <ClInclude Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\common\include\shr_r.h">
+      <Filter>Header Files\common</Filter>
+    </ClInclude>
+    <ClInclude Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\common\include\sqrt_l.h">
+      <Filter>Header Files\common</Filter>
+    </ClInclude>
+    <ClInclude Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\common\include\sub.h">
+      <Filter>Header Files\common</Filter>
+    </ClInclude>
+    <ClInclude Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\common\include\syn_filt.h">
+      <Filter>Header Files\common</Filter>
+    </ClInclude>
+    <ClInclude Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\common\include\typedef.h">
+      <Filter>Header Files\common</Filter>
+    </ClInclude>
+    <ClInclude Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\common\include\vad.h">
+      <Filter>Header Files\common</Filter>
+    </ClInclude>
+    <ClInclude Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\common\include\weight_a.h">
+      <Filter>Header Files\common</Filter>
+    </ClInclude>
+    <ClInclude Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\common\include\window_tab.h">
+      <Filter>Header Files\common</Filter>
+    </ClInclude>
+    <ClInclude Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\common\include\wmf_to_ets.h">
+      <Filter>Header Files\common</Filter>
+    </ClInclude>
+    <ClInclude Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\enc\include\gsmamr_encoder_wrapper.h">
+      <Filter>Header Files\encode</Filter>
+    </ClInclude>
+    <ClInclude Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\dec\include\decoder_gsm_amr.h">
+      <Filter>Header Files\decode</Filter>
+    </ClInclude>
+    <ClInclude Include="opencore\codecs_v2\audio\gsm_amr\amr_nb\dec\include\pvamrnbdecoder_api.h">
+      <Filter>Header Files\decode</Filter>
+    </ClInclude>
+    <ClInclude Include="amrnb\interf_dec.h">
+      <Filter>Header Files\interface</Filter>
+    </ClInclude>
+    <ClInclude Include="amrnb\interf_enc.h">
+      <Filter>Header Files\interface</Filter>
+    </ClInclude>
+    <ClInclude Include="oscl\oscl_base.h">
+      <Filter>Header Files\oscl</Filter>
+    </ClInclude>
+    <ClInclude Include="oscl\oscl_base_macros.h">
+      <Filter>Header Files\oscl</Filter>
+    </ClInclude>
+    <ClInclude Include="oscl\oscl_dll.h">
+      <Filter>Header Files\oscl</Filter>
+    </ClInclude>
+    <ClInclude Include="oscl\oscl_error.h">
+      <Filter>Header Files\oscl</Filter>
+    </ClInclude>
+    <ClInclude Include="oscl\oscl_exception.h">
+      <Filter>Header Files\oscl</Filter>
+    </ClInclude>
+    <ClInclude Include="oscl\oscl_mem.h">
+      <Filter>Header Files\oscl</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="ReadMe.txt" />
+  </ItemGroup>
+</Project>

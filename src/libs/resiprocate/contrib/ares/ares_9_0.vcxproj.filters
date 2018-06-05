@@ -1,0 +1,102 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{40eeb60d-8eea-4026-9958-c5db72139973}</UniqueIdentifier>
+      <Extensions>cpp;c;cxx;def;odl;idl;hpj;bat;asm</Extensions>
+    </Filter>
+    <Filter Include="Header Files">
+      <UniqueIdentifier>{3fb12883-71c7-411a-8587-19c7b88abdf5}</UniqueIdentifier>
+      <Extensions>h;hpp;hxx;hm;inl;inc</Extensions>
+    </Filter>
+    <Filter Include="Resource Files">
+      <UniqueIdentifier>{5b56b2f5-3097-4c73-a87a-6bc3479bae6d}</UniqueIdentifier>
+      <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;r</Extensions>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="ares__close_sockets.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="ares__get_hostent.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="ares__read_line.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="ares_destroy.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="ares_expand_name.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="ares_fds.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="ares_free_errmem.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="ares_free_hostent.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="ares_free_string.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="ares_gethostbyaddr.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="ares_gethostbyname.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="ares_init.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="ares_local.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="ares_mkquery.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="ares_parse_a_reply.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="ares_parse_ptr_reply.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="ares_process.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="ares_query.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="ares_search.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="ares_send.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="ares_strerror.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="ares_timeout.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="ares.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ares_compat.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ares_dns.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ares_local.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ares_private.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+  </ItemGroup>
+</Project>

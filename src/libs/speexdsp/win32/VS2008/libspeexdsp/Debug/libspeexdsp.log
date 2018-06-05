@@ -1,0 +1,32 @@
+﻿Build started 10/26/2015 9:42:06 AM.
+     1>Project "C:\works\sevana\pvqa\lib\rtphone\libs\speexdsp\win32\VS2008\libspeexdsp\libspeexdsp.vcxproj" on node 2 (Build target(s)).
+     1>ClCompile:
+         C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\bin\CL.exe /c /I..\..\..\include /I..\.. /ZI /nologo /W3 /WX- /Od /Oy- /D WIN32 /D _DEBUG /D _LIB /D HAVE_CONFIG_H /D _VC80_UPGRADE=0x0710 /D _MBCS /Gm /EHsc /RTC1 /MDd /GS /fp:precise /Zc:wchar_t /Zc:forScope /Zc:inline /Fo"Debug\\" /Fd"Debug\speexdsp.pdb" /Gd /TC /analyze- /errorReport:prompt ..\..\..\libspeex\buffer.c ..\..\..\libspeex\fftwrap.c ..\..\..\libspeex\filterbank.c ..\..\..\libspeex\jitter.c ..\..\..\libspeex\kiss_fft.c ..\..\..\libspeex\kiss_fftr.c ..\..\..\libspeex\mdf.c ..\..\..\libspeex\preprocess.c ..\..\..\libspeex\resample.c ..\..\..\libspeex\scal.c ..\..\..\libspeex\smallft.c
+         smallft.c
+     1>c1 : fatal error C1083: Cannot open source file: '..\..\..\libspeex\smallft.c': No such file or directory
+         scal.c
+     1>c1 : fatal error C1083: Cannot open source file: '..\..\..\libspeex\scal.c': No such file or directory
+         resample.c
+     1>c1 : fatal error C1083: Cannot open source file: '..\..\..\libspeex\resample.c': No such file or directory
+         preprocess.c
+     1>c1 : fatal error C1083: Cannot open source file: '..\..\..\libspeex\preprocess.c': No such file or directory
+         mdf.c
+     1>c1 : fatal error C1083: Cannot open source file: '..\..\..\libspeex\mdf.c': No such file or directory
+         kiss_fftr.c
+     1>c1 : fatal error C1083: Cannot open source file: '..\..\..\libspeex\kiss_fftr.c': No such file or directory
+         kiss_fft.c
+     1>c1 : fatal error C1083: Cannot open source file: '..\..\..\libspeex\kiss_fft.c': No such file or directory
+         jitter.c
+     1>c1 : fatal error C1083: Cannot open source file: '..\..\..\libspeex\jitter.c': No such file or directory
+         filterbank.c
+     1>c1 : fatal error C1083: Cannot open source file: '..\..\..\libspeex\filterbank.c': No such file or directory
+         fftwrap.c
+     1>c1 : fatal error C1083: Cannot open source file: '..\..\..\libspeex\fftwrap.c': No such file or directory
+         buffer.c
+     1>c1 : fatal error C1083: Cannot open source file: '..\..\..\libspeex\buffer.c': No such file or directory
+         Generating Code...
+     1>Done Building Project "C:\works\sevana\pvqa\lib\rtphone\libs\speexdsp\win32\VS2008\libspeexdsp\libspeexdsp.vcxproj" (Build target(s)) -- FAILED.
+
+Build FAILED.
+
+Time Elapsed 00:00:01.40

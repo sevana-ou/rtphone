@@ -1,0 +1,221 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" ToolsVersion="14.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|Win32">
+      <Configuration>Debug</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|Win32">
+      <Configuration>Release</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="libs\jrtplib\jrtplib.vcxproj">
+      <Project>{d39837a7-419f-4751-a090-429f4d3b0038}</Project>
+    </ProjectReference>
+    <ProjectReference Include="libs\opencore-amr\opencore-amr-nb.vcxproj">
+      <Project>{3480045b-45d9-48b5-befa-1b7a75652606}</Project>
+    </ProjectReference>
+    <ProjectReference Include="libs\speex\win32\VS2008\libspeexdsp\libspeexdsp.vcxproj">
+      <Project>{03207781-0d1c-4db3-a71d-45c608f28dbd}</Project>
+    </ProjectReference>
+    <ProjectReference Include="libs\srtp\srtp.vcxproj">
+      <Project>{c12a2037-3000-49a1-a007-a7e641d4fc38}</Project>
+    </ProjectReference>
+    <ProjectReference Include="libs\webrtc\webrtc.vcxproj">
+      <Project>{8d9570f8-0940-4359-99ab-7b71a229d426}</Project>
+    </ProjectReference>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="engine\audio\Audio_DataWindow.cpp" />
+    <ClCompile Include="engine\audio\Audio_Resampler.cpp" />
+    <ClCompile Include="engine\helper\HL_AsyncCommand.cpp" />
+    <ClCompile Include="engine\helper\HL_Log.cpp" />
+    <ClCompile Include="engine\helper\HL_NetworkFrame.cpp" />
+    <ClCompile Include="engine\helper\HL_NetworkSocket.cpp" />
+    <ClCompile Include="engine\helper\HL_OsVersion.cpp" />
+    <ClCompile Include="engine\helper\HL_Pointer.cpp" />
+    <ClCompile Include="engine\helper\HL_Rtp.cpp" />
+    <ClCompile Include="engine\helper\HL_SocketHeap.cpp" />
+    <ClCompile Include="engine\helper\HL_String.cpp" />
+    <ClCompile Include="engine\helper\HL_Sync.cpp" />
+    <ClCompile Include="engine\helper\HL_Usb.cpp" />
+    <ClCompile Include="engine\helper\HL_VariantMap.cpp" />
+    <ClCompile Include="engine\helper\HL_WavFile.cpp" />
+    <ClCompile Include="engine\media\MT_AudioCodec.cpp" />
+    <ClCompile Include="engine\media\MT_AudioReceiver.cpp" />
+    <ClCompile Include="engine\media\MT_AudioStream.cpp" />
+    <ClCompile Include="engine\media\MT_Box.cpp" />
+    <ClCompile Include="engine\media\MT_Codec.cpp" />
+    <ClCompile Include="engine\media\MT_CodecList.cpp" />
+    <ClCompile Include="engine\media\MT_Dtmf.cpp" />
+    <ClCompile Include="engine\media\MT_NativeRtpSender.cpp" />
+    <ClCompile Include="engine\media\MT_SingleAudioStream.cpp" />
+    <ClCompile Include="engine\media\MT_SrtpHelper.cpp" />
+    <ClCompile Include="engine\media\MT_Stream.cpp" />
+    <ClCompile Include="engine\media\MT_WebRtc.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="engine\audio\Audio_DataWindow.h" />
+    <ClInclude Include="engine\audio\Audio_Resampler.h" />
+    <ClInclude Include="engine\config.h" />
+    <ClInclude Include="engine\helper\HL_AsyncCommand.h" />
+    <ClInclude Include="engine\helper\HL_ByteBuffer.h" />
+    <ClInclude Include="engine\helper\HL_Exception.h" />
+    <ClInclude Include="engine\helper\HL_InternetAddress.h" />
+    <ClInclude Include="engine\helper\HL_Log.h" />
+    <ClInclude Include="engine\helper\HL_NetworkFrame.h" />
+    <ClInclude Include="engine\helper\HL_NetworkSocket.h" />
+    <ClInclude Include="engine\helper\HL_OsVersion.h" />
+    <ClInclude Include="engine\helper\HL_Pointer.h" />
+    <ClInclude Include="engine\helper\HL_Rtp.h" />
+    <ClInclude Include="engine\helper\HL_SocketHeap.h" />
+    <ClInclude Include="engine\helper\HL_StreamState.h" />
+    <ClInclude Include="engine\helper\HL_String.h" />
+    <ClInclude Include="engine\helper\HL_Sync.h" />
+    <ClInclude Include="engine\helper\HL_Types.h" />
+    <ClInclude Include="engine\helper\HL_Usb.h" />
+    <ClInclude Include="engine\helper\HL_VariantMap.h" />
+    <ClInclude Include="engine\helper\HL_WavFile.h" />
+    <ClInclude Include="engine\media\MT_AudioCodec.h" />
+    <ClInclude Include="engine\media\MT_AudioReceiver.h" />
+    <ClInclude Include="engine\media\MT_AudioStream.h" />
+    <ClInclude Include="engine\media\MT_Box.h" />
+    <ClInclude Include="engine\media\MT_Codec.h" />
+    <ClInclude Include="engine\media\MT_CodecList.h" />
+    <ClInclude Include="engine\media\MT_Dtmf.h" />
+    <ClInclude Include="engine\media\MT_NativeRtpSender.h" />
+    <ClInclude Include="engine\media\MT_SingleAudioStream.h" />
+    <ClInclude Include="engine\media\MT_SrtpHelper.h" />
+    <ClInclude Include="engine\media\MT_Stream.h" />
+    <ClInclude Include="engine\media\MT_WebRtc.h" />
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <ProjectGuid>{14853B13-AC80-4BE8-81BC-552FFADA910F}</ProjectGuid>
+    <Keyword>Win32Proj</Keyword>
+    <RootNamespace>mediaengine</RootNamespace>
+    <WindowsTargetPlatformVersion>8.1</WindowsTargetPlatformVersion>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v140</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v140</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v140</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v140</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+  </ImportGroup>
+  <ImportGroup Label="Shared">
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup />
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <ClCompile>
+      <PrecompiledHeader>
+      </PrecompiledHeader>
+      <WarningLevel>Level3</WarningLevel>
+      <Optimization>Disabled</Optimization>
+      <PreprocessorDefinitions>_SILENCE_STDEXT_HASH_DEPRECATION_WARNINGS;USE_RESIP_INTEGRATION;TARGET_WIN;USE_NATIVE_SMARTPTR;WIN32;_DEBUG;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>$(ProjectDir)\libs;$(ProjectDir)\libs\jrtplib\src;$(ProjectDir)\libs\speex\include;$(ProjectDir)\libs\srtp\include;$(ProjectDir)\libs\srtp\crypto\include;$(ProjectDir)\libs\webrtc;$(ProjectDir)\libs\ice;$(ProjectDir)\libs\resiprocate\;$(ProjectDir)\libs\resiprocate\rutil;$(ProjectDir)\libs\resiprocate\resip\stack;$(ProjectDir)\libs\resiprocate\resip\dum;$(ProjectDir)\libs\resiprocate\contrib\ares</AdditionalIncludeDirectories>
+    </ClCompile>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <ClCompile>
+      <PrecompiledHeader>
+      </PrecompiledHeader>
+      <WarningLevel>Level3</WarningLevel>
+      <Optimization>Disabled</Optimization>
+      <PreprocessorDefinitions>_SILENCE_STDEXT_HASH_DEPRECATION_WARNINGS;USE_RESIP_INTEGRATION;TARGET_WIN;USE_NATIVE_SMARTPTR;_DEBUG;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>$(ProjectDir)\libs;$(ProjectDir)\libs\jrtplib\src;$(ProjectDir)\libs\speex\include;$(ProjectDir)\libs\srtp\include;$(ProjectDir)\libs\srtp\crypto\include;$(ProjectDir)\libs\webrtc;$(ProjectDir)\libs\ice;$(ProjectDir)\libs\resiprocate\;$(ProjectDir)\libs\resiprocate\rutil;$(ProjectDir)\libs\resiprocate\resip\stack;$(ProjectDir)\libs\resiprocate\resip\dum;$(ProjectDir)\libs\resiprocate\contrib\ares</AdditionalIncludeDirectories>
+    </ClCompile>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <PrecompiledHeader>
+      </PrecompiledHeader>
+      <Optimization>MaxSpeed</Optimization>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <PreprocessorDefinitions>_SILENCE_STDEXT_HASH_DEPRECATION_WARNINGS;USE_RESIP_INTEGRATION;TARGET_WIN;USE_NATIVE_SMARTPTR;WIN32;NDEBUG;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>$(ProjectDir)\libs;$(ProjectDir)\libs\jrtplib\src;$(ProjectDir)\libs\speex\include;$(ProjectDir)\libs\srtp\include;$(ProjectDir)\libs\srtp\crypto\include;$(ProjectDir)\libs\webrtc;$(ProjectDir)\libs\ice;$(ProjectDir)\libs\resiprocate\;$(ProjectDir)\libs\resiprocate\rutil;$(ProjectDir)\libs\resiprocate\resip\stack;$(ProjectDir)\libs\resiprocate\resip\dum;$(ProjectDir)\libs\resiprocate\contrib\ares</AdditionalIncludeDirectories>
+    </ClCompile>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <PrecompiledHeader>
+      </PrecompiledHeader>
+      <Optimization>MaxSpeed</Optimization>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <PreprocessorDefinitions>_SILENCE_STDEXT_HASH_DEPRECATION_WARNINGS;USE_RESIP_INTEGRATION;TARGET_WIN;USE_NATIVE_SMARTPTR;NDEBUG;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>$(ProjectDir)\libs;$(ProjectDir)\libs\jrtplib\src;$(ProjectDir)\libs\speex\include;$(ProjectDir)\libs\srtp\include;$(ProjectDir)\libs\srtp\crypto\include;$(ProjectDir)\libs\webrtc;$(ProjectDir)\libs\ice;$(ProjectDir)\libs\resiprocate\;$(ProjectDir)\libs\resiprocate\rutil;$(ProjectDir)\libs\resiprocate\resip\stack;$(ProjectDir)\libs\resiprocate\resip\dum;$(ProjectDir)\libs\resiprocate\contrib\ares</AdditionalIncludeDirectories>
+    </ClCompile>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+    </Link>
+  </ItemDefinitionGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+  </ImportGroup>
+</Project>
