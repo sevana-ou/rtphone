@@ -10,6 +10,8 @@
 #endif
 #include <set>
 #include <assert.h>
+#include <unistd.h> // Responsible for close() call on Linux
+
 #include "HL_SocketHeap.h"
 #include "HL_Log.h"
 #include "HL_Sync.h"
@@ -279,6 +281,7 @@ void SocketHeap::thread()
       SyncHelper::delay(1000); // Delay for 1 millisecond
   }
   mId = 0;
+  mShutdown = false;
 //#endif
 }
 

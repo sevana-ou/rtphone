@@ -31,6 +31,8 @@ typedef struct {
 
 #define LOG_SUBSYSTEM "WavFileReader"
 
+#define LOCK std::unique_lock<std::mutex> lock(mFileMtx);
+
 using namespace Audio;
 
 // ---------------------- WavFileReader -------------------------
@@ -71,7 +73,7 @@ std::string WavFileReader::readChunk()
 
 bool WavFileReader::open(const std::tstring& filename)
 {
-  Lock lock(mFileMtx);
+  LOCK;
   try
   {
   #ifdef WIN32
@@ -160,7 +162,7 @@ bool WavFileReader::open(const std::tstring& filename)
 
 void WavFileReader::close()
 {
-  Lock lock(mFileMtx);
+  LOCK;
 
   if (NULL != mHandle)
     fclose(mHandle);
@@ -179,7 +181,7 @@ unsigned WavFileReader::read(void* buffer, unsigned bytes)
 
 unsigned WavFileReader::read(short* buffer, unsigned samples)
 {
-  Lock lock(mFileMtx);
+  LOCK;
 
   if (!mHandle)
     return 0;
@@ -208,14 +210,14 @@ unsigned WavFileReader::read(short* buffer, unsigned samples)
 
 bool WavFileReader::isOpened()
 {
-  Lock lock(mFileMtx);
+  LOCK;
 
   return (mHandle != 0);
 }
 
 void WavFileReader::rewind()
 {
-  Lock l(mFileMtx);
+  LOCK;
  
   if (mHandle)
     fseek(mHandle, mDataOffset, SEEK_SET);
@@ -223,14 +225,14 @@ void WavFileReader::rewind()
 
 std::tstring WavFileReader::filename() const
 {
-  Lock lock(mFileMtx);
+  LOCK;
 
   return mFileName;
 }
 
 unsigned WavFileReader::size() const
 {
-  Lock l(mFileMtx);
+  LOCK;
 
   return mDataLength;
 }
@@ -258,7 +260,7 @@ void WavFileWriter::checkWriteResult(int result)
 
 bool WavFileWriter::open(const std::tstring& filename, int rate, int channels)
 {
-  Lock lock(mFileMtx);
+  LOCK;
 
   close();
 	
@@ -324,7 +326,7 @@ bool WavFileWriter::open(const std::tstring& filename, int rate, int channels)
 
 void WavFileWriter::close()
 {
-  Lock lock(mFileMtx);
+  LOCK;
 
   if (mHandle)
   {
@@ -335,7 +337,7 @@ void WavFileWriter::close()
 
 unsigned WavFileWriter::write(const void* buffer, unsigned bytes)
 {
-  Lock l(mFileMtx);
+  LOCK;
 
   if (!mHandle)
     return 0;
@@ -361,14 +363,15 @@ unsigned WavFileWriter::write(const void* buffer, unsigned bytes)
 
 bool WavFileWriter::isOpened()
 {
-  Lock lock(mFileMtx);
+  LOCK;
 
   return (mHandle != 0);
 }
 
 std::tstring WavFileWriter::filename()
 {
-  Lock lock(mFileMtx);
+  LOCK;
+
   return mFileName;
 }
 

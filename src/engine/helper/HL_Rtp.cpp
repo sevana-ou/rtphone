@@ -7,9 +7,9 @@
 #include "HL_Exception.h"
 #include "HL_String.h"
 
-#include "rtprawpacket.h"
-#include "rtpipv4address.h"
-#include <alloc.h>
+#include "jrtplib/src/rtprawpacket.h"
+#include "jrtplib/src/rtpipv4address.h"
+#include <alloca.h>
 #include <sstream>
 #include <tuple>
 

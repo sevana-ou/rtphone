@@ -6,15 +6,13 @@
 #ifndef __SMART_POINTER_H
 #define __SMART_POINTER_H
 
-#ifdef USE_NATIVE_SMARTPTR
-# include <memory>
-# define SharedPtr std::shared_ptr
-#else
-#include "../../libs/resiprocate/rutil/SharedPtr.hxx"
-using resip::SharedPtr;
-#endif
+#include <memory>
+#define SharedPtr std::shared_ptr
+
 #include "HL_Sync.h"
+
 #include <map>
+
 class UsageCounter
 {
 public:

@@ -1,4 +1,4 @@
-/* Copyright(C) 2007-2017 VoIPobjects (voipobjects.com)
+/* Copyright(C) 2007-2018 VoIPobjects (voipobjects.com)
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -7,13 +7,15 @@
 #ifndef __AUDIO_WAVFILE_H
 #define __AUDIO_WAVFILE_H
 
-#include "helper/HL_Sync.h"
-#include "helper/HL_Types.h"
+//#include "helper/HL_Types.h"
 #include "Audio_Resampler.h"
 
 #include <stdio.h>
 #include <string>
 #include <memory>
+#include <mutex>
+
+#include "helper/HL_Types.h"
 
 namespace Audio
 {
@@ -26,7 +28,7 @@ namespace Audio
     short mBits;
     int mRate;
     std::tstring mFileName;
-    mutable Mutex mFileMtx;
+    mutable std::mutex mFileMtx;
     unsigned mDataOffset;
     unsigned mDataLength;
     Resampler mResampler;
@@ -57,7 +59,7 @@ namespace Audio
   protected:
     FILE*           mHandle;        /// Handle of audio file.
     std::tstring    mFileName;      /// Path to requested audio file.
-    Mutex           mFileMtx;       /// Mutex to protect this instance.
+    std::mutex      mFileMtx;       /// Mutex to protect this instance.
     int             mWritten;       /// Amount of written data (in bytes)
     int             mLengthOffset;  /// Position of length field.
     int             mRate, mChannels;

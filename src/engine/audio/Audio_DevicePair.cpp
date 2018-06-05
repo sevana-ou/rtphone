@@ -6,6 +6,7 @@
 #define NOMINMAX
 #include "Audio_DevicePair.h"
 #include <algorithm>
+#include <assert.h>
 
 #define LOG_SUBSYSTEM "Audio"
 

@@ -10,9 +10,9 @@
 # include "signal_processing_library/signal_processing_library.h"
 #endif
 
-#include "../helper/HL_Pointer.h"
 #include <vector>
 #include <memory>
+#include <map>
 
 namespace Audio 
 {

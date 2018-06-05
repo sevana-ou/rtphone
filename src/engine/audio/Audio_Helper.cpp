@@ -7,6 +7,7 @@
 # include <WinSock2.h>
 #endif
 
+#include <assert.h>
 #include "Audio_Helper.h"
 #include "../helper/HL_Exception.h"
 
