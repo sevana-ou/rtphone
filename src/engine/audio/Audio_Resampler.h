@@ -6,7 +6,10 @@
 #ifndef __AUDIO_RESAMPLER_H
 #define __AUDIO_RESAMPLER_H
 
-#include "signal_processing_library/signal_processing_library.h"
+#ifdef USE_WEBRTC_RESAMPLER
+# include "signal_processing_library/signal_processing_library.h"
+#endif
+
 #include "../helper/HL_Pointer.h"
 #include <vector>
 #include <memory>
@@ -69,6 +72,7 @@ namespace Audio
     void preload();
   };
 
+#ifdef USE_WEBRTC_RESAMPLER
   // n*10 milliseconds buffers required!
   class Resampler48kTo16k
   {
@@ -92,6 +96,7 @@ namespace Audio
     WebRtc_Word32 mTemp[336];
     WebRtcSpl_State16khzTo48khz mContext;
   };
+#endif
 }
 
 #endif

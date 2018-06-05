@@ -154,6 +154,7 @@ int ChannelConverter::monoToStereo(const void *source, int sourceLength, void *d
 }
 
 
+#if defined(USE_WEBRTC_RESAMPLER)
 Resampler48kTo16k::Resampler48kTo16k()
 {
   WebRtcSpl_ResetResample48khzTo16khz(&mContext);
@@ -198,6 +199,8 @@ int Resampler16kto48k::process(const void *source, int sourceLen, void *dest, in
 
   return sourceLen * 3;
 }
+
+#endif
 
 // ---------------- UniversalResampler -------------------
 UniversalResampler::UniversalResampler()
