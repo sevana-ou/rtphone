@@ -7,7 +7,7 @@ set (CMAKE_CXX_STANDARD_REQUIRED ON)
 file(GLOB MEDIA_LIB_SOURCES "*.cpp" "*.h")
 
 # SRTP requires this
-add_definitions(-DHAVE_STDINT_H -DHAVE_UINT64_T -DHAVE_NETINET_IN_H)
+add_definitions(-DHAVE_STDINT_H -DHAVE_UINT64_T)
 
 if(CMAKE_SYSTEM MATCHES "Linux*")
     add_definitions(-DHAVE_NETINET_IN_H)

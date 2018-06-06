@@ -1,3 +1,5 @@
+#define NOMINMAX
+
 //#include "config.h"
 #include "MT_SevanaMos.h"
 
@@ -19,6 +21,7 @@ using namespace boost::filesystem;
 #include <streambuf>
 #include <iostream>
 #include <atomic>
+#include <algorithm>
 
 #if defined(PVQA_SERVER)
 extern std::string IntervalCacheDir;

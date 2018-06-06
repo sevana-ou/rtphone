@@ -10,7 +10,10 @@
 #endif
 #include <set>
 #include <assert.h>
-#include <unistd.h> // Responsible for close() call on Linux
+
+#if !defined(TARGET_WIN)
+# include <unistd.h> // Responsible for close() call on Linux
+#endif
 
 #include "HL_SocketHeap.h"
 #include "HL_Log.h"

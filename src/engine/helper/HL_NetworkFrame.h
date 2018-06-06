@@ -35,7 +35,11 @@ public:
     uint16_t  mEtherType; /* IP? ARP? RARP? etc */
   };
 
+#if defined(TARGET_WIN)
+  struct /*__attribute__((packed))*/ LinuxSllHeader
+#else
   struct __attribute__((packed)) LinuxSllHeader
+#endif
   {
     uint16_t mPacketType;
     uint16_t mARPHRD;

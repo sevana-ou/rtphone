@@ -10,6 +10,7 @@
 #include "../Helper/HL_Exception.h"
 #include "../Helper/HL_Log.h"
 
+#include <assert.h>
 #include <dsconf.h>
 #include <process.h>
 #pragma comment(lib, "dsound.lib")

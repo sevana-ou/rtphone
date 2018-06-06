@@ -9,7 +9,9 @@
 
 #include "jrtplib/src/rtprawpacket.h"
 #include "jrtplib/src/rtpipv4address.h"
-#include <alloca.h>
+#if !defined(TARGET_WIN)
+# include <alloca.h>
+#endif
 #include <sstream>
 #include <tuple>
 

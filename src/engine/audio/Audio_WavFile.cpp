@@ -26,7 +26,9 @@ typedef struct {
   WORD  nBlockAlign;
   WORD  wBitsPerSample;
   WORD  cbSize;
-}WAVEFORMATEX;
+}
+WaveFormatEx;
+
 #define WAVE_FORMAT_PCM 1
 
 #define LOG_SUBSYSTEM "WavFileReader"
@@ -293,7 +295,7 @@ bool WavFileWriter::open(const std::tstring& filename, int rate, int channels)
   DWORD dwFmtSize = 16; /*= 16L*/;
   checkWriteResult( fwrite(&dwFmtSize, sizeof(dwFmtSize), 1, mHandle) );
 
-  WAVEFORMATEX format;
+  WaveFormatEx format;
   format.wFormatTag = WAVE_FORMAT_PCM; 
   checkWriteResult( fwrite(&format.wFormatTag, sizeof(format.wFormatTag), 1, mHandle) );
   

@@ -3,6 +3,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
+#define NOMINMAX
 
 #include "../config.h"
 #include "MT_AudioReceiver.h"
@@ -15,6 +16,8 @@
 #if defined(USE_AMR_CODEC)
 # include "MT_AmrCodec.h"
 #endif
+
+#include <algorithm>
 
 #define LOG_SUBSYSTEM "AudioReceiver"
 

@@ -14,7 +14,9 @@
 # include <fcntl.h>
 #endif
 
-#include <unistd.h>
+#if !defined(TARGET_WIN)
+# include <unistd.h>
+#endif
 #include <assert.h>
 
 DatagramSocket::DatagramSocket()

@@ -1,7 +1,9 @@
-/* Copyright(C) 2007-2017 VoIPobjects (voipobjects.com)
+/* Copyright(C) 2007-2018 VoIPobjects (voipobjects.com)
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+
+#define NOMINMAX
 
 #include "../config.h"
 #include "MT_AudioCodec.h"
@@ -23,6 +25,7 @@
 #include <assert.h>
 #include <memory.h>
 #include <string.h>
+#include <algorithm>
 
 #define LOG_SUBSYSTEM "Codec"
 

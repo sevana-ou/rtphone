@@ -14,6 +14,7 @@
 #include <assert.h>
 #include <string.h>
 #include <stdio.h>
+#include <algorithm>
 
 #ifndef _WIN32
 # include <arpa/inet.h>

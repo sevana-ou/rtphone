@@ -4,7 +4,7 @@
 Uuid::Uuid()
 {
 #if defined(TARGET_WIN) || defined(TARGET_LINUX) || defined(TARGET_OSX)
-  memset(mUuid, 0, sizeof mUuid);
+  memset(&mUuid, 0, sizeof mUuid);
 #endif
 }
 
