@@ -47,7 +47,7 @@ namespace ice
   extern const char* RunningStateToString(RunningState state);
 
   // Smart pointer to ICE stream type
-  typedef SmartPtr<Stream> ICEStreamPtr;
+  typedef std::shared_ptr<Stream> ICEStreamPtr;
   
   
   // Map of used channel TURN prefixes as key and corresponding address as value

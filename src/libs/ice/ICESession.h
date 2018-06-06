@@ -18,11 +18,10 @@
 #include "ICESync.h"
 #include "ICECheckList.h"
 #include "ICETime.h"
-#include "ICESmartPtr.h"
 #include "ICEStream.h"
 
-namespace ice {
-
+namespace ice
+{
   // ICE session context
   struct Session
   {

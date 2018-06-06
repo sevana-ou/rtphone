@@ -7,6 +7,8 @@
 #include "ICEStunAttributes.h"
 #include "ICENetworkHelper.h"
 #include <stdexcept>
+#include <assert.h>
+
 using namespace ice;
 
 

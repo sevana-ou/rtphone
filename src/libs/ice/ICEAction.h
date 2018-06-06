@@ -6,7 +6,7 @@
 #ifndef __ICE_ACTION__H
 #define __ICE_ACTION__H
 
-#include "ICESmartPtr.h"
+#include <memory>
 #include "ICECandidatePair.h"
 
 namespace ice
@@ -35,7 +35,7 @@ namespace ice
     virtual void finished(Transaction& transaction) = 0;
   };
   
-  typedef SmartPtr<Action> PAction;
+  typedef std::shared_ptr<Action> PAction;
 
 }
 

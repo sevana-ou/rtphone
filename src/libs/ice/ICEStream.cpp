@@ -14,6 +14,7 @@
 #include <stdexcept>
 #include <strstream>
 #include <algorithm>
+#include <assert.h>
 
 using namespace ice;
 

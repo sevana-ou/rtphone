@@ -8,7 +8,6 @@
 
 #include "ICEPlatform.h"
 #include "ICECandidatePair.h"
-#include "ICESmartPtr.h"
 #include <vector>
 
 namespace ice

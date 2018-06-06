@@ -14,6 +14,7 @@
 #ifndef _WIN32
 # include <stdexcept>
 #endif
+#include <assert.h>
 
 using namespace ice;
 #define LOG_SUBSYSTEM "ICE"

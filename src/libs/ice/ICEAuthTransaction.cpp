@@ -29,7 +29,7 @@ void AuthTransaction::init()
     buildAuthenticatedMsg();
   else
   {
-    SmartPtr<StunMessage> msg(new StunMessage());
+    std::shared_ptr<StunMessage> msg(new StunMessage());
     msg->setTransactionId(mTransactionID);
     setInitialRequest(*msg);
     mComposed = false;
@@ -44,7 +44,7 @@ void AuthTransaction::buildAuthenticatedMsg()
   md5Bin(key.c_str(), key.size(), mKey);
 
   // Create new authenticated message
-  SmartPtr<StunMessage> newMsg( new StunMessage() );
+  std::shared_ptr<StunMessage> newMsg( new StunMessage() );
 
   // Optional - generate new transaction ID
   // mTransactionID = StunMessage::TransactionID::GenerateNew();

@@ -7,7 +7,6 @@
 #include "ICESession.h"
 #include "ICENetworkHelper.h"
 #include "ICEAction.h"
-#include "ICESmartPtr.h"
 #include "ICEBinding.h"
 #include "ICERelaying.h"
 #include "ICEAddress.h"

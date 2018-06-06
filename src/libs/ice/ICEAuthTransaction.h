@@ -6,6 +6,7 @@
 #ifndef __AUTH_TRANSACTION_H
 #define __AUTH_TRANSACTION_H
 
+#include <memory>
 #include "ICEPlatform.h"
 #include "ICEStunTransaction.h"
 
@@ -23,7 +24,7 @@ public:
   virtual void              setInitialRequest(StunMessage& msg) = 0;
   virtual void              setAuthenticatedRequest(StunMessage& msg) = 0;
   virtual void              processSuccessMessage(StunMessage& msg, NetworkAddress& sourceAddress) = 0;
-  virtual void              processError() {};
+  virtual void              processError() {}
   
   virtual bool              processData(StunMessage& msg, NetworkAddress& address);
   virtual ByteBuffer*    generateData(bool force = false);
@@ -44,7 +45,7 @@ protected:
   bool                                mComposed;
   int                                 mErrorCode;
   std::string                         mErrorResponse;
-  std::deque<SmartPtr<StunMessage> >  mOutgoingMsgQueue;
+  std::deque<std::shared_ptr<StunMessage> >  mOutgoingMsgQueue;
   unsigned char                       mKey[16];
   bool                                mConformsToKeepaliveSchedule;
   std::string                         mRealm;

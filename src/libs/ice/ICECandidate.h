@@ -7,7 +7,6 @@
 #define __ICE_CANDIDATE_H
 
 #include "ICEPlatform.h"
-#include "ICESmartPtr.h"
 #include "ICEAddress.h"
 
 #include <string>

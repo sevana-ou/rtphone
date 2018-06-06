@@ -9,7 +9,6 @@
 #include "ICEPlatform.h"
 #include "ICECandidate.h"
 #include "ICEByteBuffer.h"
-#include "ICESmartPtr.h"
 
 namespace ice
 {
