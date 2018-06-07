@@ -208,6 +208,8 @@ bool Variant::operator == (const Variant& rhs) const
   default:
     return false;
   }
+
+  return false;
 }
 
 bool Variant::operator != (const Variant& rhs) const

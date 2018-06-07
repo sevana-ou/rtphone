@@ -47,7 +47,7 @@ void NullTimer::run()
     // Sleep for mInterval - mTail milliseconds
     std::this_thread::sleep_for(std::chrono::microseconds(mInterval * 1000 - mTail));
 
-    mTail += std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::system_clock::now() - timestamp).count();
+    mTail += (int)std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::system_clock::now() - timestamp).count();
   }
 }
 

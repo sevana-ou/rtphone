@@ -32,6 +32,6 @@ set (ICE_STACK_SOURCES ICEAddress.cpp
     ICETime.cpp
     ICETransactionList.cpp)
 
-add_definitions(-DUSE_NATIVE_SMARTPTR)
+add_definitions(-DUSE_NATIVE_SMARTPTR -D_WINSOCK_DEPRECATED_NO_WARNINGS)
 
 add_library(ice_stack ${ICE_STACK_SOURCES})

@@ -167,7 +167,7 @@ static void EmbedAttrBuffer(StunAttribute& attr, BufferWriter& writer)
   writer.writeUShort(attr.type());
   
   // Enqueue length
-  writer.writeUShort(attrBuffer.size());
+  writer.writeUShort((uint16_t)attrBuffer.size());
   
   // Save data offset in generated buffer
   attr.setDataOffset(writer.offset() + 2); // 2 is for first 16 bits written by bitstream
@@ -281,7 +281,7 @@ void StunMessage::buildPacket(ByteBuffer& buffer, const std::string& password)
   buffer.resize(stream.offset() + 2);
 
   // Put length in header
-  *((unsigned short*)buffer.mutableData() + 1) = htons(buffer.size() - STUN_HEADER_SIZE);
+  *((unsigned short*)buffer.mutableData() + 1) = (uint16_t)(htons(buffer.size() - STUN_HEADER_SIZE));
 
   // Check for fingerprint attribute
   fpIter = mAttrMap.find(StunAttribute::Fingerprint);
@@ -507,7 +507,7 @@ bool StunMessage::validatePacket(std::string key)
     unsigned short len = *lengthPtr;
     
     // Set fake length including MessageIntegrity attribute but excluding any attributes behind of it and excluding STUN header size
-    *lengthPtr = htons(mi.dataOffset() + HMAC_DIGEST_SIZE - STUN_HEADER_SIZE);
+    *lengthPtr = (uint16_t)(htons(mi.dataOffset() + HMAC_DIGEST_SIZE - STUN_HEADER_SIZE));
     
     // Find HMAC-SHA1 again
     hmacSha1Digest(mPacket2Parse.data(), mi.dataOffset() - 4, digest, key.c_str(), key.size());

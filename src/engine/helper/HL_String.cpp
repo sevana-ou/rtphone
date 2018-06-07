@@ -71,7 +71,7 @@ uint64_t StringHelper::toUint64(const char* s, uint64_t def, bool *isOk)
 {
   uint64_t result = def;
 #if defined(TARGET_WIN)
-  if (sscanf(s, "%d", &result) != 1)
+  if (sscanf(s, "%I64d", &result) != 1)
 #else
   if (sscanf(s, "%llu", &result) != 1)
 #endif
@@ -290,7 +290,7 @@ static int hex2code(char s)
 
 static int hex2code(const char* s)
 {
-  return hex2code(s[0]) << 4 + hex2code(s[1]);
+  return (hex2code(s[0]) << 4) + hex2code(s[1]);
 }
 
 std::string StringHelper::fromHex2String(const std::string& s)

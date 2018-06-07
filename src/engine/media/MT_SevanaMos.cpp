@@ -528,9 +528,9 @@ std::string SevanaPVQA::mosToColor(float mos)
 
   float mosFraction = (mos - 1.0f) / 4.0f;
 
-  end.mBlue += (start.mBlue - end.mBlue) * mosFraction;
-  end.mGreen += (start.mGreen - end.mGreen) * mosFraction;
-  end.mRed += (start.mRed - end.mRed) * mosFraction;
+  end.mBlue += (uint8_t)((start.mBlue - end.mBlue) * mosFraction);
+  end.mGreen += (uint8_t)((start.mGreen - end.mGreen) * mosFraction);
+  end.mRed += (uint8_t)((start.mRed - end.mRed) * mosFraction);
 
   return end.toHex();
 }
@@ -866,7 +866,7 @@ SevanaAqua::PFaultsReport SevanaAqua::loadFaultsReport(std::istream& input)
         if (parts.size() >= 3)
         {
           if (parts.back() == "ms.")
-            result->mSignalAdvancedInMilliseconds = std::atof(parts[parts.size() - 2].c_str());
+            result->mSignalAdvancedInMilliseconds = (float)std::atof(parts[parts.size() - 2].c_str());
         }
       }
       else
@@ -879,7 +879,7 @@ SevanaAqua::PFaultsReport SevanaAqua::loadFaultsReport(std::istream& input)
           if (parts.size() >= 3)
           {
             if (parts.back() == "percent.")
-              result->mMistimingInPercents = std::atof(parts[parts.size() - 2].c_str());
+              result->mMistimingInPercents = (float)std::atof(parts[parts.size() - 2].c_str());
           }
         }
       }
