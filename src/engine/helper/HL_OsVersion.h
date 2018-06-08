@@ -48,4 +48,7 @@ extern int _kbhit();
 
 #endif
 
+#if defined(TARGET_WIN)
+# include <conio.h>
+#endif
 #endif
