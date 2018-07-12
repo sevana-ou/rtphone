@@ -13,9 +13,9 @@
 #include "Audio_Helper.h"
 #include "Audio_Resampler.h"
 #include "Audio_DataWindow.h"
-#include "../Helper/HL_Pointer.h"
-#include "../Helper/HL_ByteBuffer.h"
-#include "../Helper/HL_Exception.h"
+#include "../helper/HL_Pointer.h"
+#include "../helper/HL_ByteBuffer.h"
+#include "../helper/HL_Exception.h"
 #include <AudioToolbox/AudioQueue.h>
 
 // Define CoreAudio buffer time length in milliseconds

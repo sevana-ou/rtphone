@@ -10,6 +10,7 @@
 #include <condition_variable>
 #include <chrono>
 #include <thread>
+#include <vector>
 
 typedef std::recursive_mutex Mutex;
 typedef std::unique_lock<std::recursive_mutex> Lock;
@@ -75,6 +76,23 @@ public:
   // Finds time delta between 'later' and 'earlier' time points.
   // Handles cases when clock is wrapped.
   static uint32_t getDelta(uint32_t later, uint32_t earlier);
+};
+
+class BufferQueue
+{
+public:
+    BufferQueue();
+    ~BufferQueue();
+
+    typedef std::shared_ptr<std::vector<unsigned char>> Block;
+
+    void push(const void* data, int bytes);
+    Block pull(std::chrono::milliseconds timeout);
+
+protected:
+    std::mutex mMutex;
+    std::condition_variable mSignal;
+    std::vector<Block> mBlockList;
 };
 
 #endif

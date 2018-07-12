@@ -84,3 +84,39 @@ uint32_t TimeHelper::getDelta(uint32_t later, uint32_t earlier)
 
   return 0;
 }
+
+// --------------- BufferQueue -----------------
+BufferQueue::BufferQueue()
+{
+
+}
+
+BufferQueue::~BufferQueue()
+{
+
+}
+
+void BufferQueue::push(const void* data, int bytes)
+{
+    std::unique_lock<std::mutex> l(mMutex);
+
+    Block b = std::make_shared<std::vector<unsigned char>>();
+    b->resize(bytes);
+    memcpy(b->data(), data, bytes);
+    mBlockList.push_back(b);
+}
+
+BufferQueue::Block BufferQueue::pull(std::chrono::milliseconds timeout)
+{
+    std::unique_lock<std::mutex> l(mMutex);
+    std::cv_status status = std::cv_status::no_timeout;
+
+    while (mBlockList.empty() && status == std::cv_status::no_timeout)
+        status = mSignal.wait_for(l, timeout);
+
+    Block r;
+    if (status == std::cv_status::no_timeout)
+        r = mBlockList.front(); mBlockList.erase(mBlockList.begin());
+
+    return r;
+}
