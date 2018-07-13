@@ -164,10 +164,41 @@ namespace MT
     // Report is returned in JSON format
     struct AudioBuffer
     {
-      int mRate = 8000;
-      int mChannels = 1;
-      void* mData = nullptr;
-      int mSize = 0; // In bytes
+        AudioBuffer()
+        {}
+
+        AudioBuffer(int size)
+        {
+            mData = std::make_shared<std::vector<unsigned char>>();
+            mData->resize(size);
+        }
+
+        AudioBuffer(const void* data, int size)
+        {
+            mData = std::make_shared<std::vector<unsigned char>>();
+            mData->resize(size);
+            memcpy(mData->data(), data, size);
+        }
+
+        void* data()
+        {
+            return mData ? mData->data() : nullptr;
+        }
+
+        const void* data() const
+        {
+            return mData ? mData->data() : nullptr;
+        }
+
+        int size() const
+        {
+            return mData ? mData->size() : 0;
+        }
+
+        int mRate = 8000;
+        int mChannels = 1;
+        std::shared_ptr<std::vector<unsigned char>> mData;
+        bool isInitialized() const { return mRate > 0 && mChannels > 0 && mData; }
     };
 
       

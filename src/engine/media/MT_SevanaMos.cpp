@@ -669,20 +669,20 @@ SevanaAqua::CompareResult SevanaAqua::compare(AudioBuffer& reference, AudioBuffe
 
   std::unique_lock<std::mutex> l(mMutex);
 
-  if (!mContext)
+  if (!mContext || !reference.isInitialized() || !test.isInitialized())
     return r;
 
   // Make analysis
   TSSA_AQuA_AudioData aad;
   aad.dSrcData.dNChannels = reference.mChannels;
   aad.dSrcData.dSampleRate = reference.mRate;
-  aad.dSrcData.pSamples = (short*)reference.mData;
-  aad.dSrcData.dNSamples = (long)reference.mSize / 2 / reference.mChannels;
+  aad.dSrcData.pSamples = (short*)reference.mData->data();
+  aad.dSrcData.dNSamples = (long)reference.mData->size() / 2 / reference.mChannels;
 
   aad.dTstData.dNChannels = test.mChannels;
   aad.dTstData.dSampleRate = test.mRate;
-  aad.dTstData.pSamples = (short*)test.mData;
-  aad.dTstData.dNSamples = (long)test.mSize / 2 / test.mChannels;
+  aad.dTstData.pSamples = (short*)test.mData->data();
+  aad.dTstData.dNSamples = (long)test.mData->size() / 2 / test.mChannels;
 
   int rescode;
   rescode = SSA_OnTestAudioData(mContext, &aad);

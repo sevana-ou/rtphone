@@ -104,19 +104,23 @@ void BufferQueue::push(const void* data, int bytes)
     b->resize(bytes);
     memcpy(b->data(), data, bytes);
     mBlockList.push_back(b);
+    mSignal.notify_all();
 }
 
 BufferQueue::Block BufferQueue::pull(std::chrono::milliseconds timeout)
 {
     std::unique_lock<std::mutex> l(mMutex);
-    std::cv_status status = std::cv_status::no_timeout;
+    std::cv_status status = mBlockList.empty() ? std::cv_status::timeout : std::cv_status::no_timeout;
 
-    while (mBlockList.empty() && status == std::cv_status::no_timeout)
+    while (mBlockList.empty() && status == std::cv_status::timeout)
         status = mSignal.wait_for(l, timeout);
 
     Block r;
     if (status == std::cv_status::no_timeout)
-        r = mBlockList.front(); mBlockList.erase(mBlockList.begin());
+    {
+        r = mBlockList.front();
+        mBlockList.erase(mBlockList.begin());
+    }
 
     return r;
 }
