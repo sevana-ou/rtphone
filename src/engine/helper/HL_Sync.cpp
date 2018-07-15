@@ -6,6 +6,7 @@
 #include "HL_Sync.h"
 #include <assert.h>
 #include <atomic>
+#include <memory.h>
 
 #ifdef TARGET_OSX
 # include <libkern/OSAtomic.h>
@@ -83,6 +84,16 @@ uint32_t TimeHelper::getDelta(uint32_t later, uint32_t earlier)
     return 0xFFFFFFFF - earlier + later;
 
   return 0;
+}
+
+TimeHelper::ExecutionTime::ExecutionTime()
+{
+    mStart = TimeHelper::getTimestamp();
+}
+
+uint64_t TimeHelper::ExecutionTime::getSpentTime() const
+{
+    return TimeHelper::getTimestamp() - mStart;
 }
 
 // --------------- BufferQueue -----------------

@@ -3,6 +3,7 @@
 
 #include <iostream>
 #include <string>
+#include <assert.h>
 
 #include "helper/HL_VariantMap.h"
 #include "helper/HL_String.h"

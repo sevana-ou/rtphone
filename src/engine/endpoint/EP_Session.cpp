@@ -167,12 +167,12 @@ int ResipSession::sessionId()
   return mSessionId;
 }
 
-void ResipSession::setUASProfile(SharedPtr<resip::UserProfile> profile)
+void ResipSession::setUASProfile(std::shared_ptr<resip::UserProfile> profile)
 {
   mUASProfile = profile;
 }
 
-SharedPtr<resip::UserProfile> ResipSession::selectUASUserProfile(const resip::SipMessage& msg)
+resip::SharedPtr<resip::UserProfile> ResipSession::selectUASUserProfile(const resip::SipMessage& msg)
 {
   assert(mUserAgent != nullptr);
 
@@ -184,7 +184,7 @@ SharedPtr<resip::UserProfile> ResipSession::selectUASUserProfile(const resip::Si
     else
       return mUserAgent->mProfile;
   }
-  return SharedPtr<resip::UserProfile>();
+  return resip::SharedPtr<resip::UserProfile>();
 }
 
 #pragma endregion

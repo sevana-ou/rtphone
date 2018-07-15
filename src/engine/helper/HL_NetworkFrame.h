@@ -80,6 +80,11 @@ public:
     {
       return mVhl >> 4;
     }
+
+    const in_addr& source4() const  { return mSource; }
+    const in_addr& dest4() const    { return mDestination; }
+    const in6_addr& source6() const { return (const in6_addr&)mSource; }
+    const in6_addr& dest6() const   { return (const in6_addr&)mDestination; }
   };
 
   struct UdpHeader

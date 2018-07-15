@@ -150,6 +150,18 @@ extern Logger GLogger;
 #define ICELogDebug(args_) ICELog(LL_DEBUG, LOG_SUBSYSTEM, args_)
 #define ICELogMedia(args_) ICELog(LL_MEDIA, LOG_SUBSYSTEM, args_)
 
+#define ICELogCritical2(args_) ICELog(LogLevel_Critical, LogSubsystem.c_str(), args_)
+#define ICELogInfo2(args_) ICELog(LogLevel_Info, LogSubsystem.c_str(), args_)
+#define ICELogDebug2(args_) ICELog(LogLevel_Debug, LogSubsystem.c_str(), args_)
+#define ICELogMedia2(args_) ICELog(LogLevel_Media, LogSubsystem.c_str(), args_)
+
+#define DEFINE_LOGGING(subsystem) \
+    static std::string LogSubsystem = subsystem; \
+    static ice::LogLevel LogLevel_Critical = LL_CRITICAL; \
+    static ice::LogLevel LogLevel_Info = LL_INFO; \
+    static ice::LogLevel LogLevel_Debug = LL_DEBUG; \
+    static ice::LogLevel LogLevel_Media = LL_MEDIA
+
 
 /*
 #define ICELogCritical(args_)

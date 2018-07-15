@@ -7,7 +7,8 @@
 #ifndef __AUDIO_WAVFILE_H
 #define __AUDIO_WAVFILE_H
 
-//#include "helper/HL_Types.h"
+#include "helper/HL_Sync.h"
+#include "helper/HL_Types.h"
 #include "Audio_Resampler.h"
 
 #include <stdio.h>
@@ -15,7 +16,6 @@
 #include <memory>
 #include <mutex>
 
-#include "helper/HL_Types.h"
 
 namespace Audio
 {

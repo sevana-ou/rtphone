@@ -1,8 +1,12 @@
+#include <iostream>
+
 #include "HL_NetworkFrame.h"
 #include "HL_InternetAddress.h"
 
-#define ETHERTYPE_MPLS_UC (0x8847)
-#define ETHERTYPE_MPLS_MC (0x8848)
+#define ETHERTYPE_MPLS_UC   (0x8847)
+#define ETHERTYPE_MPLS_MC   (0x8848)
+#define ETHERTYPE_IPV6      (0x86dd)
+#define ETHERTYPE_IP        (0x0800)
 
 #define MPLS_STACK_MASK (0x00000100)
 #define MPLS_STACK_SHIFT (8)
@@ -27,22 +31,32 @@ NetworkFrame::PacketData NetworkFrame::GetUdpPayloadForEthernet(NetworkFrame::Pa
     proto = ntohs(vlan->mData);
   }
 
-  // Skip MPLS headers
-
-  if (proto == ETHERTYPE_MPLS_UC || proto == ETHERTYPE_MPLS_MC)
-  {
-    // Parse MPLS here until marker "bottom of mpls stack"
-    for(bool bottomOfStack = false; !bottomOfStack;
-        bottomOfStack = ((ntohl(*(uint32_t*)(packet.mData - 4)) & MPLS_STACK_MASK) >> MPLS_STACK_SHIFT) != 0)
+    // Skip MPLS headers
+    switch (proto)
     {
-      packet.mData += 4;
-      packet.mLength -=4;
+    case ETHERTYPE_MPLS_UC:
+    case ETHERTYPE_MPLS_MC:
+        // Parse MPLS here until marker "bottom of mpls stack"
+        for(bool bottomOfStack = false; !bottomOfStack;
+                 bottomOfStack = ((ntohl(*(uint32_t*)(packet.mData - 4)) & MPLS_STACK_MASK) >> MPLS_STACK_SHIFT) != 0)
+        {
+            packet.mData += 4;
+            packet.mLength -=4;
+        }
+        break;
+
+    case ETHERTYPE_IP:
+        //  Next IPv4 packet
+        break;
+
+    case ETHERTYPE_IPV6:
+        // Next IPv6 packet
+        break;
     }
-  }
 
   const Ip4Header* ip4 = reinterpret_cast<const Ip4Header*>(packet.mData);
 
-  if (ip4->mProtocol != IPPROTO_UDP)
+  if (ip4->mProtocol != IPPROTO_UDP && ip4->mProtocol != 0)
     return PacketData();
 
 
@@ -89,7 +103,7 @@ NetworkFrame::PacketData NetworkFrame::GetUdpPayloadForIp4(NetworkFrame::PacketD
 {
   PacketData result(packet);
   const Ip4Header* ip4 = reinterpret_cast<const Ip4Header*>(packet.mData);
-  if (ip4->mProtocol != IPPROTO_UDP)
+  if (ip4->mProtocol != IPPROTO_UDP && ip4->mProtocol != 0)
     return PacketData(nullptr, 0);
 
   result.mData += ip4->headerLength();
@@ -113,17 +127,45 @@ NetworkFrame::PacketData NetworkFrame::GetUdpPayloadForIp4(NetworkFrame::PacketD
   return result;
 }
 
+struct Ip6Header
+{
+#if __BYTE_ORDER == __LITTLE_ENDIAN
+    uint8_t     traffic_class_hi:4,
+                        version:4;
+    uint8_t     flow_label_hi:4,
+                        traffic_class_lo:4;
+    uint16_t	flow_label_lo;
+
+#elif __BYTE_ORDER == __BIG_ENDIAN
+    uint8_t			version:4,
+                    traffic_class_hi:4;
+    uint8_t			traffic_class_lo:4,
+                    flow_label_hi:4;
+    uint16_t	    flow_label_lo;
+#else
+# error "Please fix endianness defines"
+#endif
+
+    uint16_t		payload_len;
+    uint8_t			next_header;
+    uint8_t			hop_limit;
+
+    struct	in6_addr	src_ip;
+    struct	in6_addr	dst_ip;
+};
+
 NetworkFrame::PacketData NetworkFrame::GetUdpPayloadForIp6(NetworkFrame::PacketData& packet, InternetAddress& source, InternetAddress& destination)
 {
   PacketData result(packet);
-  const Ip4Header* ip4 = reinterpret_cast<const Ip4Header*>(packet.mData);
-  if (ip4->mProtocol != IPPROTO_UDP)
+  const Ip6Header* ip6 = reinterpret_cast<const Ip6Header*>(packet.mData);
+  /*if (ip6->mProtocol != IPPROTO_UDP && ip4->mProtocol != 0)
     return PacketData(nullptr, 0);
+  */
+  result.mData += sizeof(Ip6Header);
+  result.mLength -= sizeof(Ip6Header);
+  //std::cout << sizeof(Ip6Header) << std::endl;
 
-  result.mData += ip4->headerLength();
-  result.mLength -= ip4->headerLength();
-
-  const UdpHeader* udp = reinterpret_cast<const UdpHeader*>(packet.mData);
+  const UdpHeader* udp = reinterpret_cast<const UdpHeader*>(result.mData);
   result.mData += sizeof(UdpHeader);
   result.mLength -= sizeof(UdpHeader);
 
@@ -131,11 +173,14 @@ NetworkFrame::PacketData NetworkFrame::GetUdpPayloadForIp6(NetworkFrame::PacketD
   if (result.mLength != ntohs(udp->mDatagramLength))
     return PacketData(nullptr, 0);
   */
-  source.setIp(ip4->mSource);
-  source.setPort(ntohs(udp->mSourcePort));
 
-  destination.setIp(ip4->mDestination);
+  source.setIp(ip6->src_ip);
+  source.setPort(ntohs(udp->mSourcePort));
+  //std::cout << source.toStdString() << " - ";
+
+  destination.setIp(ip6->dst_ip);
   destination.setPort(ntohs(udp->mDestinationPort));
+  //std::cout << destination.toStdString() << std::endl;
 
   return result;
 }

@@ -38,7 +38,7 @@ protected:
   std::string mPeer;
 };
 
-typedef SharedPtr<ClientObserver> PClientObserver;
+typedef std::shared_ptr<ClientObserver> PClientObserver;
 
 class ServerObserver
 {
@@ -68,6 +68,6 @@ protected:
   int mSessionId;
 };
 
-typedef SharedPtr<ServerObserver> PServerObserver;
+typedef std::shared_ptr<ServerObserver> PServerObserver;
 
 #endif // EP_OBSERVER_H

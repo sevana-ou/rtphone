@@ -321,7 +321,7 @@ public:
    static resip::AtomicCounter InstanceCounter;
 };
 
-typedef SharedPtr<Session> PSession;
+typedef std::shared_ptr<Session> PSession;
 
 /////////////////////////////////////////////////////////////////////////////////
 //
@@ -383,7 +383,7 @@ public:
 
   void runTerminatedEvent(Type type, int code = 0, int reason = 0);
 
-  void setUASProfile(SharedPtr<resip::UserProfile> profile);
+  void setUASProfile(std::shared_ptr<resip::UserProfile> profile);
 
 protected:
   bool mTerminated;
@@ -394,7 +394,7 @@ protected:
   std::string mRemoteAddress;
   void* mTag;
   bool mOnWatchingStartSent;
-  SharedPtr<resip::UserProfile> mUASProfile;
+  std::shared_ptr<resip::UserProfile> mUASProfile;
 };
 
 

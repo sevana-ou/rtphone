@@ -76,8 +76,18 @@ public:
   // Finds time delta between 'later' and 'earlier' time points.
   // Handles cases when clock is wrapped.
   static uint32_t getDelta(uint32_t later, uint32_t earlier);
+
+  class ExecutionTime
+  {
+  public:
+      ExecutionTime();
+      uint64_t getSpentTime() const;
+  protected:
+      uint64_t mStart;
+  };
 };
 
+	
 class BufferQueue
 {
 public:

@@ -7,11 +7,8 @@
 #define __SMART_POINTER_H
 
 #include <memory>
-#define SharedPtr std::shared_ptr
-
-#include "HL_Sync.h"
-
 #include <map>
+#include "HL_Sync.h"
 
 class UsageCounter
 {
