@@ -7,7 +7,7 @@
 #include <mutex>
 #include <atomic>
 #include <map>
-
+#include <memory.h>
 
 #if defined(USE_PVQA_LIBRARY)
 # include "pvqa.h"
