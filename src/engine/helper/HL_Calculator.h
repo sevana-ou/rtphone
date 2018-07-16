@@ -483,7 +483,7 @@ namespace Calc
 
       case LexemType::Dec:
         result->mType = Ast::Type::Number;
-        result->mValue = atoi(l.mValue.c_str());
+        result->mValue = (int64_t)atoll(l.mValue.c_str());
         break;
 
       case LexemType::Hex:
