@@ -108,7 +108,7 @@ namespace MT
       OPUS
     };
 
-    float getResults(std::string& report, const EchoData** echo, int samplerate, Codec codec);
+    float getResults(std::string& report, EchoData** echo, int samplerate, Codec codec);
 
     // Report is interval report. Names are output detector names. startIndex is column's start index in interval report of first detector.
     struct DetectorsList
