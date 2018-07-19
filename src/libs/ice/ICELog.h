@@ -20,72 +20,83 @@
 
 namespace ice
 {
-  // Defines log levels
-  enum LogLevel
-  {
-    LL_NONE = -1,
-    LL_CRITICAL = 0,
-    LL_INFO = 1,
-    LL_DEBUG = 2,
-    LL_MEDIA = 3
-  };
 
-  class LogHandler
-  {
-  public:
+// Defines log levels
+enum LogLevel
+{
+    LL_NONE = -1000,
+    LL_SPECIAL = 0,
+    LL_CRITICAL = 1,
+    LL_ERROR = 2,
+    LL_INFO = 3,
+    LL_DEBUG = 4,
+    LL_MEDIA = 5
+};
+
+// Helper function to convert log level text parameter to enum value
+class LogLevelHelper
+{
+public:
+    static LogLevel parse(const std::string& t);
+    static std::string toString(LogLevel level);
+};
+
+class LogHandler
+{
+public:
     virtual void onIceLog(LogLevel level, const std::string& filename, int line, const std::string& subsystem, const std::string& msg) = 0;
-  };
-  
+};
+
 #ifdef _WIN32
-  class LogGuard
-  {
-  public:
+class LogGuard
+{
+public:
     LogGuard()    {  ::InitializeCriticalSection(&mCS);  }
     ~LogGuard()   {  ::DeleteCriticalSection(&mCS);      }
     void Lock()   {  ::EnterCriticalSection(&mCS);       }
     void Unlock() {  ::LeaveCriticalSection(&mCS);       }
 
-  protected:
+protected:
     CRITICAL_SECTION mCS;
-  };
+};
 
-  class LogLock
-  {
-  public:
+class LogLock
+{
+public:
     LogLock(LogGuard& g) :mGuard(g)   {  mGuard.Lock();   }
     ~LogLock()                        {  mGuard.Unlock(); }
 
-  protected:
+protected:
     LogGuard& mGuard;
-  };
+};
 #else
-  class LogGuard
-  {
-  public:
+class LogGuard
+{
+public:
     LogGuard()    {  ::pthread_mutex_init(&mMutex, NULL);  }
     ~LogGuard()   {  ::pthread_mutex_destroy(&mMutex);     }
     void Lock()   {  ::pthread_mutex_lock(&mMutex);        }
     void Unlock() {  ::pthread_mutex_unlock(&mMutex);      }
 
-  protected:
+protected:
     pthread_mutex_t mMutex;
-  };
+};
 
-  class LogLock
-  {
-  public:
+class LogLock
+{
+public:
     LogLock(LogGuard& g) :mGuard(g)   {  mGuard.Lock();   }
     ~LogLock()                        {  mGuard.Unlock(); }
 
-  protected:
+protected:
     LogGuard& mGuard;
-  };
+};
 
 #endif
 
-  class Logger
-  {
-  public:
+class Logger
+{
+public:
     static const char* TabPrefix;
 
     Logger();
@@ -113,7 +124,7 @@ namespace ice
     Logger& operator << (const unsigned int data);
     Logger& operator << (const uint64_t data);
 
-  protected:
+protected:
     LogGuard            mGuard;
     FILE*               mFile;
     std::string         mLogPath;
@@ -127,40 +138,46 @@ namespace ice
     std::string         mFilename;
     int                 mLine;
     std::string         mSubsystem;
-  };
+};
 
 
 extern Logger GLogger;
 
 
 #define ICELog(level_, subsystem_, args_)\
-   {do\
-   {\
-      if (GLogger.level() >= level_)\
-      {\
-        LogLock l(GLogger.mutex());\
-        GLogger.beginLine(level_, __FILE__, __LINE__, subsystem_);\
-        GLogger args_;\
-        GLogger.endLine();\
-      }\
-  } while (false);}
+{do\
+{\
+    if (GLogger.level() >= level_)\
+{\
+    LogLock l(GLogger.mutex());\
+    GLogger.beginLine(level_, __FILE__, __LINE__, subsystem_);\
+    GLogger args_;\
+    GLogger.endLine();\
+}\
+} while (false);}
 
 #define ICELogCritical(args_) ICELog(LL_CRITICAL, LOG_SUBSYSTEM, args_)
 #define ICELogInfo(args_) ICELog(LL_INFO, LOG_SUBSYSTEM, args_)
 #define ICELogDebug(args_) ICELog(LL_DEBUG, LOG_SUBSYSTEM, args_)
 #define ICELogMedia(args_) ICELog(LL_MEDIA, LOG_SUBSYSTEM, args_)
+#define ICELogError(args_) ICELog(LL_ERROR, LOG_SUBSYSTEM, args_)
+#define ICELogSpecial(args_) ICELog(LL_SPECIAL, LOG_SUBSYSTEM, args_)
 
 #define ICELogCritical2(args_) ICELog(LogLevel_Critical, LogSubsystem.c_str(), args_)
 #define ICELogInfo2(args_) ICELog(LogLevel_Info, LogSubsystem.c_str(), args_)
 #define ICELogDebug2(args_) ICELog(LogLevel_Debug, LogSubsystem.c_str(), args_)
 #define ICELogMedia2(args_) ICELog(LogLevel_Media, LogSubsystem.c_str(), args_)
+#define ICELogError2(args_) ICELog(LogLevel_Error, LogSubsystem.c_str(), args_)
+#define ICELogSpecial2(args_) ICELog(LogLevel_Special, LogSubsystem.c_str(), args_)
 
 #define DEFINE_LOGGING(subsystem) \
     static std::string LogSubsystem = subsystem; \
     static ice::LogLevel LogLevel_Critical = LL_CRITICAL; \
     static ice::LogLevel LogLevel_Info = LL_INFO; \
     static ice::LogLevel LogLevel_Debug = LL_DEBUG; \
-    static ice::LogLevel LogLevel_Media = LL_MEDIA
+    static ice::LogLevel LogLevel_Media = LL_MEDIA; \
+    static ice::LogLevel LogLevel_Error = LL_ERROR; \
+    static ice::LogLevel LogLevel_Special = LL_SPECIAL
 
 
 /*

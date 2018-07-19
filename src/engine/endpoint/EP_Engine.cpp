@@ -88,7 +88,7 @@ void UserAgent::start()
   LOCK;
   if (mStack)
   {
-    ICELogCritical(<<"Endpoint is started already.");
+    ICELogError(<<"Endpoint is started already.");
     return;
   }
   
@@ -138,7 +138,7 @@ void UserAgent::start()
     }
     catch(resip::BaseException& /*e*/)
     {
-      ICELogCritical(<< "Failed to preload root certificate");
+      ICELogError(<< "Failed to preload root certificate");
     }
   }
 
@@ -554,13 +554,13 @@ bool UserAgent::compareSipAddresses(std::string sip1, std::string sip2)
 
 void UserAgent::onGathered(PSession s)
 {
-  ICELogCritical(<< "Session " << s->sessionId() << " gathered candidates");
+  ICELogInfo(<< "Session " << s->sessionId() << " gathered candidates");
 }
 
 // Called when new candidate is gathered
 void UserAgent::onCandidateGathered(PSession s, const char* address)
 {
-  ICELogCritical(<< "Session " << s->sessionId() << " gathered new candidate " << address);
+  ICELogInfo(<< "Session " << s->sessionId() << " gathered new candidate " << address);
 }
 
 
@@ -604,7 +604,7 @@ void UserAgent::sendOffer(Session* session)
     if (h)
       h->provideOffer(sdp);
     else
-      ICELogCritical(<< "No cast to InviteSession");
+      ICELogError(<< "No cast to InviteSession");
   }
 }
 
@@ -662,8 +662,11 @@ bool UserAgent::operator()(resip::Log::Level level, const resip::Subsystem& subs
   std::stringstream ss;
 
   ss << "File "  << StringHelper::extractFilename(filename).c_str() << ", line " << line << ": " << message.c_str();
+  if (level <= resip::Log::Crit)
+      ICELogCritical(<< ss.str());
+  else
   if (level <= resip::Log::Warning)
-    ICELogCritical(<< ss.str().c_str())
+    ICELogError(<< ss.str().c_str())
   else
   if (level < resip::Log::Debug)
     ICELogInfo(<< ss.str().c_str())
@@ -859,7 +862,7 @@ void UserAgent::onAnswer(resip::InviteSessionHandle h, const resip::SipMessage& 
 
   if (s->mStreamList.size() < sdp.session().media().size())
   {
-    ICELogCritical( << "Answer has wrong number of streams");
+    ICELogError( << "SDP answer has wrong number of streams");
     h->end();
     return;
   }
@@ -971,7 +974,7 @@ void UserAgent::onAnswer(resip::InviteSessionHandle h, const resip::SipMessage& 
   // Reject session if there is no media
   if (!mediasupported)
   {
-    ICELogCritical(<< "Session " << s->mSessionId << ": no supported media.");
+    ICELogError(<< "Session " << s->mSessionId << ": no supported media. Ending the session.");
     h->end();
     return;
   }
@@ -1125,13 +1128,13 @@ void UserAgent::onDnsResult(const resip::DNSResult<resip::DnsHostRecord>& result
   if (result.status == 0)
   {
     resip::Data foundAddress = result.records.front().host();
-    ICELogCritical( << "Success to resolve STUN/TURN address to " << foundAddress.c_str());
+    ICELogInfo( << "Success to resolve STUN/TURN address to " << foundAddress.c_str());
     mConfig[CONFIG_STUNSERVER_IP] = std::string(foundAddress.c_str());
     onStart(0);
   }
   else
   {
-    ICELogCritical( << "Failed to resolve STUN or TURN server IP address.");
+    ICELogError( << "Failed to resolve STUN or TURN server IP address.");
     int startCode = mConfig[CONFIG_STUNSERVER_NAME].asStdString().empty() ? 0 : 503;
     onStart(startCode);
   }
@@ -1322,7 +1325,7 @@ void UserAgent::onUpdate(resip::ClientSubscriptionHandle h, const resip::SipMess
           resip::Data tag = c.getTag();
           if (tag != "list")
           {
-            ICELogCritical( << "Failed to find <list> tag in rlmi");
+            ICELogError( << "Failed to find <list> tag in rlmi");
           }
           else
           {
@@ -1330,7 +1333,7 @@ void UserAgent::onUpdate(resip::ClientSubscriptionHandle h, const resip::SipMess
             {
               if (c.getTag() != "resource")
               {
-                ICELogCritical( << "Failed to find <resource> tag in rlmi");
+                ICELogError( << "Failed to find <resource> tag in rlmi");
               }
               else
               {

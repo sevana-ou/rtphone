@@ -313,7 +313,7 @@ void AgentImpl::processStartSession(Json::Value& request, Json::Value& answer)
   if (!mAudioManager)
   {
     // Agent was not started
-    ICELogCritical(<< "No audio manager installed.");
+    ICELogError(<< "No audio manager installed.");
     answer["status"] = "Audio manager not started. Most probably agent is not started.";
     return;
   }

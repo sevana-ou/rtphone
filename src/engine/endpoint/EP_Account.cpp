@@ -626,7 +626,7 @@ void Account::onDnsResult(const resip::DNSResult<resip::DnsHostRecord>& result)
   if (result.status == 0)
   {
     resip::Data foundAddress = result.records.front().host();
-    ICELogCritical( << "Success to resolve STUN/TURN address to " << foundAddress.c_str());
+    ICELogInfo( << "Success to resolve STUN/TURN address to " << foundAddress.c_str());
     mConfig->at(CONFIG_STUNSERVER_IP) = std::string(foundAddress.c_str());
 
     // Here the IP address of STUN/TURN server is found. If account is registered already - it means account is ready.
@@ -635,7 +635,7 @@ void Account::onDnsResult(const resip::DNSResult<resip::DnsHostRecord>& result)
   }
   else
   {
-    ICELogCritical( << "Failed to resolve STUN or TURN server IP address.");
+    ICELogError( << "Failed to resolve STUN or TURN server IP address.");
     if (mRegistrationState == RegistrationState::Registered)
     {
       int startCode = mConfig->at(CONFIG_STUNSERVER_NAME).asStdString().empty() ? 0 : 503;
@@ -675,7 +675,7 @@ void Account::onDnsResult(const resip::DNSResult<resip::DnsSrvRecord>& result)
 
     const char* host = result.records[index].target().c_str();
 
-    ICELogCritical( << "Success to find STUN/TURN server on " << result.records[index].target().c_str() <<
+    ICELogInfo( << "Success to find STUN/TURN server on " << result.records[index].target().c_str() <<
       ":" << (int)result.records[index].port());
 
 
@@ -692,7 +692,7 @@ void Account::onDnsResult(const resip::DNSResult<resip::DnsSrvRecord>& result)
   }
   else
   {
-    ICELogCritical( << "Failed to find STUN or TURN service for specified domain.");
+    ICELogError( << "Failed to find STUN or TURN service for specified domain.");
     //mAgent::shutdown();
   }
 

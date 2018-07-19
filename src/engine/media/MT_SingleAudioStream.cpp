@@ -37,6 +37,6 @@ void SingleAudioStream::copyPcmTo(Audio::DataWindow& output, int needed)
       break;
 
   if (output.filled() < needed)
-    ICELogCritical(<< "Not enough data for speaker's mixer");
+    ICELogError(<< "Not enough data for speaker's mixer");
 }
 

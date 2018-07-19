@@ -276,7 +276,7 @@ bool WavFileWriter::open(const std::tstring& filename, int rate, int channels)
 #endif
   if (NULL == mHandle)
   {
-    ICELogCritical(<< "Failed to create .wav file: filename = " << StringHelper::makeUtf8(filename) << " , error = " << errno);
+    ICELogError(<< "Failed to create .wav file: filename = " << StringHelper::makeUtf8(filename) << " , error = " << errno);
     return false;
   }
 

@@ -62,7 +62,7 @@ const char* Candidate::type()
     return "prflx";
 
   default:
-    ICELogCritical(<< "Bad candidate type, reverted to Host.");
+    ICELogError(<< "Bad candidate type, reverted to Host.");
     return "host";
   }
 }
@@ -144,7 +144,7 @@ Candidate::Type  Candidate::typeFromString(const char* candtype)
     return Candidate::ServerRelayed;
   else
   {
-    ICELogCritical(<< "Bad candidate type in parser. Reverted to Host");
+    ICELogError(<< "Bad candidate type in parser. Reverted to Host");
     return Candidate::Host;
   }
 }
@@ -166,7 +166,7 @@ bool Candidate::equal(Candidate& cand1, Candidate& cand2)
       
   }
   
-  ICELogCritical(<< "Bad candidate type, comparing as Host");
+  ICELogError(<< "Bad candidate type, comparing as Host");
   return cand1.mLocalAddr == cand2.mLocalAddr;
 }
 

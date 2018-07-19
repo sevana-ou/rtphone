@@ -412,7 +412,7 @@ OpusCodec::OpusCodec(int samplerate, int channels, int ptime)
   int status;
   mEncoderCtx = opus_encoder_create(48000, mChannels, OPUS_APPLICATION_VOIP, &status);
   if (OPUS_OK != opus_encoder_ctl(mEncoderCtx, OPUS_SET_COMPLEXITY(OPUS_CODEC_COMPLEXITY)))
-    ICELogCritical(<< "Failed to set encoder complexity");
+    ICELogError(<< "Failed to set Opus encoder complexity");
   //if (OPUS_OK != opus_encoder_ctl(mEncoderCtx, OPUS_SET_FORCE_CHANNELS(AUDIO_CHANNELS)))
   //  ICELogCritical(<<"Failed to set channel number in Opus encoder");
   mDecoderCtx = opus_decoder_create(48000, mChannels, &status);
@@ -422,16 +422,16 @@ void OpusCodec::applyParams(const Params &params)
 {
   int error;
   if (OPUS_OK != (error = opus_encoder_ctl(mEncoderCtx, OPUS_SET_DTX(params.mUseDtx ? 1 : 0))))
-    ICELogCritical(<< "Failed to (un)set DTX mode in Opus encoder. Error " << opus_strerror(error));
+    ICELogError(<< "Failed to (un)set DTX mode in Opus encoder. Error " << opus_strerror(error));
 
   if (OPUS_OK != (error = opus_encoder_ctl(mEncoderCtx, OPUS_SET_INBAND_FEC(params.mUseInbandFec ? 1 : 0))))
-    ICELogCritical(<< "Failed to (un)set FEC mode in Opus encoder. Error " << opus_strerror(error));
+    ICELogError(<< "Failed to (un)set FEC mode in Opus encoder. Error " << opus_strerror(error));
 
   if (OPUS_OK != (error = opus_encoder_ctl(mEncoderCtx, OPUS_SET_BITRATE(params.mTargetBitrate ? params.mTargetBitrate : OPUS_AUTO))))
-    ICELogCritical(<< "Failed to (un)set target bandwidth. Error " << opus_strerror(error));
+    ICELogError(<< "Failed to (un)set target bandwidth. Error " << opus_strerror(error));
 
   if (OPUS_OK != (error = opus_encoder_ctl(mEncoderCtx, OPUS_SET_PACKET_LOSS_PERC(params.mExpectedPacketLoss))))
-    ICELogCritical(<< "Failed to (un)set expected packet loss. Error " << opus_strerror(error));
+    ICELogError(<< "Failed to (un)set expected packet loss. Error " << opus_strerror(error));
 
   mDecodeResampler.start(channels(), 48000, mSamplerate);
 }

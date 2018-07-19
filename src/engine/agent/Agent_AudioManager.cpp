@@ -164,7 +164,7 @@ void AudioManager::startPlayFile(int usageId, const std::string& path, AudioTarg
 #endif
   if (!r->isOpened())
   {
-    ICELogCritical(<< "Cannot open file to play");
+    ICELogError(<< "Cannot open file to play");
     return;
   }
 

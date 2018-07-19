@@ -16,5 +16,8 @@ using ice::LL_DEBUG;
 using ice::LL_INFO;
 using ice::LL_CRITICAL;
 using ice::LL_NONE;
+using ice::LL_SPECIAL;
+using ice::LL_ERROR;
+using ice::LogLevelHelper;
 
 #endif

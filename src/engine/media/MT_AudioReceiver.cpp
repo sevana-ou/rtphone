@@ -151,7 +151,7 @@ bool RtpBuffer::add(std::shared_ptr<jrtplib::RTPPacket> packet, int timelength, 
     
     while (available > mHigh && mPacketList.size())
     {
-      //ICELogCritical( << "Dropping RTP packet from jitter");
+      //ICELogMedia( << "Dropping RTP packet from jitter");
       available -= mPacketList.front().timelength();
       mPacketList.erase(mPacketList.begin());
     }

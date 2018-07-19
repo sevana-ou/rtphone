@@ -191,7 +191,7 @@ void Mixer::addPcm(void* context, unsigned ssrc, Audio::DataWindow& w, int rate,
   }
   
   channel->addPcm(rate, w.data(), w.filled());
-  //ICELogCritical(<<"Mixer stream " << int(this) << " has " << w.filled() << " bytes");
+  //ICELogSpecial(<<"Mixer stream " << int(this) << " has " << w.filled() << " bytes");
 }
 
 void Mixer::mix()
@@ -218,7 +218,7 @@ void Mixer::mix()
   // No active channels - nothing to mix - exit
 	if (!activeCounter)
   {
-    //ICELogCritical(<< "No active channel");
+    //ICELogDebug(<< "No active channel");
     return;
   }
 	
@@ -229,7 +229,7 @@ void Mixer::mix()
     Stream& audio = *channelList[0];
 		mOutput.add(audio.data().data(), audio.data().filled());
 		audio.data().erase(audio.data().filled());
-    //ICELogCritical(<<"Length of mixer stream " << audio.data().filled());
+    //ICELogSpecial(<<"Length of mixer stream " << audio.data().filled());
 	}
   else	
 	if (activeCounter == 2)
@@ -309,7 +309,7 @@ int Mixer::getPcm(void* outputData, int outputLength)
   if (mOutput.filled() < outputLength)
     mix();
       
-	//ICELogCritical(<<"Mixer has " << mOutput.filled() << " available bytes");
+    //ICELogSpecial(<<"Mixer has " << mOutput.filled() << " available bytes");
   memset(outputData, 0, outputLength);
   return mOutput.read(outputData, outputLength);
 }

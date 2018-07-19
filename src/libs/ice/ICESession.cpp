@@ -96,7 +96,7 @@ int Session::addComponent(int streamID, void* tag, unsigned short port4, unsigne
 
   if (mStreamMap.find(streamID) == mStreamMap.end())
   {
-    ICELogCritical(<< "Cannot find stream " << streamID << " to add new component.");
+    ICELogError(<< "Cannot find stream " << streamID << " to add new component.");
     return -1;
   }
 

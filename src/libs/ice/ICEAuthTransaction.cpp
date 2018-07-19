@@ -126,7 +126,7 @@ bool AuthTransaction::processData(StunMessage& msg, NetworkAddress& address)
       mState = Transaction::Failed;
       processError();
       
-      ICELogCritical(<<"Stack ID " << mStackID << ". Got error code " << mErrorCode << " for STUN transaction. Error message: " << ec.errorPhrase());
+      ICELogError(<<"Stack ID " << mStackID << ". Got error code " << mErrorCode << " for STUN transaction. Error message: " << ec.errorPhrase());
     }
   }
   else
@@ -135,7 +135,7 @@ bool AuthTransaction::processData(StunMessage& msg, NetworkAddress& address)
     mErrorCode = 0;
     mState = Transaction::Failed;
     processError();
-    ICELogCritical(<<"Stack ID " << mStackID << ". Got ErrorClass response.");
+    ICELogError(<<"Stack ID " << mStackID << ". Got ErrorClass response.");
   }
   else
   {

@@ -201,10 +201,10 @@ void ClientRefresh::processError()
     {
       if (mStream->mTurnAllocated > 0)
         mStream->mTurnAllocated--;
-      ICELogCritical(<< "TURN allocation is not deleted due to error " << errorCode() << " " << errorResponse());
+      ICELogError(<< "TURN allocation is not deleted due to error " << errorCode() << " " << errorResponse());
     }
     else
-      ICELogDebug(<< "ClientRefresh failed due to error " << errorCode() << " " << errorResponse());
+      ICELogError(<< "ClientRefresh failed due to error " << errorCode() << " " << errorResponse());
   }
 }
 

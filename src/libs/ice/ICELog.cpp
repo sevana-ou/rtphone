@@ -16,6 +16,49 @@
 
 using namespace ice;
 
+
+LogLevel LogLevelHelper::parse(const std::string& t)
+{
+    if (t == "none")
+      return LL_NONE;
+    else
+    if (t == "debug")
+      return LL_DEBUG;
+    else
+    if (t == "critical")
+      return  LL_CRITICAL;
+    else
+    if (t == "info")
+      return LL_INFO;
+    else
+    if (t == "media")
+      return LL_MEDIA;
+    else
+    if (t == "critical")
+        return LL_CRITICAL;
+    else
+    if (t == "special")
+        return LL_SPECIAL;
+
+    throw std::runtime_error("Bad log param string value.");
+}
+
+std::string LogLevelHelper::toString(LogLevel level)
+{
+    switch (level)
+    {
+    case LL_NONE:       return "none";
+    case LL_CRITICAL:   return "critical";
+    case LL_DEBUG:      return "debug";
+    case LL_ERROR:      return "error";
+    case LL_INFO:       return "info";
+    case LL_MEDIA:      return "media";
+    case LL_SPECIAL:    return "special";
+    }
+
+    throw std::runtime_error("Bad log param value.");
+}
+
 ice::Logger ice::GLogger;
 const char* ice::Logger::TabPrefix = "  ";
 

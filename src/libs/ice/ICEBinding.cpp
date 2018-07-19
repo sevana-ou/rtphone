@@ -347,7 +347,7 @@ bool ServerBinding::processData(StunMessage& msg, NetworkAddress& address)
   
   if (!msg.hasAttribute(StunAttribute::Username) || !msg.hasAttribute(StunAttribute::MessageIntegrity))
   {
-    ICELogCritical(<< "There is no Username or MessageIntegrity attributes in Binding required. Error 400 will be generated.");
+    ICELogError(<< "There is no Username or MessageIntegrity attributes in Binding required. Error 400 will be generated.");
     // Send 400 error
     mGenerate400 = true;
 
@@ -423,7 +423,7 @@ ByteBuffer* ServerBinding::generateData(bool force)
     // Do not create username attribute here - response does not need it
     // msg.usernameAttr().setValue(mUsername);
     
-    //ICELogCritical(<< "Using password " << mPassword);
+    //ICELogMedia(<< "Using password " << mPassword);
 
     // Add message integrity attribute
     msg.setAttribute(new MessageIntegrity());

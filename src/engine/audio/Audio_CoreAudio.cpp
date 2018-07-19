@@ -89,7 +89,7 @@ void CoreAudioUnit::open(bool voice)
                     &audioCategory);
   if (ostatus != kAudioSessionNoError)
   {
-      ICELogCritical(<< "Cannot set audio session to PlaybackAndRecord category, error" << ostatus);
+      ICELogError(<< "Cannot set audio session to PlaybackAndRecord category, error" << ostatus);
       throw AudioException(ERR_COREAUDIO, ostatus);
   }
 #endif
@@ -110,7 +110,7 @@ void CoreAudioUnit::open(bool voice)
   AudioComponent component = AudioComponentFindNext(NULL, &desc);
   if (component == NULL)
   {
-      ICELogCritical(<< "Cannot find audio component, error " << int(ostatus));
+      ICELogError(<< "Cannot find audio component, error " << int(ostatus));
       throw AudioException(ERR_COREAUDIO, ostatus);
   }
 
@@ -118,7 +118,7 @@ void CoreAudioUnit::open(bool voice)
   ostatus = AudioComponentInstanceNew(component, &mUnit);
   if (ostatus != noErr)
   {
-      ICELogCritical(<< "Cannot create audio component, error " << int(ostatus));
+      ICELogError(<< "Cannot create audio component, error " << int(ostatus));
       throw AudioException(ERR_COREAUDIO, ostatus);
   }
 }
@@ -145,7 +145,7 @@ AudioStreamBasicDescription CoreAudioUnit::getFormat(int scope, int bus)
   OSStatus ostatus = AudioUnitGetProperty(mUnit, kAudioUnitProperty_StreamFormat, scope, bus, &result, &size);
   if (ostatus != noErr)
   {
-    ICELogCritical(<< "Cannot obtain stream format, error " << int(ostatus));
+    ICELogError(<< "Cannot obtain stream format, error " << int(ostatus));
     throw AudioException(ERR_COREAUDIO, ostatus);
   }
   return result;
@@ -161,7 +161,7 @@ void CoreAudioUnit::setFormat(AudioStreamBasicDescription& format, int scope, in
                sizeof(format));
   if (ostatus != noErr)
   {
-    ICELogCritical(<< "Cannot set stream format, error " << int(ostatus));
+    ICELogError(<< "Cannot set stream format, error " << int(ostatus));
     throw AudioException(ERR_COREAUDIO, ostatus);
   }
 }
@@ -173,7 +173,7 @@ bool CoreAudioUnit::getEnabled(int scope, int bus)
   OSStatus ostatus = AudioUnitGetProperty(mUnit, kAudioOutputUnitProperty_EnableIO, scope, bus, &wasEnabled, &sizeWe);
   if (ostatus != noErr)
   {
-      ICELogCritical(<< "Failed to get if input is already enabled on audio device");
+      ICELogError(<< "Failed to get if input is already enabled on audio device");
   }
   return wasEnabled != 0;
 }
@@ -190,7 +190,7 @@ void CoreAudioUnit::setEnabled(bool enabled, int scope, int bus)
 
   if (ostatus != noErr)
   {
-      ICELogCritical(<< "Cannot enable input on audio device , error " << int(ostatus));
+      ICELogError(<< "Cannot enable input on audio device , error " << int(ostatus));
       //throw AudioException(ERR_COREAUDIO, ostatus);
   }
 }
@@ -205,7 +205,7 @@ void CoreAudioUnit::makeCurrent(AudioDeviceID deviceId, int scope, int bus)
                      sizeof(deviceId));
   if (ostatus != noErr)
   {
-      ICELogCritical(<< "Cannot make device " << int(deviceId) << " current, error " << ostatus);
+      ICELogError(<< "Cannot make device " << int(deviceId) << " current, error " << ostatus);
       throw AudioException(ERR_COREAUDIO, ostatus);
   }
 }
@@ -221,7 +221,7 @@ void CoreAudioUnit::setCallback(AURenderCallbackStruct cb, int callbackType, int
                      sizeof(cb));
   if (ostatus != noErr)
   {
-      ICELogCritical(<< "Cannot set callback pointer, error " << int(ostatus));
+      ICELogError(<< "Cannot set callback pointer, error " << int(ostatus));
       throw AudioException(ERR_COREAUDIO, ostatus);
   }
 }
@@ -233,7 +233,7 @@ void CoreAudioUnit::setBufferFrameSizeInMilliseconds(int ms)
   OSStatus ostatus = AudioSessionSetProperty(kAudioSessionProperty_PreferredHardwareIOBufferDuration, sizeof(preferredBufferSize), &preferredBufferSize);
   if (ostatus != noErr)
   {
-    ICELogCritical(<< "Cannot set audio buffer length to " << ms << " milliseconds");
+    ICELogError(<< "Cannot set audio buffer length to " << ms << " milliseconds");
   }
 #endif
 #ifdef TARGET_OSX
@@ -253,7 +253,7 @@ int CoreAudioUnit::getBufferFrameSize()
                              &size);
   if (ostatus != noErr)
   {
-      ICELogCritical(<< "Cannot obtain input buffer size , error " << int(ostatus));
+      ICELogError(<< "Cannot obtain input buffer size , error " << int(ostatus));
       throw AudioException(ERR_COREAUDIO, ostatus);
   }
   return int(bufsize);
@@ -264,7 +264,7 @@ void CoreAudioUnit::initialize()
   OSStatus ostatus = AudioUnitInitialize(mUnit);
   if (ostatus != noErr)
   {
-    ICELogCritical(<< "Cannot initialize AudioUnit, error " << int(ostatus));
+    ICELogError(<< "Cannot initialize AudioUnit, error " << int(ostatus));
     throw AudioException(ERR_COREAUDIO, ostatus);
   }
 }
@@ -355,7 +355,7 @@ OSStatus MacDevice::inputCallback(void                       *inRefCon,
 
     if (ostatus != noErr)
     {
-      ICELogCritical(<< "Cannot render input audio data, error " << int(ostatus));
+      ICELogError(<< "Cannot render input audio data, error " << int(ostatus));
     }
     else
     {
@@ -414,7 +414,7 @@ void MacDevice::interruptionListener(void *inClientData, UInt32 inInterruption)
                           &audioCategory);
         if (ostatus != kAudioSessionNoError)
         {
-            ICELogCritical(<<"Cannot set the audio session category, error " << ostatus);
+            ICELogError(<<"Cannot set the audio session category, error " << ostatus);
         }
 
         // Start stream
@@ -477,7 +477,7 @@ bool MacDevice::open()
   {
     if (!createUnit(true))
     {
-      ICELogCritical(<< "Unable to create&adjust AudioUnit");
+      ICELogError(<< "Unable to create&adjust AudioUnit");
       return false;
       // TODO - enable stub for iOS
     }
@@ -609,7 +609,7 @@ bool MacDevice::createUnit(bool voice)
     mInputBufferList = (AudioBufferList*)malloc(sizeof(AudioBufferList) + sizeof(AudioBuffer));
     if (!mInputBufferList)
     {
-        ICELogCritical(<< "No memory for buffer list");
+        ICELogError(<< "No memory for buffer list");
         return false;
     }
     mInputBufferList->mNumberBuffers = 1;
@@ -619,7 +619,7 @@ bool MacDevice::createUnit(bool voice)
     ab->mData = NULL;//malloc(ab->mDataByteSize);
     if (!ab->mData)
     {
-        //ICELogCritical(<< "No memory for capture buffer");
+        //ICELogError(<< "No memory for capture buffer");
     }
 #endif
 #ifdef TARGET_IOS
@@ -629,7 +629,7 @@ bool MacDevice::createUnit(bool voice)
     mInputBufferList = (AudioBufferList*)malloc(sizeof(AudioBufferList) + sizeof(AudioBuffer));
     if (!mInputBufferList)
     {
-        ICELogCritical(<< "No memory for buffer list");
+        ICELogError(<< "No memory for buffer list");
         return false;
     }
     mInputBufferList->mNumberBuffers = 1;
@@ -675,7 +675,7 @@ void MacDevice::startStream()
     ostatus = AudioOutputUnitStart(mAudioUnit.getHandle());
     if (ostatus != noErr)
     {
-      ICELogCritical(<< "Failed to start audio unit, error " << int(ostatus));
+      ICELogError(<< "Failed to start audio unit, error " << int(ostatus));
       return;
     }
   }
@@ -690,7 +690,7 @@ void MacDevice::stopStream()
   ostatus = AudioOutputUnitStop(mAudioUnit.getHandle());
   if (ostatus != noErr)
   {
-    ICELogCritical(<< "Failed to stop audio unit, error " << int(ostatus));
+    ICELogError(<< "Failed to stop audio unit, error " << int(ostatus));
   }
 
 #ifdef TARGET_IOS

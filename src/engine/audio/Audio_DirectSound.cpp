@@ -886,12 +886,12 @@ void DSoundOutputDevice::threadProc(void* arg)
       }
       catch(const Exception& e)
       {
-        ICELogCritical(<< "DirectSound output failed with code = " << e.code() << ", subcode = " << e.subcode());
+        ICELogError(<< "DirectSound output failed with code = " << e.code() << ", subcode = " << e.subcode());
         impl->setSimulate(true);
       }
       catch(...)
       {
-        ICELogCritical(<< "DirectSound output failed due to unexpected exception.");
+        ICELogError(<< "DirectSound output failed due to unexpected exception.");
         impl->setSimulate(true);
       }
     }

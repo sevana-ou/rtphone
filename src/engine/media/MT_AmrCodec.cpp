@@ -417,7 +417,7 @@ int AmrNbCodec::decode(const void* input, int inputBytes, void* output, int outp
 
     if (ap.mFrames.empty())
     {
-      ICELogCritical(<< "No AMR frames");
+      ICELogError(<< "No AMR frames");
     }
     short* dataOut = (short*)output;
     for (AmrFrame& frame: ap.mFrames)

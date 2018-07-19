@@ -306,7 +306,7 @@ void Session::start(const std::string& peer)
 
   if (mResipSession)
   {
-    ICELogCritical(<< "Session " << mSessionId << " is already started.");
+    ICELogError(<< "Session " << mSessionId << " is already started.");
     return;
   }
   
@@ -415,7 +415,7 @@ void Session::reject(int code)
     ICELogInfo(<< "Session " << mSessionId << " is rejected.");
   }
   else
-    ICELogCritical(<< "Session " << mSessionId << " has not valid invite handle.");
+    ICELogError(<< "Session " << mSessionId << " has not valid invite handle.");
 }
 
 AudioProvider* Session::findProviderForActiveAudio()
@@ -652,7 +652,7 @@ void Session::onSuccess(ice::Stack* stack, void* tag)
 
 void Session::onFailed(ice::Stack* stack, void* tag)
 {
-  ICELogCritical(<< "ICE connectivity check failed for session " << mSessionId);
+  ICELogError(<< "ICE connectivity check failed for session " << mSessionId);
   mUserAgent->onConnectivityFailed(mUserAgent->getUserSession(mSessionId));
 
   //if (mInviteHandle.isValid())
@@ -661,7 +661,7 @@ void Session::onFailed(ice::Stack* stack, void* tag)
 
 void Session::onNetworkChange(ice::Stack *stack, void *tag)
 {
-  ICELogCritical(<< "Network change detected by ICE stack for session " << mSessionId);
+  ICELogInfo(<< "Network change detected by ICE stack for session " << mSessionId);
   mUserAgent->onNetworkChange(mUserAgent->getUserSession(mSessionId));
 }
 
@@ -981,7 +981,7 @@ int Session::processSdp(UInt64 version, bool iceAvailable, std::string icePwd, s
       }
       catch(...)
       {
-        ICELogCritical( << "Cannot create media socket.");
+        ICELogError( << "Cannot create media socket.");
         return 503;
       }
 

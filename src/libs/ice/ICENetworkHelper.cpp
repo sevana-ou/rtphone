@@ -399,7 +399,7 @@ NetworkHelper& NetworkHelper::instance()
   }
   catch(...)
   {
-    ICELogCritical(<< "Failed to create NetworkHelper instance");
+    ICELogError(<< "Failed to create NetworkHelper instance");
   }
   mGuard.unlock();
   

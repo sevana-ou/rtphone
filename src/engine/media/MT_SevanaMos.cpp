@@ -94,7 +94,7 @@ void SevanaMosUtility::run(const std::string& pcmPath, const std::string& interv
     if (!estimation.size())
     {
         // Dump utility output if estimation failed
-        ICELogCritical(<< "PVQA failed with message: " << output);
+        ICELogError(<< "PVQA failed with message: " << output);
         return;
     }
 
@@ -123,7 +123,7 @@ float getSevanaMos(const std::string& audioPath, const std::string& intervalRepo
     }
     catch(std::exception& e)
     {
-        ICELogCritical( << "MOS utility failed on PCM file " << audioPath << ". Error msg: " << e.what() );
+        ICELogError( << "MOS utility failed on PCM file " << audioPath << ". Error msg: " << e.what() );
         return 0.0;
     }
 }
@@ -160,7 +160,7 @@ bool SevanaPVQA::initializeLibrary(const std::string& pathToLicenseFile, const s
         mLibraryErrorCode = PVQA_InitLib(const_cast<char*>(pathToLicenseFile.c_str()));
         if (mLibraryErrorCode)
         {
-            ICELogCritical(<< "Problem when initializing PVQA library. Error code: " << mLibraryErrorCode
+            ICELogError(<< "Problem when initializing PVQA library. Error code: " << mLibraryErrorCode
                            << ". Path to license file is " << pathToLicenseFile
                            << ". Path to config file is " << pathToConfigFile);
             return false;
@@ -170,7 +170,7 @@ bool SevanaPVQA::initializeLibrary(const std::string& pathToLicenseFile, const s
         if (!mLibraryConfiguration)
         {
             PVQA_ReleaseLib();
-            ICELogCritical(<< "Problem with PVQA configuration file.");
+            ICELogError(<< "Problem with PVQA configuration file.");
             return false;
         }
         mPvqaLoaded = true;
@@ -206,19 +206,19 @@ void SevanaPVQA::open(double interval, Model model)
 {
     if (!isInitialized())
     {
-        ICELogCritical(<< "PVQA library is not initialized.");
+        ICELogError(<< "PVQA library is not initialized.");
         return;
     }
 
     if (mOpenFailed)
     {
-        ICELogCritical(<< "Open failed already, reject this attempt.");
+        ICELogError(<< "Open failed already, reject this attempt.");
         return;
     }
 
     if (mContext)
     {
-        ICELogCritical(<< "Already opened (context is not nullptr).");
+        ICELogError(<< "Already opened (context is not nullptr).");
         return;
     }
 
@@ -231,7 +231,7 @@ void SevanaPVQA::open(double interval, Model model)
     mContext = PVQA_CreateAudioQualityAnalyzer(mLibraryConfiguration);
     if (!mContext)
     {
-        ICELogCritical(<< "Failed to create PVQA instance. Instance counter: " << mInstanceCounter);
+        ICELogError(<< "Failed to create PVQA instance. Instance counter: " << mInstanceCounter);
         mOpenFailed = true;
         return;
     }
@@ -242,7 +242,7 @@ void SevanaPVQA::open(double interval, Model model)
     rescode = PVQA_AudioQualityAnalyzerSetIntervalLength(mContext, interval);
     if (rescode)
     {
-        ICELogCritical(<< "Failed to set interval length on PVQA instance. Result code: " << rescode);
+        ICELogError(<< "Failed to set interval length on PVQA instance. Result code: " << rescode);
         close();
         mOpenFailed = true;
         return;
@@ -253,7 +253,7 @@ void SevanaPVQA::open(double interval, Model model)
         rescode = PVQA_OnStartStreamData(mContext);
         if (rescode)
         {
-            ICELogCritical(<< "Failed to start streaming analysis on PVQA instance. Result code: " << rescode);
+            ICELogError(<< "Failed to start streaming analysis on PVQA instance. Result code: " << rescode);
             close();
             mOpenFailed = true;
             return;
@@ -284,7 +284,7 @@ void SevanaPVQA::update(int samplerate, int channels, const void *pcmBuffer, int
 {
     if (!mContext)
     {
-        ICELogCritical(<< "No PVQA context.");
+        ICELogError(<< "No PVQA context.");
         return;
     }
     // Model is assert here as it can be any if context is not created.
@@ -298,7 +298,7 @@ void SevanaPVQA::update(int samplerate, int channels, const void *pcmBuffer, int
     int rescode = PVQA_OnAddStreamAudioData(mContext, &item);
     if (rescode)
     {
-        ICELogCritical(<< "Failed to stream data to PVQA instance. Result code: " << rescode);
+        ICELogError(<< "Failed to stream data to PVQA instance. Result code: " << rescode);
     }
     int milliseconds = pcmLength / 2 / channels / (samplerate / 1000);
     mProcessedMilliseconds += milliseconds;
@@ -335,7 +335,7 @@ float SevanaPVQA::getResults(std::string& report, EchoData** echo, int samplerat
 {
     if (!mContext)
     {
-        ICELogCritical(<< "No PVQA context.");
+        ICELogError(<< "No PVQA context.");
         return 0.0;
     }
 
@@ -343,13 +343,13 @@ float SevanaPVQA::getResults(std::string& report, EchoData** echo, int samplerat
     {
         if (mProcessedMilliseconds == 0)
         {
-            ICELogCritical(<< "No audio in PVQA.");
+            ICELogError(<< "No audio in PVQA.");
             return -1;
         }
 
         if (PVQA_OnFinalizeStream(mContext, (long)samplerate))
         {
-            ICELogCritical(<< "Failed to finalize results from PVQA.");
+            ICELogError(<< "Failed to finalize results from PVQA.");
             return -1;
         }
         ICELogInfo(<< "Processed " << mProcessedMilliseconds << " milliseconds.");
@@ -358,7 +358,7 @@ float SevanaPVQA::getResults(std::string& report, EchoData** echo, int samplerat
     TPVQA_Results results;
     if (PVQA_FillQualityResultsStruct(mContext, &results))
     {
-        ICELogCritical(<< "Failed to get results from PVQA.");
+        ICELogError(<< "Failed to get results from PVQA.");
         return -1;
     }
 
@@ -368,7 +368,7 @@ float SevanaPVQA::getResults(std::string& report, EchoData** echo, int samplerat
         char* buffer = (char*)alloca(reportLength + 1);
         if (PVQA_FillQualityString(mContext, buffer))
         {
-            ICELogCritical(<< "Failed to fill intervals report.");
+            ICELogError(<< "Failed to fill intervals report.");
         }
         else
             report = buffer;
@@ -448,7 +448,7 @@ float SevanaPVQA::process(int samplerate, int channels, const void *pcmBuffer, i
   {
     mAudioLineInitialized = true;
     if (PVQA_AudioQualityAnalyzerCreateDelayLine(mContext, samplerate, channels, 20))
-      ICELogCritical(<< "Failed to create delay line.");
+      ICELogError(<< "Failed to create delay line.");
   }*/
 
     TPVQA_AudioItem item;
@@ -466,20 +466,20 @@ float SevanaPVQA::process(int samplerate, int channels, const void *pcmBuffer, i
     writer.open(mDumpWavPath, samplerate, channels);
     writer.write(item.pSamples, item.dNSamples * 2 * channels);
     writer.close();
-    ICELogCritical(<< "Sending chunk of audio with rate = " << samplerate << ", channels = " << channels << ", number of samples " << item.dNSamples);
+    ICELogError(<< "Sending chunk of audio with rate = " << samplerate << ", channels = " << channels << ", number of samples " << item.dNSamples);
   }
   */
     int code = PVQA_OnTestAudioData(mContext, &item);
     if (code)
     {
-        ICELogCritical(<< "Failed to run PVQA on audio buffer with code " << code);
+        ICELogError(<< "Failed to run PVQA on audio buffer with code " << code);
         return 0.0;
     }
 
     /*
   if (item.pSamples != pcmBuffer || item.dNSamples != pcmLength / 2 / channels || item.dSampleRate != samplerate || item.dNChannels != channels)
   {
-    ICELogCritical(<< "PVQA changed input parameters!!!!");
+    ICELogError(<< "PVQA changed input parameters!!!!");
   }
   */
     // Increase counter of processed samples

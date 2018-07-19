@@ -309,7 +309,7 @@ void AudioStream::dataArrived(PDatagramSocket s, const void* buffer, int length,
       srtpResult = mSrtpSession.unprotectRtcp(mReceiveBuffer, &receiveLength);
     if (!srtpResult)
     {
-      ICELogCritical(<<"Cannot decrypt SRTP packet.");
+      ICELogError(<<"Cannot decrypt SRTP packet.");
       return;
     }
   }
