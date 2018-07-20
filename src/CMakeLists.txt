@@ -50,9 +50,27 @@ add_subdirectory(${rtphone_libs}/speexdsp)
 add_subdirectory(${rtphone_libs}/srtp)
 add_subdirectory(${rtphone_libs}/webrtc)
 
+set(LIBS ice_stack jrtplib g729_codec gsm_codec
+    gsmhr_codec g722_codec srtp resiprocate helper_lib audio_lib webrtc speexdsp
+    uuid dl)
+
+if (CMAKE_SYSTEM MATCHES "Win*")
+    set (LIBS ${LIBS} ssleay32 libeay32 opus silk_float celt)
+else (CMAKE_SYSTEM MATCHES "Win*")
+    set (LIBS ${LIBS} ssl crypto dl opus)
+endif (CMAKE_SYSTEM MATCHES "Win*")
+
+if (USE_AMR_CODEC)
+    set(LIBS ${LIBS} opencore-amrnb opencore-amrwb)
+endif (USE_AMR_CODEC)
+
 target_link_libraries(rtphone ice_stack jrtplib g729_codec gsm_codec
     gsmhr_codec g722_codec srtp resiprocate
-    opencore-amrnb opencore-amrwb
     helper_lib audio_lib webrtc speexdsp
-    ssl crypto opus uuid dl)
+    opus uuid)
 
+
+target_include_directories(rtphone
+    PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
+           $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/engine>
+    PRIVATE ../../libs/speex/include ../../libs ../)

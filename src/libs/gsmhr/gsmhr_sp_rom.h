@@ -7,6 +7,10 @@
 #ifndef ___ROM
 #define ___ROM
 
+#if defined(__cplusplus)
+extern "C" {
+#endif
+
 #include "gsmhr_typedefs.h"
 //#include "gsmhr_mathhalf.h"
 //#include "gsmhr_mathdp31.h"
@@ -189,5 +193,10 @@ extern int32_tRom pL_rFlatSstCoefs[FLATSSTCOEFS_NUM_OF_CODES];
 
 extern int16_tRom psrOldCont[4];
 extern int16_tRom psrNewCont[4];
+
+#if defined(__cplusplus)
+}
+#endif
+
 
 #endif
