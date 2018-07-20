@@ -663,7 +663,7 @@ bool UserAgent::operator()(resip::Log::Level level, const resip::Subsystem& subs
 
   ss << "File "  << StringHelper::extractFilename(filename).c_str() << ", line " << line << ": " << message.c_str();
   if (level <= resip::Log::Crit)
-      ICELogCritical(<< ss.str());
+      ICELogCritical(<< ss.str())
   else
   if (level <= resip::Log::Warning)
     ICELogError(<< ss.str().c_str())

@@ -44,6 +44,7 @@ public:
 class LogHandler
 {
 public:
+    virtual ~LogHandler() {}
     virtual void onIceLog(LogLevel level, const std::string& filename, int line, const std::string& subsystem, const std::string& msg) = 0;
 };
 
