@@ -127,7 +127,7 @@ BufferQueue::Block BufferQueue::pull(std::chrono::milliseconds timeout)
         status = mSignal.wait_for(l, timeout);
 
     Block r;
-    if (status == std::cv_status::no_timeout)
+    if (status == std::cv_status::no_timeout && !mBlockList.empty())
     {
         r = mBlockList.front();
         mBlockList.erase(mBlockList.begin());
