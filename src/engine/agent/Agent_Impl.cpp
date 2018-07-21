@@ -533,7 +533,8 @@ void AgentImpl::processGetMediaStats(Json::Value& request, Json::Value& answer)
       if (!aquaReference.empty())
       {
         Audio::WavFileReader reader;
-        reader.open(aquaReference);
+        reader.open(StringHelper::makeTstring(aquaReference));
+
         if (reader.isOpened())
         {
           char buffer[1024];
@@ -548,11 +549,10 @@ void AgentImpl::processGetMediaStats(Json::Value& request, Json::Value& answer)
         }
       }
       MT::PSevanaAqua sa = mAquaMap[sessionIter->first];
-      MT::SevanaAqua::AudioBuffer test, reference;
+      MT::SevanaAqua::AudioBuffer test(mAquaIncoming.data(), mAquaIncoming.size()),
+              reference;
       test.mRate = AUDIO_SAMPLERATE;              reference.mRate = AUDIO_SAMPLERATE;
       test.mChannels = AUDIO_CHANNELS;            reference.mChannels = AUDIO_CHANNELS;
-      test.mData = mAquaIncoming.mutableData();   reference.mData = referenceAudio.mutableData();
-      test.mSize = mAquaIncoming.size();          reference.mSize = referenceAudio.size();
 
       MT::SevanaAqua::CompareResult r = sa->compare(reference, test);
       answer["aqua_mos"] = r.mMos;
