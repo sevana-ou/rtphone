@@ -103,10 +103,9 @@ protected:
   Mutex           mDeleteGuard;
 
   char            mTempPacket[MAX_UDPPACKET_SIZE];
-  volatile bool   mShutdown = false;
 
   int             mId = 0;
-  bool isShutdown() const { return mShutdown; }
+  //bool isShutdown() const { return mShutdown; }
   virtual void thread(); 
   
   // Processes mDeleteVector -> updates mSocketMap, removes socket items and closes sockets specified in mDeleteVector
