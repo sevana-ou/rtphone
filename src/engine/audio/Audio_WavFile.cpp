@@ -33,7 +33,7 @@ WaveFormatEx;
 
 #define LOG_SUBSYSTEM "WavFileReader"
 
-#define LOCK std::unique_lock<std::mutex> lock(mFileMtx);
+#define LOCK std::unique_lock<std::recursive_mutex> lock(mFileMtx);
 
 using namespace Audio;
 

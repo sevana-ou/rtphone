@@ -13,7 +13,7 @@
 using namespace MT;
 
 SingleAudioStream::SingleAudioStream(const CodecList::Settings& codecSettings, Statistics& stat)
-:mReceiver(codecSettings, stat), mDtmfReceiver(stat)
+    :mReceiver(codecSettings, stat), mDtmfReceiver(stat)
 {
 }
 
@@ -23,20 +23,20 @@ SingleAudioStream::~SingleAudioStream()
 
 void SingleAudioStream::process(std::shared_ptr<jrtplib::RTPPacket> packet)
 {
-  ICELogMedia(<< "Processing incoming RTP/RTCP packet");
-  if (packet->GetPayloadType() == 101/*resip::Codec::TelephoneEvent.payloadType()*/)
-    mDtmfReceiver.add(packet);
-  else
-    mReceiver.add(packet);
+    ICELogMedia(<< "Processing incoming RTP/RTCP packet");
+    if (packet->GetPayloadType() == 101/*resip::Codec::TelephoneEvent.payloadType()*/)
+        mDtmfReceiver.add(packet);
+    else
+        mReceiver.add(packet);
 }
 
 void SingleAudioStream::copyPcmTo(Audio::DataWindow& output, int needed)
 {
-  while (output.filled() < needed)
-    if (!mReceiver.getAudio(output))
-      break;
+    while (output.filled() < needed)
+        if (!mReceiver.getAudio(output))
+            break;
 
-  if (output.filled() < needed)
-    ICELogError(<< "Not enough data for speaker's mixer");
+    if (output.filled() < needed)
+        ICELogError(<< "Not enough data for speaker's mixer");
 }
 

@@ -28,7 +28,7 @@ namespace Audio
     short mBits;
     int mRate;
     std::tstring mFileName;
-    mutable std::mutex mFileMtx;
+    mutable std::recursive_mutex mFileMtx;
     unsigned mDataOffset;
     unsigned mDataLength;
     Resampler mResampler;
@@ -57,12 +57,13 @@ namespace Audio
   class WavFileWriter
   {
   protected:
-    FILE*           mHandle;        /// Handle of audio file.
-    std::tstring    mFileName;      /// Path to requested audio file.
-    std::mutex      mFileMtx;       /// Mutex to protect this instance.
-    int             mWritten;       /// Amount of written data (in bytes)
-    int             mLengthOffset;  /// Position of length field.
-    int             mRate, mChannels;
+    FILE*                   mHandle;        /// Handle of audio file.
+    std::tstring            mFileName;      /// Path to requested audio file.
+    std::recursive_mutex    mFileMtx;       /// Mutex to protect this instance.
+    int                     mWritten;       /// Amount of written data (in bytes)
+    int                     mLengthOffset;  /// Position of length field.
+    int                     mRate,
+                            mChannels;
 
     void checkWriteResult(int result);
 
