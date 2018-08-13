@@ -29,11 +29,7 @@ public:
 };
 
 // Class allocates new UDP sockets and tracks incoming packets on them. It runs in separate thread
-#ifdef USE_RESIP_INTEGRATION
-class SocketHeap: public resip::ThreadIf
-#else
-class SocketHeap: public std::thread
-#endif
+class SocketHeap
 {
 public:
   enum Multiplex
@@ -43,7 +39,7 @@ public:
   };
 
   SocketHeap(unsigned short start, unsigned short finish);
-  ~SocketHeap();
+  virtual ~SocketHeap();
 
   static SocketHeap& instance();
 
@@ -104,9 +100,13 @@ protected:
 
   char            mTempPacket[MAX_UDPPACKET_SIZE];
 
-  int             mId = 0;
-  //bool isShutdown() const { return mShutdown; }
-  virtual void thread(); 
+    std::shared_ptr<std::thread> mWorkerThread;
+
+  std::thread::id mThreadId;
+    bool mShutdown = false;
+    bool isShutdown() const { return mShutdown; }
+
+    void thread();
   
   // Processes mDeleteVector -> updates mSocketMap, removes socket items and closes sockets specified in mDeleteVector
   void processDeleted();

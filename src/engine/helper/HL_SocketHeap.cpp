@@ -44,23 +44,20 @@ SocketHeap::~SocketHeap()
 
 void SocketHeap::start()
 {
-#if defined(USE_RESIP_INTEGRATION)
-    if (!mId)
-        run();
-#else
-#endif
+    if (!mWorkerThread)
+        mWorkerThread = std::make_shared<std::thread>(&SocketHeap::thread, this);
 }
 
 void SocketHeap::stop()
 {
-#if defined(USE_RESIP_INTEGRATION)
-    if (mId)
+    if (mWorkerThread)
     {
-        shutdown();
-        // Wait for worker thread
-        join();
+        mShutdown = true;
+        if (mWorkerThread->joinable())
+            mWorkerThread->join();
+
+        mWorkerThread.reset();
     }
-#endif
 }
 
 void SocketHeap::setRange(unsigned short start, unsigned short finish)
@@ -222,7 +219,7 @@ void SocketHeap::thread()
     /*#ifdef __linux__
     // TODO: make epoll implementation for massive polling
 #else*/
-    mId = ThreadIf::selfId();
+    mThreadId = std::this_thread::get_id();
 
     while (!isShutdown())
     {
@@ -288,7 +285,7 @@ void SocketHeap::thread()
         else
             std::this_thread::sleep_for(std::chrono::milliseconds(1));
     }
-    mId = 0;
+
     mShutdown = false;
     //#endif
 }
