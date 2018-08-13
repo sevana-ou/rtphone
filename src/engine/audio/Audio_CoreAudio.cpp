@@ -80,7 +80,7 @@ CoreAudioUnit::CoreAudioUnit()
 
 void CoreAudioUnit::open(bool voice)
 {
-  OSStatus ostatus;
+  OSStatus osstatus = 0;
 #ifdef TARGET_IOS
   UInt32 audioCategory = kAudioSessionCategory_PlayAndRecord;
   /* We want to be able to open playback and recording streams */
@@ -95,7 +95,7 @@ void CoreAudioUnit::open(bool voice)
 #endif
 
   // Locate audio component
-  mUnit = NULL;
+  mUnit = nullptr;
   AudioComponentDescription desc;
   desc.componentType = kAudioUnitType_Output;
 #ifdef TARGET_IOS
@@ -107,19 +107,19 @@ void CoreAudioUnit::open(bool voice)
   desc.componentFlags = 0;
   desc.componentFlagsMask = 0;
 
-  AudioComponent component = AudioComponentFindNext(NULL, &desc);
-  if (component == NULL)
+  AudioComponent component = AudioComponentFindNext(nullptr, &desc);
+  if (component == nullptr)
   {
-      ICELogError(<< "Cannot find audio component, error " << int(ostatus));
-      throw AudioException(ERR_COREAUDIO, ostatus);
+      ICELogError(<< "Cannot find audio component (null is returned)");
+      throw AudioException(ERR_COREAUDIO, osstatus);
   }
 
   // Create audio unit
-  ostatus = AudioComponentInstanceNew(component, &mUnit);
-  if (ostatus != noErr)
+  osstatus = AudioComponentInstanceNew(component, &mUnit);
+  if (osstatus != noErr)
   {
-      ICELogError(<< "Cannot create audio component, error " << int(ostatus));
-      throw AudioException(ERR_COREAUDIO, ostatus);
+      ICELogError(<< "Cannot create audio component, error " << int(osstatus));
+      throw AudioException(ERR_COREAUDIO, osstatus);
   }
 }
 
@@ -129,7 +129,7 @@ void CoreAudioUnit::close()
   {
     AudioUnitUninitialize(mUnit);
     AudioComponentInstanceDispose(mUnit);
-    mUnit = NULL;
+    mUnit = nullptr;
   }
 }
 

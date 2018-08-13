@@ -17,6 +17,7 @@
 #include "../helper/HL_ByteBuffer.h"
 #include "../helper/HL_Exception.h"
 #include <AudioToolbox/AudioQueue.h>
+#include <memory>
 
 // Define CoreAudio buffer time length in milliseconds
 #define COREAUDIO_BUFFER_TIME 20
@@ -152,7 +153,7 @@ protected:
 
 };
 
-typedef SharedPtr<MacDevice> PMacDevice;
+typedef std::shared_ptr<MacDevice> PMacDevice;
 
 class MacInputDevice: public InputDevice
 {
