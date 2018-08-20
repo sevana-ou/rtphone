@@ -44,20 +44,122 @@ namespace MT {
 # define MOS_BAD_COLOR 0x000000
 #endif
 
-static std::string execCommand(const char* cmd)
+#if defined(TARGET_WIN)
+#   define popen _popen
+#   define pclose _pclose
+#endif
+
+static std::string execCommand(const std::string& cmd)
 {
-    std::shared_ptr<FILE> pipe(popen(cmd, "r"), pclose);
-    if (!pipe) return "ERROR";
-    char buffer[128];
+    std::cout << cmd << "\n";
+
+    std::shared_ptr<FILE> pipe(popen(cmd.c_str(), "r"), pclose);
+    if (!pipe)
+        throw std::runtime_error("Failed to run.");
+
+    char buffer[1024];
     std::string result = "";
     while (!feof(pipe.get()))
     {
-        if (fgets(buffer, 128, pipe.get()) != NULL)
+        if (fgets(buffer, 1024, pipe.get()) != nullptr)
             result += buffer;
     }
     return result;
 }
 
+// ------------ PvqaUtility ------------
+PvqaUtility::PvqaUtility()
+{
+
+}
+
+PvqaUtility::~PvqaUtility()
+{
+
+}
+
+void PvqaUtility::setPath(const std::string& path)
+{
+    mPvqaPath = path;
+}
+
+std::string PvqaUtility::getPath() const
+{
+    return mPvqaPath;
+}
+
+void PvqaUtility::setLicensePath(const std::string& path)
+{
+    mLicensePath = path;
+}
+
+std::string PvqaUtility::getLicensePath() const
+{
+    return mLicensePath;
+}
+
+void PvqaUtility::setConfigPath(const std::string& path)
+{
+    mConfigPath = path;
+}
+
+std::string PvqaUtility::getConfigPath() const
+{
+    return mConfigPath;
+}
+
+float PvqaUtility::process(const std::string& filepath, std::string& outputReport)
+{
+    float result = 0.0f;
+
+    // Generate temporary filename to receive .csv file
+    char report_filename[L_tmpnam];
+    tmpnam(report_filename);
+
+    // Build command line
+    char cmdbuffer[1024];
+    sprintf(cmdbuffer, "\"%s\" \"%s\" analysis \"%s\" \"%s\" \"%s\" 0.799", mPvqaPath.c_str(), mLicensePath.c_str(),
+            report_filename, mConfigPath.c_str(), filepath.c_str());
+    try
+    {
+        std::string output = execCommand(cmdbuffer);
+
+        std::string line;
+        std::istringstream is(output);
+        std::string estimation;
+        while (std::getline(is, line))
+        {
+            std::string::size_type mosPosition = line.find("MOS = ");
+            if ( mosPosition != std::string::npos)
+            {
+                estimation = line.substr(mosPosition + 6);
+                estimation = StringHelper::trim(estimation);
+            }
+        }
+
+        if (!estimation.size())
+            throw std::runtime_error("Bad response from pvqa: " + output);
+
+        result = std::stof(estimation);
+
+        // Read intervals report file
+        std::ifstream t(report_filename);
+        std::string str((std::istreambuf_iterator<char>(t)),
+                         std::istreambuf_iterator<char>());
+        outputReport = str;
+        ::remove(report_filename);
+        ::remove(report_filename);
+    }
+    catch (std::exception& e)
+    {
+        std::cerr << e.what() << "\n";
+    }
+
+    return result;
+}
+
+
+// -------------- SevanaMosUtility --------------
 void SevanaMosUtility::run(const std::string& pcmPath, const std::string& intervalPath,
                            std::string& estimation, std::string& intervals)
 {

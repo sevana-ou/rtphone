@@ -30,6 +30,27 @@ namespace MT
     Html
   };
   
+  class PvqaUtility
+  {
+  public:
+      PvqaUtility();
+      ~PvqaUtility();
+
+      void setPath(const std::string& path);
+      std::string getPath() const;
+
+      void setLicensePath(const std::string& path);
+      std::string getLicensePath() const;
+
+      void setConfigPath(const std::string& path);
+      std::string getConfigPath() const;
+
+      float process(const std::string& filepath, std::string& outputReport);
+
+  private:
+      std::string mPvqaPath, mLicensePath, mConfigPath;
+  };
+
   #if defined(USE_PVQA_LIBRARY)
   class SevanaMosUtility
   {
