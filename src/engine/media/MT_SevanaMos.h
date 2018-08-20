@@ -30,47 +30,6 @@ enum class ReportType
     Html
 };
 
-class PvqaUtility
-{
-public:
-    PvqaUtility();
-    ~PvqaUtility();
-
-    void setPath(const std::string& path);
-    std::string getPath() const;
-
-    void setLicensePath(const std::string& path);
-    std::string getLicensePath() const;
-
-    void setConfigPath(const std::string& path);
-    std::string getConfigPath() const;
-
-    float process(const std::string& path, std::string& report);
-private:
-    std::string mPvqaPath, mLicensePath, mConfigPath;
-};
-
-class AquaUtility
-{
-public:
-    AquaUtility();
-    ~AquaUtility();
-
-    void setPath(const std::string& path);
-    std::string getPath() const;
-
-    void setLicensePath(const std::string& path);
-    std::string getLicensePath() const;
-
-    void setConfigLine(const std::string& line);
-    std::string getConfigLine() const;
-
-    float compare(const std::string& src, const std::string& dst, std::string& outputReport);
-
-protected:
-    std::string mAquaPath, mLicensePath, mConfigLine;
-};
-
 #if defined(USE_PVQA_LIBRARY)
 class SevanaMosUtility
 {
