@@ -24,55 +24,75 @@
 
 namespace MT
 {
-  enum class ReportType
-  {
+enum class ReportType
+{
     PlainText,
     Html
-  };
-  
-  class PvqaUtility
-  {
-  public:
-      PvqaUtility();
-      ~PvqaUtility();
+};
 
-      void setPath(const std::string& path);
-      std::string getPath() const;
+class PvqaUtility
+{
+public:
+    PvqaUtility();
+    ~PvqaUtility();
 
-      void setLicensePath(const std::string& path);
-      std::string getLicensePath() const;
+    void setPath(const std::string& path);
+    std::string getPath() const;
 
-      void setConfigPath(const std::string& path);
-      std::string getConfigPath() const;
+    void setLicensePath(const std::string& path);
+    std::string getLicensePath() const;
 
-      float process(const std::string& filepath, std::string& outputReport);
+    void setConfigPath(const std::string& path);
+    std::string getConfigPath() const;
 
-  private:
-      std::string mPvqaPath, mLicensePath, mConfigPath;
-  };
+    float process(const std::string& path, std::string& report);
+private:
+    std::string mPvqaPath, mLicensePath, mConfigPath;
+};
 
-  #if defined(USE_PVQA_LIBRARY)
-  class SevanaMosUtility
-  {
-  public:
+class AquaUtility
+{
+public:
+    AquaUtility();
+    ~AquaUtility();
+
+    void setPath(const std::string& path);
+    std::string getPath() const;
+
+    void setLicensePath(const std::string& path);
+    std::string getLicensePath() const;
+
+    void setConfigLine(const std::string& line);
+    std::string getConfigLine() const;
+
+    float compare(const std::string& src, const std::string& dst, std::string& outputReport);
+
+protected:
+    std::string mAquaPath, mLicensePath, mConfigLine;
+};
+
+#if defined(USE_PVQA_LIBRARY)
+class SevanaMosUtility
+{
+public:
     // Returns MOS estimation as text representation of float value or "failed" word.
     static void run(const std::string& pcmPath, const std::string& intervalPath,
                     std::string& estimation, std::string& intervals);
-  };
+};
 
-  extern float getSevanaMos(const std::string& audioPath, const std::string& intervalReportPath,
-                            std::string& intervalReport);
+extern float getSevanaMos(const std::string& audioPath, const std::string& intervalReportPath,
+                          std::string& intervalReport);
 
-  class SevanaPVQA
-  {
-  public:
+class SevanaPVQA
+{
+public:
     enum class Model
     {
-      Stream,
-      Interval
+        Stream,
+        Interval
     };
 
-  protected:
+protected:
     static void* mLibraryConfiguration;
     static int mLibraryErrorCode;
     static std::atomic_int mInstanceCounter;
@@ -83,20 +103,20 @@ namespace MT
     Model mModel = Model::Interval;
     double mIntervalLength = 0.68;
     uint64_t mProcessedSamples = 0,
-      mProcessedMilliseconds = 0;
+    mProcessedMilliseconds = 0;
 
     bool mAudioLineInitialized = false;
     std::string mDumpWavPath;
     bool mOpenFailed = false;
 
-  public:
+public:
     static std::string getVersion();
 
     // Required to call before any call to SevanaPVQA instance methods
     
-  #if defined(TARGET_ANDROID)
+#if defined(TARGET_ANDROID)
     static void setupAndroidEnvironment(void* environment, void* appcontext);
-  #endif
+#endif
     static bool initializeLibrary(const std::string& pathToLicenseFile, const std::string& pathToConfigFile);
     static bool isInitialized();
 
@@ -118,15 +138,15 @@ namespace MT
     typedef std::vector<std::vector<float>> EchoData;
     enum class Codec
     {
-      None,
-      G711,
-      ILBC,
-      G722,
-      G729,
-      GSM,
-      AMRNB,
-      AMRWB,
-      OPUS
+        None,
+        G711,
+        ILBC,
+        G722,
+        G729,
+        GSM,
+        AMRNB,
+        AMRWB,
+        OPUS
     };
 
     float getResults(std::string& report, EchoData** echo, int samplerate, Codec codec);
@@ -134,8 +154,8 @@ namespace MT
     // Report is interval report. Names are output detector names. startIndex is column's start index in interval report of first detector.
     struct DetectorsList
     {
-      std::vector<std::string> mNames;
-      int mStartIndex = 0;
+        std::vector<std::string> mNames;
+        int mStartIndex = 0;
     };
 
     static DetectorsList getDetectorsNames(const std::string& report);
@@ -149,20 +169,20 @@ namespace MT
     int getSize() const;
 
     static std::string mosToColor(float mos);
-  };
+};
 
-  typedef std::shared_ptr<SevanaPVQA> PSevanaPVQA;
-  #endif
+typedef std::shared_ptr<SevanaPVQA> PSevanaPVQA;
+#endif
 
-  #if defined(USE_AQUA_LIBRARY)
-  class SevanaAqua
-  {
-  protected:
+#if defined(USE_AQUA_LIBRARY)
+class SevanaAqua
+{
+protected:
     void* mContext = nullptr;
     std::mutex mMutex;
     std::string mTempPath;
 
-  public:
+public:
     // Returns 0 (zero) on successful initialization, otherwise it is error code
     static int initializeLibrary(const std::string& pathToLicenseFile);
     static void releaseLibrary();
@@ -222,21 +242,21 @@ namespace MT
         bool isInitialized() const { return mRate > 0 && mChannels > 0 && mData; }
     };
 
-      
+
     struct FaultsReport
     {
-      float mSignalAdvancedInMilliseconds = -5000.0;
-      float mMistimingInPercents = -5000.0;
+        float mSignalAdvancedInMilliseconds = -5000.0;
+        float mMistimingInPercents = -5000.0;
 
-      struct Result
-      {
-        std::string mSource, mDegrated, mUnit;
-      };
-      typedef std::map<std::string, Result> ResultMap;
-      ResultMap mResultMap;
+        struct Result
+        {
+            std::string mSource, mDegrated, mUnit;
+        };
+        typedef std::map<std::string, Result> ResultMap;
+        ResultMap mResultMap;
 
-      Json::Value toJson() const;
-      std::string toText() const;
+        Json::Value toJson() const;
+        std::string toText() const;
     };
 
     typedef std::shared_ptr<FaultsReport> PFaultsReport;
@@ -246,15 +266,15 @@ namespace MT
     // Compare in one shot. Report will include text representation of json report.
     struct CompareResult
     {
-      float mMos = 0.0f;
-      Json::Value mReport;
-      PFaultsReport mFaults;
+        float mMos = 0.0f;
+        Json::Value mReport;
+        PFaultsReport mFaults;
     };
 
     CompareResult compare(AudioBuffer& reference, AudioBuffer& test);
-  };
-  typedef std::shared_ptr<SevanaAqua> PSevanaAqua;
-  #endif
+};
+typedef std::shared_ptr<SevanaAqua> PSevanaAqua;
+#endif
 }
 
 #endif

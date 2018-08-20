@@ -158,6 +158,101 @@ float PvqaUtility::process(const std::string& filepath, std::string& outputRepor
     return result;
 }
 
+// ---------------- AquaUtility -----------------
+AquaUtility::AquaUtility()
+{}
+
+AquaUtility::~AquaUtility()
+{}
+
+void AquaUtility::setPath(const std::string& path)
+{
+    mAquaPath = path;
+}
+
+std::string AquaUtility::getPath() const
+{
+    return mAquaPath;
+}
+
+void AquaUtility::setLicensePath(const std::string& path)
+{
+    mLicensePath = path;
+}
+
+std::string AquaUtility::getLicensePath() const
+{
+    return mLicensePath;
+}
+
+void AquaUtility::setConfigLine(const std::string& line)
+{
+    mConfigLine = line;
+}
+
+std::string AquaUtility::getConfigLine() const
+{
+    return mConfigLine;
+}
+
+float AquaUtility::compare(const std::string& src_path, const std::string& dst_path, std::string& output_report)
+{
+    float result = 0.0f;
+
+    // Generate temporary filename to receive .csv file
+    char spectrum_filename[L_tmpnam], report_filename[L_tmpnam];
+    tmpnam(spectrum_filename);
+    tmpnam(report_filename);
+
+    std::string config_line = mConfigLine;
+    StringHelper::replace(config_line, ":src_file", "\"" + src_path + "\"");
+    StringHelper::replace(config_line, ":tst_file", "\"" + dst_path + "\"");
+    StringHelper::replace(config_line, ":spectrum_file", spectrum_filename);
+    StringHelper::replace(config_line, ":report_file", report_filename);
+    StringHelper::replace(config_line, ":license_file", "\"" + mLicensePath + "\"");
+
+    // Build command line
+    char cmdbuffer[2048];
+    sprintf(cmdbuffer, "\"%s\" %s", mAquaPath.c_str(), config_line.c_str());
+
+    try
+    {
+        std::string output = execCommand(cmdbuffer);
+
+        std::string line;
+        std::istringstream is(output);
+        std::string estimation;
+        while (std::getline(is, line))
+        {
+            std::string::size_type mosPosition = line.find("MOS value ");
+            if ( mosPosition != std::string::npos)
+            {
+                estimation = line.substr(mosPosition + 6);
+                estimation = StringHelper::trim(estimation);
+            }
+        }
+
+        if (!estimation.size())
+            throw std::runtime_error("Bad response from pvqa: " + output);
+
+        result = std::stof(estimation);
+
+        // Read intervals report file
+        std::ifstream t(report_filename);
+        std::string str((std::istreambuf_iterator<char>(t)),
+                         std::istreambuf_iterator<char>());
+
+        output_report = str;
+        ::remove(report_filename);
+        ::remove(report_filename);
+    }
+    catch (std::exception& e)
+    {
+        std::cerr << e.what() << "\n";
+    }
+
+    return result;
+}
 
 // -------------- SevanaMosUtility --------------
 void SevanaMosUtility::run(const std::string& pcmPath, const std::string& intervalPath,
