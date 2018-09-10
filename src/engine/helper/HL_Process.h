@@ -6,7 +6,7 @@
 class OsProcess
 {
 public:
-    std::string execCommand(const std::string& cmdline);
+    static std::string execCommand(const std::string& cmdline);
 };
 
 #endif
