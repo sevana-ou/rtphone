@@ -55,6 +55,8 @@ set (CMAKE_CXX_STANDARD_REQUIRED ON)
 set (rtphone_libs libs)
 set (rtphone_engine engine)
 
+set (USE_AMR_CODEC OFF CACHE BOOL "Use AMR codec. Requires libraries.")
+
 set (RTPHONE_SOURCES
     ${rtphone_engine}/media/MT_Statistics.cpp
     ${rtphone_engine}/media/MT_WebRtc.cpp
@@ -115,7 +117,7 @@ endif (USE_AMR_CODEC)
 target_link_libraries(rtphone ice_stack jrtplib g729_codec gsm_codec
     gsmhr_codec g722_codec srtp resiprocate
     helper_lib audio_lib webrtc speexdsp
-    opus uuid)
+    opus uuid ${LIBS})
 
 
 target_include_directories(rtphone

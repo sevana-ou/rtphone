@@ -75,7 +75,12 @@ std::string OsProcess::execCommand(const std::string& cmd)
 
     return output;
 }
+
 #else
+
+#include <memory>
+#include <stdexcept>
+
 std::string OsProcess::execCommand(const std::string& cmd)
 {
     std::string cp = cmd;
