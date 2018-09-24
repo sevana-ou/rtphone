@@ -77,6 +77,7 @@ namespace HEP
     ByteBuffer mAuthenticateKey;
     ByteBuffer mBody;
     VendorId mVendorId;
+    uint32_t mBodyOffset = 0;
   };
 
 }
