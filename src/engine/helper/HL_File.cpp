@@ -32,10 +32,22 @@ void FileHelper::remove(const char* s)
 
 std::string FileHelper::gettempname()
 {
+#if defined(TARGET_LINUX) || defined(TARGET_WIN)
     char buffer[L_tmpnam];
     tmpnam(buffer);
 
     return buffer;
+#elif defined(TARGET_OSX)
+    char template_filename[L_tmpnam] = "rtphone_XXXXXXX.tmp";
+    int handle = mkstemp(template_filename);
+    if (handle != -1)
+    {
+        close(handle);
+        return template_filename;
+    }
+    else
+        return std::string();
+#endif
 }
 
 bool FileHelper::isAbsolute(const std::string& s)
