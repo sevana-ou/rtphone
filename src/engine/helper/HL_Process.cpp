@@ -1,5 +1,6 @@
 #include "HL_Process.h"
-
+#include <thread>
+#include <memory>
 
 #ifdef TARGET_WIN
 # define popen _popen
@@ -98,4 +99,35 @@ std::string OsProcess::execCommand(const std::string& cmd)
     }
     return result;
 }
+
+void OsProcess::asyncExecCommand(const std::string& cmdline,
+                                   std::function<void(const std::string& line)> callback,
+                                   bool& finish_flag)
+{
+    std::thread t([cmdline, callback, &finish_flag]()
+    {
+        std::string cp = cmdline;
+        std::shared_ptr<FILE> pipe(popen(cp.c_str(), "r"), pclose);
+        if (!pipe)
+            throw std::runtime_error("Failed to run.");
+
+        char buffer[1024];
+        std::string result = "";
+        while (!feof(pipe.get()) && !finish_flag)
+        {
+            if (fgets(buffer, 1024, pipe.get()) != nullptr)
+            {
+                if (callback)
+                    callback(buffer);
+                result += buffer;
+            }
+        }
+
+        finish_flag = true;
+    });
+
+    while (!finish_flag)
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+}
+
 #endif
