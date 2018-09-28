@@ -22,23 +22,23 @@ LogLevel LogLevelHelper::parse(const std::string& t)
     if (t == "none")
         return LL_NONE;
     else
-        if (t == "debug")
-            return LL_DEBUG;
-        else
-            if (t == "critical")
-                return  LL_CRITICAL;
-            else
-                if (t == "info")
-                    return LL_INFO;
-                else
-                    if (t == "media")
-                        return LL_MEDIA;
-                    else
-                        if (t == "error")
-                            return LL_ERROR;
-                        else
-                            if (t == "special")
-                                return LL_SPECIAL;
+    if (t == "debug")
+        return LL_DEBUG;
+    else
+    if (t == "critical")
+        return  LL_CRITICAL;
+    else
+    if (t == "info")
+        return LL_INFO;
+    else
+    if (t == "media")
+        return LL_MEDIA;
+    else
+    if (t == "error")
+        return LL_ERROR;
+    else
+    if (t == "special")
+        return LL_SPECIAL;
 
     throw std::runtime_error("Bad log param string value.");
 }
