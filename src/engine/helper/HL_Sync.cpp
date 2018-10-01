@@ -123,7 +123,7 @@ BufferQueue::Block BufferQueue::pull(std::chrono::milliseconds timeout)
     std::unique_lock<std::mutex> l(mMutex);
     std::cv_status status = mBlockList.empty() ? std::cv_status::timeout : std::cv_status::no_timeout;
 
-    while (mBlockList.empty() && status == std::cv_status::timeout)
+    if (mBlockList.empty())
         status = mSignal.wait_for(l, timeout);
 
     Block r;

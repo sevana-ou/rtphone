@@ -81,6 +81,7 @@ std::string OsProcess::execCommand(const std::string& cmd)
 
 #include <memory>
 #include <stdexcept>
+#include <sys/select.h>
 
 std::string OsProcess::execCommand(const std::string& cmd)
 {
@@ -100,22 +101,35 @@ std::string OsProcess::execCommand(const std::string& cmd)
     return result;
 }
 
-void OsProcess::asyncExecCommand(const std::string& cmdline,
+#include <poll.h>
+
+std::shared_ptr<std::thread> OsProcess::asyncExecCommand(const std::string& cmdline,
                                    std::function<void(const std::string& line)> callback,
                                    bool& finish_flag)
 {
-    std::thread t([cmdline, callback, &finish_flag]()
+    std::shared_ptr<std::thread> t = std::make_shared<std::thread>([cmdline, callback, &finish_flag]()
     {
         std::string cp = cmdline;
-        std::shared_ptr<FILE> pipe(popen(cp.c_str(), "r"), pclose);
+        FILE* pipe = popen(cp.c_str(), "r");
         if (!pipe)
             throw std::runtime_error("Failed to run.");
 
         char buffer[1024];
         std::string result = "";
-        while (!feof(pipe.get()) && !finish_flag)
+        int f = fileno(pipe);
+        while (!feof(pipe) && !finish_flag)
         {
-            if (fgets(buffer, 1024, pipe.get()) != nullptr)
+            // Wait for more data
+            struct pollfd pfd{ .fd = f, .events = POLLIN };
+
+            while (poll(&pfd, 1, 0) == 0 && !finish_flag)
+                ;
+
+            // Read data
+            if (finish_flag)
+                continue;
+
+            if (fgets(buffer, 1024, pipe) != nullptr)
             {
                 if (callback)
                     callback(buffer);
@@ -123,11 +137,13 @@ void OsProcess::asyncExecCommand(const std::string& cmdline,
             }
         }
 
+        if (pipe)
+            pclose(pipe);
+
         finish_flag = true;
     });
 
-    while (!finish_flag)
-        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    return t;
 }
 
 #endif
