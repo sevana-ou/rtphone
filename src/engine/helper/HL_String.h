@@ -20,6 +20,8 @@ class StringHelper
 {
 public:
     static std::string extractFilename(const std::string& path);
+    static std::string appendPath(const std::string& s1, const std::string& s2);
+
     static std::string makeUtf8(const std::tstring& arg);
     static std::tstring makeTstring(const std::string& arg);
     static int toInt(const char* s, int defaultValue, bool* isOk = nullptr);
@@ -59,6 +61,8 @@ public:
     static std::string replace(const std::string& s, const std::string& tmpl, const std::string& n);
     static std::string decodeUri(const std::string& s);
     static bool startsWith(const std::string& s, const std::string& prefix);
+    static bool endsWith(const std::string& s, const std::string& suffix);
+    static int stringToDuration(const std::string& s);
 };
 
 class XcapHelper

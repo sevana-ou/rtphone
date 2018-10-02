@@ -82,6 +82,7 @@ std::string OsProcess::execCommand(const std::string& cmd)
 #include <memory>
 #include <stdexcept>
 #include <sys/select.h>
+#include <fcntl.h>
 
 std::string OsProcess::execCommand(const std::string& cmd)
 {
@@ -102,6 +103,11 @@ std::string OsProcess::execCommand(const std::string& cmd)
 }
 
 #include <poll.h>
+#include <sys/types.h>
+#include <sys/uio.h>
+#include <unistd.h>
+#include <vector>
+#include "helper/HL_String.h"
 
 std::shared_ptr<std::thread> OsProcess::asyncExecCommand(const std::string& cmdline,
                                    std::function<void(const std::string& line)> callback,
@@ -115,12 +121,17 @@ std::shared_ptr<std::thread> OsProcess::asyncExecCommand(const std::string& cmdl
             throw std::runtime_error("Failed to run.");
 
         char buffer[1024];
+        std::string lines;
         std::string result = "";
-        int f = fileno(pipe);
+        int fno = fileno(pipe);
+
+        // Make it non blocking
+        fcntl(fno, F_SETFL, O_NONBLOCK);
+
         while (!feof(pipe) && !finish_flag)
         {
             // Wait for more data
-            struct pollfd pfd{ .fd = f, .events = POLLIN };
+            struct pollfd pfd{ .fd = fno, .events = POLLIN };
 
             while (poll(&pfd, 1, 0) == 0 && !finish_flag)
                 ;
@@ -129,11 +140,32 @@ std::shared_ptr<std::thread> OsProcess::asyncExecCommand(const std::string& cmdl
             if (finish_flag)
                 continue;
 
-            if (fgets(buffer, 1024, pipe) != nullptr)
+            int r;
+            do
             {
-                if (callback)
-                    callback(buffer);
-                result += buffer;
+                r = read(fno, buffer, sizeof(buffer)-1);
+                if (r > 0)
+                {
+                    buffer[r] = 0;
+                    lines += std::string(buffer);
+                }
+            }
+            while (r == sizeof(buffer) - 1);
+
+            if (lines.find("\n") != std::string::npos && callback)
+            {
+                std::string::size_type p = 0;
+                while (p < lines.size())
+                {
+                    std::string::size_type d = lines.find("\n", p);
+                    if (d != std::string::npos)
+                    {
+                        callback(StringHelper::trim(lines.substr(p, d-p)));
+                        p = d + 1;
+                    }
+                }
+
+                lines.erase(0, p);
             }
         }
 

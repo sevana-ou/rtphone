@@ -27,6 +27,20 @@ std::string StringHelper::extractFilename(const std::string& path)
 
 }
 
+std::string StringHelper::appendPath(const std::string& s1, const std::string& s2)
+{
+    std::string result = s1;
+    if (!endsWith(result, "/") && !endsWith(result, "\\"))
+    {
+#if defined(TARGET_WIN)
+        result += "\\";
+#else
+        result += "/";
+#endif
+    }
+    return result + s2;
+}
+
 std::string StringHelper::makeUtf8(const std::tstring &arg)
 {
 #if defined(TARGET_WIN)
@@ -352,6 +366,26 @@ bool StringHelper::startsWith(const std::string& s, const std::string& prefix)
 {
     std::string::size_type p = s.find(prefix);
     return p == 0;
+}
+
+bool StringHelper::endsWith(const std::string& s, const std::string& suffix)
+{
+    std::string::size_type p = s.rfind(suffix);
+    return (p == s.size() - suffix.size());
+}
+
+int StringHelper::stringToDuration(const std::string& s)
+{
+    if (endsWith(s, "ms"))
+        return std::stoi(s.substr(0, s.size()-2));
+    if (endsWith(s, "s"))
+        return std::stoi(s.substr(0, s.size()-1)) * 1000;
+    if (endsWith(s, "m"))
+        return std::stoi(s.substr(0, s.size()-1)) * 60000;
+    if (endsWith(s, "h"))
+        return std::stoi(s.substr(0, s.size()-1)) * 3600 * 1000;
+    else
+        return std::stoi(s) * 1000;
 }
 
 #define XML_HEADER "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"no\"?>"
