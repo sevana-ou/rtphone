@@ -56,7 +56,7 @@ RtpBuffer::RtpBuffer(Statistics& stat)
 
 RtpBuffer::~RtpBuffer()
 {
-  ICELogInfo(<< "Number of add packets: " << mAddCounter << ", number of retrieved packets " << mReturnedCounter);
+  ICELogDebug(<< "Number of add packets: " << mAddCounter << ", number of retrieved packets " << mReturnedCounter);
 }
 
 void RtpBuffer::setHigh(int milliseconds)
