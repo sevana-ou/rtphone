@@ -12,6 +12,7 @@
 #include <thread>
 #include <vector>
 #include <queue>
+#include <assert.h>
 
 typedef std::recursive_mutex Mutex;
 typedef std::unique_lock<std::recursive_mutex> Lock;
