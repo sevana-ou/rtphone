@@ -107,7 +107,7 @@ set(LIBS ice_stack jrtplib g729_codec gsm_codec
 if (CMAKE_SYSTEM MATCHES "Win*")
     set (LIBS ${LIBS} ssleay32 libeay32 opus silk_float celt)
 else (CMAKE_SYSTEM MATCHES "Win*")
-    set (LIBS ${LIBS} ssl crypto dl opus)
+    set (LIBS ${LIBS} ssl crypto dl)
 endif (CMAKE_SYSTEM MATCHES "Win*")
 
 if (USE_AMR_CODEC)
@@ -117,7 +117,7 @@ endif (USE_AMR_CODEC)
 target_link_libraries(rtphone ice_stack jrtplib g729_codec gsm_codec
     gsmhr_codec g722_codec srtp resiprocate
     helper_lib audio_lib webrtc speexdsp
-    opus uuid ${LIBS})
+    uuid ${LIBS})
 
 
 target_include_directories(rtphone
