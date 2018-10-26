@@ -10,6 +10,7 @@
 #include <iostream>
 #include <stdio.h>
 #include <string.h>
+#include <stdexcept>
 #if defined(__ANDROID_API__)
 # include <android/log.h>
 #endif
