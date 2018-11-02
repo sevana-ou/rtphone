@@ -1,4 +1,4 @@
-/* Copyright(C) 2007-2014 VoIP objects (voipobjects.com)
+/* Copyright(C) 2007-2018 VoIP objects (voipobjects.com)
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -16,9 +16,9 @@
 
 namespace Audio 
 {
-  class SpeexResampler
-  {
-  public:
+class SpeexResampler
+{
+public:
     SpeexResampler();
     ~SpeexResampler();
     
@@ -33,29 +33,29 @@ namespace Audio
     // Returns instance + speex encoder size in bytes
     int getSize() const;
 
-  protected:
+protected:
     void* mContext;
     int   mErrorCode;
     int   mSourceRate,
-          mDestRate,
-          mChannels;
-	  short mLastSample;
-  };
+    mDestRate,
+    mChannels;
+    short mLastSample;
+};
 
-  typedef SpeexResampler Resampler;
-  typedef std::shared_ptr<Resampler> PResampler;
+typedef SpeexResampler Resampler;
+typedef std::shared_ptr<Resampler> PResampler;
 
-  class ChannelConverter
-  {
-  public:
+class ChannelConverter
+{
+public:
     static int stereoToMono(const void* source, int sourceLength, void* dest, int destLength);
     static int monoToStereo(const void* source, int sourceLength, void* dest, int destLength);
-  };
+};
 
-  // Operates with AUDIO_CHANNELS number of channels
-  class UniversalResampler
-  {
-  public:
+// Operates with AUDIO_CHANNELS number of channels
+class UniversalResampler
+{
+public:
     UniversalResampler();
     ~UniversalResampler();
 
@@ -63,39 +63,39 @@ namespace Audio
     int getDestLength(int sourceRate, int destRate, int sourceLength);
     int getSourceLength(int sourceRate, int destRate, int destLength);
 
-  protected:
+protected:
     typedef std::pair<int, int> RatePair;
     typedef std::map<RatePair, PResampler> ResamplerMap;
     ResamplerMap mResamplerMap;
     PResampler findResampler(int sourceRate, int destRate);
 
     void preload();
-  };
+};
 
 #ifdef USE_WEBRTC_RESAMPLER
-  // n*10 milliseconds buffers required!
-  class Resampler48kTo16k
-  {
-  public:
+// n*10 milliseconds buffers required!
+class Resampler48kTo16k
+{
+public:
     Resampler48kTo16k();
     ~Resampler48kTo16k();
     int process(const void* source, int sourceLen, void* dest, int destLen);
-  protected:
+protected:
     WebRtc_Word32 mTemp[496];
     WebRtcSpl_State48khzTo16khz mContext;
-  };
+};
 
-  class Resampler16kto48k
-  {
-  public:
+class Resampler16kto48k
+{
+public:
     Resampler16kto48k();
     ~Resampler16kto48k();
     int process(const void* source, int sourceLen, void* dest, int destLen);
 
-  protected:
+protected:
     WebRtc_Word32 mTemp[336];
     WebRtcSpl_State16khzTo48khz mContext;
-  };
+};
 #endif
 }
 
