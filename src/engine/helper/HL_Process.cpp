@@ -1,6 +1,7 @@
 #include "HL_Process.h"
-#include <thread>
-#include <memory>
+#include "HL_String.h"
+
+#include <iostream>
 
 #ifdef TARGET_WIN
 # define popen _popen
@@ -32,6 +33,7 @@ std::string OsProcess::execCommand(const std::string& cmd)
 
     char* cmdline = (char*)_alloca(cmd.size()+1);
     strcpy(cmdline, StringHelper::replace(cmd, "/", "\\").c_str());
+    std::cout << cmdline << std::endl;
 
     BOOL fSuccess = CreateProcessA( NULL, cmdline, NULL, NULL, TRUE, CREATE_NEW_CONSOLE, NULL, NULL, &si, &pi);
     if (! fSuccess)
@@ -76,14 +78,7 @@ std::string OsProcess::execCommand(const std::string& cmd)
 
     return output;
 }
-
 #else
-
-#include <memory>
-#include <stdexcept>
-#include <sys/select.h>
-#include <fcntl.h>
-
 std::string OsProcess::execCommand(const std::string& cmd)
 {
     std::string cp = cmd;
@@ -101,81 +96,4 @@ std::string OsProcess::execCommand(const std::string& cmd)
     }
     return result;
 }
-
-#include <poll.h>
-#include <sys/types.h>
-#include <sys/uio.h>
-#include <unistd.h>
-#include <vector>
-#include "helper/HL_String.h"
-
-std::shared_ptr<std::thread> OsProcess::asyncExecCommand(const std::string& cmdline,
-                                   std::function<void(const std::string& line)> callback,
-                                   bool& finish_flag)
-{
-    std::shared_ptr<std::thread> t = std::make_shared<std::thread>([cmdline, callback, &finish_flag]()
-    {
-        std::string cp = cmdline;
-        FILE* pipe = popen(cp.c_str(), "r");
-        if (!pipe)
-            throw std::runtime_error("Failed to run.");
-
-        char buffer[1024];
-        std::string lines;
-        std::string result = "";
-        int fno = fileno(pipe);
-
-        // Make it non blocking
-        fcntl(fno, F_SETFL, O_NONBLOCK);
-
-        while (!feof(pipe) && !finish_flag)
-        {
-            // Wait for more data
-            struct pollfd pfd{ .fd = fno, .events = POLLIN };
-
-            while (poll(&pfd, 1, 0) == 0 && !finish_flag)
-                ;
-
-            // Read data
-            if (finish_flag)
-                continue;
-
-            int r;
-            do
-            {
-                r = read(fno, buffer, sizeof(buffer)-1);
-                if (r > 0)
-                {
-                    buffer[r] = 0;
-                    lines += std::string(buffer);
-                }
-            }
-            while (r == sizeof(buffer) - 1);
-
-            if (lines.find("\n") != std::string::npos && callback)
-            {
-                std::string::size_type p = 0;
-                while (p < lines.size())
-                {
-                    std::string::size_type d = lines.find("\n", p);
-                    if (d != std::string::npos)
-                    {
-                        callback(StringHelper::trim(lines.substr(p, d-p)));
-                        p = d + 1;
-                    }
-                }
-
-                lines.erase(0, p);
-            }
-        }
-
-        if (pipe)
-            pclose(pipe);
-
-        finish_flag = true;
-    });
-
-    return t;
-}
-
 #endif
