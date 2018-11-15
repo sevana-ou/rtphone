@@ -56,6 +56,11 @@ set (rtphone_libs libs)
 set (rtphone_engine engine)
 
 set (USE_AMR_CODEC OFF CACHE BOOL "Use AMR codec. Requires libraries.")
+set (OPENSSL_SSL ssl CACHE STRING "Pointer to ssl library")
+set (OPENSSL_CRYPTO crypto CACHE STRING "Pointer to crypto library")
+
+message ("Using ssl library at ${OPENSSL_SSL}")
+message ("Using crypto library at ${OPENSSL_CRYPTO}")
 
 set (RTPHONE_SOURCES
     ${rtphone_engine}/media/MT_Statistics.cpp
@@ -107,17 +112,18 @@ set(LIBS ice_stack jrtplib g729_codec gsm_codec
 if (CMAKE_SYSTEM MATCHES "Win*")
     set (LIBS ${LIBS} ssleay32 libeay32 opus silk_float celt)
 else (CMAKE_SYSTEM MATCHES "Win*")
-    set (LIBS ${LIBS} ssl crypto dl)
+    set (LIBS ${LIBS} dl opus uuid)
 endif (CMAKE_SYSTEM MATCHES "Win*")
 
 if (USE_AMR_CODEC)
     set(LIBS ${LIBS} opencore-amrnb opencore-amrwb)
 endif (USE_AMR_CODEC)
 
-target_link_libraries(rtphone ice_stack jrtplib g729_codec gsm_codec
+target_link_libraries(rtphone
+    ice_stack jrtplib g729_codec gsm_codec
     gsmhr_codec g722_codec srtp resiprocate
     helper_lib audio_lib webrtc speexdsp
-    uuid ${LIBS})
+    opus uuid ${OPENSSL_SSL} ${OPENSSL_CRYPTO} ${LIBS})
 
 
 target_include_directories(rtphone
