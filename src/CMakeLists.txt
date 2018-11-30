@@ -56,6 +56,7 @@ set (rtphone_libs libs)
 set (rtphone_engine engine)
 
 set (USE_AMR_CODEC OFF CACHE BOOL "Use AMR codec. Requires libraries.")
+set (USE_EVS_CODEC OFF CACHE BOOL "Use EVS codec.")
 set (OPENSSL_SSL ssl CACHE STRING "Pointer to ssl library")
 set (OPENSSL_CRYPTO crypto CACHE STRING "Pointer to crypto library")
 
@@ -78,6 +79,7 @@ set (RTPHONE_SOURCES
     ${rtphone_engine}/media/MT_AudioCodec.cpp
     ${rtphone_engine}/media/MT_SevanaMos.cpp
     ${rtphone_engine}/media/MT_AmrCodec.cpp
+    ${rtphone_engine}/media/MT_EvsCodec.cpp
     ${rtphone_engine}/media/MT_CngHelper.cpp
     ${rtphone_engine}/agent/Agent_Impl.cpp
     ${rtphone_engine}/agent/Agent_AudioManager.cpp
@@ -98,6 +100,7 @@ add_subdirectory(${rtphone_libs}/resiprocate)
 add_subdirectory(${rtphone_libs}/ice)
 add_subdirectory(${rtphone_libs}/jrtplib/src)
 add_subdirectory(${rtphone_libs}/libg729)
+add_subdirectory(${rtphone_libs}/libevs)
 add_subdirectory(${rtphone_libs}/libgsm)
 add_subdirectory(${rtphone_libs}/gsmhr)
 add_subdirectory(${rtphone_libs}/g722)
