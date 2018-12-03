@@ -1,6 +1,7 @@
 #include "HL_CrashRpt.h"
 #include "HL_String.h"
 
+
 // Define this if CrashRpt has to be deployed as .dll
 // #define CRASHRPT_DYNAMIC
 

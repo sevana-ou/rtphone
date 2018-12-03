@@ -2,12 +2,9 @@
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
-
-
 #ifndef __AUDIO_WAVFILE_H
 #define __AUDIO_WAVFILE_H
 
-#include "helper/HL_Sync.h"
 #include "helper/HL_Types.h"
 #include "Audio_Resampler.h"
 
