@@ -89,7 +89,7 @@ std::shared_ptr<std::thread> OsProcess::asyncExecCommand(const std::string& cmdl
     SECURITY_ATTRIBUTES saAttr = { sizeof(SECURITY_ATTRIBUTES), nullptr, FALSE };
     saAttr.bInheritHandle = TRUE;   //Pipe handles are inherited by child process.
     saAttr.lpSecurityDescriptor = nullptr;
-
+    
     // Create a pipe to get results from child's stdout.
     if ( !CreatePipe(&hPipeRead, &hPipeWrite, &saAttr, 0) )
         return std::shared_ptr<std::thread>();
@@ -106,6 +106,7 @@ std::shared_ptr<std::thread> OsProcess::asyncExecCommand(const std::string& cmdl
 
     char* cmdbuffer = (char*)_alloca(cmdline.size()+1);
     strcpy(cmdbuffer, StringHelper::replace(cmdline, "/", "\\").c_str());
+
 
     BOOL fSuccess = CreateProcessA( nullptr, cmdbuffer, nullptr, nullptr, TRUE,
                                     CREATE_NEW_CONSOLE, nullptr, nullptr, &si, &pi);
@@ -158,8 +159,20 @@ std::shared_ptr<std::thread> OsProcess::asyncExecCommand(const std::string& cmdl
         if (buf[0])
             callback(StringHelper::trim(std::string(buf)));
 
+        char ctrlc = 3;
+        //if (finish_flag)
+        //  ::WriteFile(hPipeWrite, &ctrlc, 1, nullptr, nullptr);
+
+        //    GenerateConsoleCtrlEvent(CTRL_BREAK_EVENT, pi.dwProcessId);
+        
         CloseHandle( hPipeWrite );
         CloseHandle( hPipeRead );
+        if (finish_flag)
+        {
+            //GenerateConsoleCtrlEvent(CTRL_C_EVENT, 0);
+            // Close underlying process
+            //TerminateProcess(pi.hProcess, 3);
+        }
         CloseHandle( pi.hProcess );
         CloseHandle( pi.hThread );
 
