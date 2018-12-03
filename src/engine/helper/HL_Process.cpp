@@ -9,6 +9,8 @@
 
 #if defined(TARGET_WIN)
 #include <Windows.h>
+#include "helper/HL_String.h"
+
 std::string OsProcess::execCommand(const std::string& cmd)
 {
     std::string output;
@@ -33,7 +35,7 @@ std::string OsProcess::execCommand(const std::string& cmd)
     char* cmdline = (char*)_alloca(cmd.size()+1);
     strcpy(cmdline, StringHelper::replace(cmd, "/", "\\").c_str());
 
-    BOOL fSuccess = CreateProcessA( NULL, cmdline, NULL, NULL, TRUE, CREATE_NEW_CONSOLE, NULL, NULL, &si, &pi);
+    BOOL fSuccess = CreateProcessA( nullptr, cmdline, NULL, NULL, TRUE, CREATE_NEW_CONSOLE, NULL, NULL, &si, &pi);
     if (! fSuccess)
     {
         CloseHandle( hPipeWrite );
@@ -75,6 +77,95 @@ std::string OsProcess::execCommand(const std::string& cmd)
     CloseHandle( pi.hThread );
 
     return output;
+}
+
+std::shared_ptr<std::thread> OsProcess::asyncExecCommand(const std::string& cmdline,
+                                                    std::function<void(const std::string& line)> callback,
+                                                    bool& finish_flag)
+{
+    std::string output;
+    HANDLE hPipeRead, hPipeWrite;
+
+    SECURITY_ATTRIBUTES saAttr = { sizeof(SECURITY_ATTRIBUTES), nullptr, FALSE };
+    saAttr.bInheritHandle = TRUE;   //Pipe handles are inherited by child process.
+    saAttr.lpSecurityDescriptor = nullptr;
+
+    // Create a pipe to get results from child's stdout.
+    if ( !CreatePipe(&hPipeRead, &hPipeWrite, &saAttr, 0) )
+        return std::shared_ptr<std::thread>();
+
+    STARTUPINFOA si; memset(&si, 0, sizeof si);
+    si.cb = sizeof(STARTUPINFOA);
+    si.dwFlags     = STARTF_USESHOWWINDOW | STARTF_USESTDHANDLES;
+    si.hStdOutput  = hPipeWrite;
+    si.hStdError   = hPipeWrite;
+    si.wShowWindow = SW_HIDE;       // Prevents cmd window from flashing. Requires STARTF_USESHOWWINDOW in dwFlags.
+
+    PROCESS_INFORMATION pi;
+    memset(&pi, 0, sizeof pi);
+
+    char* cmdbuffer = (char*)_alloca(cmdline.size()+1);
+    strcpy(cmdbuffer, StringHelper::replace(cmdline, "/", "\\").c_str());
+
+    BOOL fSuccess = CreateProcessA( nullptr, cmdbuffer, nullptr, nullptr, TRUE,
+                                    CREATE_NEW_CONSOLE, nullptr, nullptr, &si, &pi);
+    if (! fSuccess)
+    {
+        CloseHandle( hPipeWrite );
+        CloseHandle( hPipeRead );
+        return std::shared_ptr<std::thread>();
+    }
+
+    std::shared_ptr<std::thread> r = std::make_shared<std::thread>([&finish_flag, pi, callback, hPipeRead, hPipeWrite]()
+    {
+        char buf[4096]; memset(buf, 0, sizeof buf);
+        for (; !finish_flag ;)
+        {
+            // Give some timeslice (50ms), so we won't waste 100% cpu.
+            bool timeouted = WaitForSingleObject( pi.hProcess, 50) == WAIT_OBJECT_0;
+
+            // Even if process exited - we continue reading, if there is some data available over pipe.
+            for (;;)
+            {
+                DWORD dwRead = 0;
+                DWORD dwAvail = 0;
+
+                if (!::PeekNamedPipe(hPipeRead, nullptr, 0, nullptr, &dwAvail, nullptr))
+                    break;
+
+                if (!dwAvail) // no data available, return
+                    break;
+
+                int filled = strlen(buf);
+                if (!::ReadFile(hPipeRead, buf + filled, min(sizeof(buf) - 1 - filled, dwAvail), &dwRead, nullptr) || !dwRead)
+                    // error, the child process might ended
+                    break;
+
+                buf[dwRead] = 0;
+
+                // Split to lines and send to callback
+                const char* cr;
+                while ((cr = strchr(buf, '\n')) != nullptr)
+                {
+                    std::string line(buf, cr - buf -1);
+                    if (callback)
+                        callback(StringHelper::trim(line));
+                    memmove(buf, cr + 1, strlen(cr+1) + 1);
+                }
+            }
+        } //for
+
+        if (buf[0])
+            callback(StringHelper::trim(std::string(buf)));
+
+        CloseHandle( hPipeWrite );
+        CloseHandle( hPipeRead );
+        CloseHandle( pi.hProcess );
+        CloseHandle( pi.hThread );
+
+    });
+
+    return r;
 }
 
 #else
