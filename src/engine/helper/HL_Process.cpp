@@ -214,15 +214,20 @@ std::string OsProcess::execCommand(const std::string& cmd)
 #include "helper/HL_String.h"
 
 std::shared_ptr<std::thread> OsProcess::asyncExecCommand(const std::string& cmdline,
-                                   std::function<void(const std::string& line)> callback,
+                                   std::function<void(const std::string& line)> line_callback,
+                                   std::function<void(const std::string& reason)> finished_callback,
                                    bool& finish_flag)
 {
-    std::shared_ptr<std::thread> t = std::make_shared<std::thread>([cmdline, callback, &finish_flag]()
+    std::shared_ptr<std::thread> t = std::make_shared<std::thread>([cmdline, line_callback, finished_callback, &finish_flag]()
     {
         std::string cp = cmdline;
         FILE* pipe = popen(cp.c_str(), "r");
         if (!pipe)
-            throw std::runtime_error("Failed to run.");
+        {
+            if (finished_callback)
+                finished_callback("Failed to open pipe");
+            return;
+        }
 
         char buffer[1024];
         std::string lines;
@@ -247,7 +252,7 @@ std::shared_ptr<std::thread> OsProcess::asyncExecCommand(const std::string& cmdl
             int r;
             do
             {
-                r = read(fno, buffer, sizeof(buffer)-1);
+                r = (int)read(fno, buffer, sizeof(buffer) - 1);
                 if (r > 0)
                 {
                     buffer[r] = 0;
@@ -256,7 +261,7 @@ std::shared_ptr<std::thread> OsProcess::asyncExecCommand(const std::string& cmdl
             }
             while (r == sizeof(buffer) - 1);
 
-            if (lines.find("\n") != std::string::npos && callback)
+            if (lines.find("\n") != std::string::npos && line_callback)
             {
                 std::string::size_type p = 0;
                 while (p < lines.size())
@@ -264,7 +269,8 @@ std::shared_ptr<std::thread> OsProcess::asyncExecCommand(const std::string& cmdl
                     std::string::size_type d = lines.find("\n", p);
                     if (d != std::string::npos)
                     {
-                        callback(StringHelper::trim(lines.substr(p, d-p)));
+                        if (line_callback)
+                            line_callback(StringHelper::trim(lines.substr(p, d-p)));
                         p = d + 1;
                     }
                 }
@@ -277,6 +283,8 @@ std::shared_ptr<std::thread> OsProcess::asyncExecCommand(const std::string& cmdl
             pclose(pipe);
 
         finish_flag = true;
+        if (finished_callback)
+            finished_callback(std::string());
     });
 
     return t;

@@ -7,6 +7,7 @@
 #include <assert.h>
 #include <atomic>
 #include <memory.h>
+#include <iostream>
 
 #ifdef TARGET_OSX
 # include <libkern/OSAtomic.h>
@@ -160,6 +161,7 @@ bool Semaphore::waitFor(int milliseconds) {
 
     if (!m_cv.wait_for(lock, std::chrono::milliseconds(milliseconds), [this]() { return m_count > 0; }))
         return false;
+
     m_count--;
     return true;
 }
@@ -224,7 +226,7 @@ size_t TimerQueue::cancel(uint64_t id) {
             newItem.handler = std::move(item.handler);
             item.handler = nullptr;
             m_items.push(std::move(newItem));
-
+            std::cout << "Cancelled timer. " << std::endl;
             lk.unlock();
             // Something changed, so wake up timer thread
             m_checkWork.notify();
@@ -263,8 +265,10 @@ void TimerQueue::run()
         {
             // Timers found, so wait until it expires (or something else
             // changes)
-            int milliseconds = std::chrono::duration_cast<std::chrono::milliseconds>(end.second - std::chrono::steady_clock::now()).count();
-            m_checkWork.waitFor(milliseconds);
+            int milliseconds = std::chrono::duration_cast<std::chrono::milliseconds>
+                    (end.second - std::chrono::steady_clock::now()).count();
+            //std::cout << "Waiting m_checkWork for " << milliseconds * 1000 << "ms." << std::endl;
+            m_checkWork.waitFor(milliseconds * 1000);
         } else {
             // No timers exist, so wait forever until something changes
             m_checkWork.wait();
