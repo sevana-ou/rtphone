@@ -2,15 +2,18 @@
 #define RESIP_GENERIC_IP_ADDRESS_HXX
 
 #ifndef WIN32
-#include <netinet/in.h>
+# include <netinet/in.h>
 #else
-#include <winsock2.h>
-#include <Ws2tcpip.h>
+# include <winsock2.h>
+# include <Ws2tcpip.h>
 #endif
 
 #include "rutil/Socket.hxx"
 #include "rutil/compat.hxx"
 
+#ifndef IPPROTO_IPV6
+# define IPPROTO_IPV6
+#endif
 
 namespace resip
 {
