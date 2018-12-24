@@ -110,10 +110,10 @@ add_subdirectory(${rtphone_libs}/webrtc)
 
 set(LIBS ice_stack jrtplib g729_codec gsm_codec
     gsmhr_codec g722_codec srtp resiprocate helper_lib audio_lib webrtc speexdsp
-    uuid dl)
+    uuid)
 
 if (CMAKE_SYSTEM MATCHES "Win*")
-    set (LIBS ${LIBS} ssleay32 libeay32 opus silk_float celt)
+    set (LIBS ${LIBS} opus )
 else (CMAKE_SYSTEM MATCHES "Win*")
     set (LIBS ${LIBS} dl opus uuid)
 endif (CMAKE_SYSTEM MATCHES "Win*")

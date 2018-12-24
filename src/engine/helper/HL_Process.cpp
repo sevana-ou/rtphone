@@ -81,6 +81,7 @@ std::string OsProcess::execCommand(const std::string& cmd)
 
 std::shared_ptr<std::thread> OsProcess::asyncExecCommand(const std::string& cmdline,
                                                     std::function<void(const std::string& line)> callback,
+                                                    std::function<void(const std::string& reason)> finished_callback,
                                                     bool& finish_flag)
 {
     std::string output;
@@ -117,7 +118,8 @@ std::shared_ptr<std::thread> OsProcess::asyncExecCommand(const std::string& cmdl
         return std::shared_ptr<std::thread>();
     }
 
-    std::shared_ptr<std::thread> r = std::make_shared<std::thread>([&finish_flag, pi, callback, hPipeRead, hPipeWrite]()
+    std::shared_ptr<std::thread> r = std::make_shared<std::thread>(
+                [&finish_flag, pi, callback, finished_callback, hPipeRead, hPipeWrite]()
     {
         char buf[4096]; memset(buf, 0, sizeof buf);
         for (; !finish_flag ;)
@@ -175,7 +177,8 @@ std::shared_ptr<std::thread> OsProcess::asyncExecCommand(const std::string& cmdl
         }
         CloseHandle( pi.hProcess );
         CloseHandle( pi.hThread );
-
+        if (finished_callback)
+            finished_callback(std::string());
     });
 
     return r;

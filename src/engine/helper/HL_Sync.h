@@ -42,6 +42,7 @@ class ThreadHelper
 {
 public:
   static void setName(const std::string& name);
+  static uint64_t getCurrentId();
 };
 
 class TimeHelper

@@ -52,6 +52,16 @@ void ThreadHelper::setName(const std::string &name)
 #endif
 }
 
+uint64_t ThreadHelper::getCurrentId()
+{
+#if defined(TARGET_WIN)
+    return static_cast<uint64_t>(GetCurrentThreadId());
+#endif
+
+#if defined(TARGET_LINUX)||defined(TARGET_OSX)
+   return static_cast<uint64_t>(pthread_self());
+#endif
+}
 // ------------------- TimeHelper ---------------
 using namespace std::chrono;
 

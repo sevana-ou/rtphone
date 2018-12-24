@@ -58,6 +58,21 @@ bool FileHelper::isAbsolute(const std::string& s)
     return s.front() == '/' || s.front() == '\\';
 }
 
+std::string FileHelper::getCurrentDir()
+{
+#if defined(TARGET_WIN)
+    return std::string();
+#endif
+
+#if defined(TARGET_LINUX) || defined(TARGET_OSX)
+    char buffer[512];
+    if (getcwd(buf, sizeof buf) != nullptr)
+        return buf;
+    else
+        return std::string();
+#endif
+}
+
 std::string FileHelper::addTrailingSlash(const std::string& s)
 {
     if (s.empty())
