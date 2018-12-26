@@ -5,7 +5,7 @@
 
 #if defined(USE_PVQA_LIBRARY)
 
-#if defined(PVQA_SERVER)
+#if defined(TARGET_SERVER)
 # include <boost/filesystem.hpp>
 # include <boost/algorithm/string.hpp>
 using namespace boost::filesystem;
@@ -23,7 +23,7 @@ using namespace boost::filesystem;
 #include <atomic>
 #include <algorithm>
 
-#if defined(PVQA_SERVER)
+#if defined(TARGET_SERVER)
 extern std::string IntervalCacheDir;
 #endif
 
@@ -67,7 +67,7 @@ static std::string execCommand(const std::string& cmd)
 void SevanaMosUtility::run(const std::string& pcmPath, const std::string& intervalPath,
                            std::string& estimation, std::string& intervals)
 {
-#if defined(PVQA_SERVER)
+#if defined(TARGET_SERVER)
     path sevana = current_path() / "sevana";
 #if defined(TARGET_LINUX) || defined(TARGET_OSX)
     path exec = sevana / "pvqa";

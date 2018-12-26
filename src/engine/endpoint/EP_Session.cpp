@@ -458,7 +458,7 @@ void Session::getSessionInfo(Session::InfoOptions options, VariantMap& info)
         {
             media = &stream;
             MT::Statistics s = stream.provider()->getStatistics();
-#if defined(USE_PVQA_LIBRARY) && !defined(PVQA_SERVER)
+#if defined(USE_PVQA_LIBRARY) && !defined(TARGET_SERVER)
             if (options != InfoOptions::Standard)
             {
                 // This information is available AFTER audio stream is deleted
