@@ -23,6 +23,7 @@ public:
     static std::string appendPath(const std::string& s1, const std::string& s2);
 
     static std::string makeUtf8(const std::tstring& arg);
+    static std::string toUtf8(const std::tstring& arg);
     static std::tstring makeTstring(const std::string& arg);
     static int toInt(const char* s, int defaultValue, bool* isOk = nullptr);
     static uint64_t toUint64(const char* s, uint64_t def, bool *isOk = nullptr);

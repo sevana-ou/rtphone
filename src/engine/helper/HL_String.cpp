@@ -53,6 +53,11 @@ std::string StringHelper::makeUtf8(const std::tstring &arg)
 #endif
 }
 
+std::string StringHelper::toUtf8(const std::tstring &arg)
+{
+    return makeUtf8(arg);
+}
+
 std::tstring StringHelper::makeTstring(const std::string& arg)
 {
 #if defined(TARGET_WIN)
