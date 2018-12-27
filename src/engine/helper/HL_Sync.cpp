@@ -236,7 +236,7 @@ size_t TimerQueue::cancel(uint64_t id) {
             newItem.handler = std::move(item.handler);
             item.handler = nullptr;
             m_items.push(std::move(newItem));
-            std::cout << "Cancelled timer. " << std::endl;
+            // std::cout << "Cancelled timer. " << std::endl;
             lk.unlock();
             // Something changed, so wake up timer thread
             m_checkWork.notify();

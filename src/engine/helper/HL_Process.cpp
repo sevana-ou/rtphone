@@ -9,6 +9,7 @@
 
 #if defined(TARGET_WIN)
 #include <Windows.h>
+#include <iostream>
 #include "helper/HL_String.h"
 
 std::string OsProcess::execCommand(const std::string& cmd)
@@ -84,6 +85,8 @@ std::shared_ptr<std::thread> OsProcess::asyncExecCommand(const std::string& cmdl
                                                     std::function<void(const std::string& reason)> finished_callback,
                                                     bool& finish_flag)
 {
+    // std::cout << cmdline << std::endl;
+
     std::string output;
     HANDLE hPipeRead, hPipeWrite;
 
