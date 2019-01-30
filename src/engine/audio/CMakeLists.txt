@@ -20,6 +20,7 @@ set (AUDIOLIB_SOURCES
 )
 
 add_library(audio_lib ${AUDIOLIB_SOURCES})
+
 target_include_directories(audio_lib
     PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
     PRIVATE ../../libs/speex/include ../../libs ../)
