@@ -65,7 +65,7 @@ std::string FileHelper::getCurrentDir()
 #endif
 
 #if defined(TARGET_LINUX) || defined(TARGET_OSX)
-    char buffer[512];
+    char buf[512];
     if (getcwd(buf, sizeof buf) != nullptr)
         return buf;
     else
