@@ -218,6 +218,7 @@ std::string OsProcess::execCommand(const std::string& cmd)
 #include <unistd.h>
 #include <vector>
 #include "helper/HL_String.h"
+#include "helper/HL_Sync.h"
 
 std::shared_ptr<std::thread> OsProcess::asyncExecCommand(const std::string& cmdline,
                                    std::function<void(const std::string& line)> line_callback,
@@ -226,6 +227,7 @@ std::shared_ptr<std::thread> OsProcess::asyncExecCommand(const std::string& cmdl
 {
     std::shared_ptr<std::thread> t = std::make_shared<std::thread>([cmdline, line_callback, finished_callback, &finish_flag]()
     {
+        ThreadHelper::setName("OsProcess::asyncExecCommand");
         std::string cp = cmdline;
         FILE* pipe = popen(cp.c_str(), "r");
         if (!pipe)
@@ -258,7 +260,7 @@ std::shared_ptr<std::thread> OsProcess::asyncExecCommand(const std::string& cmdl
             int r;
             do
             {
-                r = (int)read(fno, buffer, sizeof(buffer) - 1);
+                r = static_cast<int>(read(fno, buffer, sizeof(buffer) - 1));
                 if (r > 0)
                 {
                     buffer[r] = 0;
@@ -285,6 +287,10 @@ std::shared_ptr<std::thread> OsProcess::asyncExecCommand(const std::string& cmdl
             }
         }
 
+        if (finish_flag)
+        {
+            // Send SIGINT to process
+        }
         if (pipe)
             pclose(pipe);
 
@@ -294,6 +300,28 @@ std::shared_ptr<std::thread> OsProcess::asyncExecCommand(const std::string& cmdl
     });
 
     return t;
+}
+
+pid_t OsProcess::findPid(const std::string& cmdline)
+{
+    try
+    {
+        std::ostringstream oss;
+        oss << "pgrep -f " << "\"" << cmdline << "\"";
+        std::string output = execCommand(oss.str());
+        return std::atoi(output.c_str());
+    }
+    catch(...)
+    {
+        return 0;
+    }
+}
+
+void OsProcess::killByPid(pid_t pid)
+{
+    if (pid <= 0)
+        return;
+    execCommand("kill -9 " + std::to_string(pid));
 }
 
 #endif

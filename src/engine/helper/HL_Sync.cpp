@@ -268,6 +268,7 @@ size_t TimerQueue::cancelAll() {
 
 void TimerQueue::run()
 {
+    ThreadHelper::setName("TimerQueue");
     while (!m_finish)
     {
         auto end = calcWaitTime();

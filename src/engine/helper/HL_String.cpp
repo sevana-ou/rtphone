@@ -335,10 +335,11 @@ std::string StringHelper::replace(const std::string& s, char f, char r)
 std::string StringHelper::replace(const std::string& s, const std::string& tmpl, const std::string& n)
 {
     std::string result(s);
-    std::string::size_type p;
-    while ( (p = result.find(tmpl)) != std::string::npos)
+    std::string::size_type p = 0;
+    while ( (p = result.find(tmpl, p)) != std::string::npos)
     {
         result.replace(p, tmpl.size(), n);
+        p += n.size();
     }
 
     return result;
