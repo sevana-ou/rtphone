@@ -75,15 +75,16 @@ public:
     BufferQueue();
     ~BufferQueue();
 
-    typedef std::shared_ptr<std::vector<unsigned char>> Block;
+    typedef std::vector<uint8_t> Block;
+    typedef std::shared_ptr<Block> PBlock;
 
     void push(const void* data, int bytes);
-    Block pull(int milliseconds);
+    PBlock pull(int milliseconds);
 
 protected:
     std::mutex mMutex;
     std::condition_variable mSignal;
-    std::vector<Block> mBlockList;
+    std::deque<PBlock> mBlockList;
 };
 
 

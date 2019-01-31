@@ -69,12 +69,12 @@ void Mixer::Stream::setActive(bool active)
 void Mixer::Stream::addPcm(int rate, const void* input, int length)
 {
   // Resample to internal sample rate
-  unsigned outputSize = unsigned(0.5 + length * ((float)AUDIO_SAMPLERATE / rate));
+  size_t outputSize = size_t(0.5 + length * ((float)AUDIO_SAMPLERATE / rate));
   if (mTempBuffer.size() < outputSize)
     mTempBuffer.resize(outputSize);
   
   Resampler* resampler = (rate == 8000) ? &mResampler8 : ((rate == 16000) ? &mResampler16 : ((rate == 32000) ? &mResampler32 : &mResampler48));
-  int inputProcessed = 0;
+  size_t inputProcessed = 0;
   resampler->processBuffer(input, length, inputProcessed, mTempBuffer.mutableData(), outputSize);
   // inputProcessed result value is ignored here - rate will be 8/16/32/48k, inputProcessed is equal to length
 

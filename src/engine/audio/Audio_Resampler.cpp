@@ -54,21 +54,22 @@ SpeexResampler::~SpeexResampler()
     stop();
 }
 
-int SpeexResampler::processBuffer(const void* src, int sourceLength, int& sourceProcessed, void* dest, int destCapacity)
+size_t SpeexResampler::processBuffer(const void* src, size_t sourceLength, size_t& sourceProcessed, void* dest, size_t destCapacity)
 {
     assert(mSourceRate != 0 && mDestRate != 0);
 
     if (mDestRate == mSourceRate)
     {
         assert(destCapacity >= sourceLength);
-        memcpy(dest, src, (size_t)sourceLength);
+        memcpy(dest, src, sourceLength);
         sourceProcessed = sourceLength;
         return sourceLength;
     }
 
     if (!mContext)
     {
-        mContext = speex_resampler_init(mChannels, mSourceRate, mDestRate, AUDIO_RESAMPLER_QUALITY, &mErrorCode);
+        mContext = speex_resampler_init(mChannels, mSourceRate, mDestRate,
+                                        AUDIO_RESAMPLER_QUALITY, &mErrorCode);
         if (!mContext)
             return 0;
     }
@@ -83,19 +84,26 @@ int SpeexResampler::processBuffer(const void* src, int sourceLength, int& source
         return 0;
     }
 
-    unsigned outLen = getDestLength(sourceLength);
-    if (outLen > (unsigned)destCapacity)
+    size_t outLen = getDestLength(sourceLength);
+    if (outLen > destCapacity)
         return 0; // Skip resampling if not enough space
 
-    assert((unsigned)destCapacity >= outLen);
+    assert(destCapacity >= outLen);
 
     // Calculate number of samples - input length is in bytes
     unsigned inLen = sourceLength / (sizeof(short) * mChannels);
     outLen /= sizeof(short) * mChannels;
     assert(mContext != NULL);
-    int speexCode = speex_resampler_process_interleaved_int((SpeexResamplerState *)mContext, (spx_int16_t*)src, &inLen,
-                                                            (spx_int16_t*)dest, &outLen);
+    spx_uint32_t in_len = static_cast<spx_uint32_t>(inLen),
+            out_len = static_cast<spx_uint32_t>(outLen);
+
+    int speexCode = speex_resampler_process_interleaved_int((SpeexResamplerState *)mContext,
+                                                            (spx_int16_t*)src, &in_len,
+                                                            (spx_int16_t*)dest, &out_len);
     assert(speexCode == RESAMPLER_ERR_SUCCESS);
+
+    inLen = static_cast<size_t>(in_len);
+    outLen = static_cast<size_t>(out_len);
 
     // Return results in bytes
     sourceProcessed = inLen * sizeof(short) * mChannels;
@@ -112,18 +120,18 @@ int SpeexResampler::destRate()
     return mDestRate;
 }
 
-int SpeexResampler::getDestLength(int sourceLen)
+size_t SpeexResampler::getDestLength(size_t sourceLen)
 {
-    return int(sourceLen * (float(mDestRate) / mSourceRate) + 0.5) / 2 * 2;
+    return size_t(sourceLen * (float(mDestRate) / mSourceRate) + 0.5f) / 2 * 2;
 }
 
-int SpeexResampler::getSourceLength(int destLen)
+size_t SpeexResampler::getSourceLength(size_t destLen)
 {
-    return int(destLen * (float(mSourceRate) / mDestRate) + 0.5) / 2 * 2;
+    return size_t(destLen * (float(mSourceRate) / mDestRate) + 0.5f) / 2 * 2;
 }
 
 // Returns instance + speex resampler size in bytes
-int SpeexResampler::getSize() const
+size_t SpeexResampler::getSize() const
 {
     return sizeof(*this) + 200; // 200 is approximate size of speex resample structure
 }
@@ -214,14 +222,15 @@ UniversalResampler::~UniversalResampler()
 
 }
 
-int UniversalResampler::resample(int sourceRate, const void *sourceBuffer, int sourceLength, int& sourceProcessed, int destRate, void *destBuffer, int destCapacity)
+size_t UniversalResampler::resample(int sourceRate, const void *sourceBuffer, size_t sourceLength,
+                                    size_t& sourceProcessed, int destRate, void *destBuffer, size_t destCapacity)
 {
     assert(destBuffer && sourceBuffer);
-    int result;
+    size_t result;
     if (sourceRate == destRate)
     {
         assert(destCapacity >= sourceLength);
-        memcpy(destBuffer, sourceBuffer, (size_t)sourceLength);
+        memcpy(destBuffer, sourceBuffer, sourceLength);
         sourceProcessed = sourceLength;
         result = sourceLength;
     }
@@ -238,7 +247,7 @@ void UniversalResampler::preload()
 
 }
 
-int UniversalResampler::getDestLength(int sourceRate, int destRate, int sourceLength)
+size_t UniversalResampler::getDestLength(int sourceRate, int destRate, size_t sourceLength)
 {
     if (sourceRate == destRate)
         return sourceLength;
@@ -246,7 +255,7 @@ int UniversalResampler::getDestLength(int sourceRate, int destRate, int sourceLe
         return findResampler(sourceRate, destRate)->getDestLength(sourceLength);
 }
 
-int UniversalResampler::getSourceLength(int sourceRate, int destRate, int destLength)
+size_t UniversalResampler::getSourceLength(int sourceRate, int destRate, size_t destLength)
 {
     if (sourceRate == destRate)
         return destLength;

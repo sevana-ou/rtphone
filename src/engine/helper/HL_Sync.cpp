@@ -59,7 +59,7 @@ uint64_t ThreadHelper::getCurrentId()
 #endif
 
 #if defined(TARGET_LINUX)||defined(TARGET_OSX)
-   return static_cast<uint64_t>(pthread_self());
+   return reinterpret_cast<uint64_t>(pthread_self());
 #endif
 }
 // ------------------- TimeHelper ---------------
@@ -122,14 +122,14 @@ void BufferQueue::push(const void* data, int bytes)
 {
     std::unique_lock<std::mutex> l(mMutex);
 
-    Block b = std::make_shared<std::vector<unsigned char>>();
+    PBlock b = std::make_shared<Block>();
     b->resize(bytes);
     memcpy(b->data(), data, bytes);
     mBlockList.push_back(b);
-    mSignal.notify_all();
+    mSignal.notify_one();
 }
 
-BufferQueue::Block BufferQueue::pull(int milliseconds)
+BufferQueue::PBlock BufferQueue::pull(int milliseconds)
 {
     std::unique_lock<std::mutex> l(mMutex);
     std::cv_status status = mBlockList.empty() ? std::cv_status::timeout : std::cv_status::no_timeout;
@@ -137,11 +137,11 @@ BufferQueue::Block BufferQueue::pull(int milliseconds)
     if (mBlockList.empty())
         status = mSignal.wait_for(l, std::chrono::milliseconds(milliseconds));
 
-    Block r;
+    PBlock r;
     if (status == std::cv_status::no_timeout && !mBlockList.empty())
     {
         r = mBlockList.front();
-        mBlockList.erase(mBlockList.begin());
+        mBlockList.pop_front();
     }
 
     return r;

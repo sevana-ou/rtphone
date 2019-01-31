@@ -204,8 +204,9 @@ unsigned WavFileReader::read(short* buffer, unsigned samples)
   }
 
   /*int readSamples = */fread(temp, 1, requiredBytes, mHandle);// / mChannels / (mBits / 8);
-  int processedBytes = 0;
-  int result = mResampler.processBuffer(temp, requiredBytes, processedBytes, buffer, samples * 2 * AUDIO_CHANNELS);
+  size_t processedBytes = 0;
+  size_t result = mResampler.processBuffer(temp, requiredBytes, processedBytes,
+                                           buffer, samples * 2 * AUDIO_CHANNELS);
 
   return result / 2 / AUDIO_CHANNELS;
 }

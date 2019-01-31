@@ -135,9 +135,9 @@ void DevicePair::onMicData(const Format& f, const void* buffer, int length)
   for (int blockIndex = 0; blockIndex < blocks; blockIndex++)
   {
 
-    int wasProcessed = 0;
+    size_t wasProcessed = 0;
 
-    int wasProduced = mMicResampler.resample(f.mRate,                                        // Source rate
+    size_t wasProduced = mMicResampler.resample(f.mRate,                                        // Source rate
                                              mInputResampingData.data(),                     // Source data
                                              (int)f.sizeFromTime(AUDIO_MIC_BUFFER_LENGTH),   // Source size
                                              wasProcessed,
@@ -196,8 +196,8 @@ void DevicePair::onSpkData(const Format& f, void* buffer, int length)
         mAecSpkBuffer.add(mOutput10msBuffer.data(), mOutput10msBuffer.capacity());
 
       // Resample these 10 milliseconds it to native format
-      int wasProcessed = 0;
-      int wasProduced = mSpkResampler.resample(AUDIO_SAMPLERATE, mOutput10msBuffer.data(), mOutput10msBuffer.capacity(), wasProcessed, f.mRate,
+      size_t wasProcessed = 0;
+      size_t wasProduced = mSpkResampler.resample(AUDIO_SAMPLERATE, mOutput10msBuffer.data(), mOutput10msBuffer.capacity(), wasProcessed, f.mRate,
                                                mOutputNativeData.mutableData() + mOutputNativeData.filled(), mOutputNativeData.capacity() - mOutputNativeData.filled());
       mOutputNativeData.setFilled(mOutputNativeData.filled() + wasProduced);
 #ifdef CONSOLE_LOGGING

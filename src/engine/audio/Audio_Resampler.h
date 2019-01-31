@@ -24,14 +24,15 @@ public:
     
     void start(int channels, int sourceRate, int destRate);
     void stop();
-    int processBuffer(const void* source, int sourceLength, int& sourceProcessed, void* dest, int destCapacity);
+    size_t processBuffer(const void* source, size_t sourceLength, size_t& sourceProcessed,
+                      void* dest, size_t destCapacity);
     int sourceRate();
     int destRate();
-    int getDestLength(int sourceLen);
-    int getSourceLength(int destLen);
+    size_t getDestLength(size_t sourceLen);
+    size_t getSourceLength(size_t destLen);
 
     // Returns instance + speex encoder size in bytes
-    int getSize() const;
+    size_t getSize() const;
 
 protected:
     void* mContext;
@@ -59,9 +60,10 @@ public:
     UniversalResampler();
     ~UniversalResampler();
 
-    int resample(int sourceRate, const void* sourceBuffer, int sourceLength, int& sourceProcessed, int destRate, void* destBuffer, int destCapacity);
-    int getDestLength(int sourceRate, int destRate, int sourceLength);
-    int getSourceLength(int sourceRate, int destRate, int destLength);
+    size_t resample(int sourceRate, const void* sourceBuffer, size_t sourceLength, size_t& sourceProcessed,
+                    int destRate, void* destBuffer, size_t destCapacity);
+    size_t getDestLength(int sourceRate, int destRate, size_t sourceLength);
+    size_t getSourceLength(int sourceRate, int destRate, size_t destLength);
 
 protected:
     typedef std::pair<int, int> RatePair;
