@@ -59,7 +59,8 @@ uint64_t ThreadHelper::getCurrentId()
 #endif
 
 #if defined(TARGET_LINUX)||defined(TARGET_OSX)
-   return reinterpret_cast<uint64_t>(pthread_self());
+    // RPi builds want this!
+    return (uint64_t)(pthread_self());
 #endif
 }
 // ------------------- TimeHelper ---------------
