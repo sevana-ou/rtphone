@@ -212,6 +212,11 @@ std::string OsProcess::execCommand(const std::string& cmd)
     return result;
 }
 
+int OsProcess::execSystem(const std::string& cmd)
+{
+    return system(cmd.c_str());
+}
+
 #include <poll.h>
 #include <sys/types.h>
 #include <sys/uio.h>
@@ -321,7 +326,7 @@ void OsProcess::killByPid(pid_t pid)
 {
     if (pid <= 0)
         return;
-    execCommand("kill -9 " + std::to_string(pid));
+    execSystem("kill " + std::to_string(pid));
 }
 
 #endif
