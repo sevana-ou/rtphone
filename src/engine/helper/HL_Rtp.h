@@ -17,69 +17,68 @@
 template<class T>
 struct RtpPair
 {
-  T mRtp;
-  T mRtcp;
+    T mRtp;
+    T mRtcp;
 
-  RtpPair()
-  {}
+    RtpPair()
+    {}
 
-  RtpPair(const T& rtp, const T& rtcp)
-    :mRtp(rtp), mRtcp(rtcp)
-  {}
+    RtpPair(const T& rtp, const T& rtcp)
+        :mRtp(rtp), mRtcp(rtcp)
+    {}
 
-  bool multiplexed() { return mRtp == mRtcp; }
+    bool multiplexed() { return mRtp == mRtcp; }
 };
 
 class RtpHelper
 {
 public:
-  static bool isRtp(const void* buffer, int length);
-  static int findPtype(const void* buffer, int length);
-  static bool isRtpOrRtcp(const void* buffer, int length);
-  static bool isRtcp(const void* buffer, int length);
-  static unsigned findSsrc(const void* buffer, int length);
-  static int findPayloadLength(const void* buffer, int length);
+    static bool isRtp(const void* buffer, int length);
+    static int findPtype(const void* buffer, int length);
+    static bool isRtpOrRtcp(const void* buffer, int length);
+    static bool isRtcp(const void* buffer, int length);
+    static unsigned findSsrc(const void* buffer, int length);
+    static int findPayloadLength(const void* buffer, int length);
 };
 
 class RtpDump
 {
 protected:
-  struct RtpData
-  {
-    jrtplib::RTPPacket* mPacket;
-    void* mData;
-    unsigned mLength;
-  };
+    struct RtpData
+    {
+        jrtplib::RTPPacket* mPacket;
+        void* mData;
+        unsigned mLength;
+    };
 
-  typedef std::vector<RtpData> PacketList;
-  PacketList mPacketList;
-  std::string mFilename;
+    typedef std::vector<RtpData> PacketList;
+    PacketList mPacketList;
+    std::string mFilename;
 
 public:
-  RtpDump(const char* filename);
-  ~RtpDump();
-  
-  void load();
-  int count() const;
-  jrtplib::RTPPacket& packetAt(int index);
-  void add(const void* data, int len);
-  void flush();
+    RtpDump(const char* filename);
+    ~RtpDump();
+
+    void load();
+    int count() const;
+    jrtplib::RTPPacket& packetAt(int index);
+    void add(const void* data, int len);
+    void flush();
 };
 
 struct MediaStreamId
 {
-  InternetAddress mSource;
-  InternetAddress mDestination;
-  uint32_t mSSRC = 0;
-  bool mSsrcIsId = true;
-  Uuid mLinkId;
+    InternetAddress mSource;
+    InternetAddress mDestination;
+    uint32_t mSSRC = 0;
+    bool mSsrcIsId = true;
+    Uuid mLinkId;
+    bool operator < (const MediaStreamId& s2) const;
+    bool operator == (const MediaStreamId& right) const;
 
-  bool operator < (const MediaStreamId& s2) const;
-  bool operator == (const MediaStreamId& right) const;
-
-  std::string toString() const;
-  std::string getDetectDescription() const;
-  std::string getFinishDescription() const;
+    std::string toString() const;
+    std::string getDetectDescription() const;
+    std::string getFinishDescription() const;
 };
 
 #endif
