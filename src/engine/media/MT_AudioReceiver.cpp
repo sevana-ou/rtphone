@@ -583,7 +583,7 @@ void AudioReceiver::makeMonoAndResample(int rate, int channels)
         return;
     }
 
-    int processedInput = 0;
+    size_t processedInput = 0;
     mResampledLength = r->processBuffer(frames, length, processedInput, mResampledFrame, r->getDestLength(length));
     // processedInput result value is ignored - it is always equal to length as internal sample rate is 8/16/32/48K
 }

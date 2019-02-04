@@ -160,7 +160,7 @@ void AudioStream::addData(const void* buffer, int bytes)
     assert(0);
   }
 
-  int processedInput = 0;
+  size_t processedInput = 0;
   dstlen = r->processBuffer(buffer, bytes, processedInput, mResampleBuffer, dstlen);
   // ProcessedInput output value is ignored - because sample rate of input is always 8/16/32/48K - so all buffer is processed
 

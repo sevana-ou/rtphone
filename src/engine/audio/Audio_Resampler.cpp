@@ -56,7 +56,8 @@ SpeexResampler::~SpeexResampler()
     stop();
 }
 
-size_t SpeexResampler::processBuffer(const void* src, size_t sourceLength, size_t& sourceProcessed, void* dest, size_t destCapacity)
+size_t SpeexResampler::processBuffer(const void* src, size_t sourceLength, size_t& sourceProcessed,
+                                     void* dest, size_t destCapacity)
 {
     assert(mSourceRate != 0 && mDestRate != 0);
 

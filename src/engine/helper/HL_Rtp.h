@@ -33,12 +33,12 @@ struct RtpPair
 class RtpHelper
 {
 public:
-    static bool isRtp(const void* buffer, int length);
-    static int findPtype(const void* buffer, int length);
-    static bool isRtpOrRtcp(const void* buffer, int length);
-    static bool isRtcp(const void* buffer, int length);
-    static unsigned findSsrc(const void* buffer, int length);
-    static int findPayloadLength(const void* buffer, int length);
+    static bool isRtp(const void* buffer, size_t length);
+    static int findPtype(const void* buffer, size_t length);
+    static bool isRtpOrRtcp(const void* buffer, size_t length);
+    static bool isRtcp(const void* buffer, size_t length);
+    static unsigned findSsrc(const void* buffer, size_t length);
+    static int findPayloadLength(const void* buffer, size_t length);
 };
 
 class RtpDump
@@ -48,7 +48,7 @@ protected:
     {
         jrtplib::RTPPacket* mPacket;
         void* mData;
-        unsigned mLength;
+        size_t mLength;
     };
 
     typedef std::vector<RtpData> PacketList;
@@ -60,9 +60,9 @@ public:
     ~RtpDump();
 
     void load();
-    int count() const;
-    jrtplib::RTPPacket& packetAt(int index);
-    void add(const void* data, int len);
+    size_t count() const;
+    jrtplib::RTPPacket& packetAt(size_t index);
+    void add(const void* data, size_t len);
     void flush();
 };
 

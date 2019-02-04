@@ -10,9 +10,9 @@ public:
     struct PacketData
     {
         const uint8_t* mData;
-        int mLength;
+        size_t mLength;
 
-        PacketData(const uint8_t* data, int length)
+        PacketData(const uint8_t* data, size_t length)
             :mData(data), mLength(length)
         {}
 
