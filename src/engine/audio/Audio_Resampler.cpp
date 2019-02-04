@@ -11,9 +11,11 @@
 #include <algorithm>
 #include "speex/speex_resampler.h"
 
-using namespace Audio;
-
 #define IS_FRACTIONAL_RATE(X) (((X) % 8000) != 0)
+
+namespace Audio
+{
+
 
 SpeexResampler::SpeexResampler()
     :mContext(NULL), mErrorCode(0), mSourceRate(0), mDestRate(0), mLastSample(0)
@@ -279,3 +281,4 @@ PResampler UniversalResampler::findResampler(int sourceRate, int destRate)
     return r;
 }
 
+} // end of namespace
