@@ -16,89 +16,87 @@
 
 namespace Audio 
 {
-class SpeexResampler
-{
-public:
-    SpeexResampler();
-    ~SpeexResampler();
-    
-    void start(int channels, int sourceRate, int destRate);
-    void stop();
-    size_t processBuffer(const void* source, size_t sourceLength, size_t& sourceProcessed,
-                      void* dest, size_t destCapacity);
-    int sourceRate();
-    int destRate();
-    size_t getDestLength(size_t sourceLen);
-    size_t getSourceLength(size_t destLen);
+    class SpeexResampler
+    {
+    public:
+        SpeexResampler();
+        ~SpeexResampler();
 
-    // Returns instance + speex encoder size in bytes
-    size_t getSize() const;
+        void start(int channels, int sourceRate, int destRate);
+        void stop();
+        int processBuffer(const void* source, int sourceLength, int& sourceProcessed, void* dest, int destCapacity);
+        int sourceRate();
+        int destRate();
+        int getDestLength(int sourceLen);
+        int getSourceLength(int destLen);
 
-protected:
-    void* mContext;
-    int   mErrorCode;
-    int   mSourceRate,
-    mDestRate,
-    mChannels;
-    short mLastSample;
-};
+        // Returns instance + speex encoder size in bytes
+        int getSize() const;
 
-typedef SpeexResampler Resampler;
-typedef std::shared_ptr<Resampler> PResampler;
+    protected:
+        void* mContext;
+        int   mErrorCode;
+        int   mSourceRate,
+        mDestRate,
+        mChannels;
+        short mLastSample;
+    };
 
-class ChannelConverter
-{
-public:
-    static int stereoToMono(const void* source, int sourceLength, void* dest, int destLength);
-    static int monoToStereo(const void* source, int sourceLength, void* dest, int destLength);
-};
+    typedef SpeexResampler Resampler;
+    typedef std::shared_ptr<Resampler> PResampler;
 
-// Operates with AUDIO_CHANNELS number of channels
-class UniversalResampler
-{
-public:
-    UniversalResampler();
-    ~UniversalResampler();
+    class ChannelConverter
+    {
+    public:
+        static int stereoToMono(const void* source, int sourceLength, void* dest, int destLength);
+        static int monoToStereo(const void* source, int sourceLength, void* dest, int destLength);
+    };
 
-    size_t resample(int sourceRate, const void* sourceBuffer, size_t sourceLength, size_t& sourceProcessed,
-                    int destRate, void* destBuffer, size_t destCapacity);
-    size_t getDestLength(int sourceRate, int destRate, size_t sourceLength);
-    size_t getSourceLength(int sourceRate, int destRate, size_t destLength);
+    // Operates with AUDIO_CHANNELS number of channels
+    class UniversalResampler
+    {
+    public:
+        UniversalResampler();
+        ~UniversalResampler();
 
-protected:
-    typedef std::pair<int, int> RatePair;
-    typedef std::map<RatePair, PResampler> ResamplerMap;
-    ResamplerMap mResamplerMap;
-    PResampler findResampler(int sourceRate, int destRate);
+        int resample(int sourceRate, const void* sourceBuffer, int sourceLength, int& sourceProcessed, int destRate, void* destBuffer, int destCapacity);
+        int getDestLength(int sourceRate, int destRate, int sourceLength);
+        int getSourceLength(int sourceRate, int destRate, int destLength);
 
-    void preload();
-};
+    protected:
+        typedef std::pair<int, int> RatePair;
+        typedef std::map<RatePair, PResampler> ResamplerMap;
+        ResamplerMap mResamplerMap;
+        PResampler findResampler(int sourceRate, int destRate);
 
-#ifdef USE_WEBRTC_RESAMPLER
-// n*10 milliseconds buffers required!
-class Resampler48kTo16k
-{
-public:
-    Resampler48kTo16k();
-    ~Resampler48kTo16k();
-    int process(const void* source, int sourceLen, void* dest, int destLen);
-protected:
-    WebRtc_Word32 mTemp[496];
-    WebRtcSpl_State48khzTo16khz mContext;
-};
+        void preload();
+    };
 
-class Resampler16kto48k
-{
-public:
-    Resampler16kto48k();
-    ~Resampler16kto48k();
-    int process(const void* source, int sourceLen, void* dest, int destLen);
+    #ifdef USE_WEBRTC_RESAMPLER
+    // n*10 milliseconds buffers required!
+    class Resampler48kTo16k
+    {
+    public:
+        Resampler48kTo16k();
+        ~Resampler48kTo16k();
+        int process(const void* source, int sourceLen, void* dest, int destLen);
+    protected:
+        WebRtc_Word32 mTemp[496];
+        WebRtcSpl_State48khzTo16khz mContext;
+    };
 
-protected:
-    WebRtc_Word32 mTemp[336];
-    WebRtcSpl_State16khzTo48khz mContext;
-};
-#endif
-}
+    class Resampler16kto48k
+    {
+    public:
+        Resampler16kto48k();
+        ~Resampler16kto48k();
+        int process(const void* source, int sourceLen, void* dest, int destLen);
+
+    protected:
+        WebRtc_Word32 mTemp[336];
+        WebRtcSpl_State16khzTo48khz mContext;
+    };
+    #endif
+} // end of namespace
 
 #endif
