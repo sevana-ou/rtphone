@@ -1,3 +1,5 @@
+#if defined(USE_CRASHRPT)
+
 #include "HL_CrashRpt.h"
 #include "HL_String.h"
 
@@ -168,3 +170,5 @@ CrashReporterGuard::~CrashReporterGuard()
 {
   CrashReporter::free();
 }
+
+#endif
