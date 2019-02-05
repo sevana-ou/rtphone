@@ -467,6 +467,8 @@ unsigned char* NetworkAddress::ipBytes() const
     return (unsigned char*)mAddr6.sin6_addr.u.Byte;
 #elif defined(TARGET_OSX) || defined(TARGET_IOS)
     return (unsigned char*)&mAddr6.sin6_addr.__u6_addr.__u6_addr8;
+#elif defined(TARGET_OPENWRT)
+    return (unsigned char*)&mAddr6.sin6_addr.__in6_union.__s6_addr;
 #elif defined(TARGET_LINUX)
     return (unsigned char*)&mAddr6.sin6_addr.__in6_u.__u6_addr8;
 #elif defined(TARGET_ANDROID)

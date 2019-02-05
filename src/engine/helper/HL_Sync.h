@@ -11,6 +11,7 @@
 #include <thread>
 #include <vector>
 #include <queue>
+#include <functional>
 #include <assert.h>
 
 typedef std::recursive_mutex Mutex;
