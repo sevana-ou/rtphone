@@ -34,16 +34,16 @@
  * would be missing from the tree. */
 extern int check_stack(const char*, const char*);
 #define STACK_DEPTH_FCT_CALL   (BASOP_push_wmops(__FUNCTION__), check_stack(   __FILE__, __FUNCTION__))
-#define STACK_DEPTH_FCT_RETURN (BASOP_pop_wmops(), check_stack("-"__FILE__, __FUNCTION__))
+//#define STACK_DEPTH_FCT_RETURN (BASOP_pop_wmops(), check_stack("-"__FILE__, __FUNCTION__))
 
 #include <stdlib.h> /* for size_t */
 extern void* check_alloc_in(const char*, const char *, size_t, size_t);
 extern void  check_alloc_out(void*);
 extern void  check_alloc_exit(void);
 
-#define MALLOC_FCT_CALL(n1)     check_alloc_in("m"__FILE__, __FUNCTION__, n1, 0)
-#define CALLOC_FCT_CALL(n1, n2) check_alloc_in("c"__FILE__, __FUNCTION__, n1, n2)
-#define   FREE_FCT_CALL(ptr)    check_alloc_out(ptr)
+//#define MALLOC_FCT_CALL(n1)     check_alloc_in("m"##__FILE__, __FUNCTION__, n1, 0)
+//#define CALLOC_FCT_CALL(n1, n2) check_alloc_in("c"##__FILE__, __FUNCTION__, n1, n2)
+//#define   FREE_FCT_CALL(ptr)    check_alloc_out(ptr)
 
 /* both ALLOW_40bits and ALLOW_ENH_UL32 shall be enabled for the EVS codec.  */
 #define ALLOW_40bits         /* allow 32x16 and 32x32 multiplications */

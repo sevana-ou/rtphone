@@ -11,7 +11,6 @@
 #include <algorithm>
 #include <iterator>
 #include <sstream>
-#include <strstream>
 
 using namespace ice;
 #define LOG_SUBSYSTEM "ICE"
