@@ -305,4 +305,4 @@ SET (RUTIL_SOURCES
 
 
 add_library(resiprocate ${ARES_SOURCES} ${RUTIL_SOURCES} ${STACK_SOURCES} ${DUM_SOURCES})
-add_library(resiprocate_lite ${RUTIL_SOURCES} ${STACK_SOURCES})
+#add_library(resiprocate_lite ${RUTIL_SOURCES} ${STACK_SOURCES})
