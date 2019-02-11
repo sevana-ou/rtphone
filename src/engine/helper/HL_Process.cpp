@@ -12,6 +12,11 @@
 #include <iostream>
 #include "helper/HL_String.h"
 
+int OsProcess::execSystem(const std::string& cmd)
+{
+    return system(cmd.c_str());
+}
+
 std::string OsProcess::execCommand(const std::string& cmd)
 {
     std::string output;
