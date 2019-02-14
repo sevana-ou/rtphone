@@ -39,14 +39,8 @@ std::string FileHelper::gettempname()
     return buffer;
 #elif defined(TARGET_OSX)
     char template_filename[L_tmpnam] = "rtphone_XXXXXXX.tmp";
-    int handle = mkstemp(template_filename);
-    if (handle != -1)
-    {
-        close(handle);
-        return template_filename;
-    }
-    else
-        return std::string();
+    mktemp(template_filename);
+    return template_filename;
 #endif
 }
 
