@@ -508,7 +508,7 @@ int OpusCodec::decode(const void* input, int inputBytes, void* output, int outpu
     else
     {
       // Resample 48000 to requested samplerate
-      int processed = 0;
+      size_t processed = 0;
       return mDecodeResampler.processBuffer(buffer, decoded * sizeof(short) * channels(), processed, output, outputCapacity);
     }
   }
