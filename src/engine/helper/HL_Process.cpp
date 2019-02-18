@@ -331,7 +331,7 @@ void OsProcess::killByPid(pid_t pid)
 {
     if (pid <= 0)
         return;
-    execSystem("kill " + std::to_string(pid));
+    execSystem("kill -9 " + std::to_string(pid) + " &");
 }
 
 #endif
