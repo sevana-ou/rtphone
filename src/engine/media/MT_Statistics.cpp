@@ -9,6 +9,7 @@ using namespace MT;
 
 void JitterStatistics::process(jrtplib::RTPPacket* packet, int rate)
 {
+    /*
     uint32_t      arrival = 0;
     int           d = 0;
     uint32_t      transit = 0;
@@ -23,25 +24,25 @@ void JitterStatistics::process(jrtplib::RTPPacket* packet, int rate)
     if (mPrevArrival == 0)
         arrival = packet->GetTimestamp();
     else
-        arrival += mPrevArrival;;
+        arrival += mPrevArrival;
 
     mPrevArrival = packet->GetTimestamp();
 
     transit = arrival - packet->GetTimestamp();
-    jrtplib::RTPTime receiveTime = packet->GetReceiveTime();
 
     d = transit - mPrevTransit;
     mPrevTransit = transit;
     if (d < 0)
         d = -d;
-    mJitter += (1.0/16.0) * ((double)d - mJitter);
+    mJitterNow += (1.0/16.0) * ((double)d - mJitterNow);
 
     mPrevRxTimestamp = current_time;
-    if (mMaxJitter < mJitter)
-        mMaxJitter = mJitter;
-
+    if (mMaxJitter < mJitterNow)
+        mMaxJitter = mJitterNow;
+    */
 
     uint32_t timestamp = packet->GetTimestamp();
+    jrtplib::RTPTime receiveTime = packet->GetReceiveTime();
 
     if (!mLastJitter.is_initialized())
     {
@@ -68,6 +69,8 @@ void JitterStatistics::process(jrtplib::RTPPacket* packet, int rate)
 
         mJitter.process(mLastJitter.value());
     }
+
+    //mJitter.process(mJitterNow / rate);
 }
 
 

@@ -92,6 +92,7 @@ protected:
     uint64_t mPrevRxTimestamp = 0;
     uint64_t mPrevArrival = 0;
     uint64_t mPrevTransit = 0;
+    double mJitterNow = 0.0, mMaxJitter = 0.0;
 };
 
 class Statistics
