@@ -199,6 +199,13 @@ void StringHelper::split(const std::string& src, std::vector<std::string>& dst, 
     }
 }
 
+std::vector<std::string> StringHelper::split(const std::string& src, const std::string& delims)
+{
+    std::vector<std::string> r;
+    split(src, r, delims);
+    return r;
+}
+
 std::pair<std::string, int> StringHelper::parseHost(const std::string& host, int defaultPort)
 {
     std::pair<std::string, int> result;

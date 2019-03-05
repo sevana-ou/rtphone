@@ -36,6 +36,7 @@ public:
 
     static const char* findSubstring(const char* buffer, const char* substring, size_t bufferLength);
     static void split(const std::string& src, std::vector<std::string>& dst, const std::string& delims);
+    static std::vector<std::string> split(const std::string& src, const std::string& delims = "\n");
 
     template <typename T>
     static std::string join(const std::vector<T>& v, const std::string& delimiter)
