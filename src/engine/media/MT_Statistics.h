@@ -92,10 +92,10 @@ protected:
     // It is classic jitter value in units
     optional<double> mLastJitter;
 
-    // Some statistics for jitter value in milliseconds
+    // Some statistics for jitter value in seconds
     ProbeStats<double> mJitter;
 
-    // Maximal delta in milliseconds
+    // Maximal delta in seconds
     double mMaxDelta = 0.0;
 };
 

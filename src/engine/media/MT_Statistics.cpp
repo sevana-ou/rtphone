@@ -40,9 +40,9 @@ void JitterStatistics::process(jrtplib::RTPPacket* packet, int rate)
         int64_t delta = receiveDelta - timestampDelta;
 
         // Update max delta in milliseconds
-        double delta_in_ms = fabs(double(delta) / (rate / 1000));
-        if (delta_in_ms > mMaxDelta)
-            mMaxDelta = delta_in_ms;
+        double delta_in_seconds = fabs(double(delta) / rate);
+        if (delta_in_seconds > mMaxDelta)
+            mMaxDelta = delta_in_seconds;
 
         // Update jitter value in units
         mLastJitter = mLastJitter.value() + (fabs(double(delta)) - mLastJitter.value()) / 16.0;
@@ -55,6 +55,7 @@ void JitterStatistics::process(jrtplib::RTPPacket* packet, int rate)
         mReceiveTime = receiveTime;
         mReceiveTimestamp = timestamp;
 
+        // And mJitter are in seconds again
         mJitter.process(mLastJitter.value() / rate);
     }
 }
@@ -201,7 +202,7 @@ double Statistics::calculateMos(double maximalMos) const
     if (mReceivedRtp < 100)
         return 0.0;
 
-    if (lossr == 0 || burstr == 0)
+    if (lossr == 0.0 || burstr == 0.0)
     {
         return maximalMos;
     }
