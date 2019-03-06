@@ -9,68 +9,54 @@ using namespace MT;
 
 void JitterStatistics::process(jrtplib::RTPPacket* packet, int rate)
 {
-    /*
-    uint32_t      arrival = 0;
-    int           d = 0;
-    uint32_t      transit = 0;
-
-    uint64_t    current_time = TimeHelper::getTimestamp();
-    int         interarrival_time_ms = current_time - mPrevRxTimestamp;
-
-    // get the 'arrival time' of this packet as measured in 'timestamp units' and offset
-    //  to match the timestamp range in this stream
-    arrival = interarrival_time_ms * (rate / 1000);
-
-    if (mPrevArrival == 0)
-        arrival = packet->GetTimestamp();
-    else
-        arrival += mPrevArrival;
-
-    mPrevArrival = packet->GetTimestamp();
-
-    transit = arrival - packet->GetTimestamp();
-
-    d = transit - mPrevTransit;
-    mPrevTransit = transit;
-    if (d < 0)
-        d = -d;
-    mJitterNow += (1.0/16.0) * ((double)d - mJitterNow);
-
-    mPrevRxTimestamp = current_time;
-    if (mMaxJitter < mJitterNow)
-        mMaxJitter = mJitterNow;
-    */
-
+    // Get current timestamp and receive time
     uint32_t timestamp = packet->GetTimestamp();
     jrtplib::RTPTime receiveTime = packet->GetReceiveTime();
 
     if (!mLastJitter.is_initialized())
     {
+        // First packet
         mReceiveTime = receiveTime;
         mReceiveTimestamp = timestamp;
         mLastJitter = 0.0;
     }
     else
     {
-        double receiveDelta = receiveTime.GetDouble() - mReceiveTime.GetDouble();
-        double timestampDelta = double(timestamp - mReceiveTimestamp);
+        // It is in units
+        int64_t receiveDelta = int64_t(receiveTime.GetDouble() * rate) - int64_t(mReceiveTime.GetDouble() * rate);
 
-        if (timestampDelta == 0.0)
+        // Check if packets are ordered ok
+        if (timestamp <= mReceiveTimestamp)
+            return;
+
+        // Find differences in timestamp
+        int64_t timestampDelta = timestamp - mReceiveTimestamp;
+
+        if (!timestampDelta)
             // Skip current packet silently. Most probably it is error in RTP stream like duplicated packet.
             return;
 
-        double delta = receiveDelta / timestampDelta;
-        if (fabs(delta) > mMaxDelta)
-            mMaxDelta = fabs(delta);
+        // Find delta in units
+        int64_t delta = receiveDelta - timestampDelta;
 
-        mLastJitter = mLastJitter.value() + (fabs(delta) - mLastJitter.value()) / 16.0;
+        // Update max delta in milliseconds
+        double delta_in_ms = fabs(double(delta) / (rate / 1000));
+        if (delta_in_ms > mMaxDelta)
+            mMaxDelta = delta_in_ms;
+
+        // Update jitter value in units
+        mLastJitter = mLastJitter.value() + (fabs(double(delta)) - mLastJitter.value()) / 16.0;
+        /*printf("PacketNo: %d, current delta in ms: %f, jitter in ms: %f\n",
+               (int)packet->GetSequenceNumber(),
+               delta_in_ms,
+               float(mLastJitter.value() / (rate / 1000)));*/
+
+        // Save last values
         mReceiveTime = receiveTime;
         mReceiveTimestamp = timestamp;
 
-        mJitter.process(mLastJitter.value());
+        mJitter.process(mLastJitter.value() / rate);
     }
-
-    //mJitter.process(mJitterNow / rate);
 }
 
 

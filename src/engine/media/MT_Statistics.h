@@ -85,14 +85,18 @@ public:
 protected:
     // Jitter calculation
     jrtplib::RTPTime mReceiveTime = jrtplib::RTPTime(0,0);
+
+    // Last timestamp from packet in units
     uint32_t mReceiveTimestamp = 0;
+
+    // It is classic jitter value in units
     optional<double> mLastJitter;
+
+    // Some statistics for jitter value in milliseconds
     ProbeStats<double> mJitter;
+
+    // Maximal delta in milliseconds
     double mMaxDelta = 0.0;
-    uint64_t mPrevRxTimestamp = 0;
-    uint64_t mPrevArrival = 0;
-    uint64_t mPrevTransit = 0;
-    double mJitterNow = 0.0, mMaxJitter = 0.0;
 };
 
 class Statistics
