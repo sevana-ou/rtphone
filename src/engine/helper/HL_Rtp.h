@@ -35,6 +35,7 @@ class RtpHelper
 public:
     static bool isRtp(const void* buffer, size_t length);
     static int findPtype(const void* buffer, size_t length);
+    static int findPacketNo(const void* buffer, size_t length);
     static bool isRtpOrRtcp(const void* buffer, size_t length);
     static bool isRtcp(const void* buffer, size_t length);
     static unsigned findSsrc(const void* buffer, size_t length);

@@ -79,6 +79,14 @@ int RtpHelper::findPtype(const void* buffer, size_t length)
         return -1;
 }
 
+int RtpHelper::findPacketNo(const void *buffer, size_t length)
+{
+    if (isRtp(buffer, length))
+        return ntohs(reinterpret_cast<const RtpHeader*>(buffer)->seq);
+    else
+        return -1;
+}
+
 int RtpHelper::findPayloadLength(const void* buffer, size_t length)
 {
     if (isRtp(buffer, length))

@@ -108,7 +108,7 @@ bool RtpBuffer::add(std::shared_ptr<jrtplib::RTPPacket> packet, int timelength, 
     Lock l(mGuard);
 
     // Update statistics
-    mStat.mSsrc = packet->GetSSRC();
+    mStat.mSsrc = static_cast<uint16_t>(packet->GetSSRC());
 
     // Update jitter
     ICELogMedia(<< "Adding new packet into jitter buffer");
@@ -149,12 +149,14 @@ bool RtpBuffer::add(std::shared_ptr<jrtplib::RTPPacket> packet, int timelength, 
         // Limit by max timelength
         available = findTimelength();
 
-        while (available > mHigh && mPacketList.size())
+        if (available > mHigh)
+            ICELogMedia(<< "Available " << available << "ms with limit " << mHigh << "ms");
+        /*while (available > mHigh && mPacketList.size())
         {
-            //ICELogMedia( << "Dropping RTP packet from jitter");
+            ICELogDebug( << "Dropping RTP packet from jitter buffer");
             available -= mPacketList.front().timelength();
             mPacketList.erase(mPacketList.begin());
-        }
+        }*/
     }
     else
     {
@@ -175,6 +177,18 @@ RtpBuffer::FetchResult RtpBuffer::fetch(ResultList& rl)
 
     // See if there is enough information in buffer
     int total = findTimelength();
+
+    while (total > mHigh && mPacketList.size())
+    {
+        ICELogMedia( << "Dropping RTP packets from jitter buffer");
+        total -= mPacketList.front().timelength();
+
+        // Save it as last packet however - to not confuse loss packet counter
+        mFetchedPacket = mPacketList.front();
+
+        // Erase from packet list
+        mPacketList.erase(mPacketList.begin());
+    }
 
     if (total < mLow)
         result = FetchResult::NoPacket;

@@ -313,7 +313,9 @@ void AudioStream::dataArrived(PDatagramSocket s, const void* buffer, int length,
       return;
     }
   }
-   
+
+  //ICELogDebug(<< "Packet no: " << RtpHelper::findPacketNo(mReceiveBuffer, receiveLength));
+
   switch (source.family())
   {
   case AF_INET:
@@ -362,7 +364,7 @@ void AudioStream::dataArrived(PDatagramSocket s, const void* buffer, int length,
 
         // Process incoming data packet
         rtpStream->process(packet);
-
+        
         double rtt = mRtpSession.GetCurrentSourceInfo()->INF_GetRoundtripTime().GetDouble();
         if (rtt > 0)
           mStat.mRttDelay.process(rtt);
