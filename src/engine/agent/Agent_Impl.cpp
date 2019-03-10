@@ -550,7 +550,7 @@ void AgentImpl::processGetMediaStats(Json::Value& request, Json::Value& answer)
       }
       MT::PSevanaAqua sa = mAquaMap[sessionIter->first];
       MT::SevanaAqua::AudioBuffer test(mAquaIncoming.data(), mAquaIncoming.size()),
-              reference;
+              reference(referenceAudio.data(), referenceAudio.size());
       test.mRate = AUDIO_SAMPLERATE;              reference.mRate = AUDIO_SAMPLERATE;
       test.mChannels = AUDIO_CHANNELS;            reference.mChannels = AUDIO_CHANNELS;
 

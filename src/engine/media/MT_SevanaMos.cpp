@@ -184,6 +184,36 @@ bool SevanaPVQA::initializeLibrary(const std::string& pathToLicenseFile, const s
     return true;
 }
 
+bool SevanaPVQA::initializeLibraryWithData(const void* license_buffer, size_t license_len,
+        const void* config_buffer, size_t config_len)
+{
+    mPvqaLoaded = false;
+
+    ICELogInfo(<< "Sevana PVQA is about to be initialized via byte buffers.");
+
+    // Initialize PVQA library
+    if (!mLibraryConfiguration)
+    {
+        mInstanceCounter = 0;
+        mLibraryErrorCode = PVQA_InitLibWithLicData(license_buffer, license_len);
+        if (mLibraryErrorCode)
+        {
+            ICELogError(<< "Problem when initializing PVQA library. Error code: " << mLibraryErrorCode);
+            return false;
+        }
+
+        mLibraryConfiguration = PVQA_LoadCFGData(config_buffer, config_len, &mLibraryErrorCode);
+        if (!mLibraryConfiguration)
+        {
+            PVQA_ReleaseLib();
+            ICELogError(<< "Problem with PVQA configuration file.");
+            return false;
+        }
+        mPvqaLoaded = true;
+    }
+    return true;
+}
+
 bool SevanaPVQA::isInitialized()
 {
     return mPvqaLoaded;
@@ -572,6 +602,11 @@ int SevanaAqua::initializeLibrary(const std::string& pathToLicenseFile)
     return SSA_InitLib(const_cast<char*>(pathToLicenseFile.data()));
 }
 
+
+int SevanaAqua::initializeLibrary(const void* buffer, size_t len)
+{
+    return SSA_InitLibWithData(buffer, len);
+}
 
 void SevanaAqua::releaseLibrary()
 {

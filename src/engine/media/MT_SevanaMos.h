@@ -77,6 +77,8 @@ public:
     static void setupAndroidEnvironment(void* environment, void* appcontext);
 #endif
     static bool initializeLibrary(const std::string& pathToLicenseFile, const std::string& pathToConfigFile);
+    static bool initializeLibraryWithData(const void* license_buffer, size_t license_len,
+            const void* config_buffer, size_t config_len);
     static bool isInitialized();
 
     static int getLibraryError();
@@ -144,6 +146,8 @@ protected:
 public:
     // Returns 0 (zero) on successful initialization, otherwise it is error code
     static int initializeLibrary(const std::string& pathToLicenseFile);
+    static int initializeLibrary(const void* buffer, size_t len);
+
     static void releaseLibrary();
     static std::string getVersion();
 
