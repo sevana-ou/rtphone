@@ -452,8 +452,12 @@ bool AudioReceiver::getAudio(Audio::DataWindow& output, DecodeOptions options, i
             if (mCodec && mFrameCount && !mCodecSettings.mSkipDecode)
             {
                 // Do PLC to mDecodedFrame/mDecodedLength
-                mDecodedLength = mCodec->plc(mFrameCount, mDecodedFrame, sizeof mDecodedFrame);
+                if ((int)options & (int)DecodeOptions::SkipDecode)
+                    mDecodedLength = 0;
+                else
+                    mDecodedLength = mCodec->plc(mFrameCount, mDecodedFrame, sizeof mDecodedFrame);
             }
+
         if (mDecodedLength)
         {
             processDecoded(output, options);
@@ -487,7 +491,11 @@ bool AudioReceiver::getAudio(Audio::DataWindow& output, DecodeOptions options, i
                     int frames100ms = milliseconds / 100;
                     for (int frameIndex = 0; frameIndex < frames100ms; frameIndex++)
                     {
-                        mDecodedLength = mCngDecoder.produce(mCodec->samplerate(), 100, (short*)mDecodedFrame, false);
+                        if ((int)options & (int)DecodeOptions::SkipDecode)
+                            mDecodedLength = 0;
+                        else
+                            mDecodedLength = mCngDecoder.produce(mCodec->samplerate(), 100, (short*)mDecodedFrame, false);
+
                         if (mDecodedLength)
                             processDecoded(output, options);
                     }
@@ -495,7 +503,11 @@ bool AudioReceiver::getAudio(Audio::DataWindow& output, DecodeOptions options, i
                     int tail = milliseconds % 100;
                     if (tail)
                     {
-                        mDecodedLength = mCngDecoder.produce(mCodec->samplerate(), tail, (short*)mDecodedFrame, false);
+                        if ((int)options & (int)DecodeOptions::SkipDecode)
+                            mDecodedLength = 0;
+                        else
+                            mDecodedLength = mCngDecoder.produce(mCodec->samplerate(), tail, (short*)mDecodedFrame, false);
+
                         if (mDecodedLength)
                             processDecoded(output, options);
                     }
@@ -513,12 +525,17 @@ bool AudioReceiver::getAudio(Audio::DataWindow& output, DecodeOptions options, i
                 // Check if it is CNG packet
                 if ((p->GetPayloadType() == 0 || p->GetPayloadType() == 8) && p->GetPayloadLength() >= 1 && p->GetPayloadLength() <= 6)
                 {
-                    mCngPacket = p;
-                    mCngDecoder.decode3389(p->GetPayloadData(), p->GetPayloadLength());
-                    // Emit CNG mLastPacketLength milliseconds
-                    mDecodedLength = mCngDecoder.produce(mCodec->samplerate(), mLastPacketTimeLength, (short*)mDecodedFrame, true);
-                    if (mDecodedLength)
-                        processDecoded(output, options);
+                    if ((int)options & (int)DecodeOptions::SkipDecode)
+                        mDecodedLength = 0;
+                    else
+                    {
+                        mCngPacket = p;
+                        mCngDecoder.decode3389(p->GetPayloadData(), p->GetPayloadLength());
+                        // Emit CNG mLastPacketLength milliseconds
+                        mDecodedLength = mCngDecoder.produce(mCodec->samplerate(), mLastPacketTimeLength, (short*)mDecodedFrame, true);
+                        if (mDecodedLength)
+                            processDecoded(output, options);
+                    }
                     result = true;
                 }
                 else
@@ -542,11 +559,16 @@ bool AudioReceiver::getAudio(Audio::DataWindow& output, DecodeOptions options, i
                         // Decode
                         for (int i=0; i<mFrameCount && !mCodecSettings.mSkipDecode; i++)
                         {
-                            // Decode frame by frame
-                            mDecodedLength = mCodec->decode(p->GetPayloadData() + i*mCodec->rtpLength(),
-                                                            frameLength, mDecodedFrame, sizeof mDecodedFrame);
-                            if (mDecodedLength)
-                                processDecoded(output, options);
+                            if ((int)options & (int)DecodeOptions::SkipDecode)
+                                mDecodedLength = 0;
+                            else
+                            {
+                                // Decode frame by frame
+                                mDecodedLength = mCodec->decode(p->GetPayloadData() + i*mCodec->rtpLength(),
+                                                                frameLength, mDecodedFrame, sizeof mDecodedFrame);
+                                if (mDecodedLength)
+                                    processDecoded(output, options);
+                            }
                         }
                         result = mFrameCount > 0;
 

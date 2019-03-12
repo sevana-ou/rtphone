@@ -76,6 +76,8 @@ public:
 #if defined(TARGET_ANDROID)
     static void setupAndroidEnvironment(void* environment, void* appcontext);
 #endif
+    // Path to config file can be empty
+    // In this case library will be considered initialized (but will produce zero MOS)
     static bool initializeLibrary(const std::string& pathToLicenseFile, const std::string& pathToConfigFile);
     static bool initializeLibraryWithData(const void* license_buffer, size_t license_len,
             const void* config_buffer, size_t config_len);

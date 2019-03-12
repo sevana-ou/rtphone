@@ -117,7 +117,8 @@ namespace MT
     {
       ResampleToMainRate = 0,
       DontResample = 1,
-      FillCngGap = 2
+      FillCngGap = 2,
+      SkipDecode = 4
     };
 
     bool getAudio(Audio::DataWindow& output, DecodeOptions options = DecodeOptions::ResampleToMainRate, int* rate = nullptr);

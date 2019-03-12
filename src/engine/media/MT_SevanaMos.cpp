@@ -172,12 +172,15 @@ bool SevanaPVQA::initializeLibrary(const std::string& pathToLicenseFile, const s
             return false;
         }
 
-        mLibraryConfiguration = PVQA_LoadCFGFile(const_cast<char*>(pathToConfigFile.c_str()), &mLibraryErrorCode);
-        if (!mLibraryConfiguration)
+        if (pathToConfigFile.size())
         {
-            PVQA_ReleaseLib();
-            ICELogError(<< "Problem with PVQA configuration file.");
-            return false;
+            mLibraryConfiguration = PVQA_LoadCFGFile(const_cast<char*>(pathToConfigFile.c_str()), &mLibraryErrorCode);
+            if (!mLibraryConfiguration)
+            {
+                PVQA_ReleaseLib();
+                ICELogError(<< "Problem with PVQA configuration file.");
+                return false;
+            }
         }
         mPvqaLoaded = true;
     }
@@ -202,12 +205,15 @@ bool SevanaPVQA::initializeLibraryWithData(const void* license_buffer, size_t li
             return false;
         }
 
-        mLibraryConfiguration = PVQA_LoadCFGData(config_buffer, config_len, &mLibraryErrorCode);
-        if (!mLibraryConfiguration)
+        if (config_buffer && config_len)
         {
-            PVQA_ReleaseLib();
-            ICELogError(<< "Problem with PVQA configuration file.");
-            return false;
+            mLibraryConfiguration = PVQA_LoadCFGData(config_buffer, config_len, &mLibraryErrorCode);
+            if (!mLibraryConfiguration)
+            {
+                PVQA_ReleaseLib();
+                ICELogError(<< "Problem with PVQA configuration file.");
+                return false;
+            }
         }
         mPvqaLoaded = true;
     }
