@@ -24,7 +24,7 @@ using namespace MT;
 AudioStream::AudioStream(const CodecList::Settings& settings)
 :mPacketTime(0), mEncodedTime(0), mCodecSettings(settings),
 mRemoteTelephoneCodec(0), mRtpSession(), mTransmittingPayloadType(-1),
-mRtpSender(mStat), mRtpDump(NULL)
+mRtpSender(mStat)
 {
   mOutputBuffer.setCapacity(16384);
   mCapturedAudio.setCapacity(16384);
@@ -75,11 +75,13 @@ AudioStream::~AudioStream()
   if (mRtpSession.IsActive())
     mRtpSession.Destroy();
 
+#if defined(USE_RTPDUMP)
   if (mRtpDump)
   {
     mRtpDump->flush();
     delete mRtpDump;
   }
+#endif
 
   mCaptureResampler8.stop();
   mCaptureResampler16.stop();

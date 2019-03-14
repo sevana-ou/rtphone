@@ -79,7 +79,9 @@ namespace MT
     NativeRtpSender mRtpSender;
     AudioStreamMap mStreamMap;                      // Map of media streams. Key is RTP's SSRC value.
     Audio::DataWindow mOutputBuffer;
-    RtpDump* mRtpDump;
+#if defined(USE_RTPDUMP)
+    RtpDump* mRtpDump = nullptr;
+#endif
     Audio::Resampler  mCaptureResampler8,
                       mCaptureResampler16,
                       mCaptureResampler32,

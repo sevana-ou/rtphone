@@ -6,8 +6,15 @@
 #ifndef __HL_RTP_H
 #define __HL_RTP_H
 
-#include "jrtplib/src/rtppacket.h"
-#include "HL_Uuid.h"
+#if defined(USE_RTPDUMP)
+# include "jrtplib/src/rtppacket.h"
+#endif
+
+#if !defined(USE_NULL_UUID)
+# include "HL_Uuid.h"
+#endif
+
+
 #include "HL_InternetAddress.h"
 
 #include <vector>
@@ -42,6 +49,7 @@ public:
     static int findPayloadLength(const void* buffer, size_t length);
 };
 
+#if defined(USE_RTPDUMP)
 class RtpDump
 {
 protected:
@@ -66,6 +74,7 @@ public:
     void add(const void* data, size_t len);
     void flush();
 };
+#endif
 
 struct MediaStreamId
 {
@@ -73,7 +82,9 @@ struct MediaStreamId
     InternetAddress mDestination;
     uint32_t mSSRC = 0;
     bool mSsrcIsId = true;
+#if !defined(USE_NULL_UUID)
     Uuid mLinkId;
+#endif
     bool operator < (const MediaStreamId& s2) const;
     bool operator == (const MediaStreamId& right) const;
 

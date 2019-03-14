@@ -1,4 +1,4 @@
-/* Copyright(C) 2007-2014 VoIP objects (voipobjects.com)
+/* Copyright(C) 2007-2019 VoIP objects (voipobjects.com)
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -9,7 +9,7 @@
 using namespace MT;
 
 NativeRtpSender::NativeRtpSender(Statistics& stat)
-:mDumpWriter(NULL), mStat(stat), mSrtpSession(NULL)
+:mStat(stat), mSrtpSession(nullptr)
 {
 }
 
@@ -22,8 +22,10 @@ bool NativeRtpSender::SendRTP(const void *data, size_t len)
   if (mTarget.mRtp.isEmpty() || !mSocket.mRtp)
     return false;
   
+#if defined(USE_RTPDUMP)
   if (mDumpWriter)
     mDumpWriter->add(data, len);
+#endif
 
   // Copy data to intermediary buffer bigger that original
   int sendLength = len;
@@ -99,6 +101,7 @@ RtpPair<PDatagramSocket>& NativeRtpSender::socket()
   return mSocket;
 }
 
+#if defined(USE_RTPDUMP)
 void NativeRtpSender::setDumpWriter(RtpDump *dump)
 {
   mDumpWriter = dump;
@@ -108,6 +111,7 @@ RtpDump* NativeRtpSender::dumpWriter()
 {
   return mDumpWriter;
 }
+#endif
 
 void NativeRtpSender::setSrtpSession(SrtpSession* srtp)
 {

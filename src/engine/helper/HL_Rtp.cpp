@@ -7,8 +7,11 @@
 #include "HL_Exception.h"
 #include "HL_String.h"
 
-#include "jrtplib/src/rtprawpacket.h"
-#include "jrtplib/src/rtpipv4address.h"
+#if defined(USE_RTP_DUMP)
+# include "jrtplib/src/rtprawpacket.h"
+# include "jrtplib/src/rtpipv4address.h"
+#endif
+
 #if !defined(TARGET_WIN)
 # include <alloca.h>
 #endif
@@ -97,6 +100,7 @@ int RtpHelper::findPayloadLength(const void* buffer, size_t length)
         return -1;
 }
 
+#if defined(USE_RTPDUMP)
 RtpDump::RtpDump(const char *filename)
     :mFilename(filename)
 {}
@@ -172,6 +176,8 @@ void RtpDump::flush()
     }
     fclose(f);
 }
+#endif
+
 
 // -------------- MediaStreamId --------------------
 bool MediaStreamId::operator < (const MediaStreamId& right) const
@@ -206,7 +212,10 @@ void writeToJson(const MediaStreamId& id, std::ostringstream& oss)
     oss << "  \"src\": \"" << id.mSource.toStdString() << "\"," << std::endl
         << "  \"dst\": \"" << id.mDestination.toStdString() << "\"," << std::endl
         << "  \"ssrc\": \"" << StringHelper::toHex(id.mSSRC) << "\"," << std::endl
-        << "  \"link_id\": \"" << id.mLinkId.toString() << "\"" << std::endl;
+#if !defined(USE_NULL_UUID)
+        << "  \"link_id\": \"" << id.mLinkId.toString() << "\"" << std::endl
+#endif
+        ;
 }
 
 std::string MediaStreamId::getDetectDescription() const

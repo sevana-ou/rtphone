@@ -39,9 +39,10 @@ namespace MT
     void setSocket(const RtpPair<PDatagramSocket>& socket);
     RtpPair<PDatagramSocket>& socket();
     
+#if defined(USE_RTPDUMP)
     void setDumpWriter(RtpDump* dump);
     RtpDump* dumpWriter();
-
+#endif
     void setSrtpSession(SrtpSession* srtp);
     SrtpSession* srtpSession();
 
@@ -49,7 +50,9 @@ namespace MT
     RtpPair<PDatagramSocket> mSocket;
     RtpPair<InternetAddress> mTarget;
     Statistics& mStat;
-    RtpDump* mDumpWriter;
+#if defined(USE_RTPDUMP)
+    RtpDump* mDumpWriter = nullptr;
+#endif
     SrtpSession* mSrtpSession;
     char mSendBuffer[MAX_VALID_UDPPACKET_SIZE];
   };
