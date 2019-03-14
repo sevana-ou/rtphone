@@ -227,7 +227,6 @@ int G729Codec::plc(int lostFrames, void* output, int outputCapacity)
 }
 
 
-#ifdef USE_OPUS_CODEC
 // -------------- Opus -------------------
 #define OPUS_CODEC_NAME "OPUS"
 #define OPUS_CODEC_RATE 16000
@@ -527,8 +526,6 @@ int OpusCodec::plc(int lostFrames, void* output, int outputCapacity)
   }
   return lostFrames * pcmLength();
 }
-
-#endif
 
 
 // -------------- ILBC -------------------

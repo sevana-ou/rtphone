@@ -258,9 +258,7 @@ Statistics& Statistics::operator += (const Statistics& src)
         if (src.mFirstRtpTime.is_initialized())
             mFirstRtpTime = src.mFirstRtpTime;
 
-#if defined(USE_AMR_CODEC)
     mBitrateSwitchCounter += src.mBitrateSwitchCounter;
-#endif
     mRemotePeer = src.mRemotePeer;
     mSsrc = src.mSsrc;
 

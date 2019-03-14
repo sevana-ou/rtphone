@@ -182,9 +182,7 @@ namespace MT
     std::shared_ptr<Audio::DataWindow> mPvqaBuffer;
 #endif
 
-#if defined(USE_AMR_CODEC)
     void processStatisticsWithAmrCodec(Codec* c);
-#endif
   };
   
   class DtmfReceiver: public Receiver

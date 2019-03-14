@@ -1,4 +1,4 @@
-/* Copyright(C) 2007-2017 VoIPobjects (voipobjects.com)
+/* Copyright(C) 2007-2019 VoIPobjects (voipobjects.com)
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -18,7 +18,6 @@ CodecList::CodecList(const Settings& settings)
   :mSettings(settings)
 {
   //mFactoryList.push_back(new OpusCodec::OpusFactory(16000, 1));
-#ifdef USE_OPUS_CODEC
   if (settings.mOpusSpec.empty())
   {
     mFactoryList.push_back(new OpusCodec::OpusFactory(48000, 2, MT_OPUS_CODEC_PT));
@@ -30,8 +29,7 @@ CodecList::CodecList(const Settings& settings)
       mFactoryList.push_back(new OpusCodec::OpusFactory(spec.mRate, spec.mChannels, spec.mPayloadType));
     }
   }
-#endif
-#ifdef USE_AMR_CODEC
+
   for (int pt: mSettings.mAmrWbPayloadType)
     mFactoryList.push_back(new AmrWbCodec::CodecFactory({mSettings.mWrapIuUP, false, pt}));
   for (int pt: mSettings.mAmrWbOctetPayloadType)
@@ -44,7 +42,6 @@ CodecList::CodecList(const Settings& settings)
 
   mFactoryList.push_back(new GsmEfrCodec::GsmEfrFactory(mSettings.mWrapIuUP, mSettings.mGsmEfrPayloadType));
 
-#endif
   //mFactoryList.push_back(new IsacCodec::IsacFactory16K(mSettings.mIsac16KPayloadType));
   //mFactoryList.push_back(new IlbcCodec::IlbcFactory(mSettings.mIlbc20PayloadType, mSettings.mIlbc30PayloadType));
   mFactoryList.push_back(new G711Codec::AlawFactory());
@@ -66,7 +63,7 @@ CodecList::~CodecList()
 
 int CodecList::count() const
 {
-  return (int)mFactoryList.size();
+  return static_cast<int>(mFactoryList.size());
 }
 
 Codec::Factory& CodecList::codecAt(int index) const

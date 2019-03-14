@@ -12,10 +12,7 @@
 #include "../helper/HL_Log.h"
 #include "../audio/Audio_Interface.h"
 #include "../audio/Audio_Resampler.h"
-
-#if defined(USE_AMR_CODEC)
-# include "MT_AmrCodec.h"
-#endif
+#include "MT_AmrCodec.h"
 
 #include <algorithm>
 
@@ -573,9 +570,7 @@ bool AudioReceiver::getAudio(Audio::DataWindow& output, DecodeOptions options, i
                         result = mFrameCount > 0;
 
                         // Check for bitrate counter
-#if defined(USE_AMR_CODEC)
                         processStatisticsWithAmrCodec(mCodec.get());
-#endif
                     }
                     else
                         ICELogMedia(<< "RTP packet with tail.");
@@ -692,8 +687,6 @@ float AudioReceiver::calculatePvqaMos(int rate, std::string& report)
 }
 #endif
 
-
-#if defined(USE_AMR_CODEC)
 void AudioReceiver::processStatisticsWithAmrCodec(Codec* c)
 {
     AmrNbCodec* nb = dynamic_cast<AmrNbCodec*>(c);
@@ -705,7 +698,6 @@ void AudioReceiver::processStatisticsWithAmrCodec(Codec* c)
         if (wb != nullptr)
             mStat.mBitrateSwitchCounter = wb->getSwitchCounter();
 }
-#endif
 
 int AudioReceiver::getSize() const
 {

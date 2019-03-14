@@ -6,7 +6,6 @@
 #include "MT_Codec.h"
 #include "../helper/HL_Pointer.h"
 
-#if defined(USE_AMR_CODEC)
 # include "opencore-amr/amrnb/interf_enc.h"
 # include "opencore-amr/amrnb/interf_dec.h"
 
@@ -156,7 +155,6 @@ namespace MT
 
 } // End of MT namespace
 
-#endif
 
 #endif // MT_AMRCODEC_H
 
