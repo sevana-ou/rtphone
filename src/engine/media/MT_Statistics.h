@@ -117,9 +117,8 @@ public:
     uint16_t  mSsrc;            // Last known SSRC ID in a RTP stream
     ice::NetworkAddress mRemotePeer; // Last known remote RTP address
 
-#if defined(USE_AMR_CODEC)
+    // AMR codec bitrate switch counter
     int       mBitrateSwitchCounter;
-#endif
 
     std::string mCodecName;
 

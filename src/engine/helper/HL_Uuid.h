@@ -20,6 +20,10 @@ public:
   bool operator < (const Uuid& right) const;
 
 protected:
+#if defined(USE_NULL_UUID)
+  unsigned char mUuid[16];
+#else
+
 #if defined(TARGET_LINUX) || defined(TARGET_OSX)
   uuid_t mUuid;
 #endif
@@ -28,6 +32,7 @@ protected:
 #endif
 #if defined(TARGET_ANDROID)
   // Stub only
+#endif
 #endif
 };
 

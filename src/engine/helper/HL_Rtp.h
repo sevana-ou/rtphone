@@ -10,9 +10,7 @@
 # include "jrtplib/src/rtppacket.h"
 #endif
 
-#if !defined(USE_NULL_UUID)
-# include "HL_Uuid.h"
-#endif
+#include "HL_Uuid.h"
 
 
 #include "HL_InternetAddress.h"
@@ -82,9 +80,7 @@ struct MediaStreamId
     InternetAddress mDestination;
     uint32_t mSSRC = 0;
     bool mSsrcIsId = true;
-#if !defined(USE_NULL_UUID)
     Uuid mLinkId;
-#endif
     bool operator < (const MediaStreamId& s2) const;
     bool operator == (const MediaStreamId& right) const;
 

@@ -69,10 +69,7 @@ Statistics::Statistics()
       mReceivedRtcp(0), mSentRtcp(0), mDuplicatedRtp(0), mOldRtp(0), mIllegalRtp(0),
       mPacketLoss(0), mJitter(0.0), mAudioTime(0), mSsrc(0)
 {
-#if defined(USE_AMR_CODEC)
     mBitrateSwitchCounter = 0;
-#endif
-
     memset(mLoss, 0, sizeof mLoss);
 
     // It is to keep track of statistics instance via grep | wc -l
