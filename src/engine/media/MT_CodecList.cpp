@@ -7,7 +7,7 @@
 #include "MT_CodecList.h"
 #include "MT_AudioCodec.h"
 
-#if !defined(TARGET_ANDROID)
+#if !defined(TARGET_ANDROID) && !defined(TARGET_OPENWRT)
 # include "MT_AmrCodec.h"
 #endif
 
@@ -33,7 +33,7 @@ CodecList::CodecList(const Settings& settings)
     }
   }
 
-#if !defined(TARGET_ANDROID)
+#if !defined(TARGET_ANDROID) && !defined(TARGET_OPENWRT)
   for (int pt: mSettings.mAmrWbPayloadType)
     mFactoryList.push_back(new AmrWbCodec::CodecFactory({mSettings.mWrapIuUP, false, pt}));
   for (int pt: mSettings.mAmrWbOctetPayloadType)

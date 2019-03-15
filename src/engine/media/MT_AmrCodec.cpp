@@ -1,5 +1,5 @@
 // Avoid linking issues on Android systems
-#if !defined(TARGET_ANDROID)
+#if !defined(TARGET_ANDROID) && !defined(TARGET_OPENWRT)
 
 #include "MT_AmrCodec.h"
 #include "../helper/HL_ByteBuffer.h"
