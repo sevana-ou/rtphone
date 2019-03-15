@@ -6,7 +6,10 @@
 #include "../config.h"
 #include "MT_CodecList.h"
 #include "MT_AudioCodec.h"
-#include "MT_AmrCodec.h"
+
+#if !defined(TARGET_ANDROID)
+# include "MT_AmrCodec.h"
+#endif
 
 #include <algorithm>
 
@@ -30,6 +33,7 @@ CodecList::CodecList(const Settings& settings)
     }
   }
 
+#if !defined(TARGET_ANDROID)
   for (int pt: mSettings.mAmrWbPayloadType)
     mFactoryList.push_back(new AmrWbCodec::CodecFactory({mSettings.mWrapIuUP, false, pt}));
   for (int pt: mSettings.mAmrWbOctetPayloadType)
@@ -41,9 +45,10 @@ CodecList::CodecList(const Settings& settings)
     mFactoryList.push_back(new AmrNbCodec::CodecFactory({mSettings.mWrapIuUP, true, pt}));
 
   mFactoryList.push_back(new GsmEfrCodec::GsmEfrFactory(mSettings.mWrapIuUP, mSettings.mGsmEfrPayloadType));
+#endif
 
-  //mFactoryList.push_back(new IsacCodec::IsacFactory16K(mSettings.mIsac16KPayloadType));
-  //mFactoryList.push_back(new IlbcCodec::IlbcFactory(mSettings.mIlbc20PayloadType, mSettings.mIlbc30PayloadType));
+  mFactoryList.push_back(new IsacCodec::IsacFactory16K(mSettings.mIsac16KPayloadType));
+  mFactoryList.push_back(new IlbcCodec::IlbcFactory(mSettings.mIlbc20PayloadType, mSettings.mIlbc30PayloadType));
   mFactoryList.push_back(new G711Codec::AlawFactory());
   mFactoryList.push_back(new G711Codec::UlawFactory());
 

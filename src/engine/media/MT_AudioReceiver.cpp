@@ -12,7 +12,10 @@
 #include "../helper/HL_Log.h"
 #include "../audio/Audio_Interface.h"
 #include "../audio/Audio_Resampler.h"
-#include "MT_AmrCodec.h"
+
+#if !defined(TARGET_ANDROID)
+# include "MT_AmrCodec.h"
+#endif
 
 #include <algorithm>
 
@@ -689,6 +692,7 @@ float AudioReceiver::calculatePvqaMos(int rate, std::string& report)
 
 void AudioReceiver::processStatisticsWithAmrCodec(Codec* c)
 {
+#if !defined(TARGET_ANDROID)
     AmrNbCodec* nb = dynamic_cast<AmrNbCodec*>(c);
     AmrWbCodec* wb = dynamic_cast<AmrWbCodec*>(c);
 
@@ -697,6 +701,7 @@ void AudioReceiver::processStatisticsWithAmrCodec(Codec* c)
     else
         if (wb != nullptr)
             mStat.mBitrateSwitchCounter = wb->getSwitchCounter();
+#endif
 }
 
 int AudioReceiver::getSize() const

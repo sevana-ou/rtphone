@@ -1,3 +1,6 @@
+// Avoid linking issues on Android systems
+#if !defined(TARGET_ANDROID)
+
 #include "MT_AmrCodec.h"
 #include "../helper/HL_ByteBuffer.h"
 #include "../helper/HL_Log.h"
@@ -972,3 +975,5 @@ int GsmEfrCodec::plc(int lostFrames, void* output, int outputCapacity)
 
     return lostFrames * pcmLength();
 }
+
+#endif
