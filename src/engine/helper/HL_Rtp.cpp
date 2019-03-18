@@ -3,6 +3,11 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
+#if defined(TARGET_WIN)
+# include <WinSock2.h>
+# include <Windows.h>
+#endif
+
 #include "HL_Rtp.h"
 #include "HL_Exception.h"
 #include "HL_String.h"
@@ -15,6 +20,7 @@
 #if !defined(TARGET_WIN)
 # include <alloca.h>
 #endif
+
 #include <sstream>
 #include <tuple>
 
