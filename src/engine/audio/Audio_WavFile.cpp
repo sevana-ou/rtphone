@@ -275,7 +275,7 @@ bool WavFileWriter::open(const std::tstring& filename, int rate, int channels)
 #else
   mHandle = fopen(StringHelper::makeUtf8(filename).c_str(), "wb");
 #endif
-  if (NULL == mHandle)
+  if (nullptr == mHandle)
   {
     ICELogError(<< "Failed to create .wav file: filename = " << StringHelper::makeUtf8(filename) << " , error = " << errno);
     return false;
@@ -334,11 +334,11 @@ void WavFileWriter::close()
   if (mHandle)
   {
     fclose(mHandle);
-    mHandle = NULL;
+    mHandle = nullptr;
   }
 }
 
-unsigned WavFileWriter::write(const void* buffer, unsigned bytes)
+size_t WavFileWriter::write(const void* buffer, size_t bytes)
 {
   LOCK;
 
@@ -354,11 +354,11 @@ unsigned WavFileWriter::write(const void* buffer, unsigned bytes)
 
   // Write file length
   fseek(mHandle, 4, SEEK_SET);
-  unsigned int fl = mWritten + 36;
+  size_t fl = mWritten + 36;
   fwrite(&fl, sizeof(fl), 1, mHandle);
   
   // Write data length
-  fseek(mHandle, mLengthOffset, SEEK_SET);
+  fseek(mHandle, static_cast<long>(mLengthOffset), SEEK_SET);
   checkWriteResult( fwrite(&mWritten, 4, 1, mHandle) );
 
   return bytes;
@@ -368,7 +368,7 @@ bool WavFileWriter::isOpened()
 {
   LOCK;
 
-  return (mHandle != 0);
+  return (mHandle != nullptr);
 }
 
 std::tstring WavFileWriter::filename()
