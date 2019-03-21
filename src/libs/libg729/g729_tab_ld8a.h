@@ -8,10 +8,10 @@
 */
 
 extern Word16 hamwindow[L_WINDOW];
-extern Word16 lag_h[M10];
-extern Word16 lag_l[M10];
+extern Word16 g729_lag_h[M10];
+extern Word16 g729_lag_l[M10];
 extern Word16 table[65];
-extern Word16 slope[64];
+extern Word16 g729_slope[64];
 extern Word16 table2[64];
 extern Word16 slope_cos[64];
 extern Word16 slope_acos[64];
@@ -20,7 +20,7 @@ extern Word16 lspcb2[NC1][M10];
 extern Word16 fg[2][MA_NP][M10];
 extern Word16 fg_sum[2][M10];
 extern Word16 fg_sum_inv[2][M10];
-extern Word16 grid[GRID_POINTS + 1];
+extern Word16 g729_grid[GRID_POINTS + 1];
 extern Word16 inter_3l[FIR_SIZE_SYN];
 extern Word16 g729_pred[4];
 extern Word16 gbk1[NCODE1][2];

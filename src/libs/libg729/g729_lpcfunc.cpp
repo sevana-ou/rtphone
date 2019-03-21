@@ -154,7 +154,7 @@ Lsp_lsf (Word16 lsp[],		/* (i) Q15 : lsp[m] (range: -1<=val<1)                */
 
     /* acos(lsp[i])= ind*256 + ( ( lsp[i]-table[ind] ) * slope[ind] )/4096 */
 
-    L_tmp = L_mult (sub (lsp[i], table[ind]), slope[ind]);
+    L_tmp = L_mult (sub (lsp[i], table[ind]), g729_slope[ind]);
     tmp = wround (L_shl (L_tmp, 3));	/*(lsp[i]-table[ind])*slope[ind])>>12 */
     lsf[i] = add (tmp, shl (ind, 8));
   }

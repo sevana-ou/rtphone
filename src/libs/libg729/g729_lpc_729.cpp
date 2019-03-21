@@ -98,7 +98,7 @@ Lag_window (Word16 m,		/* (i)     : LPC order                        */
   Word32 x;
 
   for (i = 1; i <= m; i++) {
-    x = Mpy_32 (r_h[i], r_l[i], lag_h[i - 1], lag_l[i - 1]);
+    x = Mpy_32 (r_h[i], r_l[i], g729_lag_h[i - 1], g729_lag_l[i - 1]);
     L_Extract (x, &r_h[i], &r_l[i]);
   }
   return;
@@ -415,7 +415,7 @@ Az_lsp (Word16 a[],		/* (i) Q12 : predictor coefficients              */
 
   coef = f1;
 
-  xlow = grid[0];
+  xlow = g729_grid[0];
   ylow = (*pChebps) (xlow, coef, NC);
 
   j = 0;
@@ -423,7 +423,7 @@ Az_lsp (Word16 a[],		/* (i) Q12 : predictor coefficients              */
     j = add (j, 1);
     xhigh = xlow;
     yhigh = ylow;
-    xlow = grid[j];
+    xlow = g729_grid[j];
     ylow = (*pChebps) (xlow, coef, NC);
 
     L_temp = L_mult (ylow, yhigh);
