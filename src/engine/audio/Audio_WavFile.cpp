@@ -39,7 +39,7 @@ using namespace Audio;
 
 // ---------------------- WavFileReader -------------------------
 WavFileReader::WavFileReader()
-:mHandle(NULL), mRate(0)
+:mHandle(nullptr), mRate(0)
 {
   mDataOffset = 0;
 }
@@ -166,9 +166,9 @@ void WavFileReader::close()
 {
   LOCK;
 
-  if (NULL != mHandle)
+  if (nullptr != mHandle)
     fclose(mHandle);
-  mHandle = NULL;
+  mHandle = nullptr;
 }
 
 int WavFileReader::rate() const
@@ -246,7 +246,7 @@ unsigned WavFileReader::size() const
 #define BITS_PER_CHANNEL  16
 
 WavFileWriter::WavFileWriter()
-:mHandle(NULL), mLengthOffset(0), mRate(AUDIO_SAMPLERATE), mChannels(1)
+:mHandle(nullptr), mLengthOffset(0), mRate(AUDIO_SAMPLERATE), mChannels(1)
 {
 }
 
@@ -354,7 +354,7 @@ size_t WavFileWriter::write(const void* buffer, size_t bytes)
 
   // Write file length
   fseek(mHandle, 4, SEEK_SET);
-  size_t fl = mWritten + 36;
+  int32_t fl = mWritten + 36;
   fwrite(&fl, sizeof(fl), 1, mHandle);
   
   // Write data length

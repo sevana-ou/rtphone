@@ -57,8 +57,8 @@ namespace Audio
     FILE*                   mHandle;        /// Handle of audio file.
     std::tstring            mFileName;      /// Path to requested audio file.
     std::recursive_mutex    mFileMtx;       /// Mutex to protect this instance.
-    size_t                  mWritten;       /// Amount of written data (in bytes)
-    size_t                  mLengthOffset;  /// Position of length field.
+    int                     mWritten;       /// Amount of written data (in bytes)
+    int                     mLengthOffset;  /// Position of length field.
     int                     mRate,
                             mChannels;
 
