@@ -113,15 +113,15 @@ namespace MT
     bool add(std::shared_ptr<jrtplib::RTPPacket> p, Codec** codec = nullptr);
 
     // Returns false when there is no rtp data from jitter
-    enum class DecodeOptions
+    enum DecodeOptions
     {
-      ResampleToMainRate = 0,
-      DontResample = 1,
-      FillCngGap = 2,
-      SkipDecode = 4
+      DecodeOptions_ResampleToMainRate = 0,
+      DecodeOptions_DontResample = 1,
+      DecodeOptions_FillCngGap = 2,
+      DecodeOptions_SkipDecode = 4
     };
 
-    bool getAudio(Audio::DataWindow& output, DecodeOptions options = DecodeOptions::ResampleToMainRate, int* rate = nullptr);
+    bool getAudio(Audio::DataWindow& output, int options = DecodeOptions_ResampleToMainRate, int* rate = nullptr);
 
     // Looks for codec by payload type
     Codec* findCodec(int payloadType);
@@ -172,7 +172,7 @@ namespace MT
     void makeMonoAndResample(int rate, int channels);
 
     // Resamples, sends to analysis, writes to dump and queues to output decoded frames from mDecodedFrame
-    void processDecoded(Audio::DataWindow& output, DecodeOptions options);
+    void processDecoded(Audio::DataWindow& output, int options);
 
 #if defined(USE_PVQA_LIBRARY) && !defined(PVQA_SERVER)
     std::shared_ptr<SevanaPVQA> mPVQA;

@@ -92,7 +92,7 @@ int RtpBuffer::prebuffer()
 int RtpBuffer::getCount() const
 {
     Lock l(mGuard);
-    return mPacketList.size();
+    return static_cast<int>(mPacketList.size());
 }
 
 bool SequenceSort(const RtpBuffer::Packet& p1, const RtpBuffer::Packet& p2)
@@ -390,7 +390,7 @@ bool AudioReceiver::add(std::shared_ptr<jrtplib::RTPPacket> p, Codec** codec)
 
     // Process jitter
     mJitterStats.process(p.get(), codecIter->second->samplerate());
-    mStat.mJitter = (float)mJitterStats.get().getCurrent();
+    mStat.mJitter = static_cast<float>(mJitterStats.get().getCurrent());
 
     // Check if packet is CNG
     if (payloadLength >= 1 && payloadLength <= 6 && (ptype == 0 || ptype == 8))
@@ -409,14 +409,14 @@ bool AudioReceiver::add(std::shared_ptr<jrtplib::RTPPacket> p, Codec** codec)
     return mBuffer.add(p, timelen, codecIter->second->samplerate());
 }
 
-void AudioReceiver::processDecoded(Audio::DataWindow& output, DecodeOptions options)
+void AudioReceiver::processDecoded(Audio::DataWindow& output, int options)
 {
     // Write to audio dump if requested
     if (mDecodedDump && mDecodedLength)
         mDecodedDump->write(mDecodedFrame, mDecodedLength);
 
     // Resample to target rate
-    bool resample = !((int)options & (int)DecodeOptions::DontResample);
+    bool resample = !(options & DecodeOptions_DontResample);
     makeMonoAndResample(resample ? mCodec->samplerate() : 0,
                         mCodec->channels());
 
@@ -429,7 +429,7 @@ void AudioReceiver::processDecoded(Audio::DataWindow& output, DecodeOptions opti
     output.add(mResampledFrame, mResampledLength);
 }
 
-bool AudioReceiver::getAudio(Audio::DataWindow& output, DecodeOptions options, int* rate)
+bool AudioReceiver::getAudio(Audio::DataWindow& output, int options, int* rate)
 {
     bool result = false;
 
@@ -446,13 +446,14 @@ bool AudioReceiver::getAudio(Audio::DataWindow& output, DecodeOptions options, i
         {
             // Synthesize comfort noise. It will be done on AUDIO_SAMPLERATE rate directly to mResampledFrame buffer.
             // Do not forget to send this noise to analysis
-            mDecodedLength = mCngDecoder.produce(mCodec->samplerate(), mLastPacketTimeLength, (short*)mDecodedFrame, false);
+            mDecodedLength = mCngDecoder.produce(mCodec->samplerate(), mLastPacketTimeLength,
+                                                 reinterpret_cast<short*>(mDecodedFrame), false);
         }
         else
             if (mCodec && mFrameCount && !mCodecSettings.mSkipDecode)
             {
                 // Do PLC to mDecodedFrame/mDecodedLength
-                if ((int)options & (int)DecodeOptions::SkipDecode)
+                if (options & DecodeOptions_SkipDecode)
                     mDecodedLength = 0;
                 else
                     mDecodedLength = mCodec->plc(mFrameCount, mDecodedFrame, sizeof mDecodedFrame);
@@ -481,7 +482,7 @@ bool AudioReceiver::getAudio(Audio::DataWindow& output, DecodeOptions options, i
         {
             assert(p);
             // Check if previously CNG packet was detected. Emit CNG audio here if needed.
-            if ((int)options & (int)DecodeOptions::FillCngGap && mCngPacket && mCodec)
+            if (options & DecodeOptions_FillCngGap && mCngPacket && mCodec)
             {
                 // Fill CNG audio is server mode is present
                 int units = p->GetTimestamp() - mCngPacket->GetTimestamp();
@@ -491,10 +492,11 @@ bool AudioReceiver::getAudio(Audio::DataWindow& output, DecodeOptions options, i
                     int frames100ms = milliseconds / 100;
                     for (int frameIndex = 0; frameIndex < frames100ms; frameIndex++)
                     {
-                        if ((int)options & (int)DecodeOptions::SkipDecode)
+                        if (options & DecodeOptions_SkipDecode)
                             mDecodedLength = 0;
                         else
-                            mDecodedLength = mCngDecoder.produce(mCodec->samplerate(), 100, (short*)mDecodedFrame, false);
+                            mDecodedLength = mCngDecoder.produce(mCodec->samplerate(), 100,
+                                                                 reinterpret_cast<short*>(mDecodedFrame), false);
 
                         if (mDecodedLength)
                             processDecoded(output, options);
@@ -503,10 +505,11 @@ bool AudioReceiver::getAudio(Audio::DataWindow& output, DecodeOptions options, i
                     int tail = milliseconds % 100;
                     if (tail)
                     {
-                        if ((int)options & (int)DecodeOptions::SkipDecode)
+                        if (options & DecodeOptions_SkipDecode)
                             mDecodedLength = 0;
                         else
-                            mDecodedLength = mCngDecoder.produce(mCodec->samplerate(), tail, (short*)mDecodedFrame, false);
+                            mDecodedLength = mCngDecoder.produce(mCodec->samplerate(), tail,
+                                                                 reinterpret_cast<short*>(mDecodedFrame), false);
 
                         if (mDecodedLength)
                             processDecoded(output, options);
@@ -525,14 +528,15 @@ bool AudioReceiver::getAudio(Audio::DataWindow& output, DecodeOptions options, i
                 // Check if it is CNG packet
                 if ((p->GetPayloadType() == 0 || p->GetPayloadType() == 8) && p->GetPayloadLength() >= 1 && p->GetPayloadLength() <= 6)
                 {
-                    if ((int)options & (int)DecodeOptions::SkipDecode)
+                    if (options & DecodeOptions_SkipDecode)
                         mDecodedLength = 0;
                     else
                     {
                         mCngPacket = p;
                         mCngDecoder.decode3389(p->GetPayloadData(), p->GetPayloadLength());
                         // Emit CNG mLastPacketLength milliseconds
-                        mDecodedLength = mCngDecoder.produce(mCodec->samplerate(), mLastPacketTimeLength, (short*)mDecodedFrame, true);
+                        mDecodedLength = mCngDecoder.produce(mCodec->samplerate(), mLastPacketTimeLength,
+                                                             (short*)mDecodedFrame, true);
                         if (mDecodedLength)
                             processDecoded(output, options);
                     }
@@ -559,7 +563,7 @@ bool AudioReceiver::getAudio(Audio::DataWindow& output, DecodeOptions options, i
                         // Decode
                         for (int i=0; i<mFrameCount && !mCodecSettings.mSkipDecode; i++)
                         {
-                            if ((int)options & (int)DecodeOptions::SkipDecode)
+                            if (options & DecodeOptions_SkipDecode)
                                 mDecodedLength = 0;
                             else
                             {
@@ -725,7 +729,7 @@ int AudioReceiver::timelengthFor(jrtplib::RTPPacket& p)
     PCodec codec = codecIter->second;
     if (codec)
     {
-        int frameCount = p.GetPayloadLength() / codec->rtpLength();
+        int frameCount = static_cast<int>(p.GetPayloadLength() / codec->rtpLength());
         if (p.GetPayloadType() == 9/*G729A silence*/ && p.GetPayloadLength() % codec->rtpLength())
             frameCount++;
 
@@ -758,6 +762,6 @@ DtmfReceiver::~DtmfReceiver()
 {
 }
 
-void DtmfReceiver::add(std::shared_ptr<RTPPacket> p)
+void DtmfReceiver::add(std::shared_ptr<RTPPacket> /*p*/)
 {
 }

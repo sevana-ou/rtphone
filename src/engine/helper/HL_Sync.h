@@ -1,4 +1,4 @@
-/* Copyright(C) 2007-2018 VoIPobjects (voipobjects.com)
+/* Copyright(C) 2007-2019 VoIPobjects (voipobjects.com)
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -99,7 +99,8 @@ protected:
 //  - Handlers are ALWAYS executed in the Timer Queue worker thread.
 //  - Handlers execution order is NOT guaranteed
 //
-class TimerQueue {
+class TimerQueue
+{
 public:
     TimerQueue();
     ~TimerQueue();
@@ -135,7 +136,8 @@ private:
     bool m_finish = false;
     uint64_t m_idcounter = 0;
 
-    struct WorkItem {
+    struct WorkItem
+    {
         Clock::time_point end;
         uint64_t id;  // id==0 means it was cancelled
         std::function<void(bool)> handler;
@@ -145,7 +147,8 @@ private:
     std::mutex m_mtx;
     // Inheriting from priority_queue, so we can access the internal container
     class Queue : public std::priority_queue<WorkItem, std::vector<WorkItem>,
-                                             std::greater<WorkItem>> {
+                                             std::greater<WorkItem>>
+    {
     public:
         std::vector<WorkItem>& getContainer();
     } m_items;
