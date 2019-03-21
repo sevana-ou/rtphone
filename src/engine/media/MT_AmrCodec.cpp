@@ -119,13 +119,23 @@ struct AmrPayload
 static AmrPayload parseAmrPayload(AmrPayloadInfo& input)
 {
     AmrPayload result;
+    // Do not skip packet by default; I suppose packet is good enough by default.
     result.mDiscardPacket = false;
 
     // Wrap incoming data with ByteArray to make bit dequeuing easy
-    ByteBuffer dataIn(input.mPayload, input.mPayloadLength);
-    BitReader br(input.mPayload, input.mPayloadLength);
+    ByteBuffer dataIn(input.mPayload, static_cast<size_t>(input.mPayloadLength));
+    BitReader br(input.mPayload, static_cast<size_t>(input.mPayloadLength));
 
-    result.mCodeModeRequest = br.readBits(4);
+    // In bandwidth-efficient mode, the payload header simply consists of a
+    //   4-bit codec mode request:
+    // CMR (4 bits): Indicates a codec mode request sent to the speech
+    //      encoder at the site of the receiver of this payload.  The value of
+    //      the CMR field is set to the frame type index of the corresponding
+    //      speech mode being requested.  The frame type index may be 0-7 for
+    //      AMR, as defined in Table 1a in [2], or 0-8 for AMR-WB, as defined
+    //      in Table 1a in [4].  CMR value 15 indicates that no mode request
+    //      is present, and other values are for future use.
+    result.mCodeModeRequest = static_cast<uint8_t>(br.readBits(4));
     //ICELogMedia(<< "CMR: " << result.mCodeModeRequest);
 
     // Consume extra 4 bits for octet aligned profile
@@ -136,6 +146,7 @@ static AmrPayload parseAmrPayload(AmrPayloadInfo& input)
     if (input.mInterleaving && input.mOctetAligned)
         br.readBits(8);
 
+    // Silence codec mode constant (it differs for wideband and narrowband codecs)
     uint8_t SID_FT = input.mWideband ? 9 : 8;
 
     // Table of contents
@@ -143,11 +154,29 @@ static AmrPayload parseAmrPayload(AmrPayloadInfo& input)
 
     do
     {
+        // Read TOC. It is still relates to RTP part of AMR frames packing; not the AMR frame itself.
+        //    F (1 bit): If set to 1, indicates that this frame is followed by
+        // another speech frame in this payload; if set to 0, indicates that
+        // this frame is the last frame in this payload.
         F = br.readBit();
-        FT = br.readBits(4);
+
+        //    FT (4 bits): Frame type index, indicating either the AMR or AMR-WB
+        // speech coding mode or comfort noise (SID) mode of the
+        // corresponding frame carried in this payload.
+        FT = static_cast<uint8_t>(br.readBits(4));
+
+        //   Q (1 bit): Frame quality indicator.  If set to 0, indicates the
+        // corresponding frame is severely damaged, and the receiver should
+        // set the RX_TYPE (see [6]) to either SPEECH_BAD or SID_BAD
+        // depending on the frame type (FT).
         Q = br.readBit();
 
-        if (FT > SID_FT && FT < 14)
+        // If receiving a ToC entry with a FT value in the range 9-14 for AMR or
+        //   10-13 for AMR-WB, the whole packet SHOULD be discarded.  This is to
+        //   avoid the loss of data synchronization in the depacketization
+        //   process, which can result in a huge degradation in speech quality.
+        if ((input.mWideband && (FT >= 10 && FT <= 13)) ||
+            (!input.mWideband && (FT >= 9 && FT <= 14)))
         {
             ICELogMedia(<< "Discard corrupted packet");
             // Discard bad packet
@@ -161,10 +190,8 @@ static AmrPayload parseAmrPayload(AmrPayloadInfo& input)
 
         AmrFrame frame;
         frame.mFrameType = FT;
-        if (frame.mFrameType < 10)
-            throw std::runtime_error("Failed to parse AMR frame type");
 
-        frame.mMode = FT < SID_FT ? FT : -1;
+        frame.mMode = FT < SID_FT ? FT : 0xFF;
         frame.mGoodQuality = Q == 1;
         frame.mTimestamp = input.mCurrentTimestamp;
 
@@ -174,28 +201,28 @@ static AmrPayload parseAmrPayload(AmrPayloadInfo& input)
     }
     while (F != 0);
 
-    for (int frameIndex=0; frameIndex < (int)result.mFrames.size(); frameIndex++)
+    for (size_t frameIndex=0; frameIndex < result.mFrames.size(); frameIndex++)
     {
         AmrFrame& frame = result.mFrames[frameIndex];
-        int bitsLength = input.mWideband ? amrwb_framelenbits[frame.mFrameType] : amrnb_framelenbits[frame.mFrameType];
-        int byteLength = input.mWideband ? amrwb_framelen[frame.mFrameType] : amrnb_framelen[frame.mFrameType];
-        ICELogMedia(<< "New AMR speech frame: frame type = " << FT << ", mode = " << frame.mMode <<
-                    ", good quality = " << frame.mGoodQuality << ", timestamp = " << (int)frame.mTimestamp <<
-                    ", bits length = " << bitsLength << ", byte length =" << byteLength <<
-                    ", remaining packet length = " << (int)dataIn.size() );
+        size_t bitsLength = input.mWideband ? amrwb_framelenbits[frame.mFrameType] : amrnb_framelenbits[frame.mFrameType];
+        size_t byteLength = input.mWideband ? amrwb_framelen[frame.mFrameType] : amrnb_framelen[frame.mFrameType];
+        ICELogMedia(<< "New AMR speech frame: frame type = " << FT <<
+                    ", mode = " << frame.mMode <<
+                    ", timestamp = " << static_cast<int>(frame.mTimestamp) <<
+                    ", bits length = " << static_cast<int>(bitsLength) <<
+                    ", byte length =" << static_cast<int>(byteLength) <<
+                    ", remaining packet length = " << static_cast<int>(dataIn.size()));
 
         if (bitsLength > 0)
         {
             if (input.mOctetAligned)
             {
-                if ((int)dataIn.size() < byteLength)
-                {
+                if (dataIn.size() < byteLength)
                     frame.mGoodQuality = false;
-                }
                 else
                 {
                     // It is octet aligned scheme, so we are on byte boundary now
-                    int byteOffset = br.count() / 8;
+                    size_t byteOffset = br.count() / 8;
 
                     // Copy data of AMR frame
                     frame.mData = std::make_shared<ByteBuffer>(input.mPayload + byteOffset, byteLength);
@@ -218,9 +245,9 @@ static AmrPayload parseAmrPayload(AmrPayloadInfo& input)
     }
     // Padding bits are skipped
 
-    if (br.count() / 8 != br.position() / 8 &&
+    /*if (br.count() / 8 != br.position() / 8 &&
             br.count() / 8 != br.position() / 8 + 1)
-        throw std::runtime_error("Failed to parse AMR frame");
+        throw std::runtime_error("Failed to parse AMR frame");*/
 
     return result;
 }
@@ -662,6 +689,8 @@ int AmrWbCodec::decode(const void* input, int inputBytes, void* output, int outp
         short* dataOut = (short*)output;
         for (AmrFrame& frame: ap.mFrames)
         {
+            memset(dataOut, 0, static_cast<size_t>(pcmLength()));
+
             if (frame.mData)
             {
                 D_IF_decode(mDecoderCtx, (const unsigned char*)frame.mData->data(), (short*)dataOut, 0);

@@ -604,7 +604,7 @@ void AudioReceiver::makeMonoAndResample(int rate, int channels)
     void* frames = mConvertedLength ? mConvertedFrame : mDecodedFrame;
     unsigned length = mConvertedLength ? mConvertedLength : mDecodedLength;
 
-    Audio::Resampler* r = NULL;
+    Audio::Resampler* r = nullptr;
     switch (rate)
     {
     case 8000:     r = &mResampler8; break;
