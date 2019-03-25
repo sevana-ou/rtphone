@@ -53,7 +53,7 @@ void DtmfBuilder::buildRfc2833(int tone, int duration, int volume, bool endOfEve
 #ifndef TARGET_WIN
 #	include <ctype.h>
 # if !defined(TARGET_ANDROID) && !defined(TARGET_WIN)
-#	include <xlocale.h>
+//#	include <xlocale.h>
 # endif
 #endif
 

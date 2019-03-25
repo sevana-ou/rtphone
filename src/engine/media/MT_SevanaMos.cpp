@@ -6,9 +6,7 @@
 #if defined(USE_PVQA_LIBRARY)
 
 #if defined(TARGET_SERVER)
-# include <boost/filesystem.hpp>
-# include <boost/algorithm/string.hpp>
-using namespace boost::filesystem;
+# include <filesystem>
 #endif
 
 #include "../engine/helper/HL_Log.h"
@@ -67,6 +65,7 @@ static std::string execCommand(const std::string& cmd)
 void SevanaMosUtility::run(const std::string& pcmPath, const std::string& intervalPath,
                            std::string& estimation, std::string& intervals)
 {
+/*
 #if defined(TARGET_SERVER)
     path sevana = current_path() / "sevana";
 #if defined(TARGET_LINUX) || defined(TARGET_OSX)
@@ -113,11 +112,16 @@ void SevanaMosUtility::run(const std::string& pcmPath, const std::string& interv
         intervals = str;
     }
 #endif
+*/
+
+
 }
 
 float getSevanaMos(const std::string& audioPath, const std::string& intervalReportPath,
                    std::string& intervalReport)
 {
+    return 0.0f;
+    /*
     // Find Sevana MOS estimation
     ICELogDebug( << "Running MOS utitlity on resulted PCM file " << audioPath );
     try
@@ -131,7 +135,7 @@ float getSevanaMos(const std::string& audioPath, const std::string& intervalRepo
     {
         ICELogError( << "MOS utility failed on PCM file " << audioPath << ". Error msg: " << e.what() );
         return 0.0;
-    }
+    }*/
 }
 
 // ------------------- SevanaPVQA -------------------

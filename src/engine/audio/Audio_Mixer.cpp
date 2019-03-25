@@ -22,7 +22,7 @@ Mixer::Stream::Stream()
   mResampler32.start(AUDIO_CHANNELS, 32000, AUDIO_SAMPLERATE);
   mResampler48.start(AUDIO_CHANNELS, 48000, AUDIO_SAMPLERATE);
   mActive = false;
-  mContext = NULL;
+  mContext = nullptr;
   mSSRC = 0;
   mFadeOutCounter = 0;
   mData.setCapacity(AUDIO_SPK_BUFFER_SIZE * AUDIO_SPK_BUFFER_COUNT);
