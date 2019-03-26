@@ -10,7 +10,7 @@
 extern Word16 hamwindow[L_WINDOW];
 extern Word16 g729_lag_h[M10];
 extern Word16 g729_lag_l[M10];
-extern Word16 table[65];
+extern Word16 g729_table[65];
 extern Word16 g729_slope[64];
 extern Word16 table2[64];
 extern Word16 slope_cos[64];

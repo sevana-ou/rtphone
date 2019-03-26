@@ -128,8 +128,8 @@ Lsf_lsp (Word16 lsf[],		/* (i) Q15 : lsf[m] normalized (range: 0.0<=val<=0.5) */
 
     /* lsp[i] = table[ind]+ ((table[ind+1]-table[ind])*offset) / 256 */
 
-    L_tmp = L_mult (sub (table[ind + 1], table[ind]), offset);
-    lsp[i] = add (table[ind], extract_l (L_shr (L_tmp, 9)));
+    L_tmp = L_mult (sub (g729_table[ind + 1], g729_table[ind]), offset);
+    lsp[i] = add (g729_table[ind], extract_l (L_shr (L_tmp, 9)));
   }
   return;
 }
@@ -148,13 +148,13 @@ Lsp_lsf (Word16 lsp[],		/* (i) Q15 : lsp[m] (range: -1<=val<1)                */
 
   for (i = m - (Word16) 1; i >= 0; i--) {
     /* find value in table that is just greater than lsp[i] */
-    while (sub (table[ind], lsp[i]) < 0) {
+    while (sub (g729_table[ind], lsp[i]) < 0) {
       ind = sub (ind, 1);
     }
 
     /* acos(lsp[i])= ind*256 + ( ( lsp[i]-table[ind] ) * slope[ind] )/4096 */
 
-    L_tmp = L_mult (sub (lsp[i], table[ind]), g729_slope[ind]);
+    L_tmp = L_mult (sub (lsp[i], g729_table[ind]), g729_slope[ind]);
     tmp = wround (L_shl (L_tmp, 3));	/*(lsp[i]-table[ind])*slope[ind])>>12 */
     lsf[i] = add (tmp, shl (ind, 8));
   }

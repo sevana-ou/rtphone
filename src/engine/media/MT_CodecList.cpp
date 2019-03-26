@@ -21,6 +21,7 @@ CodecList::CodecList(const Settings& settings)
   :mSettings(settings)
 {
   //mFactoryList.push_back(new OpusCodec::OpusFactory(16000, 1));
+#if !defined(TARGET_ANDROID)
   if (settings.mOpusSpec.empty())
   {
     mFactoryList.push_back(new OpusCodec::OpusFactory(48000, 2, MT_OPUS_CODEC_PT));
@@ -32,6 +33,7 @@ CodecList::CodecList(const Settings& settings)
       mFactoryList.push_back(new OpusCodec::OpusFactory(spec.mRate, spec.mChannels, spec.mPayloadType));
     }
   }
+#endif
 
 #if !defined(TARGET_ANDROID) && !defined(TARGET_OPENWRT) && !defined(TARGET_WIN)
   for (int pt: mSettings.mAmrWbPayloadType)
@@ -47,8 +49,8 @@ CodecList::CodecList(const Settings& settings)
   mFactoryList.push_back(new GsmEfrCodec::GsmEfrFactory(mSettings.mWrapIuUP, mSettings.mGsmEfrPayloadType));
 #endif
 
-  mFactoryList.push_back(new IsacCodec::IsacFactory16K(mSettings.mIsac16KPayloadType));
-  mFactoryList.push_back(new IlbcCodec::IlbcFactory(mSettings.mIlbc20PayloadType, mSettings.mIlbc30PayloadType));
+  //mFactoryList.push_back(new IsacCodec::IsacFactory16K(mSettings.mIsac16KPayloadType));
+  //mFactoryList.push_back(new IlbcCodec::IlbcFactory(mSettings.mIlbc20PayloadType, mSettings.mIlbc30PayloadType));
   mFactoryList.push_back(new G711Codec::AlawFactory());
   mFactoryList.push_back(new G711Codec::UlawFactory());
 
