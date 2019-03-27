@@ -333,6 +333,8 @@ void SevanaPVQA::update(int samplerate, int channels, const void *pcmBuffer, int
         ICELogError(<< "No PVQA context.");
         return;
     }
+
+
     // Model is assert here as it can be any if context is not created.
     assert (mModel == Model::Stream);
 
@@ -346,6 +348,8 @@ void SevanaPVQA::update(int samplerate, int channels, const void *pcmBuffer, int
     {
         ICELogError(<< "Failed to stream data to PVQA instance. Result code: " << rescode);
     }
+
+
     int milliseconds = pcmLength / 2 / channels / (samplerate / 1000);
     mProcessedMilliseconds += milliseconds;
     mAllProcessedMilliseconds += milliseconds;
@@ -466,7 +470,7 @@ float SevanaPVQA::getResults(std::string& report, EchoData** echo, int samplerat
 
     // Limit maximal value of MOS depending on codec
     float result = (float)results.dMOSLike;
-    float mv = 5.0;
+    float mv = 5.0f;
     switch (codec)
     {
     case Codec::G711:       mv = 4.1f; break;

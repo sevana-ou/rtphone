@@ -19,6 +19,8 @@
 #if defined(USE_AQUA_LIBRARY)
 # include "aqua.h"
 # include <json/json.h>
+#include <helper/HL_ByteBuffer.h>
+
 #endif
 
 
@@ -68,6 +70,7 @@ protected:
     std::string mDumpWavPath;
     bool mOpenFailed = false;
 
+    ByteBuffer mAudioDump;
 public:
     static std::string getVersion();
 
