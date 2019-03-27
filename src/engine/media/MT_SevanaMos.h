@@ -19,9 +19,8 @@
 #if defined(USE_AQUA_LIBRARY)
 # include "aqua.h"
 # include <json/json.h>
-#include <helper/HL_ByteBuffer.h>
-
 #endif
+# include "helper/HL_ByteBuffer.h"
 
 
 namespace MT
