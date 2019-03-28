@@ -642,7 +642,7 @@ void AudioReceiver::initPvqa()
     if (!mPvqaBuffer)
     {
         mPvqaBuffer = std::make_shared<Audio::DataWindow>();
-        mPvqaBuffer->setCapacity(Audio::Format().sizeFromTime(20000));
+        mPvqaBuffer->setCapacity(Audio::Format().sizeFromTime(30000));
     }
 
     // Instantiate & open PVQA analyzer
@@ -675,7 +675,7 @@ void AudioReceiver::updatePvqa(const void *data, int size)
         {
             int time4pvqa = (int)(frames * PVQA_INTERVAL * 1000);
             int size4pvqa = (int)fmt.sizeFromTime(time4pvqa);
-            ICELogInfo(<< "Updating PVQA with " << time4pvqa << " milliseconds of audio.");
+            ICELogInfo(<< "PVQA buffer has " << time4pvqa << " milliseconds of audio.");
 #if defined(USE_PVQA_STREAM)
             mPVQA->update(fmt.mRate, fmt.mChannels, mPvqaBuffer->data(), size4pvqa);
             mPvqaBuffer->erase(size4pvqa);
