@@ -4,6 +4,8 @@ project (webrtc)
 set (CMAKE_CXX_STANDARD 11)
 set (CMAKE_CXX_STANDARD_REQUIRED ON)
 
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+
 set (WEBRTC_SOURCES
     ilbcfix/xcorr_coef.c
     ilbcfix/window32_w32.c

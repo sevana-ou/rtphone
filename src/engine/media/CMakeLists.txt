@@ -4,6 +4,8 @@ project (media_lib)
 set (CMAKE_CXX_STANDARD 11)
 set (CMAKE_CXX_STANDARD_REQUIRED ON)
 
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+
 file(GLOB MEDIA_LIB_SOURCES "*.cpp" "*.h")
 
 # SRTP requires this

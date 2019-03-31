@@ -4,6 +4,8 @@ project (srtp)
 set (CMAKE_CXX_STANDARD 11)
 set (CMAKE_CXX_STANDARD_REQUIRED ON)
 
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+
 set (SRTP_SOURCES
     srtp/srtp.c
     srtp/ekt.c

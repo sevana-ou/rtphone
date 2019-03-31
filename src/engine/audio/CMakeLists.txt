@@ -4,6 +4,8 @@ project (audio_lib)
 set (CMAKE_CXX_STANDARD 11)
 set (CMAKE_CXX_STANDARD_REQUIRED ON)
 
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+
 set (AUDIOLIB_SOURCES
     Audio_Resampler.cpp
     Audio_Quality.cpp

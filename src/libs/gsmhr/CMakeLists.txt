@@ -4,6 +4,8 @@ project (gsmhr_codec)
 set (CMAKE_CXX_STANDARD 11)
 set (CMAKE_CXX_STANDARD_REQUIRED ON)
 
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+
 set (GSMHR_SOURCES
     gsmhr.cpp
     gsmhr_sp_rom.c

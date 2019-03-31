@@ -4,6 +4,8 @@ project (g722_codec)
 set (CMAKE_CXX_STANDARD 11)
 set (CMAKE_CXX_STANDARD_REQUIRED ON)
 
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+
 set (G722_SOURCES
     g722_bitstream.c
     g722_decode.c

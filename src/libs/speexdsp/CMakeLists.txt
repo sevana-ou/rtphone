@@ -4,6 +4,8 @@ project (speexdsp)
 set (CMAKE_CXX_STANDARD 11)
 set (CMAKE_CXX_STANDARD_REQUIRED ON)
 
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+
 set (SPEEXDSP_SOURCES
     libspeexdsp/buffer.c
     libspeexdsp/fftwrap.c

@@ -4,6 +4,8 @@ project (ice_stack)
 set (CMAKE_CXX_STANDARD 11)
 set (CMAKE_CXX_STANDARD_REQUIRED ON)
 
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+
 set (ICE_STACK_SOURCES ICEAddress.cpp
     ICEAuthTransaction.cpp
     ICEBinding.cpp

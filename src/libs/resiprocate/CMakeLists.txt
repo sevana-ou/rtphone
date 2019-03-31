@@ -4,6 +4,8 @@ project (resiprocate)
 set (CMAKE_CXX_STANDARD 11)
 set (CMAKE_CXX_STANDARD_REQUIRED ON)
 
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+
 set (ARES_SOURCES
     contrib/ares/ares_timeout.c
     contrib/ares/ares_strerror.c

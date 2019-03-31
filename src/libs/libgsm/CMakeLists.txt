@@ -4,6 +4,8 @@ project (gsm_codec)
 set (CMAKE_CXX_STANDARD 11)
 set (CMAKE_CXX_STANDARD_REQUIRED ON)
 
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+
 set (GSM_SOURCES
     gsm_add.c          
     gsm_code.c         

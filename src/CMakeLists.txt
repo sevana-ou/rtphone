@@ -60,6 +60,8 @@ set (USE_EVS_CODEC OFF CACHE BOOL "Use EVS codec.")
 set (OPENSSL_SSL ssl CACHE STRING "Pointer to ssl library")
 set (OPENSSL_CRYPTO crypto CACHE STRING "Pointer to crypto library")
 
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+
 message ("Using ssl library at ${OPENSSL_SSL}")
 message ("Using crypto library at ${OPENSSL_CRYPTO}")
 

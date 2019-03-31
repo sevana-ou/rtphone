@@ -5,6 +5,8 @@ set (CMAKE_CXX_STANDARD 11)
 set (CMAKE_CXX_STANDARD_REQUIRED ON)
 set (USE_NULL_UUID OFF CACHE BOOL "When enabled linking to libuuid is avoided")
 
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+
 file(GLOB HELPER_LIB_SOURCES "*.cpp" "*.h")
 
 add_library(helper_lib ${HELPER_LIB_SOURCES})

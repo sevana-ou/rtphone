@@ -4,6 +4,8 @@ project (g729)
 set (CMAKE_CXX_STANDARD 11)
 set (CMAKE_CXX_STANDARD_REQUIRED ON)
 
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+
 set (G729_SOURCES 
     g729_acelp_ca.cpp
     g729_basic_op.cpp
