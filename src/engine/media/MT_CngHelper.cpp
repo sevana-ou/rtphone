@@ -21,7 +21,7 @@ namespace MT
 
     int result = rand();
 
-    result = (int)(result / ((float)RAND_MAX / maxvalue) + 0.5);
+    result = static_cast<int>(result / ((float)RAND_MAX / maxvalue) + 0.5);
     if (result > maxvalue)
       result = maxvalue;
 
