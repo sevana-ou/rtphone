@@ -466,34 +466,34 @@ void Session::getSessionInfo(Session::InfoOptions options, VariantMap& info)
                 info[SessionInfo_PvqaReport] = s.mPvqaReport;
             }
 #endif
-            info[SessionInfo_NetworkMos] = (float)s.calculateMos(4.14);
+            info[SessionInfo_NetworkMos] = static_cast<float>(s.calculateMos(4.14));
             info[SessionInfo_AudioCodec] = s.mCodecName;
 
             stat += s;
         }
     }
 
-    info[SessionInfo_ReceivedTraffic] = (int)stat.mReceived;
-    info[SessionInfo_SentTraffic] = (int)stat.mSent;
-    info[SessionInfo_ReceivedRtp] = stat.mReceivedRtp;
-    info[SessionInfo_ReceivedRtcp] = stat.mReceivedRtcp;
-    info[SessionInfo_LostRtp] = stat.mPacketLoss;
-    info[SessionInfo_SentRtp] = stat.mSentRtp;
-    info[SessionInfo_SentRtcp] = stat.mSentRtcp;
+    info[SessionInfo_ReceivedTraffic] = static_cast<int>(stat.mReceived);
+    info[SessionInfo_SentTraffic] = static_cast<int>(stat.mSent);
+    info[SessionInfo_ReceivedRtp] = static_cast<int>(stat.mReceivedRtp);
+    info[SessionInfo_ReceivedRtcp] = static_cast<int>(stat.mReceivedRtcp);
+    info[SessionInfo_LostRtp] = static_cast<int>(stat.mPacketLoss);
+    info[SessionInfo_SentRtp] = static_cast<int>(stat.mSentRtp);
+    info[SessionInfo_SentRtcp] = static_cast<int>(stat.mSentRtcp);
     if (stat.mFirstRtpTime)
-        info[SessionInfo_Duration] = (int)std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now() - *(stat.mFirstRtpTime)).count();
+        info[SessionInfo_Duration] = static_cast<int>(std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now() - *(stat.mFirstRtpTime)).count());
     else
         info[SessionInfo_Duration] = 0;
 
     if (stat.mReceivedRtp)
-        info[SessionInfo_PacketLoss] = (stat.mPacketLoss * 1000) / stat.mReceivedRtp;
+        info[SessionInfo_PacketLoss] = static_cast<int>((stat.mPacketLoss * 1000) / stat.mReceivedRtp);
 
     if (media)
         info[SessionInfo_AudioPeer] = mIceStack->remoteAddress(media->iceInfo().mStreamId, media->iceInfo().mComponentId.mRtp).toStdString();
 
     info[SessionInfo_Jitter] = stat.mJitter;
     if (stat.mRttDelay.isInitialized())
-        info[SessionInfo_Rtt] = (float)stat.mRttDelay.getCurrent() * 1000;
+        info[SessionInfo_Rtt] = static_cast<float>(stat.mRttDelay.getCurrent() * 1000);
 #if defined(USE_AMR_CODEC)
     info[SessionInfo_BitrateSwitchCounter] = stat.mBitrateSwitchCounter;
 #endif

@@ -35,18 +35,18 @@ namespace Audio
             :mRate(rate), mChannels(channels)
     {}
 
-    int samplesFromSize(int length) const
+    size_t samplesFromSize(size_t length) const
     {
       return length / 2 / mChannels;
     }
 
     // Returns milliseconds
-    float timeFromSize(int length) const
+    float timeFromSize(size_t length) const
     {
       return float(samplesFromSize(length) / (mRate / 1000.0));
     }
 
-    float sizeFromTime(int milliseconds) const
+    float sizeFromTime(size_t milliseconds) const
     {
       return float((milliseconds * mRate) / 500.0 * mChannels);
     }

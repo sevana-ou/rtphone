@@ -102,19 +102,19 @@ protected:
 class Statistics
 {
 public:
-    int       mReceived,        // Received traffic in bytes
-    mSent,            // Sent traffic in bytes
-    mReceivedRtp,     // Number of received rtp packets
-    mSentRtp,         // Number of sent rtp packets
-    mReceivedRtcp,    // Number of received rtcp packets
-    mSentRtcp,        // Number of sent rtcp packets
-    mDuplicatedRtp,   // Number of received duplicated rtp packets
-    mOldRtp,          // Number of late rtp packets
-    mPacketLoss,      // Number of lost packets
-    mIllegalRtp;      // Number of rtp packets with bad payload type
-    int       mLoss[128];       // Every item is number of loss of corresping length
-    int       mAudioTime;       // Decoded/found time in milliseconds
-    uint16_t  mSsrc;            // Last known SSRC ID in a RTP stream
+    size_t      mReceived,        // Received traffic in bytes
+                mSent,            // Sent traffic in bytes
+                mReceivedRtp,     // Number of received rtp packets
+                mSentRtp,         // Number of sent rtp packets
+                mReceivedRtcp,    // Number of received rtcp packets
+                mSentRtcp,        // Number of sent rtcp packets
+                mDuplicatedRtp,   // Number of received duplicated rtp packets
+                mOldRtp,          // Number of late rtp packets
+                mPacketLoss,      // Number of lost packets
+                mIllegalRtp;      // Number of rtp packets with bad payload type
+    int         mLoss[128];       // Every item is number of loss of corresping length
+    size_t      mAudioTime;       // Decoded/found time in milliseconds
+    uint16_t    mSsrc;            // Last known SSRC ID in a RTP stream
     ice::NetworkAddress mRemotePeer; // Last known remote RTP address
 
     // AMR codec bitrate switch counter
