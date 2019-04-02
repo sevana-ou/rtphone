@@ -22,7 +22,7 @@
 # include "ICEIosSupport.h"
 #endif
 # include <unistd.h>
-# if defined(TARGET_ANDROID) || defined(TARGET_LINUX)
+# if defined(TARGET_ANDROID)/* || defined(TARGET_LINUX) */
 #  include <linux/in6.h>
 # endif
 #endif

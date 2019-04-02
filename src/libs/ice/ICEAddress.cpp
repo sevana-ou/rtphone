@@ -24,7 +24,7 @@
 # include <ws2tcpip.h>
 #else
 # include <netinet/in.h>
-# if defined(TARGET_LINUX) || defined(TARGET_ANDROID)
+# if /*defined(TARGET_LINUX) || */ defined(TARGET_ANDROID)
 #  include <linux/in6.h>
 # endif
 #endif
