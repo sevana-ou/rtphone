@@ -22,7 +22,7 @@ Variant::Variant()
   mBool = 0;
   mFloat = 0;
   
-  mPointer = NULL;
+  mPointer = nullptr;
 }
 
 Variant::~Variant()
@@ -299,7 +299,7 @@ std::string Variant::asStdString() const
     return buffer;
 
   case VTYPE_INT64:
-    sprintf(buffer, "%lli", mInt64);
+    sprintf(buffer, "%lli", static_cast<long long int>(mInt64));
     return buffer;
 
   case VTYPE_BOOL:
