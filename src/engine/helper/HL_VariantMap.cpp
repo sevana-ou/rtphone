@@ -299,7 +299,7 @@ std::string Variant::asStdString() const
     return buffer;
 
   case VTYPE_INT64:
-    sprintf(buffer, "%" PRId64, mInt64);
+    sprintf(buffer, "%lli", mInt64);
     return buffer;
 
   case VTYPE_BOOL:
