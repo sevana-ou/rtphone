@@ -203,6 +203,8 @@ int AndroidInputDevice::readBuffer(void* buffer)
   return mSdkRateCache.read(buffer, AUDIO_MIC_BUFFER_SIZE);
 }
 
+#define CHECK_SL_INTERFACE(INTF, ERR) {if (!INTF) throw Exception(ERR_OPENSLES, ERR); if (!(*INTF)) throw Exception(ERR_OPENSLES, ERR);}
+
 void AndroidInputDevice::internalOpen(int rateCode, int rate)
 {
   SLresult resultCode = 0;
@@ -228,13 +230,16 @@ void AndroidInputDevice::internalOpen(int rateCode, int rate)
   // Do not forget about RECORD_AUDIO permission
   const SLInterfaceID interfacesList[2] = { SL_IID_ANDROIDSIMPLEBUFFERQUEUE, SL_IID_ANDROIDCONFIGURATION };
   const SLboolean interfacesRequirements[2] = { SL_BOOLEAN_TRUE, SL_BOOLEAN_TRUE };
-  if (*OpenSLEngine::instance().getNativeEngine() == nullptr)
-    throw Exception(ERR_OPENSLES, -1);
 
-  resultCode = (*OpenSLEngine::instance().getNativeEngine())->CreateAudioRecorder(
+  // Get access to OpenSL engine
+  SLEngineItf engine_interface = OpenSLEngine::instance().getNativeEngine();
+  CHECK_SL_INTERFACE(engine_interface, -1);
+
+  resultCode = (*engine_interface)->CreateAudioRecorder(
           OpenSLEngine::instance().getNativeEngine(),
           &mRecorderObject, &audioSource, &audioSink, 2, interfacesList, interfacesRequirements);
   CHECK_OPENSLES_ERROR;
+  CHECK_SL_INTERFACE(mRecorderObject, -2);
 
   // Obtain stream type
   resultCode = (*mRecorderObject)->GetInterface(mRecorderObject, SL_IID_ANDROIDCONFIGURATION, &mAndroidCfg);
@@ -247,10 +252,12 @@ void AndroidInputDevice::internalOpen(int rateCode, int rate)
   // Get recorder interface
   resultCode = (*mRecorderObject)->GetInterface(mRecorderObject, SL_IID_RECORD, &mRecorderInterface);
   CHECK_OPENSLES_ERROR;
+  CHECK_SL_INTERFACE(mRecorderInterface, -3);
 
   // Now buffer queue interface...
   resultCode = (*mRecorderObject)->GetInterface(mRecorderObject, SL_IID_ANDROIDSIMPLEBUFFERQUEUE, &mRecorderBufferInterface);
   CHECK_OPENSLES_ERROR;
+  CHECK_SL_INTERFACE(mRecorderBufferInterface, -4);
 
   // Resampler is needed to provide SDK's rate
   mResampler = std::make_shared<Resampler>();
