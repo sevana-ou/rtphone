@@ -195,7 +195,9 @@ bool SevanaPVQA::initializeLibraryWithData(const void* license_buffer, size_t li
         const void* config_buffer, size_t config_len)
 {
     mPvqaLoaded = false;
-
+#if defined(OLD_PVQA)
+    return false;
+#else
     ICELogInfo(<< "Sevana PVQA is about to be initialized via byte buffers.");
 
     // Initialize PVQA library
@@ -222,6 +224,7 @@ bool SevanaPVQA::initializeLibraryWithData(const void* license_buffer, size_t li
         mPvqaLoaded = true;
     }
     return true;
+#endif
 }
 
 bool SevanaPVQA::isInitialized()
