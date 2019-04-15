@@ -17,14 +17,17 @@
 
 std::string StringHelper::extractFilename(const std::string& path)
 {
-    // Look for separator from end of string
-    for (int i = path.size() - 1; i >= 0; i--)
-    {
-        if (path[i] == '/' || path[i] == '\\')
-            return path.substr(i+1);
-    }
-    return "";
+    if (path.empty())
+        return std::string();
 
+    // Look for separator from end of string
+    std::string::size_type p_s = path.find_last_of('/'), p_bs = path.find_last_of('\\');
+    if (p_s == std::string::npos && p_bs == std::string::npos)
+        return path;
+    if (p_s != std::string::npos)
+        return path.substr(p_s + 1);
+    else
+        return path.substr(p_bs + 1);
 }
 
 std::string StringHelper::appendPath(const std::string& s1, const std::string& s2)
