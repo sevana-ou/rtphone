@@ -3,7 +3,8 @@
 
 #include <string>
 
-#if defined(TARGET_LINUX) || defined(TARGET_OSX)
+
+#if (defined(TARGET_LINUX) || defined(TARGET_OSX)) && !defined(USE_NULL_UUID)
 # include <uuid/uuid.h>
 #endif
 #if defined(TARGET_WIN)

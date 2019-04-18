@@ -11,8 +11,6 @@
 #endif
 
 #include "HL_Uuid.h"
-
-
 #include "HL_InternetAddress.h"
 
 #include <vector>

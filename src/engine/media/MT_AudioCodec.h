@@ -51,7 +51,7 @@ namespace MT
       PCodec create() override;
     };
     G729Codec();
-    ~G729Codec();
+    ~G729Codec() override;
 
     const char* name() override;
     int pcmLength() override;
@@ -399,7 +399,7 @@ namespace MT
     };
 
     GsmHrCodec();
-    virtual ~GsmHrCodec();
+    ~GsmHrCodec() override;
 
     const char* name() override;
     int pcmLength() override;

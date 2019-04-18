@@ -13,7 +13,7 @@
 #include "../audio/Audio_Interface.h"
 #include "../audio/Audio_Resampler.h"
 
-#if !defined(TARGET_ANDROID) && !defined(TARGET_OPENWRT) && !defined(TARGET_WIN)
+#if !defined(TARGET_ANDROID) && !defined(TARGET_OPENWRT) && !defined(TARGET_WIN) && !defined(TARGET_RPI)
 # include "MT_AmrCodec.h"
 #endif
 
@@ -705,7 +705,7 @@ float AudioReceiver::calculatePvqaMos(int rate, std::string& report)
 
 void AudioReceiver::processStatisticsWithAmrCodec(Codec* c)
 {
-#if !defined(TARGET_ANDROID) && !defined(TARGET_OPENWRT) && !defined(TARGET_WIN)
+#if !defined(TARGET_ANDROID) && !defined(TARGET_OPENWRT) && !defined(TARGET_WIN) && !defined(TARGET_RPI)
     AmrNbCodec* nb = dynamic_cast<AmrNbCodec*>(c);
     AmrWbCodec* wb = dynamic_cast<AmrWbCodec*>(c);
 
