@@ -337,7 +337,7 @@ AudioReceiver::AudioReceiver(const CodecList::Settings& settings, MT::Statistics
 
 AudioReceiver::~AudioReceiver()
 {
-#if defined(USE_PVQA_LIBRARY) && !defined(TARGET_SERVER)
+#if defined(USE_PVQA_LIBRARY) && defined(PVQA_IN_RECEIVER)
     if (mPVQA && mPvqaBuffer)
     {
         mStat.mPvqaMos = calculatePvqaMos(AUDIO_SAMPLERATE, mStat.mPvqaReport);
@@ -421,7 +421,7 @@ void AudioReceiver::processDecoded(Audio::DataWindow& output, int options)
                         mCodec->channels());
 
     // Update PVQA with stats
-#if defined(USE_PVQA_LIBRARY) && !defined(TARGET_SERVER)
+#if defined(USE_PVQA_LIBRARY) && defined(PVQA_IN_RECEIVER)
     updatePvqa(mResampledFrame, mResampledLength);
 #endif
 
@@ -469,7 +469,7 @@ bool AudioReceiver::getAudio(Audio::DataWindow& output, int options, int* rate)
     case RtpBuffer::FetchResult::NoPacket:
         ICELogDebug(<< "No packet available in jitter buffer");
         mFailedCount++;
-#if defined(USE_PVQA_LIBRARY) && !defined(TARGET_SERVER)
+#if defined(USE_PVQA_LIBRARY) && defined(PVQA_IN_RECEIVER)
         if (mResampledLength > 0)
             updatePvqa(nullptr, mResampledLength);
 #endif
@@ -635,7 +635,7 @@ Codec* AudioReceiver::findCodec(int payloadType)
     return codecIter->second.get();
 }
 
-#if defined(USE_PVQA_LIBRARY) && !defined(TARGET_SERVER)
+#if defined(USE_PVQA_LIBRARY) && defined(PVQA_IN_RECEIVER)
 void AudioReceiver::initPvqa()
 {
     // Allocate space for 20 seconds audio

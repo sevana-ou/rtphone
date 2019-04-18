@@ -174,7 +174,7 @@ namespace MT
     // Resamples, sends to analysis, writes to dump and queues to output decoded frames from mDecodedFrame
     void processDecoded(Audio::DataWindow& output, int options);
 
-#if defined(USE_PVQA_LIBRARY) && !defined(PVQA_SERVER)
+#if defined(USE_PVQA_LIBRARY) && defined(PVQA_IN_RECEIVER)
     std::shared_ptr<SevanaPVQA> mPVQA;
     void initPvqa();
     void updatePvqa(const void* data, int size);
