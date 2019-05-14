@@ -187,7 +187,7 @@ TimerQueue::~TimerQueue()
 {
     cancelAll();
     // Abusing the timer queue to trigger the shutdown.
-    add(0, [this](bool) { m_finish = true; });
+    add(std::chrono::milliseconds(0), [this](bool) { m_finish = true; });
     m_th.join();
 }
 
@@ -195,9 +195,10 @@ TimerQueue::~TimerQueue()
 // \return
 //  Returns the ID of the new timer. You can use this ID to cancel the
 // timer
-uint64_t TimerQueue::add(int64_t milliseconds, std::function<void(bool)> handler) {
+uint64_t TimerQueue::add(std::chrono::milliseconds milliseconds, std::function<void(bool)> handler)
+{
     WorkItem item;
-    item.end = Clock::now() + std::chrono::milliseconds(milliseconds);
+    item.end = Clock::now() + milliseconds;
     item.handler = std::move(handler);
 
     std::unique_lock<std::mutex> lk(m_mtx);
@@ -280,7 +281,7 @@ void TimerQueue::run()
             int milliseconds = std::chrono::duration_cast<std::chrono::milliseconds>
                     (end.second - std::chrono::steady_clock::now()).count();
             //std::cout << "Waiting m_checkWork for " << milliseconds * 1000 << "ms." << std::endl;
-            m_checkWork.waitFor(milliseconds * 1000);
+            m_checkWork.waitFor(milliseconds);
         } else {
             // No timers exist, so wait forever until something changes
             m_checkWork.wait();

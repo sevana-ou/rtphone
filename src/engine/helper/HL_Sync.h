@@ -109,7 +109,7 @@ public:
     // \return
     //  Returns the ID of the new timer. You can use this ID to cancel the
     // timer
-    uint64_t add(int64_t milliseconds, std::function<void(bool)> handler);
+    uint64_t add(std::chrono::milliseconds seconds, std::function<void(bool)> handler);
 
     //! Cancels the specified timer
     // \return
