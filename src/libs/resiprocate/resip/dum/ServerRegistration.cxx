@@ -85,8 +85,8 @@ ServerRegistration::accept(SipMessage& ok)
          }
          else
          {
-            std::auto_ptr<ContactRecordTransactionLog> log;
-            std::auto_ptr<ContactPtrList> contacts;
+            std::unique_ptr<ContactRecordTransactionLog> log;
+            std::unique_ptr<ContactPtrList> contacts;
 
             mAsyncLocalStore->releaseLog(log,contacts);
 
@@ -111,8 +111,8 @@ ServerRegistration::accept(SipMessage& ok)
          //receive a final contact list before sending the 200.
          mAsyncState = asyncStateAcceptedWaitingForFinalContactList;
 
-         std::auto_ptr<ContactRecordTransactionLog> log;
-         std::auto_ptr<ContactPtrList> modifiedContacts;
+         std::unique_ptr<ContactRecordTransactionLog> log;
+         std::unique_ptr<ContactPtrList> modifiedContacts;
 
          mAsyncLocalStore->releaseLog(log,modifiedContacts);
 
@@ -612,7 +612,7 @@ ServerRegistration::asyncProcessFinalOkMsg(SipMessage &msg, ContactPtrList &cont
       ContactPtrList::iterator it(contacts.begin());
       ContactPtrList::iterator itEnd(contacts.end());
 
-      std::auto_ptr<ContactPtrList> expired;
+      std::unique_ptr<ContactPtrList> expired;
 
       UInt64 now=Timer::getTimeSecs();
 
@@ -630,7 +630,7 @@ ServerRegistration::asyncProcessFinalOkMsg(SipMessage &msg, ContactPtrList &cont
          {
             if (!expired.get())
             {
-               expired = std::auto_ptr<ContactPtrList>(new ContactPtrList());
+               expired = std::unique_ptr<ContactPtrList>(new ContactPtrList());
             }
             expired->push_back(rec);
             continue;
@@ -677,7 +677,7 @@ ServerRegistration::processFinalOkMsg(SipMessage &msg, ContactList &contacts)
 }
 
 bool
-ServerRegistration::asyncProvideContacts(std::auto_ptr<resip::ContactPtrList> contacts)
+ServerRegistration::asyncProvideContacts(std::unique_ptr<resip::ContactPtrList> contacts)
 {
    switch (mAsyncState)
    {
@@ -711,7 +711,7 @@ ServerRegistration::asyncProvideContacts(std::auto_ptr<resip::ContactPtrList> co
 }
 
 void
-ServerRegistration::asyncProcessFinalContacts(std::auto_ptr<resip::ContactPtrList> contacts)
+ServerRegistration::asyncProcessFinalContacts(std::unique_ptr<resip::ContactPtrList> contacts)
 {
    if (contacts.get())
    {
@@ -732,10 +732,10 @@ ServerRegistration::asyncProcessFinalContacts(std::auto_ptr<resip::ContactPtrLis
 }
 
 void
-ServerRegistration::AsyncLocalStore::create(std::auto_ptr<ContactPtrList> originalContacts)
+ServerRegistration::AsyncLocalStore::create(std::unique_ptr<ContactPtrList> originalContacts)
 {
    mModifiedContacts = originalContacts;
-   mLog = std::auto_ptr<ContactRecordTransactionLog>(new ContactRecordTransactionLog());
+   mLog = std::unique_ptr<ContactRecordTransactionLog>(new ContactRecordTransactionLog());
 }
 
 void

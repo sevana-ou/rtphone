@@ -292,7 +292,7 @@ DialogUsageManager::forceShutdown(DumShutdownHandler* h)
    DialogUsageManager::onAllHandlesDestroyed();
 }
 
-void DialogUsageManager::setAppDialogSetFactory(std::auto_ptr<AppDialogSetFactory> factory)
+void DialogUsageManager::setAppDialogSetFactory(std::unique_ptr<AppDialogSetFactory> factory)
 {
    mAppDialogSetFactory = factory;
 }
@@ -318,13 +318,13 @@ void DialogUsageManager::setMasterProfile(const SharedPtr<MasterProfile>& master
    mMasterUserProfile = masterProfile; // required so that we can return a reference to SharedPtr<UserProfile> in getMasterUserProfile
 }
 
-void DialogUsageManager::setKeepAliveManager(std::auto_ptr<KeepAliveManager> manager)
+void DialogUsageManager::setKeepAliveManager(std::unique_ptr<KeepAliveManager> manager)
 {
    mKeepAliveManager = manager;
    mKeepAliveManager->setDialogUsageManager(this);
 }
 
-void DialogUsageManager::setRedirectManager(std::auto_ptr<RedirectManager> manager)
+void DialogUsageManager::setRedirectManager(std::unique_ptr<RedirectManager> manager)
 {
    mRedirectManager = manager;
 }
@@ -340,7 +340,7 @@ RedirectHandler* DialogUsageManager::getRedirectHandler()
 }
 
 void
-DialogUsageManager::setClientAuthManager(std::auto_ptr<ClientAuthManager> manager)
+DialogUsageManager::setClientAuthManager(std::unique_ptr<ClientAuthManager> manager)
 {
    mClientAuthManager = manager;
 }
@@ -393,7 +393,7 @@ DialogUsageManager::setRegistrationPersistenceManager(RegistrationPersistenceMan
 }
 
 void
-DialogUsageManager::setRemoteCertStore(auto_ptr<RemoteCertStore> store)
+DialogUsageManager::setRemoteCertStore(unique_ptr<RemoteCertStore> store)
 {
 }
 
@@ -924,7 +924,7 @@ DialogUsageManager::send(SharedPtr<SipMessage> msg)
    SharedPtr<MessageDecorator> outboundDecorator = userProfile->getOutboundDecorator();
    if (outboundDecorator.get())
    {
-      msg->addOutboundDecorator(std::auto_ptr<MessageDecorator>(outboundDecorator->clone()));
+      msg->addOutboundDecorator(std::unique_ptr<MessageDecorator>(outboundDecorator->clone()));
    }
    else
    {
@@ -987,7 +987,7 @@ DialogUsageManager::send(SharedPtr<SipMessage> msg)
    DebugLog (<< "SEND: " << std::endl << std::endl << *msg);
 
    OutgoingEvent* event = new OutgoingEvent(msg);
-   outgoingProcess(auto_ptr<Message>(event));
+   outgoingProcess(unique_ptr<Message>(event));
 }
 
 void 
@@ -998,7 +998,7 @@ DialogUsageManager::sendCommand(SharedPtr<SipMessage> request)
 }
 
 
-void DialogUsageManager::outgoingProcess(auto_ptr<Message> message)
+void DialogUsageManager::outgoingProcess(unique_ptr<Message> message)
 {
    Data tid = Data::Empty;
    {
@@ -1073,10 +1073,10 @@ void DialogUsageManager::outgoingProcess(auto_ptr<Message> message)
 
          assert(userProfile);
 
-         //!dcm! -- unique SharedPtr to auto_ptr conversion prob. a worthwhile
+         //!dcm! -- unique SharedPtr to unique_ptr conversion prob. a worthwhile
          //optimzation here. SharedPtr would have to be changed; would
          //throw/assert if not unique.
-         std::auto_ptr<SipMessage> toSend(static_cast<SipMessage*>(event->message()->clone()));
+         std::unique_ptr<SipMessage> toSend(static_cast<SipMessage*>(event->message()->clone()));
 
          // .bwc. Protect ourselves from garbage with an isWellFormed() check.
          // (Code in Dialog doesn't check for well-formedness in the 
@@ -1102,7 +1102,7 @@ void DialogUsageManager::outgoingProcess(auto_ptr<Message> message)
 }
 
 void
-DialogUsageManager::sendUsingOutboundIfAppropriate(UserProfile& userProfile, auto_ptr<SipMessage> msg)
+DialogUsageManager::sendUsingOutboundIfAppropriate(UserProfile& userProfile, unique_ptr<SipMessage> msg)
 {
    //a little inefficient, branch parameter might be better
    DialogId id(*msg);
@@ -1308,7 +1308,7 @@ AppDialogSetHandle DialogUsageManager::findAppDialogSet(const DialogSetId& id)
 }
 
 void
-DialogUsageManager::internalProcess(std::auto_ptr<Message> msg)
+DialogUsageManager::internalProcess(std::unique_ptr<Message> msg)
 {
 #ifdef RESIP_DUM_THREAD_DEBUG
    if(!mThreadDebugKey)
@@ -1499,7 +1499,7 @@ DialogUsageManager::processExternalMessage(ExternalMessageBase* externalMessage)
 }
 
 void 
-DialogUsageManager::incomingProcess(std::auto_ptr<Message> msg)
+DialogUsageManager::incomingProcess(std::unique_ptr<Message> msg)
 {
    //call or create feature chain if appropriate
    Data tid = Data::Empty;
@@ -1680,7 +1680,7 @@ DialogUsageManager::process(resip::Lockable* mutex)
 #ifdef RESIP_DUM_THREAD_DEBUG
       mThreadDebugKey=mHiddenThreadDebugKey;
 #endif
-      internalProcess(std::auto_ptr<Message>(mFifo.getNext()));
+      internalProcess(std::unique_ptr<Message>(mFifo.getNext()));
 #ifdef RESIP_DUM_THREAD_DEBUG
       // .bwc. Thread checking is disabled if mThreadDebugKey is 0; if the app 
       // is using this mutex-locked process() call, we only enable thread-
@@ -1698,7 +1698,7 @@ DialogUsageManager::process(resip::Lockable* mutex)
 bool 
 DialogUsageManager::process(int timeoutMs, resip::Lockable* mutex)
 {
-   std::auto_ptr<Message> message;
+   std::unique_ptr<Message> message;
 
    if(timeoutMs == -1)
    {

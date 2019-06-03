@@ -322,7 +322,7 @@ public:
 
 private:
    ClientPublication& mClientPublication;
-   std::auto_ptr<Contents> mBody;
+   std::unique_ptr<Contents> mBody;
 };
 
 void

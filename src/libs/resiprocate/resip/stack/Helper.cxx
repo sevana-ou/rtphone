@@ -116,7 +116,7 @@ unsigned int Helper::hex2integer(const char* _s)
 SipMessage*
 Helper::makeRequest(const NameAddr& target, const NameAddr& from, const NameAddr& contact, MethodTypes method)
 {
-   std::auto_ptr<SipMessage> request(new SipMessage);
+   std::unique_ptr<SipMessage> request(new SipMessage);
    RequestLine rLine(method);
    rLine.uri() = target.uri();
    request->header(h_To) = target;
@@ -153,7 +153,7 @@ Helper::makeRegister(const NameAddr& to, const NameAddr& from)
 SipMessage*
 Helper::makeRegister(const NameAddr& to, const NameAddr& from, const NameAddr& contact)
 {
-   std::auto_ptr<SipMessage> request(new SipMessage);
+   std::unique_ptr<SipMessage> request(new SipMessage);
    RequestLine rLine(REGISTER);
 
    rLine.uri().scheme() = to.uri().scheme();
@@ -192,7 +192,7 @@ Helper::makeRegister(const NameAddr& to,const Data& transport)
 SipMessage*
 Helper::makeRegister(const NameAddr& to, const Data& transport, const NameAddr& contact)
 {
-   std::auto_ptr<SipMessage> request(new SipMessage);
+   std::unique_ptr<SipMessage> request(new SipMessage);
    RequestLine rLine(REGISTER);
 
    rLine.uri().scheme() = to.uri().scheme();
@@ -231,7 +231,7 @@ Helper::makePublish(const NameAddr& target, const NameAddr& from)
 SipMessage*
 Helper::makePublish(const NameAddr& target, const NameAddr& from, const NameAddr& contact)
 {
-   std::auto_ptr<SipMessage> request(new SipMessage);
+   std::unique_ptr<SipMessage> request(new SipMessage);
    RequestLine rLine(PUBLISH);
    rLine.uri() = target.uri();
 
@@ -261,7 +261,7 @@ Helper::makeMessage(const NameAddr& target, const NameAddr& from)
 SipMessage*
 Helper::makeMessage(const NameAddr& target, const NameAddr& from, const NameAddr& contact)
 {
-   std::auto_ptr<SipMessage> request(new SipMessage);
+   std::unique_ptr<SipMessage> request(new SipMessage);
    RequestLine rLine(MESSAGE);
    rLine.uri() = target.uri();
 
@@ -292,7 +292,7 @@ Helper::makeSubscribe(const NameAddr& target, const NameAddr& from)
 SipMessage*
 Helper::makeSubscribe(const NameAddr& target, const NameAddr& from, const NameAddr& contact)
 {
-   std::auto_ptr<SipMessage> request(new SipMessage);
+   std::unique_ptr<SipMessage> request(new SipMessage);
    RequestLine rLine(SUBSCRIBE);
    rLine.uri() = target.uri();
 
@@ -453,7 +453,7 @@ Helper::makeResponse(const SipMessage& request,
 {
    // .bwc. Exception safety. Catch/rethrow is dicey because we can't rethrow
    // resip::BaseException, since it is abstract.
-   std::auto_ptr<SipMessage> response(new SipMessage);
+   std::unique_ptr<SipMessage> response(new SipMessage);
 
    makeResponse(*response, request, responseCode, reason, hostname, warning);
 
@@ -475,7 +475,7 @@ Helper::makeResponse(const SipMessage& request,
 {
    // .bwc. Exception safety. Catch/rethrow is dicey because we can't rethrow
    // resip::BaseException, since it is abstract.
-   std::auto_ptr<SipMessage> response(new SipMessage);
+   std::unique_ptr<SipMessage> response(new SipMessage);
    
    makeResponse(*response, request, responseCode, reason, hostname, warning);
    return response.release();
@@ -574,7 +574,7 @@ Helper::makeCancel(const SipMessage& request)
 {
    assert(request.isRequest());
    assert(request.header(h_RequestLine).getMethod() == INVITE);
-   std::auto_ptr<SipMessage> cancel(new SipMessage);
+   std::unique_ptr<SipMessage> cancel(new SipMessage);
 
    RequestLine rLine(CANCEL, request.header(h_RequestLine).getSipVersion());
    rLine.uri() = request.header(h_RequestLine).uri();
@@ -611,7 +611,7 @@ Helper::makeFailureAck(const SipMessage& request, const SipMessage& response)
    assert (request.header(h_Vias).size() >= 1);
    assert (request.header(h_RequestLine).getMethod() == INVITE);
    
-   std::auto_ptr<SipMessage> ack(new SipMessage);
+   std::unique_ptr<SipMessage> ack(new SipMessage);
 
    RequestLine rLine(ACK, request.header(h_RequestLine).getSipVersion());
    rLine.uri() = request.header(h_RequestLine).uri();
@@ -1800,7 +1800,7 @@ Helper::gruuUserPart(const Data& instanceId,
                                          sep.size() + 1 
                                          + aor.size() ) % 8))
                                % 8));
-   auto_ptr <unsigned char> out(new unsigned char[token.size()]);
+   unique_ptr <unsigned char> out(new unsigned char[token.size()]);
    BF_cbc_encrypt((const unsigned char*)token.data(),
                   out.get(),
                   (long)token.size(),
@@ -1840,7 +1840,7 @@ Helper::fromGruuUserPart(const Data& gruuUserPart,
 
    const Data decoded = gruu.base64decode();
 
-   auto_ptr <unsigned char> out(new unsigned char[gruuUserPart.size()+1]);
+   unique_ptr <unsigned char> out(new unsigned char[gruuUserPart.size()+1]);
    BF_cbc_encrypt((const unsigned char*)decoded.data(),
                   out.get(),
                   (long)decoded.size(),
@@ -1864,8 +1864,8 @@ Helper::ContentsSecAttrs::ContentsSecAttrs()
      mAttributes(0)
 {}
 
-Helper::ContentsSecAttrs::ContentsSecAttrs(std::auto_ptr<Contents> contents,
-                                           std::auto_ptr<SecurityAttributes> attributes)
+Helper::ContentsSecAttrs::ContentsSecAttrs(std::unique_ptr<Contents> contents,
+                                           std::unique_ptr<SecurityAttributes> attributes)
    : mContents(contents),
      mAttributes(attributes)
 {}
@@ -1990,8 +1990,8 @@ Helper::extractFromPkcs7(const SipMessage& message,
          b = extractFromPkcs7Recurse(b, toAor, fromAor, attr, security);
       }
    }
-   std::auto_ptr<Contents> c(b);
-   std::auto_ptr<SecurityAttributes> a(attr);
+   std::unique_ptr<Contents> c(b);
+   std::unique_ptr<SecurityAttributes> a(attr);
    return ContentsSecAttrs(c, a);
 }
 
@@ -2161,8 +2161,8 @@ SdpContents* getSdpRecurse(Contents* tree)
    return 0;
 }
 
-static std::auto_ptr<SdpContents> emptysdp;
-auto_ptr<SdpContents> Helper::getSdp(Contents* tree)
+static std::unique_ptr<SdpContents> emptysdp;
+unique_ptr<SdpContents> Helper::getSdp(Contents* tree)
 {
    if (tree) 
    {
@@ -2171,7 +2171,7 @@ auto_ptr<SdpContents> Helper::getSdp(Contents* tree)
       if (sdp)
       {
          DebugLog(<< "Got sdp" << endl);
-         return auto_ptr<SdpContents>(static_cast<SdpContents*>(sdp->clone()));
+         return unique_ptr<SdpContents>(static_cast<SdpContents*>(sdp->clone()));
       }
    }
 

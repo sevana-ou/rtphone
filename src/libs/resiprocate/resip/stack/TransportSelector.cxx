@@ -162,7 +162,7 @@ TransportSelector::isFinished() const
 }
 
 void
-TransportSelector::addTransport(std::auto_ptr<Transport> autoTransport,
+TransportSelector::addTransport(std::unique_ptr<Transport> autoTransport,
                                  bool immediate)
 {
    if(immediate)
@@ -176,7 +176,7 @@ TransportSelector::addTransport(std::auto_ptr<Transport> autoTransport,
 }
 
 void
-TransportSelector::addTransportInternal(std::auto_ptr<Transport> autoTransport)
+TransportSelector::addTransportInternal(std::unique_ptr<Transport> autoTransport)
 {
    Transport* transport = autoTransport.release();
    mDns.addTransportType(transport->transport(), transport->ipVersion());
@@ -370,7 +370,7 @@ TransportSelector::process()
 void
 TransportSelector::checkTransportAddQueue()
 {
-   std::auto_ptr<Transport> t(mTransportsToAdd.getNext(-1));
+   std::unique_ptr<Transport> t(mTransportsToAdd.getNext(-1));
    while(t.get())
    {
       addTransportInternal(t);
@@ -1138,7 +1138,7 @@ TransportSelector::transmit(SipMessage* msg, Tuple& target, SendData* sendData)
          // Call back anyone who wants to perform outbound decoration
          msg->callOutboundDecorators(source, target,remoteSigcompId);
 
-         std::auto_ptr<SendData> send(new SendData(target, 
+         std::unique_ptr<SendData> send(new SendData(target, 
                                                    resip::Data::Empty, 
                                                    msg->getTransactionId(),
                                                    remoteSigcompId));
@@ -1217,7 +1217,7 @@ TransportSelector::retransmit(const SendData& data)
    if(transport)
    {
       // If this is not true, it means the transport has been removed.
-      transport->send(std::auto_ptr<SendData>(data.clone()));
+      transport->send(std::unique_ptr<SendData>(data.clone()));
    }
 }
 
@@ -1232,7 +1232,7 @@ TransportSelector::closeConnection(const Tuple& peer)
                                     resip::Data::Empty,
                                     resip::Data::Empty);
       close->command = SendData::CloseConnection;
-      t->send(std::auto_ptr<SendData>(close));
+      t->send(std::unique_ptr<SendData>(close));
    }
 }
 
@@ -1279,7 +1279,7 @@ TransportSelector::enableFlowTimer(const resip::Tuple& flow)
                                     resip::Data::Empty,
                                     resip::Data::Empty);
       enableFlowTimer->command = SendData::EnableFlowTimer;
-      t->send(std::auto_ptr<SendData>(enableFlowTimer));
+      t->send(std::unique_ptr<SendData>(enableFlowTimer));
    }
 }
 

@@ -1857,7 +1857,7 @@ BaseSecurity::checkIdentity( const Data& signerDomain, const Data& in, const Dat
 void
 BaseSecurity::checkAndSetIdentity(SipMessage& msg, const Data& certDer) const
 {
-   auto_ptr<SecurityAttributes> sec(new SecurityAttributes);
+   unique_ptr<SecurityAttributes> sec(new SecurityAttributes);
    X509* cert=NULL;
    
    try

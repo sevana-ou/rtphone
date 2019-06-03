@@ -37,7 +37,7 @@ InviteSessionCreator::InviteSessionCreator(DialogUsageManager& dum,
       }
    }
 
-   std::auto_ptr<Contents> initialOffer;
+   std::unique_ptr<Contents> initialOffer;
    if (initial)
    {
       if (alternative)

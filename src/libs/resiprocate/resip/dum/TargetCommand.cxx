@@ -7,7 +7,7 @@ using namespace std;
 
 
 TargetCommand::TargetCommand(Target& target,
-                             auto_ptr<Message> message)
+                             unique_ptr<Message> message)
    : mTarget(target),
      mMessage(message)
 {

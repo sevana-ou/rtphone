@@ -389,12 +389,12 @@ SipStack::addTransport( TransportType protocol,
              << ": " << e);
       throw;
    }
-   addTransport(std::auto_ptr<Transport>(transport));
+   addTransport(std::unique_ptr<Transport>(transport));
    return transport;
 }
 
 void
-SipStack::addTransport(std::auto_ptr<Transport> transport)
+SipStack::addTransport(std::unique_ptr<Transport> transport)
 {
    //.dcm. once addTransport starts throwing, need to back out alias
    if (!transport->interfaceName().empty())
@@ -566,7 +566,7 @@ SipStack::send(const SipMessage& msg, TransactionUser* tu)
 }
 
 void
-SipStack::send(std::auto_ptr<SipMessage> msg, TransactionUser* tu)
+SipStack::send(std::unique_ptr<SipMessage> msg, TransactionUser* tu)
 {
    DebugLog (<< "SEND: " << msg->brief());
 
@@ -580,7 +580,7 @@ SipStack::send(std::auto_ptr<SipMessage> msg, TransactionUser* tu)
 }
 
 void
-SipStack::sendTo(std::auto_ptr<SipMessage> msg, const Uri& uri, TransactionUser* tu)
+SipStack::sendTo(std::unique_ptr<SipMessage> msg, const Uri& uri, TransactionUser* tu)
 {
    if (tu) msg->setTransactionUser(tu);
    msg->setForceTarget(uri);
@@ -590,7 +590,7 @@ SipStack::sendTo(std::auto_ptr<SipMessage> msg, const Uri& uri, TransactionUser*
 }
 
 void
-SipStack::sendTo(std::auto_ptr<SipMessage> msg, const Tuple& destination, TransactionUser* tu)
+SipStack::sendTo(std::unique_ptr<SipMessage> msg, const Tuple& destination, TransactionUser* tu)
 {
    assert(!mShuttingDown);
 
@@ -641,7 +641,7 @@ SipStack::checkAsyncProcessHandler()
 }
 
 void
-SipStack::post(std::auto_ptr<ApplicationMessage> message)
+SipStack::post(std::unique_ptr<ApplicationMessage> message)
 {
    assert(!mShuttingDown);
    mTuSelector.add(message.release(), TimeLimitFifo<Message>::InternalElement);
@@ -678,7 +678,7 @@ SipStack::postMS(const ApplicationMessage& message, unsigned int ms,
 }
 
 void
-SipStack::post(std::auto_ptr<ApplicationMessage> message,
+SipStack::post(std::unique_ptr<ApplicationMessage> message,
                unsigned int secondsLater,
                TransactionUser* tu)
 {
@@ -687,7 +687,7 @@ SipStack::post(std::auto_ptr<ApplicationMessage> message,
 
 
 void
-SipStack::postMS( std::auto_ptr<ApplicationMessage> message,
+SipStack::postMS( std::unique_ptr<ApplicationMessage> message,
                   unsigned int ms,
                   TransactionUser* tu)
 {

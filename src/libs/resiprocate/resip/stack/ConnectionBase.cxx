@@ -403,7 +403,7 @@ ConnectionBase::preparseNewBytes(int bytesRead)
                   
                   // .bwc. This handles all appropriate checking for whether
                   // this is a response or an ACK.
-                  std::auto_ptr<SendData> tryLater(transport()->make503(*mMessage, expectedWait/1000));
+                  std::unique_ptr<SendData> tryLater(transport()->make503(*mMessage, expectedWait/1000));
                   if(tryLater.get())
                   {
                      transport()->send(tryLater);
@@ -478,7 +478,7 @@ ConnectionBase::preparseNewBytes(int bytesRead)
                
                // .bwc. This handles all appropriate checking for whether
                // this is a response or an ACK.
-               std::auto_ptr<SendData> tryLater = transport()->make503(*mMessage, expectedWait/1000);
+               std::unique_ptr<SendData> tryLater = transport()->make503(*mMessage, expectedWait/1000);
                if(tryLater.get())
                {
                   transport()->send(tryLater);

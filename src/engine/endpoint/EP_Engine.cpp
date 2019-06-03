@@ -232,7 +232,7 @@ void UserAgent::start()
   
   mDum->setMasterProfile(mProfile);
   mDum->setClientRegistrationHandler(this);
-  mDum->setClientAuthManager(auto_ptr<resip::ClientAuthManager>(new resip::ClientAuthManager()));
+  mDum->setClientAuthManager(unique_ptr<resip::ClientAuthManager>(new resip::ClientAuthManager()));
 
   mDum->addClientSubscriptionHandler(resip::Symbols::Presence, this);
   mDum->addClientSubscriptionHandler(resip::Data("message-summary"), this);
@@ -244,7 +244,7 @@ void UserAgent::start()
   mDum->setClientPagerMessageHandler(this);
   mDum->setServerPagerMessageHandler(this);
 
-  auto_ptr<resip::AppDialogSetFactory> uac_dsf(new ResipSessionFactory(this));
+  unique_ptr<resip::AppDialogSetFactory> uac_dsf(new ResipSessionFactory(this));
   mDum->setAppDialogSetFactory(uac_dsf);
 
   // Fire onStart event if stun is not used or stun server ip is known
@@ -1471,7 +1471,7 @@ void UserAgent::onSuccess(resip::ClientPagerMessageHandle h, const resip::SipMes
   onMessageSent(getAccount(status.header(resip::h_From)), s->sessionId(), s->remoteAddress(), s->tag());
 }
 
-void UserAgent::onFailure(resip::ClientPagerMessageHandle h, const resip::SipMessage& status, std::auto_ptr<resip::Contents> contents)
+void UserAgent::onFailure(resip::ClientPagerMessageHandle h, const resip::SipMessage& status, std::unique_ptr<resip::Contents> contents)
 {
   if (!h.isValid())
     return;

@@ -970,7 +970,7 @@ SipMessage::setRawBody(const HeaderFieldValue& body)
 
 
 void
-SipMessage::setContents(auto_ptr<Contents> contents)
+SipMessage::setContents(unique_ptr<Contents> contents)
 {
    Contents* contentsP = contents.release();
 
@@ -1020,11 +1020,11 @@ SipMessage::setContents(const Contents* contents)
 { 
    if (contents)
    {
-      setContents(auto_ptr<Contents>(contents->clone()));
+      setContents(unique_ptr<Contents>(contents->clone()));
    }
    else
    {
-      setContents(auto_ptr<Contents>(0));
+      setContents(unique_ptr<Contents>(0));
    }
 }
 
@@ -1082,13 +1082,13 @@ SipMessage::getContents() const
    return mContents;
 }
 
-auto_ptr<Contents>
+unique_ptr<Contents>
 SipMessage::releaseContents()
 {
    Contents* c=getContents();
-   // .bwc. auto_ptr owns the Contents. No other references allowed!
-   auto_ptr<Contents> ret(c ? c->clone() : 0);
-   setContents(std::auto_ptr<Contents>(0));
+   // .bwc. unique_ptr owns the Contents. No other references allowed!
+   unique_ptr<Contents> ret(c ? c->clone() : 0);
+   setContents(std::unique_ptr<Contents>(0));
 
    if (ret.get() != 0 && !ret->isWellFormed())
    {
@@ -1692,7 +1692,7 @@ SipMessage::mergeUri(const Uri& source)
 }
 
 void 
-SipMessage::setSecurityAttributes(auto_ptr<SecurityAttributes> sec)
+SipMessage::setSecurityAttributes(unique_ptr<SecurityAttributes> sec)
 {
    mSecurityAttributes = sec;
 }
@@ -1746,7 +1746,7 @@ SipMessage::copyOutboundDecoratorsToStackCancel(SipMessage& cancel)
   {
      if((*i)->copyToStackCancels())
      {
-        cancel.addOutboundDecorator(*(new auto_ptr<MessageDecorator>((*i)->clone())));
+        cancel.addOutboundDecorator(*(new unique_ptr<MessageDecorator>((*i)->clone())));
      }    
   }
 }
@@ -1760,7 +1760,7 @@ SipMessage::copyOutboundDecoratorsToStackFailureAck(SipMessage& ack)
   {
      if((*i)->copyToStackFailureAcks())
      {
-        ack.addOutboundDecorator(*(new auto_ptr<MessageDecorator>((*i)->clone())));
+        ack.addOutboundDecorator(*(new unique_ptr<MessageDecorator>((*i)->clone())));
      }    
   }
 }

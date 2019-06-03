@@ -31,17 +31,17 @@ DialogEventInfo::DialogEventInfo(const DialogEventInfo& rhs)
 {
    if (rhs.mReplacesId.get())
    {
-      mReplacesId = std::auto_ptr<DialogId>(new DialogId(rhs.mReplacesId->getCallId(),
+      mReplacesId = std::unique_ptr<DialogId>(new DialogId(rhs.mReplacesId->getCallId(),
                                                          rhs.mReplacesId->getLocalTag(),
                                                          rhs.mReplacesId->getRemoteTag()));
    }
    if (rhs.mLocalOfferAnswer.get())
    {
-      mLocalOfferAnswer = std::auto_ptr<Contents>(rhs.mLocalOfferAnswer->clone());
+      mLocalOfferAnswer = std::unique_ptr<Contents>(rhs.mLocalOfferAnswer->clone());
    }
    if (rhs.mRemoteOfferAnswer.get())
    {
-      mRemoteOfferAnswer = std::auto_ptr<Contents>(rhs.mRemoteOfferAnswer->clone());
+      mRemoteOfferAnswer = std::unique_ptr<Contents>(rhs.mRemoteOfferAnswer->clone());
    }
 }
 

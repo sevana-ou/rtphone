@@ -65,7 +65,7 @@ ServerAuthManager::process(Message* msg)
       InfoLog(<< "ServerAuth got ChallengeInfo " << challengeInfo->brief());
       MessageMap::iterator it = mMessages.find(challengeInfo->getTransactionId());
       assert(it != mMessages.end());
-      std::auto_ptr<SipMessage> sipMsg(it->second);
+      std::unique_ptr<SipMessage> sipMsg(it->second);
       mMessages.erase(it);
 
       if(challengeInfo->isFailed()) 
@@ -88,7 +88,7 @@ ServerAuthManager::process(Message* msg)
       else 
       {
         // challenge is not required, re-instate original message
-        postCommand(auto_ptr<Message>(sipMsg));
+        postCommand(unique_ptr<Message>(sipMsg));
         return FeatureDoneAndEventDone;
       }
    }
@@ -103,7 +103,7 @@ ServerAuthManager::process(Message* msg)
          Message* result = handleUserAuthInfo(userAuth);
          if (result)
          {
-            postCommand(auto_ptr<Message>(result));
+            postCommand(unique_ptr<Message>(result));
             return FeatureDoneAndEventDone;
          }
          else

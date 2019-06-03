@@ -113,7 +113,7 @@ ClientPagerMessage::getMessageRequest()
 }
 
 void
-ClientPagerMessage::page(std::auto_ptr<Contents> contents,
+ClientPagerMessage::page(std::unique_ptr<Contents> contents,
                          DialogUsageManager::EncryptionLevel level)
 {
     assert(contents.get() != 0);
@@ -132,7 +132,7 @@ class ClientPagerMessagePageCommand : public DumCommandAdapter
 {
 public:
    ClientPagerMessagePageCommand(ClientPagerMessage& clientPagerMessage, 
-      std::auto_ptr<Contents> contents,
+      std::unique_ptr<Contents> contents,
       DialogUsageManager::EncryptionLevel level)
       : mClientPagerMessage(clientPagerMessage),
         mContents(contents),
@@ -152,12 +152,12 @@ public:
    }
 private:
    ClientPagerMessage& mClientPagerMessage;
-   std::auto_ptr<Contents> mContents;
+   std::unique_ptr<Contents> mContents;
    DialogUsageManager::EncryptionLevel mLevel;
 };
 
 void
-ClientPagerMessage::pageCommand(std::auto_ptr<Contents> contents,
+ClientPagerMessage::pageCommand(std::unique_ptr<Contents> contents,
                                 DialogUsageManager::EncryptionLevel level)
 {
    mDum.post(new ClientPagerMessagePageCommand(*this, contents, level));
@@ -203,7 +203,7 @@ ClientPagerMessage::dispatch(const SipMessage& msg)
             Contents* p = contents->contents;
             WarningLog ( << "Paging failed " << *p );
             Helper::makeResponse(errResponse, *mRequest, code);
-            handler->onFailure(getHandle(), errResponse, std::auto_ptr<Contents>(p));
+            handler->onFailure(getHandle(), errResponse, std::unique_ptr<Contents>(p));
             contents->contents = 0;
          }
          mMsgQueue.clear();

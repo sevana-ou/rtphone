@@ -264,8 +264,8 @@ class Uri : public ParserCategory
       mutable bool mHostCanonicalized;
 
    private:
-      std::auto_ptr<Data> mEmbeddedHeadersText;
-      std::auto_ptr<SipMessage> mEmbeddedHeaders;
+      std::unique_ptr<Data> mEmbeddedHeadersText;
+      std::unique_ptr<SipMessage> mEmbeddedHeaders;
 
       static ParameterTypes::Factory ParameterFactories[ParameterTypes::MAX_PARAMETER];
 

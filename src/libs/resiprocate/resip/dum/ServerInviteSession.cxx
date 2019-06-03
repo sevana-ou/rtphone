@@ -726,7 +726,7 @@ ServerInviteSession::dispatchStart(const SipMessage& msg)
    assert(msg.header(h_CSeq).method() == INVITE);
 
    InviteSessionHandler* handler = mDum.mInviteSessionHandler;
-   std::auto_ptr<Contents> offerAnswer = InviteSession::getOfferAnswer(msg);
+   std::unique_ptr<Contents> offerAnswer = InviteSession::getOfferAnswer(msg);
    storePeerCapabilities(msg);
 
    if (mDum.mDialogEventStateManager)
@@ -786,7 +786,7 @@ ServerInviteSession::dispatchStart(const SipMessage& msg)
 void
 ServerInviteSession::dispatchOfferOrEarly(const SipMessage& msg)
 {
-   std::auto_ptr<Contents> offerAnswer = InviteSession::getOfferAnswer(msg);
+   std::unique_ptr<Contents> offerAnswer = InviteSession::getOfferAnswer(msg);
    switch (toEvent(msg, offerAnswer.get()))
    {
       case OnCancel:
@@ -806,7 +806,7 @@ void
 ServerInviteSession::dispatchAccepted(const SipMessage& msg)
 {
    InviteSessionHandler* handler = mDum.mInviteSessionHandler;
-   std::auto_ptr<Contents> offerAnswer = InviteSession::getOfferAnswer(msg);
+   std::unique_ptr<Contents> offerAnswer = InviteSession::getOfferAnswer(msg);
    InfoLog (<< "dispatchAccepted: " << msg.brief());
    
    switch (toEvent(msg, offerAnswer.get()))
@@ -868,7 +868,7 @@ void
 ServerInviteSession::dispatchWaitingToOffer(const SipMessage& msg)
 {
    InviteSessionHandler* handler = mDum.mInviteSessionHandler;
-   std::auto_ptr<Contents> offerAnswer = InviteSession::getOfferAnswer(msg);
+   std::unique_ptr<Contents> offerAnswer = InviteSession::getOfferAnswer(msg);
    InfoLog (<< "dispatchWaitingToOffer: " << msg.brief());
    
    switch (toEvent(msg, offerAnswer.get()))
@@ -937,7 +937,7 @@ void
 ServerInviteSession::dispatchWaitingToRequestOffer(const SipMessage& msg)
 {
    InviteSessionHandler* handler = mDum.mInviteSessionHandler;
-   std::auto_ptr<Contents> offerAnswer = InviteSession::getOfferAnswer(msg);
+   std::unique_ptr<Contents> offerAnswer = InviteSession::getOfferAnswer(msg);
    InfoLog (<< "dispatchWaitingToRequestOffer: " << msg.brief());
    
    switch (toEvent(msg, offerAnswer.get()))
@@ -1005,7 +1005,7 @@ void
 ServerInviteSession::dispatchAcceptedWaitingAnswer(const SipMessage& msg)
 {
    InviteSessionHandler* handler = mDum.mInviteSessionHandler;
-   std::auto_ptr<Contents> offerAnswer = InviteSession::getOfferAnswer(msg);
+   std::unique_ptr<Contents> offerAnswer = InviteSession::getOfferAnswer(msg);
 
    switch (toEvent(msg, offerAnswer.get()))
    {
@@ -1131,7 +1131,7 @@ ServerInviteSession::dispatchWaitingToTerminate(const SipMessage& msg)
 void
 ServerInviteSession::dispatchWaitingToHangup(const SipMessage& msg)
 {
-   std::auto_ptr<Contents> offerAnswer = InviteSession::getOfferAnswer(msg);
+   std::unique_ptr<Contents> offerAnswer = InviteSession::getOfferAnswer(msg);
 
    switch (toEvent(msg, offerAnswer.get()))
    {

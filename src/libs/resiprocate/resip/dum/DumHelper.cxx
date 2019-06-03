@@ -12,7 +12,7 @@ void DumHelper::setOutgoingEncryptionLevel(SipMessage& message,
 {
    SecurityAttributes* attr = new SecurityAttributes();
    attr->setOutgoingEncryptionLevel(convert(level));
-   message.setSecurityAttributes(auto_ptr<SecurityAttributes>(attr));
+   message.setSecurityAttributes(unique_ptr<SecurityAttributes>(attr));
 }
 
 void DumHelper::setEncryptionPerformed(SipMessage& message)
@@ -20,7 +20,7 @@ void DumHelper::setEncryptionPerformed(SipMessage& message)
    SecurityAttributes* attr = new SecurityAttributes();
    attr->setOutgoingEncryptionLevel(message.getSecurityAttributes()->getOutgoingEncryptionLevel());
    attr->setEncryptionPerformed(true);
-   message.setSecurityAttributes(auto_ptr<SecurityAttributes>(attr));
+   message.setSecurityAttributes(unique_ptr<SecurityAttributes>(attr));
 }
 
 SecurityAttributes::OutgoingEncryptionLevel DumHelper::convert(DialogUsageManager::EncryptionLevel level)
