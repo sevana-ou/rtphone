@@ -1860,21 +1860,21 @@ Helper::fromGruuUserPart(const Data& gruuUserPart,
 }
 #endif
 Helper::ContentsSecAttrs::ContentsSecAttrs()
-   : mContents(0),
-     mAttributes(0)
+   : mContents(nullptr),
+     mAttributes(nullptr)
 {}
 
 Helper::ContentsSecAttrs::ContentsSecAttrs(std::unique_ptr<Contents> contents,
                                            std::unique_ptr<SecurityAttributes> attributes)
-   : mContents(contents),
-     mAttributes(attributes)
+   : mContents(std::move(contents)),
+     mAttributes(std::move(attributes))
 {}
 
 // !!bwc!! Yikes! Destructive copy c'tor! Are we _sure_ this is the 
 // intended behavior?
 Helper::ContentsSecAttrs::ContentsSecAttrs(const ContentsSecAttrs& rhs)
-   : mContents(rhs.mContents),
-     mAttributes(rhs.mAttributes)
+   : mContents(std::move(rhs.mContents)),
+     mAttributes(std::move(rhs.mAttributes))
 {}
 
 Helper::ContentsSecAttrs& 
@@ -1884,8 +1884,8 @@ Helper::ContentsSecAttrs::operator=(const ContentsSecAttrs& rhs)
    {
       // !!bwc!! Yikes! Destructive assignment operator! Are we _sure_ this is 
       // the intended behavior?
-      mContents = rhs.mContents;
-      mAttributes = rhs.mAttributes;
+      mContents = std::move(rhs.mContents);
+      mAttributes = std::move(rhs.mAttributes);
    }
    return *this;
 }
@@ -1992,7 +1992,7 @@ Helper::extractFromPkcs7(const SipMessage& message,
    }
    std::unique_ptr<Contents> c(b);
    std::unique_ptr<SecurityAttributes> a(attr);
-   return ContentsSecAttrs(c, a);
+   return ContentsSecAttrs(std::move(c), std::move(a));
 }
 
 Helper::FailureMessageEffect 
@@ -2176,7 +2176,7 @@ unique_ptr<SdpContents> Helper::getSdp(Contents* tree)
    }
 
    //DebugLog(<< "No sdp" << endl);
-   return emptysdp;
+   return std::unique_ptr<SdpContents>();
 }
 
 bool 

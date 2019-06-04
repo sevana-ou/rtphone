@@ -34,7 +34,7 @@ TuPresSvr::process()
 	}
 	else if (msg->header(h_RequestLine).getMethod() == OPTIONS )
 	{
-          auto_ptr<SipMessage> resp(
+          unique_ptr<SipMessage> resp(
                Helper::makeResponse(*msg,500,"You Shot Me!")); 
           mStack->send(*resp);
 	  done = 1;
@@ -45,7 +45,7 @@ TuPresSvr::process()
 	}
 	else
 	{
-          auto_ptr<SipMessage> resp(Helper::makeResponse(*msg,501,"")); 
+          unique_ptr<SipMessage> resp(Helper::makeResponse(*msg,501,"")); 
           mStack->send(*resp);
 	}
       }
@@ -86,7 +86,7 @@ void TuPresSvr::processNewSubscribe(SipMessage* msg)
        || msg->header(h_Event).value()!=presence.value()
      )
   {
-    auto_ptr<SipMessage> resp(Helper::makeResponse(*msg,489,"")); 
+    unique_ptr<SipMessage> resp(Helper::makeResponse(*msg,489,"")); 
     resp->header(h_AllowEvents).push_back(presence); 
     mStack->send(*resp);
     return;
@@ -99,7 +99,7 @@ void TuPresSvr::processNewSubscribe(SipMessage* msg)
   }
   else
   {
-    auto_ptr<SipMessage> resp(Helper::makeResponse(*msg,404,"")); 
+    unique_ptr<SipMessage> resp(Helper::makeResponse(*msg,404,"")); 
     mStack->send(*resp);
   }
 
@@ -126,18 +126,18 @@ void TuPresSvr::processPublish(SipMessage* msg)
     {
       int retcode = (ResourceMgr::instance().setPresenceDocument(aor,contents)
 	             ?200:403);
-      auto_ptr<SipMessage> resp(Helper::makeResponse(*msg,retcode,"")); 
+      unique_ptr<SipMessage> resp(Helper::makeResponse(*msg,retcode,"")); 
       mStack->send(*resp);
     }
     else
     {
-      auto_ptr<SipMessage> resp(Helper::makeResponse(*msg,400,"This hacked-up service requires a body")); 
+      unique_ptr<SipMessage> resp(Helper::makeResponse(*msg,400,"This hacked-up service requires a body")); 
       mStack->send(*resp);
     }
   }
   else
   {
-    auto_ptr<SipMessage> resp(Helper::makeResponse(*msg,404,"")); 
+    unique_ptr<SipMessage> resp(Helper::makeResponse(*msg,404,"")); 
     mStack->send(*resp);
   }
 }

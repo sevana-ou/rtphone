@@ -322,7 +322,7 @@ class SipStack : public FdSetIOObserver
           @param transport Pointer to an externally created transport.  SipStack
                            assumes ownership.
       */
-      void addTransport( std::auto_ptr<Transport> transport);
+      void addTransport( std::unique_ptr<Transport> transport);
 
       /**
           Returns the fifo that subclasses of Transport should use for the rxFifo
@@ -397,14 +397,14 @@ class SipStack : public FdSetIOObserver
       */
       void send(const SipMessage& msg, TransactionUser* tu=0);
 
-      void send(std::auto_ptr<SipMessage> msg, TransactionUser* tu = 0);
+      void send(std::unique_ptr<SipMessage> msg, TransactionUser* tu = 0);
       
       /** @brief this is only if you want to send to a destination not in the route.
           @note You probably don't want to use it. */
-      void sendTo(std::auto_ptr<SipMessage> msg, const Uri& uri, TransactionUser* tu=0);
+      void sendTo(std::unique_ptr<SipMessage> msg, const Uri& uri, TransactionUser* tu=0);
       /** @brief this is only if you want to send to a destination not in the route.
           @note You probably don't want to use it. */
-      void sendTo(std::auto_ptr<SipMessage> msg, const Tuple& tuple, TransactionUser* tu=0);
+      void sendTo(std::unique_ptr<SipMessage> msg, const Tuple& tuple, TransactionUser* tu=0);
 
       /**
           @brief send a message to a destination not in the route
@@ -468,7 +468,7 @@ class SipStack : public FdSetIOObserver
 
           @param tu    TransactionUser to post to.
       */
-      void post(std::auto_ptr<ApplicationMessage> message,
+      void post(std::unique_ptr<ApplicationMessage> message,
                 unsigned int secondsLater,
                 TransactionUser* tu=0);
 
@@ -484,7 +484,7 @@ class SipStack : public FdSetIOObserver
 
           @param tu      TransactionUser to post to.
       */
-      void postMS(const std::auto_ptr<ApplicationMessage> message,
+      void postMS(const std::unique_ptr<ApplicationMessage> message,
                   unsigned int ms,
                   TransactionUser* tu=0);
 
@@ -495,7 +495,7 @@ class SipStack : public FdSetIOObserver
           
           @param message ApplicationMessage to post
       */
-      void post(std::auto_ptr<ApplicationMessage> message);
+      void post(std::unique_ptr<ApplicationMessage> message);
 
       /**
           @brief Makes the message available to the TU later
@@ -1050,7 +1050,7 @@ class SipStack : public FdSetIOObserver
 
       /** @brief All aspects of the Transaction State Machine / DNS resolver **/
       TransactionController* mTransactionController;
-      std::auto_ptr<ProducerFifoBuffer<TransactionMessage> > mStateMacFifoBuffer;
+      std::unique_ptr<ProducerFifoBuffer<TransactionMessage> > mStateMacFifoBuffer;
 
       TransactionControllerThread* mTransactionControllerThread;
       TransportSelectorThread* mTransportSelectorThread;

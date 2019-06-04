@@ -68,7 +68,7 @@ class ResponseContext
          @note Targets are not checked for duplicate uris until an attempt 
             is made to start them.
       */
-      bool addTarget(std::auto_ptr<repro::Target> target, bool beginImmediately=false);
+      bool addTarget(std::unique_ptr<repro::Target> target, bool beginImmediately=false);
 
       /**
          Adds a batch of Targets. 

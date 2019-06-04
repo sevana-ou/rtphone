@@ -167,7 +167,7 @@ TransportSelector::addTransport(std::unique_ptr<Transport> autoTransport,
 {
    if(immediate)
    {
-      addTransportInternal(autoTransport);
+      addTransportInternal(std::move(autoTransport));
    }
    else
    {
@@ -373,7 +373,7 @@ TransportSelector::checkTransportAddQueue()
    std::unique_ptr<Transport> t(mTransportsToAdd.getNext(-1));
    while(t.get())
    {
-      addTransportInternal(t);
+      addTransportInternal(std::move(t));
       t.reset(mTransportsToAdd.getNext(0));
    }
 }
@@ -1166,7 +1166,7 @@ TransportSelector::transmit(SipMessage* msg, Tuple& target, SendData* sendData)
             *sendData = *send;
          }
 
-         transport->send(send);
+         transport->send(std::move(send));
          return true;
       }
       else

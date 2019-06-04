@@ -416,7 +416,7 @@ int Account::sendMsg(const std::string& peer, const void* ptr, unsigned length, 
   resip::ClientPagerMessageHandle msgHandle = mAgent.mDum->makePagerMessage(resip::NameAddr(resip::Data(peer)), mProfile, s);
   unique_ptr<resip::Contents> contentPtr(new resip::PlainContents(resip::Data(std::string((const char*)ptr, length)),type));
   int result = s->sessionId();
-  msgHandle->page(contentPtr);
+  msgHandle->page(std::move(contentPtr));
 
   return result;
 }

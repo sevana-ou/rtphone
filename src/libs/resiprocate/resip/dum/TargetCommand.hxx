@@ -19,13 +19,13 @@ class TargetCommand : public DumCommand
             {
             }
             virtual ~Target()=0;
-            virtual void post(std::auto_ptr<Message>)=0;
+            virtual void post(std::unique_ptr<Message>)=0;
 
          protected:
             DialogUsageManager& mDum;
       };
 
-      TargetCommand(Target& target, std::auto_ptr<Message> message);
+      TargetCommand(Target& target, std::unique_ptr<Message> message);
       TargetCommand(const TargetCommand&);
       void executeCommand();
 
@@ -36,7 +36,7 @@ class TargetCommand : public DumCommand
       
    private:
       Target& mTarget;
-      mutable std::auto_ptr<Message> mMessage;
+      mutable std::unique_ptr<Message> mMessage;
 };
 
 }

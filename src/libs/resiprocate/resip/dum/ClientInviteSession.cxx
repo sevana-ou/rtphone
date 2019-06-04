@@ -124,7 +124,7 @@ ClientInviteSession::provideAnswer (const Contents& answer)
          transition(UAC_SentAnswer);
 
          //  Remember proposed local offerAnswer.
-         mCurrentRemoteOfferAnswer = mProposedRemoteOfferAnswer;
+         mCurrentRemoteOfferAnswer = std::move(mProposedRemoteOfferAnswer);
          mCurrentLocalOfferAnswer = InviteSession::makeOfferAnswer(answer);
 
          //  Creates an PRACK request with application supplied offer.
@@ -137,7 +137,7 @@ ClientInviteSession::provideAnswer (const Contents& answer)
          transition(Connected);
          sendAck(&answer);
 
-         mCurrentRemoteOfferAnswer = mProposedRemoteOfferAnswer;
+         mCurrentRemoteOfferAnswer = std::move(mProposedRemoteOfferAnswer);
          mCurrentLocalOfferAnswer = InviteSession::makeOfferAnswer(answer);
          // mLastSessionModification = ack;  // ?slg? is this needed?
          break;
@@ -154,7 +154,7 @@ ClientInviteSession::provideAnswer (const Contents& answer)
          mDialog.makeResponse(*response, *mLastRemoteSessionModification, 200);
          InviteSession::setOfferAnswer(*response, answer, 0);
          mCurrentLocalOfferAnswer = InviteSession::makeOfferAnswer(answer);
-         mCurrentRemoteOfferAnswer = mProposedRemoteOfferAnswer;
+         mCurrentRemoteOfferAnswer = std::move(mProposedRemoteOfferAnswer);
          InfoLog (<< "Sending " << response->brief());
          DumHelper::setOutgoingEncryptionLevel(*response, mCurrentEncryptionLevel);
          send(response);

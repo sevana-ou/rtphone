@@ -56,7 +56,7 @@ SubDialog::processSubscribe(SipMessage* msg)
 
   }
 
-  auto_ptr<SipMessage> resp(Helper::makeResponse(*msg,202,""));
+  unique_ptr<SipMessage> resp(Helper::makeResponse(*msg,202,""));
   resp->header(h_Expires).value() = mSubState->expires()-time(NULL);
   mStack->send(*resp);
 

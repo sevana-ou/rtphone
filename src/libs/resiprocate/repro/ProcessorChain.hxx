@@ -14,7 +14,7 @@ class ProcessorChain : public Processor
       ProcessorChain(ChainType type);
       virtual ~ProcessorChain();
 
-      void addProcessor(std::auto_ptr<Processor>);
+      void addProcessor(std::unique_ptr<Processor>);
 
       virtual processor_action_t process(RequestContext &);
 

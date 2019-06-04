@@ -88,7 +88,7 @@ ServerAuthManager::process(Message* msg)
       else 
       {
         // challenge is not required, re-instate original message
-        postCommand(unique_ptr<Message>(sipMsg));
+        postCommand(std::move(sipMsg));
         return FeatureDoneAndEventDone;
       }
    }

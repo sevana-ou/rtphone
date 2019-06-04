@@ -406,7 +406,7 @@ ConnectionBase::preparseNewBytes(int bytesRead)
                   std::unique_ptr<SendData> tryLater(transport()->make503(*mMessage, expectedWait/1000));
                   if(tryLater.get())
                   {
-                     transport()->send(tryLater);
+                     transport()->send(std::move(tryLater));
                   }
                   delete mMessage; // dropping message due to congestion
                   mMessage = 0;
@@ -481,7 +481,7 @@ ConnectionBase::preparseNewBytes(int bytesRead)
                std::unique_ptr<SendData> tryLater = transport()->make503(*mMessage, expectedWait/1000);
                if(tryLater.get())
                {
-                  transport()->send(tryLater);
+                  transport()->send(std::move(tryLater));
                }
                delete mMessage; // dropping message due to congestion
                mMessage = 0;

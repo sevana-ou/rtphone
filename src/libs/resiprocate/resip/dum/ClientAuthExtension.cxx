@@ -7,7 +7,7 @@ std::unique_ptr<ClientAuthExtension> ClientAuthExtension::mInstance = std::uniqu
 void 
 ClientAuthExtension::setInstance(std::unique_ptr<ClientAuthExtension> ext)
 {
-   mInstance = ext;
+   mInstance = std::move(ext);
 }
 
 

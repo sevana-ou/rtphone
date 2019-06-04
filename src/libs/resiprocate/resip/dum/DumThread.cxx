@@ -21,7 +21,7 @@ DumThread::thread()
          std::unique_ptr<Message> msg(mDum.mFifo.getNext(1000));  // Only need to wake up to see if we are shutdown
          if (msg.get())
          {
-            mDum.internalProcess(msg);
+            mDum.internalProcess(std::move(msg));
          }
       }
       catch (BaseException& e)

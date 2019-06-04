@@ -245,7 +245,7 @@ void UserAgent::start()
   mDum->setServerPagerMessageHandler(this);
 
   unique_ptr<resip::AppDialogSetFactory> uac_dsf(new ResipSessionFactory(this));
-  mDum->setAppDialogSetFactory(uac_dsf);
+  mDum->setAppDialogSetFactory(std::move(uac_dsf));
 
   // Fire onStart event if stun is not used or stun server ip is known
   if (mConfig[CONFIG_STUNSERVER_NAME].asStdString().empty() || !mConfig[CONFIG_STUNSERVER_IP].asStdString().empty())

@@ -9,19 +9,19 @@ using namespace std;
 TargetCommand::TargetCommand(Target& target,
                              unique_ptr<Message> message)
    : mTarget(target),
-     mMessage(message)
+     mMessage(std::move(message))
 {
 }
 
 TargetCommand::TargetCommand(const TargetCommand& from)
    : mTarget(from.mTarget),
-     mMessage(from.mMessage)
+     mMessage(std::move(from.mMessage))
 {
 }
 
 void TargetCommand::executeCommand()
 {
-   mTarget.post(mMessage);
+   mTarget.post(std::move(mMessage));
 }
 
 Message* TargetCommand::clone() const

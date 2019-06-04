@@ -88,7 +88,7 @@ class TransportSelector
       /// Causes transport process loops to be interrupted if there is stuff in
       /// their transmit fifos.
       void poke();
-      void addTransport( std::auto_ptr<Transport> transport, bool immediate);
+      void addTransport( std::unique_ptr<Transport> transport, bool immediate);
 
       DnsResult* createDnsResult(DnsHandler* handler);
 
@@ -135,7 +135,7 @@ class TransportSelector
       }
 
    private:
-      void addTransportInternal( std::auto_ptr<Transport> transport);
+      void addTransportInternal( std::unique_ptr<Transport> transport);
       void checkTransportAddQueue();
       Connection* findConnection(const Tuple& dest) const;
       Transport* findTransportBySource(Tuple& src, const SipMessage* msg) const;
@@ -244,7 +244,7 @@ class TransportSelector
 
       int mAvgBufferSize;
       Fifo<Transport> mTransportsToAdd;
-      std::auto_ptr<SelectInterruptor> mSelectInterruptor;
+      std::unique_ptr<SelectInterruptor> mSelectInterruptor;
       FdPollItemHandle mInterruptorHandle;
 
       friend class TestTransportSelector;

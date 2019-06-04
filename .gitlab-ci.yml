@@ -1,0 +1,7 @@
+build_exe:
+    script:
+        - mkdir -p build
+        - cd build
+        - cmake ../src
+        - cmake --build .
+        

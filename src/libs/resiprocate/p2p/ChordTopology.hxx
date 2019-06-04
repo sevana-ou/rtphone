@@ -69,7 +69,7 @@ class ChordTopology : public TopologyAPI
       virtual ResourceId resourceId( const resip::Data& resourceName );
 
       // not public api
-      virtual void post(std::auto_ptr<Event> message);
+      virtual void post(std::unique_ptr<Event> message);
               
    private:
       

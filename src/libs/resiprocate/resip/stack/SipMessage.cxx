@@ -1024,20 +1024,20 @@ SipMessage::setContents(const Contents* contents)
    }
    else
    {
-      setContents(unique_ptr<Contents>(0));
+      setContents(unique_ptr<Contents>(nullptr));
    }
 }
 
 Contents*
 SipMessage::getContents() const
 {
-   if (mContents == 0 && mContentsHfv.getBuffer() != 0)
+   if (mContents == nullptr && mContentsHfv.getBuffer() != nullptr)
    {
       if (empty(h_ContentType) ||
             !const_header(h_ContentType).isWellFormed())
       {
          StackLog(<< "SipMessage::getContents: ContentType header does not exist - implies no contents");
-         return 0;
+         return nullptr;
       }
       DebugLog(<< "SipMessage::getContents: " 
                << const_header(h_ContentType).type()
@@ -1087,12 +1087,12 @@ SipMessage::releaseContents()
 {
    Contents* c=getContents();
    // .bwc. unique_ptr owns the Contents. No other references allowed!
-   unique_ptr<Contents> ret(c ? c->clone() : 0);
-   setContents(std::unique_ptr<Contents>(0));
+   unique_ptr<Contents> ret(c ? c->clone() : nullptr);
+   setContents(std::unique_ptr<Contents>(nullptr));
 
    if (ret.get() != 0 && !ret->isWellFormed())
    {
-      ret.reset(0);
+      ret.reset(nullptr);
    }
 
    return ret;
@@ -1108,7 +1108,7 @@ SipMessage::header(const ExtensionHeader& headerName) const
       if (isEqualNoCase(i->first, headerName.getName()))
       {
          HeaderFieldValueList* hfvs = i->second;
-         if (hfvs->getParserContainer() == 0)
+         if (hfvs->getParserContainer() == nullptr)
          {
             SipMessage* nc_this(const_cast<SipMessage*>(this));
             hfvs->setParserContainer(nc_this->makeParserContainer<StringCategory>(hfvs, Headers::RESIP_DO_NOT_USE));
@@ -1694,7 +1694,7 @@ SipMessage::mergeUri(const Uri& source)
 void 
 SipMessage::setSecurityAttributes(unique_ptr<SecurityAttributes> sec)
 {
-   mSecurityAttributes = sec;
+   mSecurityAttributes = std::move(sec);
 }
 
 void
@@ -1746,7 +1746,7 @@ SipMessage::copyOutboundDecoratorsToStackCancel(SipMessage& cancel)
   {
      if((*i)->copyToStackCancels())
      {
-        cancel.addOutboundDecorator(*(new unique_ptr<MessageDecorator>((*i)->clone())));
+        cancel.addOutboundDecorator(std::move(*(new unique_ptr<MessageDecorator>((*i)->clone()))));
      }    
   }
 }
@@ -1760,7 +1760,7 @@ SipMessage::copyOutboundDecoratorsToStackFailureAck(SipMessage& ack)
   {
      if((*i)->copyToStackFailureAcks())
      {
-        ack.addOutboundDecorator(*(new unique_ptr<MessageDecorator>((*i)->clone())));
+        ack.addOutboundDecorator(std::move(*(new unique_ptr<MessageDecorator>((*i)->clone()))));
      }    
   }
 }

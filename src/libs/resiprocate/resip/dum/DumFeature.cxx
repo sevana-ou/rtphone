@@ -18,5 +18,5 @@ DumFeature::~DumFeature()
 
 void DumFeature::postCommand(std::unique_ptr<Message> message)
 {
-   mDum.post(new TargetCommand(mTarget, message));
+   mDum.post(new TargetCommand(mTarget, std::move(message)));
 }

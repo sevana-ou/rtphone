@@ -10,7 +10,7 @@ SubDialogMgr::dispatchSubscribe(SipMessage* msg)
   SubDialog *dialog = matchDialog(msg);
   if (!dialog)
   {
-    auto_ptr<SipMessage> resp(Helper::makeResponse(*msg,481,""));
+    unique_ptr<SipMessage> resp(Helper::makeResponse(*msg,481,""));
     mStack->send(*resp);
     // !dlb! return here?
   }

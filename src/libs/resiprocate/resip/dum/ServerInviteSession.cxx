@@ -323,13 +323,13 @@ ServerInviteSession::provideAnswer(const Contents& answer)
    {
       case UAS_Offer:
          transition(UAS_OfferProvidedAnswer);
-         mCurrentRemoteOfferAnswer = mProposedRemoteOfferAnswer;
+         mCurrentRemoteOfferAnswer = std::move(mProposedRemoteOfferAnswer);
          mCurrentLocalOfferAnswer = InviteSession::makeOfferAnswer(answer);
          break;
 
       case UAS_EarlyOffer:
          transition(UAS_EarlyProvidedAnswer);
-         mCurrentRemoteOfferAnswer = mProposedRemoteOfferAnswer;
+         mCurrentRemoteOfferAnswer = std::move(mProposedRemoteOfferAnswer);
          mCurrentLocalOfferAnswer = InviteSession::makeOfferAnswer(answer);
          break;
          

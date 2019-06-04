@@ -28,14 +28,14 @@ class ClientPagerMessage : public NonDialogUsage
       //queues the message if there is one sent but not yet received a response
       //for it.
       //asserts if contents->get() is NULL.
-      virtual void page(std::auto_ptr<Contents> contents, DialogUsageManager::EncryptionLevel level=DialogUsageManager::None);
+      virtual void page(std::unique_ptr<Contents> contents, DialogUsageManager::EncryptionLevel level=DialogUsageManager::None);
       virtual void end();
 
       /**
        * Provide asynchronous method access by using command
        */
       virtual void endCommand();
-      virtual void pageCommand(std::auto_ptr<Contents> contents, DialogUsageManager::EncryptionLevel level=DialogUsageManager::None);
+      virtual void pageCommand(std::unique_ptr<Contents> contents, DialogUsageManager::EncryptionLevel level=DialogUsageManager::None);
 
       virtual void dispatch(const SipMessage& msg);
       virtual void dispatch(const DumTimeout& timer);

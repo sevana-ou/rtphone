@@ -429,7 +429,7 @@ public:
 
 #pragma region PagerHandler
   void onSuccess(resip::ClientPagerMessageHandle, const resip::SipMessage& status) override;
-  void onFailure(resip::ClientPagerMessageHandle, const resip::SipMessage& status, std::auto_ptr<resip::Contents> contents) override;
+  void onFailure(resip::ClientPagerMessageHandle, const resip::SipMessage& status, std::unique_ptr<resip::Contents> contents) override;
   void onMessageArrived(resip::ServerPagerMessageHandle, const resip::SipMessage& message) override;
 #pragma endregion
 

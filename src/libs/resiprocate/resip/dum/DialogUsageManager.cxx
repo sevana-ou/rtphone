@@ -294,7 +294,7 @@ DialogUsageManager::forceShutdown(DumShutdownHandler* h)
 
 void DialogUsageManager::setAppDialogSetFactory(std::unique_ptr<AppDialogSetFactory> factory)
 {
-   mAppDialogSetFactory = factory;
+   mAppDialogSetFactory = std::move(factory);
 }
 
 SharedPtr<MasterProfile>&
@@ -320,13 +320,13 @@ void DialogUsageManager::setMasterProfile(const SharedPtr<MasterProfile>& master
 
 void DialogUsageManager::setKeepAliveManager(std::unique_ptr<KeepAliveManager> manager)
 {
-   mKeepAliveManager = manager;
+   mKeepAliveManager = std::move(manager);
    mKeepAliveManager->setDialogUsageManager(this);
 }
 
 void DialogUsageManager::setRedirectManager(std::unique_ptr<RedirectManager> manager)
 {
-   mRedirectManager = manager;
+   mRedirectManager = std::move(manager);
 }
 
 void DialogUsageManager::setRedirectHandler(RedirectHandler* handler)
@@ -342,7 +342,7 @@ RedirectHandler* DialogUsageManager::getRedirectHandler()
 void
 DialogUsageManager::setClientAuthManager(std::unique_ptr<ClientAuthManager> manager)
 {
-   mClientAuthManager = manager;
+   mClientAuthManager = std::move(manager);
 }
 
 void
@@ -1087,11 +1087,11 @@ void DialogUsageManager::outgoingProcess(unique_ptr<Message> message)
              !event->message()->header(h_Routes).front().uri().exists(p_lr))
          {
             Helper::processStrictRoute(*toSend);
-            sendUsingOutboundIfAppropriate(*userProfile, toSend);
+            sendUsingOutboundIfAppropriate(*userProfile, std::move(toSend));
          }
          else
          {
-            sendUsingOutboundIfAppropriate(*userProfile, toSend);
+            sendUsingOutboundIfAppropriate(*userProfile, std::move(toSend));
          }
       }
       else
@@ -1121,12 +1121,12 @@ DialogUsageManager::sendUsingOutboundIfAppropriate(UserProfile& userProfile, uni
          {
             DebugLog ( << "Sending with client outbound flow tuple to express outbound" );
             DebugLog ( << "Flow Tuple: " << userProfile.mClientOutboundFlowTuple << " and key: " << userProfile.mClientOutboundFlowTuple.mFlowKey);
-            mStack.sendTo(msg, userProfile.mClientOutboundFlowTuple, this);
+            mStack.sendTo(std::move(msg), userProfile.mClientOutboundFlowTuple, this);
          }
          else
          {
             DebugLog ( << "Sending to express outbound w/o flow tuple");
-            mStack.send(msg, this);
+            mStack.send(std::move(msg), this);
          }
       }
       else
@@ -1134,12 +1134,12 @@ DialogUsageManager::sendUsingOutboundIfAppropriate(UserProfile& userProfile, uni
          if(userProfile.clientOutboundEnabled() && userProfile.mClientOutboundFlowTuple.mFlowKey != 0)
          {
             DebugLog ( << "Sending to outbound (no express) with flow tuple");
-            mStack.sendTo(msg, userProfile.mClientOutboundFlowTuple, this);
+            mStack.sendTo(std::move(msg), userProfile.mClientOutboundFlowTuple, this);
          }
          else
          {
             DebugLog ( << "Sending to outbound uri");
-            mStack.sendTo(msg, userProfile.getOutboundProxy().uri(), this);
+            mStack.sendTo(std::move(msg), userProfile.getOutboundProxy().uri(), this);
          }
       }
    }
@@ -1148,11 +1148,11 @@ DialogUsageManager::sendUsingOutboundIfAppropriate(UserProfile& userProfile, uni
       DebugLog (<< "Send: " << msg->brief());
       if(userProfile.clientOutboundEnabled() && userProfile.mClientOutboundFlowTuple.mFlowKey != 0)
       {
-         mStack.sendTo(msg, userProfile.mClientOutboundFlowTuple, this);
+         mStack.sendTo(std::move(msg), userProfile.mClientOutboundFlowTuple, this);
       }
       else
       {
-         mStack.send(msg, this);
+         mStack.send(std::move(msg), this);
       }
    }
 }
@@ -1162,7 +1162,7 @@ void
 DialogUsageManager::end(DialogSetId setid)
 {
    DialogSet* ds = findDialogSet(setid);
-   if (ds == 0)
+   if (ds == nullptr)
    {
       throw Exception("Request no longer exists", __FILE__, __LINE__);
    }
@@ -1480,7 +1480,7 @@ DialogUsageManager::internalProcess(std::unique_ptr<Message> msg)
       }
    }
 
-   incomingProcess(msg);
+   incomingProcess(std::move(msg));
 }
 
 void
@@ -1714,7 +1714,7 @@ DialogUsageManager::process(int timeoutMs, resip::Lockable* mutex)
 #ifdef RESIP_DUM_THREAD_DEBUG
       mThreadDebugKey=mHiddenThreadDebugKey;
 #endif
-      internalProcess(message);
+      internalProcess(std::move(message));
 #ifdef RESIP_DUM_THREAD_DEBUG
       // .bwc. Thread checking is disabled if mThreadDebugKey is 0; if the app 
       // is using this mutex-locked process() call, we only enable thread-

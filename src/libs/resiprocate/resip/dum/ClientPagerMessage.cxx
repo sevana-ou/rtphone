@@ -135,7 +135,7 @@ public:
       std::unique_ptr<Contents> contents,
       DialogUsageManager::EncryptionLevel level)
       : mClientPagerMessage(clientPagerMessage),
-        mContents(contents),
+        mContents(std::move(contents)),
         mLevel(level)
    {
 
@@ -143,7 +143,7 @@ public:
 
    virtual void executeCommand()
    {
-      mClientPagerMessage.page(mContents, mLevel);
+      mClientPagerMessage.page(std::move(mContents), mLevel);
    }
 
    virtual EncodeStream& encodeBrief(EncodeStream& strm) const
@@ -160,7 +160,7 @@ void
 ClientPagerMessage::pageCommand(std::unique_ptr<Contents> contents,
                                 DialogUsageManager::EncryptionLevel level)
 {
-   mDum.post(new ClientPagerMessagePageCommand(*this, contents, level));
+   mDum.post(new ClientPagerMessagePageCommand(*this, std::move(contents), level));
 }
 
 void

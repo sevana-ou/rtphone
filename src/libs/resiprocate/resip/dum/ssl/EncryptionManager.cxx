@@ -287,7 +287,7 @@ bool EncryptionManager::decrypt(SipMessage* msg)
    {
       if (csa.mContents.get())
       {
-         msg->setContents(csa.mContents);
+         msg->setContents(std::move(csa.mContents));
          
          if (csa.mAttributes.get()) 
          {
@@ -298,7 +298,7 @@ bool EncryptionManager::decrypt(SipMessage* msg)
             {
                 csa.mAttributes->setIdentityStrength(origSecurityAttributes->getIdentityStrength());
             }
-            msg->setSecurityAttributes(csa.mAttributes);
+            msg->setSecurityAttributes(std::move(csa.mAttributes));
          }
       }
       else
@@ -855,11 +855,11 @@ EncryptionManager::Result EncryptionManager::Decrypt::received(bool success,
       if (csa.mContents.get())
       {
          csa.mContents->checkParsed();
-         mMsgToDecrypt->setContents(csa.mContents);
+         mMsgToDecrypt->setContents(std::move(csa.mContents));
          
          if (csa.mAttributes.get()) 
          {
-            mMsgToDecrypt->setSecurityAttributes(csa.mAttributes);
+            mMsgToDecrypt->setSecurityAttributes(std::move(csa.mAttributes));
          }         
       }
       else
@@ -1129,7 +1129,7 @@ Helper::ContentsSecAttrs EncryptionManager::Decrypt::getContents(SipMessage* mes
 
    std::unique_ptr<Contents> c(contents);
    std::unique_ptr<SecurityAttributes> a(attr);
-   return Helper::ContentsSecAttrs(c, a);
+   return Helper::ContentsSecAttrs(std::move(c), std::move(a));
 }
 
 Contents* EncryptionManager::Decrypt::getContentsRecurse(Contents** tree,

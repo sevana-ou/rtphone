@@ -420,7 +420,7 @@ SipStack::addTransport(std::unique_ptr<Transport> transport)
       }
    }
    mPorts.insert(transport->port());
-   mTransactionController->transportSelector().addTransport(transport,true);
+   mTransactionController->transportSelector().addTransport(std::move(transport), true);
 }
 
 Fifo<TransactionMessage>&
@@ -682,7 +682,7 @@ SipStack::post(std::unique_ptr<ApplicationMessage> message,
                unsigned int secondsLater,
                TransactionUser* tu)
 {
-   postMS(message, secondsLater*1000, tu);
+   postMS(std::move(message), secondsLater*1000, tu);
 }
 
 

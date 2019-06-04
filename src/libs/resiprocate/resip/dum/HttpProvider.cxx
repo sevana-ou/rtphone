@@ -10,7 +10,7 @@ Mutex HttpProvider::mMutex;
 void 
 HttpProvider::setFactory(std::unique_ptr<HttpProviderFactory> fact)
 {
-   mFactory = fact;
+   mFactory = std::move(fact);
 }
 
 HttpProvider* 

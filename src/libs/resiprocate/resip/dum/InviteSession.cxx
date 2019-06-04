@@ -564,7 +564,7 @@ InviteSession::provideAnswer(const Contents& answer)
          handleSessionTimerRequest(*mInvite200, *mLastRemoteSessionModification);
          InviteSession::setOfferAnswer(*mInvite200, answer, 0);
          mCurrentLocalOfferAnswer = InviteSession::makeOfferAnswer(answer);
-         mCurrentRemoteOfferAnswer = mProposedRemoteOfferAnswer;
+         mCurrentRemoteOfferAnswer = std::move(mProposedRemoteOfferAnswer);
          InfoLog (<< "Sending " << mInvite200->brief());
          DumHelper::setOutgoingEncryptionLevel(*mInvite200, mCurrentEncryptionLevel);
          send(mInvite200);
@@ -578,9 +578,9 @@ InviteSession::provideAnswer(const Contents& answer)
          SharedPtr<SipMessage> response(new SipMessage);
          mDialog.makeResponse(*response, *mLastRemoteSessionModification, 200);
          handleSessionTimerRequest(*response, *mLastRemoteSessionModification);
-         InviteSession::setOfferAnswer(*response, answer, 0);
+         InviteSession::setOfferAnswer(*response, answer, nullptr);
          mCurrentLocalOfferAnswer = InviteSession::makeOfferAnswer(answer);
-         mCurrentRemoteOfferAnswer = mProposedRemoteOfferAnswer;
+         mCurrentRemoteOfferAnswer = std::move(mProposedRemoteOfferAnswer);
          InfoLog (<< "Sending " << response->brief());
          DumHelper::setOutgoingEncryptionLevel(*response, mCurrentEncryptionLevel);
          send(response);
@@ -591,7 +591,7 @@ InviteSession::provideAnswer(const Contents& answer)
          transition(Connected);
          sendAck(&answer);
 
-         mCurrentRemoteOfferAnswer = mProposedRemoteOfferAnswer;
+         mCurrentRemoteOfferAnswer = std::move(mProposedRemoteOfferAnswer);
          mCurrentLocalOfferAnswer = InviteSession::makeOfferAnswer(answer);
          break;
 
@@ -840,7 +840,7 @@ InviteSession::targetRefresh(const NameAddr& localUri)
 void
 InviteSession::refer(const NameAddr& referTo, bool referSub)
 {
-   refer(referTo,std::unique_ptr<resip::Contents>(0),referSub);
+   refer(referTo, std::unique_ptr<resip::Contents>(nullptr),referSub);
 }
 void
 InviteSession::refer(const NameAddr& referTo, std::unique_ptr<resip::Contents> contents,bool referSub)
@@ -852,7 +852,7 @@ InviteSession::refer(const NameAddr& referTo, std::unique_ptr<resip::Contents> c
       refer->header(h_ReferTo) = referTo;
       refer->header(h_ReferredBy) = myAddr(); 
       refer->header(h_ReferredBy).remove(p_tag);   // tag-param not permitted in rfc3892; not the same as generic-param
-      refer->setContents(contents);
+      refer->setContents(std::move(contents));
       if (!referSub)
       {
          refer->header(h_ReferSub).value() = "false";
@@ -938,7 +938,7 @@ InviteSession::referCommand(const NameAddr& referTo, bool referSub)
 void
 InviteSession::refer(const NameAddr& referTo, InviteSessionHandle sessionToReplace, bool referSub)
 {
-   refer(referTo,sessionToReplace,std::unique_ptr<resip::Contents>(0),referSub);
+   refer(referTo,sessionToReplace, std::unique_ptr<resip::Contents>(nullptr),referSub);
 }
 
 void
@@ -955,13 +955,13 @@ InviteSession::refer(const NameAddr& referTo, InviteSessionHandle sessionToRepla
    replaces.param(p_toTag) = id.getRemoteTag();
    replaces.param(p_fromTag) = id.getLocalTag();
 
-   refer(referTo, replaces, contents, referSub);
+   refer(referTo, replaces, std::move(contents), referSub);
 }
 
 void 
 InviteSession::refer(const NameAddr& referTo, const CallId& replaces, bool referSub)
 {
-   refer(referTo,replaces,std::unique_ptr<resip::Contents>(0),referSub);
+   refer(referTo, replaces, std::unique_ptr<resip::Contents>(nullptr), referSub);
 }
 
 void 
@@ -971,7 +971,7 @@ InviteSession::refer(const NameAddr& referTo, const CallId& replaces, std::uniqu
    {
       SharedPtr<SipMessage> refer(new SipMessage());      
       mDialog.makeRequest(*refer, REFER);
-      refer->setContents(contents);
+      refer->setContents(std::move(contents));
       refer->header(h_ReferTo) = referTo;
       refer->header(h_ReferredBy) = myAddr();
       refer->header(h_ReferredBy).remove(p_tag);
@@ -1381,7 +1381,7 @@ InviteSession::dispatchConnected(const SipMessage& msg)
          *mLastRemoteSessionModification = msg;
          transition(ReceivedReinvite);
          mCurrentEncryptionLevel = getEncryptionLevel(msg);
-         mProposedRemoteOfferAnswer = offerAnswer; 
+         mProposedRemoteOfferAnswer = std::move(offerAnswer);
 
          handler->onOffer(getSessionHandle(), msg, *mProposedRemoteOfferAnswer);
          break;
@@ -1402,7 +1402,7 @@ InviteSession::dispatchConnected(const SipMessage& msg)
          //  See rfc3311 5.2, 4th paragraph.
          *mLastRemoteSessionModification = msg;
          mCurrentEncryptionLevel = getEncryptionLevel(msg);
-         mProposedRemoteOfferAnswer = offerAnswer; 
+         mProposedRemoteOfferAnswer = std::move(offerAnswer);
          handler->onOffer(getSessionHandle(), msg, *mProposedRemoteOfferAnswer);
          break;
 
@@ -1466,7 +1466,7 @@ InviteSession::dispatchSentUpdate(const SipMessage& msg)
             mCurrentEncryptionLevel = getEncryptionLevel(msg);
             setCurrentLocalOfferAnswer(msg);
 
-            mCurrentRemoteOfferAnswer = offerAnswer; 
+            mCurrentRemoteOfferAnswer = std::move(offerAnswer);
             handler->onAnswer(getSessionHandle(), msg, *mCurrentRemoteOfferAnswer);
          }
          else if(mProposedLocalOfferAnswer.get()) 
@@ -1569,13 +1569,13 @@ InviteSession::dispatchSentReinvite(const SipMessage& msg)
 
             if (changed)
             {
-               mCurrentRemoteOfferAnswer = offerAnswer; 
+               mCurrentRemoteOfferAnswer = std::move(offerAnswer);
                handler->onRemoteAnswerChanged(getSessionHandle(), msg, *mCurrentRemoteOfferAnswer);
             }
          }
          else
          {
-            mCurrentRemoteOfferAnswer = offerAnswer; 
+            mCurrentRemoteOfferAnswer = std::move(offerAnswer);
             handler->onAnswer(getSessionHandle(), msg, *mCurrentRemoteOfferAnswer);
          }
          
@@ -1674,7 +1674,7 @@ InviteSession::dispatchSentReinviteNoOffer(const SipMessage& msg)
          handleSessionTimerResponse(msg);
          // mLastSessionModification = msg;   // ?slg? why are we storing 200's?
          mCurrentEncryptionLevel = getEncryptionLevel(msg);
-         mProposedRemoteOfferAnswer = offerAnswer; 
+         mProposedRemoteOfferAnswer = std::move(offerAnswer);
          handler->onOffer(getSessionHandle(), msg, *mProposedRemoteOfferAnswer);
          break;
       }
@@ -1758,7 +1758,7 @@ InviteSession::dispatchReceivedReinviteSentOffer(const SipMessage& msg)
       case OnAckAnswer:
          transition(Connected);
          setCurrentLocalOfferAnswer(msg);
-         mCurrentRemoteOfferAnswer = offerAnswer; 
+         mCurrentRemoteOfferAnswer = std::move(offerAnswer);
          mCurrentEncryptionLevel = getEncryptionLevel(msg);
          mCurrentRetransmit200 = 0; // stop the 200 retransmit timer
 

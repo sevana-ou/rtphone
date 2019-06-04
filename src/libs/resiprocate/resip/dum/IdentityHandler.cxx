@@ -101,7 +101,7 @@ IdentityHandler::queueForIdentityCheck(SipMessage* sipMsg)
    std::unique_ptr<SecurityAttributes> sec(new SecurityAttributes);
    sec->setIdentity(sipMsg->header(h_From).uri().getAor());
    sec->setIdentityStrength(SecurityAttributes::From);
-   sipMsg->setSecurityAttributes(sec);
+   sipMsg->setSecurityAttributes(std::move(sec));
    return false;
 }
 

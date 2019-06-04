@@ -599,12 +599,12 @@ UdpTransport::processRxParse(char *buffer, int len, Tuple& sender)
       if(mExternalUnknownDatagramHandler)
       {
          unique_ptr<Data> datagram(new Data(buffer,len));
-         (*mExternalUnknownDatagramHandler)(this,sender,datagram);
+         (*mExternalUnknownDatagramHandler)(this,sender, std::move(datagram));
       }
 
       // Idea: consider backing buffer out of message and letting caller reuse it
       delete message;
-      message=0;
+      message = nullptr;
       return origBufferConsumed;
    }
 
@@ -643,10 +643,10 @@ UdpTransport::processRxParse(char *buffer, int len, Tuple& sender)
       std::unique_ptr<SendData> tryLater(make503(*message, getExpectedWaitForIncoming()/1000));
       if(tryLater.get())
       {
-         send(tryLater);
+         send(std::move(tryLater));
       }
      delete message; // dropping message due to congestion
-     message = 0;
+     message = nullptr;
      return origBufferConsumed;
    }
 
@@ -654,7 +654,7 @@ UdpTransport::processRxParse(char *buffer, int len, Tuple& sender)
    {
       delete message; // cannot use it, so, punt on it...
       // basicCheck queued any response required
-      message = 0;
+      message = nullptr;
       return origBufferConsumed;
    }
 

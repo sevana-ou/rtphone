@@ -414,7 +414,7 @@ ClientAuthManager::RealmState::addAuthentication(SipMessage& request)
    // Add client auth decorator so that we ensure any body hashes are calcuated after user defined outbound decorators that
    // may be modifying the message body
    std::unique_ptr<MessageDecorator> clientAuthDecorator(new ClientAuthDecorator(mIsProxyCredential, mAuth, mCredential, authQop, nonceCountString));
-   request.addOutboundDecorator(clientAuthDecorator);
+   request.addOutboundDecorator(std::move(clientAuthDecorator));
 }
 
 void ClientAuthManager::dialogSetDestroyed(const DialogSetId& id)

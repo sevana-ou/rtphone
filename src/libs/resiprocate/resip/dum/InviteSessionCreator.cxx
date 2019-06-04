@@ -51,7 +51,7 @@ InviteSessionCreator::InviteSessionCreator(DialogUsageManager& dum,
       {
          initialOffer.reset(initial->clone());
       }
-      getLastRequest()->setContents(initialOffer);
+      getLastRequest()->setContents(std::move(initialOffer));
    }
    //100rel 
    switch(mDum.getMasterProfile()->getUacReliableProvisionalMode())
