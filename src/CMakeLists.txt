@@ -1,5 +1,7 @@
 project(rtphone)
 
+cmake_minimum_required(VERSION 3.0)
+
 macro(configure_msvc_runtime)
   if(MSVC)
     # Default to statically-linked runtime.
@@ -59,11 +61,25 @@ set (USE_AMR_CODEC OFF CACHE BOOL "Use AMR codec. Requires libraries.")
 set (USE_EVS_CODEC OFF CACHE BOOL "Use EVS codec.")
 set (OPENSSL_SSL ssl CACHE STRING "Pointer to ssl library")
 set (OPENSSL_CRYPTO crypto CACHE STRING "Pointer to crypto library")
+set (OPENSSL_INCLUDE "/usr/local/include/openssl" CACHE STRING "Pointer to OpenSSL include files")
 
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 message ("Using ssl library at ${OPENSSL_SSL}")
 message ("Using crypto library at ${OPENSSL_CRYPTO}")
+message ("Using OpenSSL include files from ${OPENSSL_INCLUDE}")
+
+if (CMAKE_SYSTEM MATCHES "Windows*")
+    add_definitions(-DTARGET_WIN)
+endif()
+
+if (CMAKE_SYSTEM MATCHES "Linux*")
+    add_definitions(-DTARGET_LINUX)
+endif()
+
+if (CMAKE_SYSTEM MATCHES "Darwin*")
+    add_definitions(-DTARGET_OSX)
+endif()
 
 set (RTPHONE_SOURCES
     ${rtphone_engine}/media/MT_Statistics.cpp
@@ -94,10 +110,39 @@ set (RTPHONE_SOURCES
     ${rtphone_engine}/endpoint/EP_Session.cpp
 )
 
-add_library(rtphone STATIC ${RTPHONE_SOURCES})
+set (RTPHONE_HEADERS
+    ${rtphone_engine}/media/MT_Statistics.h
+    ${rtphone_engine}/media/MT_WebRtc.h
+    ${rtphone_engine}/media/MT_Stream.h
+    ${rtphone_engine}/media/MT_SrtpHelper.h
+    ${rtphone_engine}/media/MT_SingleAudioStream.h
+    ${rtphone_engine}/media/MT_NativeRtpSender.h
+    ${rtphone_engine}/media/MT_Dtmf.h
+    ${rtphone_engine}/media/MT_CodecList.h
+    ${rtphone_engine}/media/MT_Codec.h
+    ${rtphone_engine}/media/MT_Box.h
+    ${rtphone_engine}/media/MT_AudioStream.h
+    ${rtphone_engine}/media/MT_AudioReceiver.h
+    ${rtphone_engine}/media/MT_AudioCodec.h
+    ${rtphone_engine}/media/MT_SevanaMos.h
+    ${rtphone_engine}/media/MT_AmrCodec.h
+    ${rtphone_engine}/media/MT_EvsCodec.h
+    ${rtphone_engine}/media/MT_CngHelper.h
+    ${rtphone_engine}/agent/Agent_Impl.h
+    ${rtphone_engine}/agent/Agent_AudioManager.h
+    ${rtphone_engine}/endpoint/EP_Account.h
+    ${rtphone_engine}/endpoint/EP_AudioProvider.h
+    ${rtphone_engine}/endpoint/EP_DataProvider.h
+    ${rtphone_engine}/endpoint/EP_Engine.h
+    ${rtphone_engine}/endpoint/EP_NetworkQueue.h
+    ${rtphone_engine}/endpoint/EP_Observer.h
+    ${rtphone_engine}/endpoint/EP_Session.h
+    )
+add_library(rtphone STATIC ${RTPHONE_SOURCES} ${RTPHONE_HEADERS})
 
 add_subdirectory(${rtphone_engine}/helper)
 add_subdirectory(${rtphone_engine}/audio)
+add_subdirectory(${rtphone_engine}/media)
 add_subdirectory(${rtphone_libs}/resiprocate)
 add_subdirectory(${rtphone_libs}/ice)
 add_subdirectory(${rtphone_libs}/jrtplib/src)
@@ -116,9 +161,9 @@ set(LIBS ice_stack jrtplib g729_codec gsm_codec
 
 if (CMAKE_SYSTEM MATCHES "Win*")
     set (LIBS ${LIBS} opus )
-else (CMAKE_SYSTEM MATCHES "Win*")
+else ()
     set (LIBS ${LIBS} dl opus uuid)
-endif (CMAKE_SYSTEM MATCHES "Win*")
+endif ()
 
 if (USE_AMR_CODEC)
     set(LIBS ${LIBS} opencore-amrnb opencore-amrwb)
@@ -134,6 +179,11 @@ target_link_libraries(rtphone
 target_include_directories(rtphone
     PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
            $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/engine>
-    PRIVATE ../../libs/speex/include ../../libs ../)
+
+    PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/libs/
+            ${CMAKE_CURRENT_SOURCE_DIR}/libs/speex/include
+            ${CMAKE_CURRENT_SOURCE_DIR}/libs/opus/include/
+            ${CMAKE_CURRENT_SOURCE_DIR}/libs/json
+            )
 
 configure_msvc_runtime()

@@ -307,4 +307,11 @@ SET (RUTIL_SOURCES
 
 
 add_library(resiprocate ${ARES_SOURCES} ${RUTIL_SOURCES} ${STACK_SOURCES} ${DUM_SOURCES})
+
+target_include_directories(resiprocate PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/contrib/ares
+    /usr/local/include
+    )
+target_compile_definitions(resiprocate PUBLIC -DUSE_ARES -DUSE_SSL)
 #add_library(resiprocate_lite ${RUTIL_SOURCES} ${STACK_SOURCES})

@@ -35,3 +35,7 @@ set (SRTP_SOURCES
 )
 
 add_library(srtp ${SRTP_SOURCES})
+target_include_directories(srtp PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/crypto/include
+    )

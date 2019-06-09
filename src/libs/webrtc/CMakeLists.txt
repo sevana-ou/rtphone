@@ -173,3 +173,9 @@ set (WEBRTC_SOURCES
 )
 
 add_library(webrtc ${WEBRTC_SOURCES})
+
+target_include_directories(webrtc PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/signal_processing_library
+    ${CMAKE_CURRENT_SOURCE_DIR}/utility
+    )

@@ -24,3 +24,5 @@ set (GSM_SOURCES
 )
 
 add_library(gsm_codec ${GSM_SOURCES})
+target_include_directories(gsm_codec PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+target_compile_definitions(gsm_codec PUBLIC HAS_STDLIB_H HAS_STRING_H)

@@ -7,7 +7,7 @@
  */
 
 
-#include	"config.h"
+//#include	"config.h"
 
 
 #ifdef	HAS_STDLIB_H
