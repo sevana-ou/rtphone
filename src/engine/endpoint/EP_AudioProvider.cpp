@@ -99,6 +99,7 @@ void AudioProvider::updateSdpOffer(resip::SdpContents::Session::Medium& sdp, Sdp
         else
             sdp.addAttribute("crypto", resip::Data(createCryptoAttribute(mSrtpSuite)));
     }
+#if defined(USE_RESIP_INTEGRATION)
 
     // Use CodecListPriority mCodecPriority adapter to work with codec priorities
     if (mAvailableCodecs.empty())
@@ -113,6 +114,7 @@ void AudioProvider::updateSdpOffer(resip::SdpContents::Session::Medium& sdp, Sdp
         if (mRemoteTelephoneCodec)
             sdp.addCodec(resip::SdpContents::Session::Codec::TelephoneEvent);
     }
+#endif
 
     // Publish stream state
     const char* attr = nullptr;
@@ -224,9 +226,10 @@ bool AudioProvider::processSdpOffer(const resip::SdpContents::Session::Medium& m
     for (int localIndex=0; localIndex<mCodecPriority.count(mTerminal.codeclist()); localIndex++)
     {
         MT::Codec::Factory& factory = mCodecPriority.codecAt(mTerminal.codeclist(), localIndex);
-
+#if defined(USE_RESIP_INTEGRATION)
         if ((pt = factory.processSdp(media.codecs(), sdpDirection)) != -1)
             mAvailableCodecs.push_back(RemoteCodec(&factory, pt));
+#endif
     }
 
     if (!mAvailableCodecs.size())

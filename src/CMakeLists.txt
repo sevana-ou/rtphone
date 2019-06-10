@@ -138,11 +138,9 @@ set (RTPHONE_HEADERS
     ${rtphone_engine}/endpoint/EP_Observer.h
     ${rtphone_engine}/endpoint/EP_Session.h
     )
+
 add_library(rtphone STATIC ${RTPHONE_SOURCES} ${RTPHONE_HEADERS})
 
-add_subdirectory(${rtphone_engine}/helper)
-add_subdirectory(${rtphone_engine}/audio)
-add_subdirectory(${rtphone_engine}/media)
 add_subdirectory(${rtphone_libs}/resiprocate)
 add_subdirectory(${rtphone_libs}/ice)
 add_subdirectory(${rtphone_libs}/jrtplib/src)
@@ -154,6 +152,9 @@ add_subdirectory(${rtphone_libs}/g722)
 add_subdirectory(${rtphone_libs}/speexdsp)
 add_subdirectory(${rtphone_libs}/srtp)
 add_subdirectory(${rtphone_libs}/webrtc)
+add_subdirectory(${rtphone_engine}/helper)
+add_subdirectory(${rtphone_engine}/audio)
+add_subdirectory(${rtphone_engine}/media)
 
 set(LIBS ice_stack jrtplib g729_codec gsm_codec
     gsmhr_codec g722_codec srtp resiprocate helper_lib audio_lib webrtc speexdsp

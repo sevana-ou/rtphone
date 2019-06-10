@@ -4,12 +4,11 @@ project (media_lib)
 set (CMAKE_CXX_STANDARD 11)
 set (CMAKE_CXX_STANDARD_REQUIRED ON)
 
-set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+# Produce PIC code always
+set (CMAKE_POSITION_INDEPENDENT_CODE ON)
 
+set (USE_RESIP_INTEGRATION CACHE BOOL FALSE "Integrate with resip structures")
 file(GLOB MEDIA_LIB_SOURCES "*.cpp" "*.h")
-
-# SRTP requires this
-add_definitions(-DHAVE_STDINT_H -DHAVE_UINT64_T)
 
 if(CMAKE_SYSTEM MATCHES "Linux*")
     add_definitions(-DHAVE_NETINET_IN_H)
@@ -35,6 +34,10 @@ target_include_directories(media_lib
             ${CMAKE_CURRENT_SOURCE_DIR}/../../libs/srtp/crypto/include
             ${CMAKE_CURRENT_SOURCE_DIR}/../../libs/webrtc
             ${CMAKE_CURRENT_SOURCE_DIR}/../../libs/opus/include/
+            ${CMAKE_CURRENT_SOURCE_DIR}/../../libs/resiprocate/
             )
 
+if (USE_RESIP_INTEGRATION)
+    target_compile_definitions(media_lib PUBLIC -DUSE_RESIP_INTEGRATION)
+endif()
 
