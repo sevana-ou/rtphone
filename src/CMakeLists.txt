@@ -141,6 +141,7 @@ set (RTPHONE_HEADERS
 
 add_library(rtphone STATIC ${RTPHONE_SOURCES} ${RTPHONE_HEADERS})
 
+include_directories(BEFORE SYSTEM ${OPENSSL_INCLUDE})
 add_subdirectory(${rtphone_libs}/resiprocate)
 add_subdirectory(${rtphone_libs}/ice)
 add_subdirectory(${rtphone_libs}/jrtplib/src)

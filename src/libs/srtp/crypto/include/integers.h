@@ -84,7 +84,7 @@
 # if SIZEOF_UNSIGNED_LONG == 8
 typedef unsigned long		uint64_t;
 # elif SIZEOF_UNSIGNED_LONG_LONG == 8
-typedef unsigned long long	uint64_t;
+//typedef unsigned long long	uint64_t;
 # else
 #  ifdef _WIN32
 typedef unsigned __int64 uint64_t;

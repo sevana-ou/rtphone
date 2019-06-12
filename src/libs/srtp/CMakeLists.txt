@@ -39,3 +39,11 @@ target_include_directories(srtp PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include
     ${CMAKE_CURRENT_SOURCE_DIR}/crypto/include
     )
+
+if (CMAKE_SYSTEM MATCHES "Linux*" OR CMAKE_SYSTEM MATCHES "Darwin*")
+    set (PLATFORM_DEFINES HAVE_NETINET_IN_H)
+else()
+    set (PLATFORM_DEFINES HAVE_WINSOCK2_H)
+endif()
+
+target_compile_definitions(srtp PUBLIC -DHAVE_INTTYPES_H -D${PLATFORM_DEFINES})
