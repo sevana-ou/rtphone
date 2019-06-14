@@ -88,7 +88,7 @@ endif()
 if (CMAKE_SYSTEM MATCHES "Darwin*")
     set (TARGET_OSX ON)
     add_definitions(-DTARGET_OSX)
-    find_library(SSL_LIB    NAMES ssl    PATHS ${PLATFORM_LIBS}/openssl/lib/osx NO_DEFAULT_PATH)
+    find_library(SSL_LIB    NAMES ssl    PATHS ${PLATFORM_LIBS}/openssl/1.0/osx NO_DEFAULT_PATH)
     find_library(CRYPTO_LIB NAMES crypto PATHS ${PLATFORM_LIBS}/openssl/1.0/osx NO_DEFAULT_PATH)
 endif()
 
