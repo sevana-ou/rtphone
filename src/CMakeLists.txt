@@ -3,50 +3,50 @@ project(rtphone)
 cmake_minimum_required(VERSION 3.0)
 
 macro(configure_msvc_runtime)
-  if(MSVC)
-    # Default to statically-linked runtime.
-    if("${MSVC_RUNTIME}" STREQUAL "")
-      set(MSVC_RUNTIME "static")
-    endif()
-    # Set compiler options.
-    set(variables
-      CMAKE_C_FLAGS_DEBUG
-      CMAKE_C_FLAGS_MINSIZEREL
-      CMAKE_C_FLAGS_RELEASE
-      CMAKE_C_FLAGS_RELWITHDEBINFO
-      CMAKE_CXX_FLAGS_DEBUG
-      CMAKE_CXX_FLAGS_MINSIZEREL
-      CMAKE_CXX_FLAGS_RELEASE
-      CMAKE_CXX_FLAGS_RELWITHDEBINFO
-    )
-    if(${MSVC_RUNTIME} STREQUAL "static")
-      message(STATUS
-        "rtphone: MSVC -> forcing use of statically-linked runtime."
-      )
-      foreach(variable ${variables})
-        if(${variable} MATCHES "/MD")
-          string(REGEX REPLACE "/MD" "/MT" ${variable} "${${variable}}")
+    if(MSVC)
+        # Default to statically-linked runtime.
+        if("${MSVC_RUNTIME}" STREQUAL "")
+            set(MSVC_RUNTIME "static")
         endif()
-      endforeach()
-    else()
-      message(STATUS
-        "rtphone: MSVC -> forcing use of dynamically-linked runtime."
-      )
-      foreach(variable ${variables})
-        if(${variable} MATCHES "/MT")
-          string(REGEX REPLACE "/MT" "/MD" ${variable} "${${variable}}")
+        # Set compiler options.
+        set(variables
+            CMAKE_C_FLAGS_DEBUG
+            CMAKE_C_FLAGS_MINSIZEREL
+            CMAKE_C_FLAGS_RELEASE
+            CMAKE_C_FLAGS_RELWITHDEBINFO
+            CMAKE_CXX_FLAGS_DEBUG
+            CMAKE_CXX_FLAGS_MINSIZEREL
+            CMAKE_CXX_FLAGS_RELEASE
+            CMAKE_CXX_FLAGS_RELWITHDEBINFO
+            )
+        if(${MSVC_RUNTIME} STREQUAL "static")
+            message(STATUS
+                "rtphone: MSVC -> forcing use of statically-linked runtime."
+                )
+            foreach(variable ${variables})
+                if(${variable} MATCHES "/MD")
+                    string(REGEX REPLACE "/MD" "/MT" ${variable} "${${variable}}")
+                endif()
+            endforeach()
+        else()
+            message(STATUS
+                "rtphone: MSVC -> forcing use of dynamically-linked runtime."
+                )
+            foreach(variable ${variables})
+                if(${variable} MATCHES "/MT")
+                    string(REGEX REPLACE "/MT" "/MD" ${variable} "${${variable}}")
+                endif()
+            endforeach()
         endif()
-      endforeach()
+
+        foreach(variable ${variables})
+            string(REGEX REPLACE "/Z[iI7]" ""
+                ${variable}
+                "${${variable}}")
+
+            set(${variable} "${${variable}} /Zi /Oy-")
+        endforeach()
     endif()
-
-    foreach(variable ${variables})
-        string(REGEX REPLACE "/Z[iI7]" ""
-               ${variable}
-               "${${variable}}")
-
-        set(${variable} "${${variable}} /Zi /Oy-")
-    endforeach()
-  endif()
 endmacro()
 
 
@@ -59,27 +59,47 @@ set (rtphone_engine engine)
 
 set (USE_AMR_CODEC OFF CACHE BOOL "Use AMR codec. Requires libraries.")
 set (USE_EVS_CODEC OFF CACHE BOOL "Use EVS codec.")
-set (OPENSSL_SSL ssl CACHE STRING "Pointer to ssl library")
-set (OPENSSL_CRYPTO crypto CACHE STRING "Pointer to crypto library")
-set (OPENSSL_INCLUDE "/usr/local/include/openssl" CACHE STRING "Pointer to OpenSSL include files")
 
-set(CMAKE_POSITION_INDEPENDENT_CODE ON)
-
-message ("Using ssl library at ${OPENSSL_SSL}")
-message ("Using crypto library at ${OPENSSL_CRYPTO}")
-message ("Using OpenSSL include files from ${OPENSSL_INCLUDE}")
+if (NOT PLATFORM_LIBS)
+    message(FATAL_ERROR "PLATFORM_LIBS must be defined before build! This project requires it to get access to OpenSSL 1.0.x headers")
+endif()
 
 if (CMAKE_SYSTEM MATCHES "Windows*")
+    set (TARGET_WIN ON)
     add_definitions(-DTARGET_WIN)
+    find_library(SSL_LIB ssl PATHES ${PLATFORM_LIBRARIES}/openssl/lib/win64)
 endif()
 
 if (CMAKE_SYSTEM MATCHES "Linux*")
+    set (TARGET_LINUX ON)
     add_definitions(-DTARGET_LINUX)
+
+    find_library(SSL_LIB
+        NAMES ssl
+        PATHS ${PLATFORM_LIBS}/openssl/1.0/lin64
+        NO_DEFAULT_PATH)
+
+    find_library(CRYPTO_LIB
+        NAMES crypto
+        PATHS ${PLATFORM_LIBS}/openssl/1.0/lin64
+        NO_DEFAULT_PATH)
 endif()
 
 if (CMAKE_SYSTEM MATCHES "Darwin*")
+    set (TARGET_OSX ON)
     add_definitions(-DTARGET_OSX)
+    find_library(SSL_LIB    NAMES ssl    PATHS ${PLATFORM_LIBS}/openssl/lib/osx NO_DEFAULT_PATH)
+    find_library(CRYPTO_LIB NAMES crypto PATHS ${PLATFORM_LIBS}/openssl/1.0/osx NO_DEFAULT_PATH)
 endif()
+
+message(STATUS "SSL library: ${SSL_LIB}")
+message(STATUS "Crypto library: ${CRYPTO_LIB}")
+
+set (OPENSSL_INCLUDE "${PLATFORM_LIBS}/openssl/1.0/include")
+
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+
+message (STATUS "OpenSSL include files from ${OPENSSL_INCLUDE}")
 
 set (RTPHONE_SOURCES
     ${rtphone_engine}/media/MT_Statistics.cpp
@@ -108,7 +128,7 @@ set (RTPHONE_SOURCES
     ${rtphone_engine}/endpoint/EP_NetworkQueue.cpp
     ${rtphone_engine}/endpoint/EP_Observer.cpp
     ${rtphone_engine}/endpoint/EP_Session.cpp
-)
+    )
 
 set (RTPHONE_HEADERS
     ${rtphone_engine}/media/MT_Statistics.h
@@ -180,12 +200,12 @@ target_link_libraries(rtphone
 
 target_include_directories(rtphone
     PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
-           $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/engine>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/engine>
 
     PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/libs/
-            ${CMAKE_CURRENT_SOURCE_DIR}/libs/speex/include
-            ${CMAKE_CURRENT_SOURCE_DIR}/libs/opus/include/
-            ${CMAKE_CURRENT_SOURCE_DIR}/libs/json
-            )
+    ${CMAKE_CURRENT_SOURCE_DIR}/libs/speex/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/libs/opus/include/
+    ${CMAKE_CURRENT_SOURCE_DIR}/libs/json
+    )
 
 configure_msvc_runtime()
