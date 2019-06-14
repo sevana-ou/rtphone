@@ -2,7 +2,7 @@ build_exe:
     script:
         - mkdir -p build
         - cd build
-        - git clone git@gitlab.com:dmytro.bogovych/libraries.git
+        - git clone https://gitlab.com/dmytro.bogovych/libraries.git
         - cmake -D PLATFORM_LIBS=libraries ../src
         - cmake --build .
         
