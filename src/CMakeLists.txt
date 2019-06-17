@@ -59,14 +59,10 @@ set (rtphone_engine engine)
 
 set (USE_AMR_CODEC OFF CACHE BOOL "Use AMR codec. Requires libraries.")
 set (USE_EVS_CODEC OFF CACHE BOOL "Use EVS codec.")
-set (OPENSSL_SSL ssl CACHE STRING "Pointer to ssl library")
-set (OPENSSL_CRYPTO crypto CACHE STRING "Pointer to crypto library")
-set (OPENSSL_INCLUDE "/usr/local/include/openssl" CACHE STRING "Pointer to OpenSSL include files")
 
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
-message ("Using ssl library at ${OPENSSL_SSL}")
-message ("Using crypto library at ${OPENSSL_CRYPTO}")
+set (OPENSSL_INCLUDE ${PLATFORM_LIBS}/openssl/1.0/include)
 message ("Using OpenSSL include files from ${OPENSSL_INCLUDE}")
 
 if (CMAKE_SYSTEM MATCHES "Windows*")
@@ -181,8 +177,8 @@ target_include_directories(rtphone
     PUBLIC
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/engine>
-        ${CMAKE_CURRENT_SOURCE_DIR}/libs/
-
+        ${CMAKE_CURRENT_SOURCE_DIR}/libs
+        ${PLATFORM_LIBS}/opus/include
     PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/libs/
         ${CMAKE_CURRENT_SOURCE_DIR}/libs/speex/include
