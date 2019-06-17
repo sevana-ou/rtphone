@@ -59,47 +59,27 @@ set (rtphone_engine engine)
 
 set (USE_AMR_CODEC OFF CACHE BOOL "Use AMR codec. Requires libraries.")
 set (USE_EVS_CODEC OFF CACHE BOOL "Use EVS codec.")
-
-if (NOT PLATFORM_LIBS)
-    message(FATAL_ERROR "PLATFORM_LIBS must be defined before build! This project requires it to get access to OpenSSL 1.0.x headers")
-endif()
-
-if (CMAKE_SYSTEM MATCHES "Windows*")
-    set (TARGET_WIN ON)
-    add_definitions(-DTARGET_WIN)
-    find_library(SSL_LIB ssl PATHES ${PLATFORM_LIBRARIES}/openssl/lib/win64)
-endif()
-
-if (CMAKE_SYSTEM MATCHES "Linux*")
-    set (TARGET_LINUX ON)
-    add_definitions(-DTARGET_LINUX)
-
-    find_library(SSL_LIB
-        NAMES ssl
-        PATHS ${PLATFORM_LIBS}/openssl/1.0/lin64
-        NO_DEFAULT_PATH)
-
-    find_library(CRYPTO_LIB
-        NAMES crypto
-        PATHS ${PLATFORM_LIBS}/openssl/1.0/lin64
-        NO_DEFAULT_PATH)
-endif()
-
-if (CMAKE_SYSTEM MATCHES "Darwin*")
-    set (TARGET_OSX ON)
-    add_definitions(-DTARGET_OSX)
-    find_library(SSL_LIB    NAMES ssl    PATHS ${PLATFORM_LIBS}/openssl/1.0/osx NO_DEFAULT_PATH)
-    find_library(CRYPTO_LIB NAMES crypto PATHS ${PLATFORM_LIBS}/openssl/1.0/osx NO_DEFAULT_PATH)
-endif()
-
-message(STATUS "SSL library: ${SSL_LIB}")
-message(STATUS "Crypto library: ${CRYPTO_LIB}")
-
-set (OPENSSL_INCLUDE "${PLATFORM_LIBS}/openssl/1.0/include")
+set (OPENSSL_SSL ssl CACHE STRING "Pointer to ssl library")
+set (OPENSSL_CRYPTO crypto CACHE STRING "Pointer to crypto library")
+set (OPENSSL_INCLUDE "/usr/local/include/openssl" CACHE STRING "Pointer to OpenSSL include files")
 
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
-message (STATUS "OpenSSL include files from ${OPENSSL_INCLUDE}")
+message ("Using ssl library at ${OPENSSL_SSL}")
+message ("Using crypto library at ${OPENSSL_CRYPTO}")
+message ("Using OpenSSL include files from ${OPENSSL_INCLUDE}")
+
+if (CMAKE_SYSTEM MATCHES "Windows*")
+    add_definitions(-DTARGET_WIN)
+endif()
+
+if (CMAKE_SYSTEM MATCHES "Linux*")
+    add_definitions(-DTARGET_LINUX)
+endif()
+
+if (CMAKE_SYSTEM MATCHES "Darwin*")
+    add_definitions(-DTARGET_OSX)
+endif()
 
 set (RTPHONE_SOURCES
     ${rtphone_engine}/media/MT_Statistics.cpp
@@ -161,7 +141,6 @@ set (RTPHONE_HEADERS
 
 add_library(rtphone STATIC ${RTPHONE_SOURCES} ${RTPHONE_HEADERS})
 
-include_directories(BEFORE SYSTEM ${OPENSSL_INCLUDE})
 add_subdirectory(${rtphone_libs}/resiprocate)
 add_subdirectory(${rtphone_libs}/ice)
 add_subdirectory(${rtphone_libs}/jrtplib/src)
@@ -199,13 +178,16 @@ target_link_libraries(rtphone
 
 
 target_include_directories(rtphone
-    PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/engine>
+    PUBLIC
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/engine>
+        ${CMAKE_CURRENT_SOURCE_DIR}/libs/
 
-    PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/libs/
-    ${CMAKE_CURRENT_SOURCE_DIR}/libs/speex/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/libs/opus/include/
-    ${CMAKE_CURRENT_SOURCE_DIR}/libs/json
+    PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/libs/
+        ${CMAKE_CURRENT_SOURCE_DIR}/libs/speex/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/libs/opus/include/
+        ${CMAKE_CURRENT_SOURCE_DIR}/libs/json
     )
 
 configure_msvc_runtime()
