@@ -91,7 +91,6 @@ set (RTPHONE_SOURCES
     ${rtphone_engine}/media/MT_AudioStream.cpp
     ${rtphone_engine}/media/MT_AudioReceiver.cpp
     ${rtphone_engine}/media/MT_AudioCodec.cpp
-    ${rtphone_engine}/media/MT_SevanaMos.cpp
     ${rtphone_engine}/media/MT_AmrCodec.cpp
     ${rtphone_engine}/media/MT_EvsCodec.cpp
     ${rtphone_engine}/media/MT_CngHelper.cpp
@@ -120,7 +119,6 @@ set (RTPHONE_HEADERS
     ${rtphone_engine}/media/MT_AudioStream.h
     ${rtphone_engine}/media/MT_AudioReceiver.h
     ${rtphone_engine}/media/MT_AudioCodec.h
-    ${rtphone_engine}/media/MT_SevanaMos.h
     ${rtphone_engine}/media/MT_AmrCodec.h
     ${rtphone_engine}/media/MT_EvsCodec.h
     ${rtphone_engine}/media/MT_CngHelper.h

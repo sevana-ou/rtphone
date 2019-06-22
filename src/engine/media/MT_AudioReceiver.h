@@ -22,11 +22,6 @@
 
 #include <map>
 
-#if defined(USE_PVQA_LIBRARY)
-# include "MT_SevanaMos.h"
-#endif
-
-
 // #define DUMP_DECODED
 
 namespace MT

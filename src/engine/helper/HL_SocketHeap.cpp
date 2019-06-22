@@ -1,4 +1,4 @@
-/* Copyright(C) 2007-2014 VoIP objects (voipobjects.com)
+/* Copyright(C) 2007-2019 VoIP objects (voipobjects.com)
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -28,6 +28,10 @@
 #define WSAEADDRINUSE EADDRINUSE
 #endif
 
+
+// ----------------------------- SocketSink -------------------------
+SocketSink::~SocketSink()
+{}
 
 // ----------------------------- SocketHeap -------------------------
 
@@ -132,7 +136,7 @@ PDatagramSocket SocketHeap::allocSocket(int family, SocketSink* sink, int port)
     // Obtain port number
     sockaddr_in addr;
     sockaddr_in6 addr6;
-    int result;
+    int result = 0;
     int testport;
     do
     {
@@ -144,7 +148,7 @@ PDatagramSocket SocketHeap::allocSocket(int family, SocketSink* sink, int port)
             memset(&addr, 0, sizeof addr);
             addr.sin_family = AF_INET;
             addr.sin_port = htons(testport);
-            result = ::bind(sock, (const sockaddr*)&addr, sizeof addr);
+            result = ::bind(sock, reinterpret_cast<const sockaddr*>(&addr), sizeof addr);
             if (result)
                 result = WSAGetLastError();
             break;
@@ -153,7 +157,7 @@ PDatagramSocket SocketHeap::allocSocket(int family, SocketSink* sink, int port)
             memset(&addr6, 0, sizeof addr6);
             addr6.sin6_family = AF_INET6;
             addr6.sin6_port = htons(testport);
-            result = ::bind(sock, (const sockaddr*)&addr6, sizeof addr6);
+            result = ::bind(sock, reinterpret_cast<const sockaddr*>(&addr6), sizeof addr6);
             if (result)
                 result = WSAGetLastError();
             break;

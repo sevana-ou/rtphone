@@ -60,7 +60,8 @@ public:
   int asInt() const;
   int64_t asInt64() const;
   bool asBool() const;
-  float asFloat() const ;
+  float asFloat() const;
+  double asDouble() const;
   std::string asStdString() const;
   //const char* asString();
   void* asPointer() const;

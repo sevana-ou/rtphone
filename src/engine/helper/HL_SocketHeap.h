@@ -11,11 +11,7 @@
 #include <vector>
 #include <algorithm>
 
-#ifdef USE_RESIP_INTEGRATION
-# include "resiprocate/rutil/ThreadIf.hxx"
-#else
-# include <thread>
-#endif
+#include <thread>
 
 #include "HL_NetworkSocket.h"
 #include "HL_Sync.h"
@@ -25,91 +21,92 @@
 class SocketSink
 {
 public:
-  virtual void onReceivedData(PDatagramSocket socket, InternetAddress& src, const void* receivedPtr, unsigned receivedSize) = 0;
+    virtual ~SocketSink();
+    virtual void onReceivedData(PDatagramSocket socket, InternetAddress& src, const void* receivedPtr, unsigned receivedSize) = 0;
 };
 
 // Class allocates new UDP sockets and tracks incoming packets on them. It runs in separate thread
 class SocketHeap
 {
 public:
-  enum Multiplex
-  {
-    DoMultiplexing,
-    DontMultiplexing
-  };
+    enum Multiplex
+    {
+        DoMultiplexing,
+        DontMultiplexing
+    };
 
-  SocketHeap(unsigned short start, unsigned short finish);
-  virtual ~SocketHeap();
+    SocketHeap(unsigned short start, unsigned short finish);
+    virtual ~SocketHeap();
 
-  static SocketHeap& instance();
+    static SocketHeap& instance();
 
-  void start();
-  void stop();
+    void start();
+    void stop();
 
-  // Specifies ne\ port number range. The sockets will be allocated in range [start..finish]
-  void setRange(unsigned short start, unsigned short finish);
+    // Specifies ne\ port number range. The sockets will be allocated in range [start..finish]
+    void setRange(unsigned short start, unsigned short finish);
 
-  // Returns used port number range
-  void range(unsigned short& start, unsigned short& finish);
-  
-  // Attempts to allocate and return socket + allocated port number. REQUIRES pointer to data sink - it will be used to process incoming datagrams
-  PDatagramSocket allocSocket(int family, SocketSink* sink, int port = 0);
-  RtpPair<PDatagramSocket> allocSocketPair(int family, SocketSink* sink,  Multiplex m);
+    // Returns used port number range
+    void range(unsigned short& start, unsigned short& finish);
 
-  // Stops receiving data for specified socket and frees socket itself.
-  void freeSocket(PDatagramSocket socket);
-  void freeSocketPair(const RtpPair<PDatagramSocket>& p);
+    // Attempts to allocate and return socket + allocated port number. REQUIRES pointer to data sink - it will be used to process incoming datagrams
+    PDatagramSocket allocSocket(int family, SocketSink* sink, int port = 0);
+    RtpPair<PDatagramSocket> allocSocketPair(int family, SocketSink* sink,  Multiplex m);
 
-  // Sends data to specified address on specified socket.
-  void sendData(DatagramSocket& socket, InternetAddress& dest, const void* dataPtr, int dataSize);
-  
+    // Stops receiving data for specified socket and frees socket itself.
+    void freeSocket(PDatagramSocket socket);
+    void freeSocketPair(const RtpPair<PDatagramSocket>& p);
+
+    // Sends data to specified address on specified socket.
+    void sendData(DatagramSocket& socket, InternetAddress& dest, const void* dataPtr, int dataSize);
+
 protected:
-  struct SocketItem
-  {
-    // Local port number for socket
-    PDatagramSocket  mSocket;
-    
-    // Data sink pointer
-    SocketSink* mSink;
-    
-    SocketItem()
-      :mSink(NULL)
-    { }
+    struct SocketItem
+    {
+        // Local port number for socket
+        PDatagramSocket  mSocket;
 
-    SocketItem(unsigned short portnumber, SocketSink* sink)
-      :mSink(sink)
-    { 
-      mSocket->mLocalPort = portnumber;
-    }
-    
-    ~SocketItem()
-    { }
-  };
+        // Data sink pointer
+        SocketSink* mSink;
 
-  typedef std::map<SOCKET, SocketItem> SocketMap;
-  typedef std::vector<unsigned short> PortVector;
-  typedef std::vector<PDatagramSocket> SocketVector;
+        SocketItem()
+            :mSink(nullptr)
+        { }
 
-  Mutex           mGuard;
-  SocketMap       mSocketMap;
-  PortVector      mPortVector;
-  unsigned short  mStart, 
-                  mFinish;
-  SocketVector    mDeleteVector;
-  Mutex           mDeleteGuard;
+        SocketItem(unsigned short portnumber, SocketSink* sink)
+            :mSink(sink)
+        {
+            mSocket->mLocalPort = portnumber;
+        }
 
-  char            mTempPacket[MAX_UDPPACKET_SIZE];
+        ~SocketItem()
+        { }
+    };
+
+    typedef std::map<SOCKET, SocketItem> SocketMap;
+    typedef std::vector<unsigned short> PortVector;
+    typedef std::vector<PDatagramSocket> SocketVector;
+
+    Mutex           mGuard;
+    SocketMap       mSocketMap;
+    PortVector      mPortVector;
+    unsigned short  mStart,
+    mFinish;
+    SocketVector    mDeleteVector;
+    Mutex           mDeleteGuard;
+
+    char            mTempPacket[MAX_UDPPACKET_SIZE];
 
     std::shared_ptr<std::thread> mWorkerThread;
 
-  std::thread::id mThreadId;
+    std::thread::id mThreadId;
     bool mShutdown = false;
     bool isShutdown() const { return mShutdown; }
 
     void thread();
-  
-  // Processes mDeleteVector -> updates mSocketMap, removes socket items and closes sockets specified in mDeleteVector
-  void processDeleted();
+
+    // Processes mDeleteVector -> updates mSocketMap, removes socket items and closes sockets specified in mDeleteVector
+    void processDeleted();
 
 };
 

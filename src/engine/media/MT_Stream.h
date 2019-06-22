@@ -21,10 +21,6 @@
 #include <chrono>
 #include "../helper/HL_Optional.hpp"
 
-#if defined(USE_PVQA_LIBRARY)
-# include "MT_SevanaMos.h"
-#endif
-
 using std::experimental::optional;
 
 namespace MT

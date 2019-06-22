@@ -9,8 +9,6 @@
 #include "jrtplib/src/rtptimeutilities.h"
 #include "jrtplib/src/rtppacket.h"
 
-#include "MT_SevanaMos.h"
-
 using std::experimental::optional;
 
 namespace MT
@@ -79,8 +77,8 @@ class JitterStatistics
 {
 public:
     void process(jrtplib::RTPPacket* packet, int samplerate);
-    ProbeStats<double> get() const  { return mJitter; }
-    double getMaxDelta() const      { return mMaxDelta; }
+    ProbeStats<float> get() const  { return mJitter; }
+    float getMaxDelta() const      { return mMaxDelta; }
 
 protected:
     // Jitter calculation
@@ -90,13 +88,13 @@ protected:
     uint32_t mReceiveTimestamp = 0;
 
     // It is classic jitter value in units
-    optional<double> mLastJitter;
+    optional<float> mLastJitter;
 
     // Some statistics for jitter value in seconds
-    ProbeStats<double> mJitter;
+    ProbeStats<float> mJitter;
 
     // Maximal delta in seconds
-    double mMaxDelta = 0.0;
+    float mMaxDelta = 0.0f;
 };
 
 class Statistics
