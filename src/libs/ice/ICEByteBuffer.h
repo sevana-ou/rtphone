@@ -68,7 +68,7 @@ namespace ice
   protected:
     std::vector<uint8_t>        mData;            // Internal storage
     uint8_t*                    mDataPtr;         // Pointer to internal storage or external data
-    uint32_t                    mDataSize;        // Used only for mCopyBehavior == UseExternal
+    size_t                      mDataSize;        // Used only for mCopyBehavior == UseExternal
     NetworkAddress              mRemoteAddress;   // Associates buffer with IP address
     int                         mComponent;       // Associates buffer with component ID
     std::string                 mComment;         // Comment's for this buffer - useful in debugging

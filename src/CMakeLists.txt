@@ -62,7 +62,7 @@ set (USE_EVS_CODEC OFF CACHE BOOL "Use EVS codec.")
 
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
-set (OPENSSL_INCLUDE ${PLATFORM_LIBS}/openssl/1.0/include)
+set (OPENSSL_INCLUDE ${LIB_PLATFORM}/openssl/1.0/include)
 message ("Using OpenSSL include files from ${OPENSSL_INCLUDE}")
 
 if (CMAKE_SYSTEM MATCHES "Windows*")
@@ -176,7 +176,7 @@ target_include_directories(rtphone
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/engine>
         ${CMAKE_CURRENT_SOURCE_DIR}/libs
-        ${PLATFORM_LIBS}/opus/include
+        ${LIB_PLATFORM}/opus/include
     PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/libs/
         ${CMAKE_CURRENT_SOURCE_DIR}/libs/speex/include

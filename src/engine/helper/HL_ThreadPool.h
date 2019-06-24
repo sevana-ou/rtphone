@@ -10,6 +10,7 @@
 #include <future>
 #include <functional>
 #include <stdexcept>
+#include <optional>
 
 class ThreadPool
 {
@@ -42,7 +43,7 @@ inline ThreadPool::ThreadPool(size_t threads)
             {
                 for(;;)
                 {
-                    std::function<void()> task;
+                    std::function<void()> task; bool task_assigned = false;
 
                     {
                         std::unique_lock<std::mutex> lock(this->queue_mutex);
@@ -54,11 +55,14 @@ inline ThreadPool::ThreadPool(size_t threads)
                             return;
                         if(this->pause)
                             continue;
-                        task = std::move(this->tasks.front());
-                        this->tasks.pop();
+                        if (this->tasks.size())
+                        {
+                            task = std::move(this->tasks.front()); task_assigned = true;
+                            this->tasks.pop();
+                        }
                     }
-
-                    task();
+                    if (task_assigned)
+                        task();
                 }
             }
         );
