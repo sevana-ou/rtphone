@@ -33,7 +33,7 @@ struct Average
 };
 
 template<typename T, int minimum = 100000, int maximum = 0>
-struct ProbeStats
+struct TestResult
 {
     T mMin = minimum;
     T mMax = maximum;
@@ -77,7 +77,7 @@ class JitterStatistics
 {
 public:
     void process(jrtplib::RTPPacket* packet, int samplerate);
-    ProbeStats<float> get() const  { return mJitter; }
+    TestResult<float> get() const  { return mJitter; }
     float getMaxDelta() const      { return mMaxDelta; }
 
 protected:
@@ -91,7 +91,7 @@ protected:
     optional<float> mLastJitter;
 
     // Some statistics for jitter value in seconds
-    ProbeStats<float> mJitter;
+    TestResult<float> mJitter;
 
     // Maximal delta in seconds
     float mMaxDelta = 0.0f;
@@ -122,7 +122,7 @@ public:
 
     float     mJitter;          // Jitter
 
-    ProbeStats<double> mRttDelay; // RTT delay
+    TestResult<float> mRttDelay; // RTT delay
 
     // Timestamp when first RTP packet has arrived
     optional<std::chrono::system_clock::time_point> mFirstRtpTime;
