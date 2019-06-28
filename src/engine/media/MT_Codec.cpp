@@ -12,7 +12,7 @@ int Codec::Factory::channels()
   return 1;
 }
 
-#ifdef USE_RESIP_INTEGRATION
+#if defined(USE_RESIP_INTEGRATION)
 void Codec::Factory::create(CodecMap& codecs)
 {
   codecs[payloadType()] = std::shared_ptr<Codec>(create());

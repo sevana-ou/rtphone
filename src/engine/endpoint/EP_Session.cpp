@@ -492,8 +492,8 @@ void Session::getSessionInfo(Session::InfoOptions options, VariantMap& info)
         info[SessionInfo_AudioPeer] = mIceStack->remoteAddress(media->iceInfo().mStreamId, media->iceInfo().mComponentId.mRtp).toStdString();
 
     info[SessionInfo_Jitter] = stat.mJitter;
-    if (stat.mRttDelay.isInitialized())
-        info[SessionInfo_Rtt] = static_cast<float>(stat.mRttDelay.getCurrent() * 1000);
+    if (stat.mRttDelay.is_initialized())
+        info[SessionInfo_Rtt] = static_cast<float>(stat.mRttDelay * 1000);
 #if defined(USE_AMR_CODEC)
     info[SessionInfo_BitrateSwitchCounter] = stat.mBitrateSwitchCounter;
 #endif

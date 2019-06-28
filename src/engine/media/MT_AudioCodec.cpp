@@ -646,7 +646,7 @@ PCodec IlbcCodec::IlbcFactory::create()
   return PCodec(new IlbcCodec(mPtime));
 }
 
-#ifdef USE_RESIP_INTEGRATION
+#if defined(USE_RESIP_INTEGRATION)
 void IlbcCodec::IlbcFactory::create(CodecMap& codecs)
 {
   codecs[mPType20ms] = PCodec(create());

@@ -141,7 +141,7 @@ namespace MT
       const char* name();
       int samplerate();
       int payloadType();
-#ifdef USE_RESIP_INTEGRATION
+#if defined(USE_RESIP_INTEGRATION)
       void updateSdp(resip::SdpContents::Session::Medium::CodecContainer& codecs, SdpDirection direction);
       int processSdp(const resip::SdpContents::Session::Medium::CodecContainer& codecs, SdpDirection direction);
       void create(CodecMap& codecs);

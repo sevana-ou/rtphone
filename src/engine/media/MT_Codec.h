@@ -6,7 +6,7 @@
 #ifndef __MT_CODEC_H
 #define __MT_CODEC_H
 
-#ifdef USE_RESIP_INTEGRATION
+#if defined(USE_RESIP_INTEGRATION)
 # include "resiprocate/resip/stack/SdpContents.hxx"
 #endif
 #include "../helper/HL_Types.h"
@@ -36,7 +36,7 @@ namespace MT
       virtual PCodec create() = 0;
 
       virtual int channels();
-#ifdef USE_RESIP_INTEGRATION
+#if defined(USE_RESIP_INTEGRATION)
       typedef std::map<int, PCodec > CodecMap;
       virtual void create(CodecMap& codecs);
       virtual void updateSdp(resip::SdpContents::Session::Medium::CodecContainer& codecs, SdpDirection direction);

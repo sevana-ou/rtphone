@@ -7,7 +7,7 @@ set (CMAKE_CXX_STANDARD_REQUIRED ON)
 # Produce PIC code always
 set (CMAKE_POSITION_INDEPENDENT_CODE ON)
 
-set (USE_RESIP_INTEGRATION CACHE BOOL FALSE "Integrate with resip structures")
+#set (USE_RESIP_INTEGRATION CACHE BOOL OFF "Integrate with resip structures")
 file(GLOB MEDIA_LIB_SOURCES "*.cpp" "*.h")
 
 if(CMAKE_SYSTEM MATCHES "Linux*")
@@ -38,6 +38,7 @@ target_include_directories(media_lib
             )
 
 if (USE_RESIP_INTEGRATION)
+    message("USE_RESIP_INTEGRATION is turned on!")
     target_compile_definitions(media_lib PUBLIC -DUSE_RESIP_INTEGRATION)
 endif()
 

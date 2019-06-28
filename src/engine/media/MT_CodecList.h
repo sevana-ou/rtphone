@@ -7,7 +7,7 @@
 #define __MT_CODEC_LIST_H
 
 #include "../config.h"
-#ifdef USE_RESIP_INTEGRATION
+#if defined(USE_RESIP_INTEGRATION)
 # include "resiprocate/resip/stack/SdpContents.hxx"
 #endif
 #include "MT_Codec.h"

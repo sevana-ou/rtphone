@@ -390,7 +390,7 @@ bool AudioReceiver::add(std::shared_ptr<jrtplib::RTPPacket> p, Codec** codec)
 
     // Process jitter
     mJitterStats.process(p.get(), codecIter->second->samplerate());
-    mStat.mJitter = static_cast<float>(mJitterStats.get().getCurrent());
+    mStat.mJitter = static_cast<float>(mJitterStats.get());
 
     // Check if packet is CNG
     if (payloadLength >= 1 && payloadLength <= 6 && (ptype == 0 || ptype == 8))

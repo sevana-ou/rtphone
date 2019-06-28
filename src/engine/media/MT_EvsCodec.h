@@ -36,7 +36,7 @@ namespace MT
       int samplerate() override;
       int payloadType() override;
 
-#ifdef USE_RESIP_INTEGRATION
+#if defined(USE_RESIP_INTEGRATION)
       void updateSdp(resip::SdpContents::Session::Medium::CodecContainer& codecs, SdpDirection direction) override;
       int processSdp(const resip::SdpContents::Session::Medium::CodecContainer& codecs, SdpDirection direction) override;
       void create(CodecMap& codecs) override;
@@ -81,7 +81,7 @@ namespace MT
       int samplerate() override;
       int payloadType() override;
 
-#ifdef USE_RESIP_INTEGRATION
+#if defined(USE_RESIP_INTEGRATION)
       void updateSdp(resip::SdpContents::Session::Medium::CodecContainer& codecs, SdpDirection direction) override;
       int processSdp(const resip::SdpContents::Session::Medium::CodecContainer& codecs, SdpDirection direction) override;
       void create(CodecMap& codecs) override;
@@ -123,7 +123,7 @@ namespace MT
       int samplerate() override;
       int payloadType() override;
 
-#ifdef USE_RESIP_INTEGRATION
+#if defined(USE_RESIP_INTEGRATION)
       void updateSdp(resip::SdpContents::Session::Medium::CodecContainer& codecs, SdpDirection direction) override;
       int processSdp(const resip::SdpContents::Session::Medium::CodecContainer& codecs, SdpDirection direction) override;
       void create(CodecMap& codecs) override;
