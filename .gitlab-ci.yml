@@ -3,6 +3,6 @@ build_exe:
         - mkdir -p build
         - cd build
         - git clone https://gitlab.com/dmytro.bogovych/libraries.git
-        - cmake -D PLATFORM_LIBS=libraries ../src
+        - cmake -D LIB_PLATFORM=libraries ../src
         - cmake --build .
         

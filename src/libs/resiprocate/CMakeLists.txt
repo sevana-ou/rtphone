@@ -1,5 +1,9 @@
 project (resiprocate)
 
+if (NOT OPENSSL_INCLUDE)
+    message(FATAL_ERROR "OPENSSL_INCLUDE has to be directory with OpenSSL 1.0.x include files.")
+endif()
+
 # Rely on C++ 11
 set (CMAKE_CXX_STANDARD 11)
 set (CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -311,7 +315,7 @@ add_library(resiprocate ${ARES_SOURCES} ${RUTIL_SOURCES} ${STACK_SOURCES} ${DUM_
 target_include_directories(resiprocate PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_CURRENT_SOURCE_DIR}/contrib/ares
-    /usr/local/include
+    ${OPENSSL_INCLUDE}
     )
 target_compile_definitions(resiprocate PUBLIC -DUSE_ARES -DUSE_SSL)
 #add_library(resiprocate_lite ${RUTIL_SOURCES} ${STACK_SOURCES})
