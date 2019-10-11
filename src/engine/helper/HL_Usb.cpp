@@ -1,5 +1,6 @@
 #include "HL_Usb.h"
 #include "HL_Exception.h"
+
 #ifdef TARGET_WIN
 #include <devguid.h>
 
@@ -9,7 +10,7 @@
 UsbChangeListener::UsbChangeListener()
 :mNotifyHandle(NULL), mHiddenWindow(NULL), mDelegate(NULL)
 {
-  wsprintf(mWindowClassName, ADR_WINDOW_CLASS_NAME, (unsigned int)rand());
+  wsprintfW(mWindowClassName, ADR_WINDOW_CLASS_NAME, (unsigned int)rand());
 }
 
 UsbChangeListener::~UsbChangeListener()
@@ -30,16 +31,16 @@ UsbChangeListener::Delegate* UsbChangeListener::getDelegate() const
 void UsbChangeListener::start()
 {
   // Exposing Window to Mixer
-	WNDCLASSEX wcx;
-	memset( &wcx, 0, sizeof(WNDCLASSEX) );	
-	wcx.cbSize = sizeof(WNDCLASSEX);
-  wcx.lpszClassName = mWindowClassName;
+    WNDCLASSEXW wcx;
+    memset( &wcx, 0, sizeof(WNDCLASSEXW) );
+    wcx.cbSize = sizeof(WNDCLASSEXW);
+    wcx.lpszClassName = mWindowClassName;
 	wcx.lpfnWndProc = (WNDPROC)ADRWindowProc;
-	::RegisterClassEx(&wcx);
+    ::RegisterClassExW(&wcx);
 
   wchar_t windowname[128]; 
-  wsprintf(windowname, ADR_WINDOW_NAME, rand());
-	mHiddenWindow = CreateWindow(	mWindowClassName,
+  wsprintfW(windowname, ADR_WINDOW_NAME, rand());
+    mHiddenWindow = CreateWindowW(	mWindowClassName,
 							windowname,
 							WS_POPUP | WS_DISABLED,
 							0, 0, 0, 0,
@@ -102,7 +103,7 @@ void UsbChangeListener::stop()
     ::DestroyWindow(mHiddenWindow);
     mHiddenWindow = NULL;
 
-    ::UnregisterClass(mWindowClassName, NULL);
+    ::UnregisterClassW(mWindowClassName, NULL);
   }
 }
 

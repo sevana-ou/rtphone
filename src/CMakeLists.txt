@@ -60,21 +60,21 @@ set (rtphone_engine engine)
 set (USE_AMR_CODEC OFF CACHE BOOL "Use AMR codec. Requires libraries.")
 set (USE_EVS_CODEC OFF CACHE BOOL "Use EVS codec.")
 
-set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+set (CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 set (OPENSSL_INCLUDE ${LIB_PLATFORM}/openssl/1.0/include)
 message ("Using OpenSSL include files from ${OPENSSL_INCLUDE}")
 
 if (CMAKE_SYSTEM MATCHES "Windows*")
-    add_definitions(-DTARGET_WIN)
+    add_definitions (-DTARGET_WIN -D_SILENCE_STDEXT_HASH_DEPRECATION_WARNINGS -D_UNICODE -D_CRT_SECURE_NO_WARNINGS)
 endif()
 
 if (CMAKE_SYSTEM MATCHES "Linux*")
-    add_definitions(-DTARGET_LINUX)
+    add_definitions (-DTARGET_LINUX)
 endif()
 
 if (CMAKE_SYSTEM MATCHES "Darwin*")
-    add_definitions(-DTARGET_OSX)
+    add_definitions (-DTARGET_OSX)
 endif()
 
 set (RTPHONE_SOURCES
@@ -133,7 +133,7 @@ set (RTPHONE_HEADERS
     ${rtphone_engine}/endpoint/EP_Session.h
     )
 
-add_library(rtphone STATIC ${RTPHONE_SOURCES} ${RTPHONE_HEADERS})
+add_library (rtphone STATIC ${RTPHONE_SOURCES} ${RTPHONE_HEADERS})
 
 add_subdirectory(${rtphone_libs}/resiprocate)
 add_subdirectory(${rtphone_libs}/ice)
@@ -150,7 +150,7 @@ add_subdirectory(${rtphone_engine}/helper)
 add_subdirectory(${rtphone_engine}/audio)
 add_subdirectory(${rtphone_engine}/media)
 
-set(LIBS ice_stack jrtplib g729_codec gsm_codec
+set (LIBS ice_stack jrtplib g729_codec gsm_codec
     gsmhr_codec g722_codec srtp resiprocate helper_lib audio_lib webrtc speexdsp
     uuid)
 
@@ -161,7 +161,7 @@ else ()
 endif ()
 
 if (USE_AMR_CODEC)
-    set(LIBS ${LIBS} opencore-amrnb opencore-amrwb)
+    set (LIBS ${LIBS} opencore-amrnb opencore-amrwb)
 endif (USE_AMR_CODEC)
 
 target_link_libraries(rtphone

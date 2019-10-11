@@ -31,9 +31,9 @@
 
 namespace Audio
 {
-  class VistaEnumerator: public Enumerator
-  {
-  public:
+class VistaEnumerator: public Enumerator
+{
+public:
     VistaEnumerator();
     ~VistaEnumerator();
 
@@ -45,7 +45,7 @@ namespace Audio
     int idAt(int index);
     int indexOfDefaultDevice();
 
-  protected:
+protected:
     IMMDeviceCollection*        mCollection;
     IMMDevice*                  mDefaultDevice;
     IMMDeviceEnumerator*        mEnumerator;
@@ -54,11 +54,11 @@ namespace Audio
 
     void enumerate();
     IMMDevice* mapIndexToInterface(int index);
-  };
+};
 
-  class XpEnumerator: public Enumerator
-  {
-  public:
+class XpEnumerator: public Enumerator
+{
+public:
     XpEnumerator();
     ~XpEnumerator();
 
@@ -70,25 +70,25 @@ namespace Audio
     int idAt(int index);
     int indexOfDefaultDevice();
 
-  protected:
+protected:
     std::vector<std::wstring> mNameList;
     int mDirection;
-  };
+};
 
-  class DSoundHelper
-  {
-  public:
+class DSoundHelper
+{
+public:
     static void checkComResult(HRESULT code);
     static GUID deviceId2Guid(int deviceId, bool captureDevice);
-  };
+};
 
 #if !defined(_MSC_VER)
-  typedef struct IDirectSoundNotify8          *LPDIRECTSOUNDNOTIFY8;
+typedef struct IDirectSoundNotify8          *LPDIRECTSOUNDNOTIFY8;
 #endif
 
-  class DSoundInputDevice: public InputDevice
-  {
-  public:
+class DSoundInputDevice: public InputDevice
+{
+public:
     DSoundInputDevice(GUID deviceId);
     ~DSoundInputDevice();
     
@@ -102,7 +102,7 @@ namespace Audio
     int readBuffer(void* buffer);
     Format getFormat();
 
-  protected:
+protected:
     Mutex         mGuard;                         /// Mutex to protect this instance.
     LPDIRECTSOUNDCAPTURE8         mDevice;
     LPDIRECTSOUNDCAPTUREBUFFER8   mBuffer;
@@ -134,11 +134,11 @@ namespace Audio
     void          closeDevice();
 
     static void threadProc(void* arg);
-  };
+};
 
-  class DSoundOutputDevice: public OutputDevice
-  {
-  public:
+class DSoundOutputDevice: public OutputDevice
+{
+public:
     DSoundOutputDevice(GUID deviceId);
     ~DSoundOutputDevice();
     
@@ -151,7 +151,7 @@ namespace Audio
     bool          closing();
     Format        getFormat();
 
-  protected:
+protected:
     Mutex                       mGuard;               /// Mutex to protect this instance
     int                         mDeviceID;
     LPDIRECTSOUND8              mDevice;
@@ -181,7 +181,7 @@ namespace Audio
     bool getMediaFrame();
 
     static void threadProc(void* arg);
-  };
+};
 }
 
 #endif
