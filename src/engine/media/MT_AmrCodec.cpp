@@ -1,5 +1,5 @@
-// Avoid linking issues on Android systems
-#if !defined(TARGET_ANDROID) && !defined(TARGET_OPENWRT) && !defined(TARGET_WIN) && !defined(TARGET_RPI)
+// Avoid linking issues on embedded systems
+#if !defined(TARGET_ANDROID) && !defined(TARGET_OPENWRT) && !defined(TARGET_RPI)
 
 #include "MT_AmrCodec.h"
 #include "../helper/HL_ByteBuffer.h"
