@@ -98,6 +98,35 @@ NetworkFrame::PacketData NetworkFrame::GetUdpPayloadForSLL(NetworkFrame::PacketD
     }
 }
 
+NetworkFrame::PacketData NetworkFrame::GetUdpPayloadForLoopback(NetworkFrame::PacketData& packet, InternetAddress& source, InternetAddress& destination)
+{
+    PacketData result(packet);
+
+    if (packet.mLength < 16)
+        return PacketData();
+
+    struct LoopbackHeader
+    {
+        uint32_t mProtocolType;
+    };
+
+    const LoopbackHeader* lh = reinterpret_cast<const LoopbackHeader*>(packet.mData);
+
+    packet.mData += sizeof(LoopbackHeader);
+    packet.mLength -= sizeof(LoopbackHeader);
+
+    switch (lh->mProtocolType)
+    {
+    case AF_INET:
+        return GetUdpPayloadForIp4(packet, source, destination);
+
+    case AF_INET6:
+        return GetUdpPayloadForIp6(packet, source, destination);
+
+    default:
+        return PacketData();
+    }
+}
 
 NetworkFrame::PacketData NetworkFrame::GetUdpPayloadForIp4(NetworkFrame::PacketData& packet, InternetAddress& source, InternetAddress& destination)
 {

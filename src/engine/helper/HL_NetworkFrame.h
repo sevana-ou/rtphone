@@ -25,6 +25,7 @@ public:
     static PacketData GetUdpPayloadForIp4(PacketData& packet, InternetAddress& source, InternetAddress& destination);
     static PacketData GetUdpPayloadForIp6(PacketData& packet, InternetAddress& source, InternetAddress& destination);
     static PacketData GetUdpPayloadForSLL(PacketData& packet, InternetAddress& source, InternetAddress& destination);
+    static PacketData GetUdpPayloadForLoopback(PacketData& packet, InternetAddress& source, InternetAddress& destination);
 
     struct EthernetHeader
     {
