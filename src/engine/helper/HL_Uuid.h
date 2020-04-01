@@ -3,8 +3,8 @@
 
 #include <string>
 
-
 #if (defined(TARGET_LINUX) || defined(TARGET_OSX)) && !defined(USE_NULL_UUID)
+// Please do not forget "sudo apt install uuid-dev" on Ubuntu
 # include <uuid/uuid.h>
 #endif
 #if defined(TARGET_WIN)

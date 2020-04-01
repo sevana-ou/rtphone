@@ -168,7 +168,11 @@ target_link_libraries(rtphone
     ice_stack jrtplib g729_codec gsm_codec
     gsmhr_codec g722_codec srtp resiprocate
     helper_lib audio_lib webrtc speexdsp
-    opus uuid ${OPENSSL_SSL} ${OPENSSL_CRYPTO} ${LIBS})
+    opus
+    uuid
+    ${OPENSSL_SSL}
+    ${OPENSSL_CRYPTO}
+    ${LIBS})
 
 
 target_include_directories(rtphone
