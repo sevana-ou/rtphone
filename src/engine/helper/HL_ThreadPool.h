@@ -11,11 +11,12 @@
 #include <functional>
 #include <stdexcept>
 #include <optional>
+#include "HL_Sync.h"
 
 class ThreadPool
 {
 public:
-    ThreadPool(size_t);
+    ThreadPool(size_t, const std::string&);
     template<class F, class... Args>
     auto enqueue(F&& f, Args&&... args)
         -> std::future<typename std::result_of<F(Args...)>::type>;
@@ -31,16 +32,18 @@ private:
     std::mutex queue_mutex;
     std::condition_variable condition;
     bool stop, pause;
+    std::string name;
 };
  
 // the constructor just launches some amount of workers
-inline ThreadPool::ThreadPool(size_t threads)
-    :   stop(false), pause(false)
+inline ThreadPool::ThreadPool(size_t threads, const std::string& name)
+    :   stop(false), pause(false), name(name)
 {
     for(size_t i = 0;i<threads;++i)
         workers.emplace_back(
-            [this]
+            [this, i]
             {
+                ThreadHelper::setName(this->name + std::to_string(i));
                 for(;;)
                 {
                     std::function<void()> task; bool task_assigned = false;

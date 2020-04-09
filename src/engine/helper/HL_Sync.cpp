@@ -48,7 +48,11 @@ long SyncHelper::increment(long *value)
 void ThreadHelper::setName(const std::string &name)
 {
 #if defined(TARGET_LINUX)
-    pthread_setname_np(pthread_self(), name.c_str());
+    int retcode = pthread_setname_np(pthread_self(), name.c_str());
+    if (retcode != 0)
+    {
+        std::cerr << "Failed to set Linux thread name" << std::endl;
+    }
 #endif
 }
 
