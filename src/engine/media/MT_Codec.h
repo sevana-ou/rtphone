@@ -16,33 +16,33 @@
 
 namespace MT
 {
-  class Codec;
-  typedef std::shared_ptr<Codec> PCodec;
+class Codec;
+typedef std::shared_ptr<Codec> PCodec;
 
-  class CodecMap: public std::map<int, PCodec>
-  {
-  };
+class CodecMap: public std::map<int, PCodec>
+{
+};
 
-  class Codec
-  {
-  public:
+class Codec
+{
+public:
     class Factory
     {
     public:
-      virtual ~Factory() {}
-      virtual const char* name() = 0;
-      virtual int samplerate() = 0;
-      virtual int payloadType() = 0;
-      virtual PCodec create() = 0;
+        virtual ~Factory() {}
+        virtual const char* name() = 0;
+        virtual int samplerate() = 0;
+        virtual int payloadType() = 0;
+        virtual PCodec create() = 0;
 
-      virtual int channels();
+        virtual int channels();
 #if defined(USE_RESIP_INTEGRATION)
-      typedef std::map<int, PCodec > CodecMap;
-      virtual void create(CodecMap& codecs);
-      virtual void updateSdp(resip::SdpContents::Session::Medium::CodecContainer& codecs, SdpDirection direction);
-      // Returns payload type from chosen codec if success. -1 is returned for negative result.
-      virtual int processSdp(const resip::SdpContents::Session::Medium::CodecContainer& codecs, SdpDirection direction);
-      resip::Codec resipCodec();
+        typedef std::map<int, PCodec > CodecMap;
+        virtual void create(CodecMap& codecs);
+        virtual void updateSdp(resip::SdpContents::Session::Medium::CodecContainer& codecs, SdpDirection direction);
+        // Returns payload type from chosen codec if success. -1 is returned for negative result.
+        virtual int processSdp(const resip::SdpContents::Session::Medium::CodecContainer& codecs, SdpDirection direction);
+        resip::Codec resipCodec();
 #endif
     };
     virtual ~Codec() {}
@@ -59,6 +59,6 @@ namespace MT
 
     // Returns size of codec in memory
     virtual int getSize() const { return 0; };
-  };
+};
 }
 #endif

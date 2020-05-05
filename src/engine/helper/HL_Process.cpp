@@ -202,7 +202,6 @@ std::shared_ptr<std::thread> OsProcess::asyncExecCommand(const std::string& cmdl
 std::string OsProcess::execCommand(const std::string& cmd)
 {
     std::string cp = cmd;
-
     std::shared_ptr<FILE> pipe(popen(cp.c_str(), "r"), pclose);
     if (!pipe)
         throw std::runtime_error("Failed to run.");

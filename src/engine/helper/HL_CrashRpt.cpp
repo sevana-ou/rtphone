@@ -1,6 +1,7 @@
+#include "HL_CrashRpt.h"
+
 #if defined(USE_CRASHRPT)
 
-#include "HL_CrashRpt.h"
 #include "HL_String.h"
 
 
@@ -169,6 +170,24 @@ CrashReporterGuard::CrashReporterGuard()
 CrashReporterGuard::~CrashReporterGuard()
 {
   CrashReporter::free();
+}
+
+#else
+
+CrashReporterThreadPoint::CrashReporterThreadPoint()
+{
+}
+
+CrashReporterThreadPoint::~CrashReporterThreadPoint()
+{
+}
+
+CrashReporterGuard::CrashReporterGuard()
+{
+}
+
+CrashReporterGuard::~CrashReporterGuard()
+{
 }
 
 #endif
