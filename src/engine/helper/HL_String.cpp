@@ -283,10 +283,11 @@ std::string StringHelper::trim(const std::string &s)
 
 std::string StringHelper::timeToString(time_t t)
 {
-    char buffer[96];
+    char buffer[128] = "";
     struct tm lt;
 #if defined(TARGET_LINUX) || defined(TARGET_OSX) || defined(TARGET_ANDROID)
-    localtime_r(&t, &lt);
+    if (localtime_r(&t, &lt) == nullptr)
+        return std::string();
 #else
     lt = *localtime(&t);
 #endif
