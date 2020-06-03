@@ -19,6 +19,10 @@ public:
 
     static std::string addTrailingSlash(const std::string& s);
     static std::string mergePathes(const std::string& s1, const std::string& s2);
+
+    // Returns free space on volume for path
+    // Works for Linux only. For other systems (size_t)-1 is returned (for errors too)
+    static size_t getFreespace(const std::string& path);
 };
 
 #endif

@@ -3,6 +3,8 @@
 
 #if defined(TARGET_LINUX) || defined(TARGET_OSX)
 # include <unistd.h>
+# include <sys/statvfs.h>
+# include <memory.h>
 #endif
 
 bool FileHelper::exists(const std::string& s)
@@ -87,4 +89,19 @@ std::string FileHelper::mergePathes(const std::string& s1, const std::string& s2
         result += s2;
 
     return result;
+}
+
+// Returns free space on volume for path
+size_t FileHelper::getFreespace(const std::string& path)
+{
+    size_t r = static_cast<size_t>(-1);
+
+#if defined(TARGET_LINUX)
+    struct statvfs stats; memset(&stats, 0, sizeof stats);
+
+    int retcode = statvfs(path.c_str(), &stats);
+    if (retcode == 0)
+        r = stats.f_bfree * stats.f_bsize;
+#endif
+    return r;
 }
