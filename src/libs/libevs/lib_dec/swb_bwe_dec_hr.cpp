@@ -7,6 +7,9 @@
 #include "prot.h"
 #include "rom_com.h"
 
+namespace evs { 
+
+
 /*-------------------------------------------------------------------*
  * swb_bwe_dec_hr()
  *
@@ -754,3 +757,5 @@ void swb_bwe_dec_hr(
 
     return;
 }
+
+} // end of namespace

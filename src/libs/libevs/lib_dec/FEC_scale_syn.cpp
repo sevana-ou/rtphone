@@ -7,6 +7,9 @@
 #include "cnst.h"
 #include "prot.h"
 
+namespace evs { 
+
+
 #define SCLSYN_LAMBDA           0.3f
 
 /*-------------------------------------------------------------------*
@@ -406,3 +409,5 @@ void FEC_scale_syn(
 
     return;
 }
+
+} // end of namespace

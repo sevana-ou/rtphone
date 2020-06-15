@@ -10,6 +10,9 @@
 #include <limits.h>
 #include "prot.h"
 
+namespace evs { 
+
+
 
 
 static void LpFilter2(float *x, float *y, int N, float *mem);
@@ -781,3 +784,5 @@ void concealment_signal_tuning(int bfi, int curr_mode, float *outx_new, void *_p
     }
     return;
 }
+
+} // end of namespace

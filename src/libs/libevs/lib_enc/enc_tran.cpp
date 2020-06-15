@@ -6,6 +6,9 @@
 #include "prot.h"
 #include "rom_com.h"
 
+namespace evs { 
+
+
 /*-------------------------------------------------------------------*
  * encod_tran()
  *
@@ -312,3 +315,5 @@ short encod_tran(
 
     return tc_subfr;
 }
+
+} // end of namespace

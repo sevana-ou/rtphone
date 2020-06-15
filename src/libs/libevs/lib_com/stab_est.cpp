@@ -8,6 +8,9 @@
 #include "rom_com.h"
 #include "prot.h"
 
+namespace evs { 
+
+
 /*-------------------------------------------------------------------*
  * Local constants
  *-------------------------------------------------------------------*/
@@ -196,3 +199,5 @@ short stab_est(
     return music_flag2;
 }
 
+
+} // end of namespace

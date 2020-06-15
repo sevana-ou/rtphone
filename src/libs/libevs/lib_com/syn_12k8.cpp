@@ -6,6 +6,9 @@
 #include "cnst.h"
 #include "prot.h"
 
+namespace evs { 
+
+
 /*------------------------------------------------------------------
  * syn_12k8()
  *
@@ -33,3 +36,5 @@ void syn_12k8(
 
     return;
 }
+
+} // end of namespace

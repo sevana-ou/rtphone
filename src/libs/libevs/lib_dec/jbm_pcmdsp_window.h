@@ -10,6 +10,8 @@
 /* local headers */
 #include "jbm_types.h"
 
+namespace evs {
+
 /*! Generates a Hann window (cos-shaped) of length n.
  *  Roughly:
  *
@@ -32,4 +34,5 @@ void hannWindow(uint16_t n, Float * w);
 void overlapAdd(const int16_t *fadeOut, const int16_t *fadeIn, int16_t *out,
                 uint16_t n, uint16_t nChannels, const float *fadeOutWin, const float *fadeInWin);
 
+} // end of namespace
 #endif /* JBM_PCMDSP_WINDOW_H */

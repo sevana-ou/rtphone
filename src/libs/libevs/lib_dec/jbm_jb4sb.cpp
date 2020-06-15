@@ -18,6 +18,9 @@
 #include "jbm_jb4sb.h"
 #include "prot.h"
 
+namespace evs { 
+
+
 
 #define JB4_MIN(a,b)  ((a)>(b) ? (b) : (a))
 #define JB4_MAX(a,b)  ((a)>(b) ? (a) : (b))
@@ -1385,3 +1388,5 @@ static int JB4_inputBufferCompareFunction( const JB4_INPUTBUFFER_ELEMENT newElem
     }
     return result;
 }
+
+} // end of namespace

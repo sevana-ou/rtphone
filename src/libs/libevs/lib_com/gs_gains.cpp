@@ -8,6 +8,9 @@
 #include "rom_com.h"
 #include "prot.h"
 
+namespace evs { 
+
+
 
 /*-------------------------------------------------------------------*
  * Local functions
@@ -569,3 +572,5 @@ static short VDQ_vec(
 
     return index;
 }
+
+} // end of namespace

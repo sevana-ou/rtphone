@@ -7,6 +7,9 @@
 #include "rom_com.h"
 #include "prot.h"
 
+namespace evs { 
+
+
 
 /*-------------------------------------------------------------------*
  * Local functions
@@ -398,3 +401,5 @@ void re8_k2y(
 
     return;
 }
+
+} // end of namespace

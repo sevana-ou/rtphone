@@ -6,6 +6,9 @@
 #include "rom_enc.h"
 #include "cnst.h"
 
+namespace evs { 
+
+
 
 /*-------------------------------------------------------------------*
  * spec_center()
@@ -59,3 +62,5 @@ void spec_center(
 
     return;
 }
+
+} // end of namespace

@@ -11,6 +11,9 @@
 #include "prot.h"
 #include "rom_com.h"
 
+namespace evs { 
+
+
 
 
 void tcx_decoder_memory_update(
@@ -248,3 +251,5 @@ int tcx_res_invQ_spec(
 
     return bits;
 }
+
+} // end of namespace

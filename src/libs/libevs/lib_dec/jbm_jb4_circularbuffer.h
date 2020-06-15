@@ -7,6 +7,9 @@
 #ifndef JBM_JB4_CIRCULARBUFFER_H
 #define JBM_JB4_CIRCULARBUFFER_H JBM_JB4_CIRCULARBUFFER_H
 
+namespace evs {
+
+
 /** handle for circular buffer (FIFO) with fixed capacity */
 typedef struct JB4_CIRCULARBUFFER *JB4_CIRCULARBUFFER_HANDLE;
 /** type of circular buffer elements */
@@ -47,5 +50,7 @@ void JB4_CIRCULARBUFFER_Max( const JB4_CIRCULARBUFFER_HANDLE h, JB4_CIRCULARBUFF
  * @param[out] pPercentile consideredFraction percentile of the highest elements */
 void JB4_CIRCULARBUFFER_MinAndPercentile( const JB4_CIRCULARBUFFER_HANDLE h, unsigned int nElementsToIgnore,
         JB4_CIRCULARBUFFER_ELEMENT *pMin, JB4_CIRCULARBUFFER_ELEMENT *pPercentile );
+
+} // end of namespace
 
 #endif /* JBM_JB4_CIRCULARBUFFER_H */

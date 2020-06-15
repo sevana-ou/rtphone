@@ -6,6 +6,9 @@
 #include "cnst.h"
 #include "prot.h"
 
+namespace evs { 
+
+
 
 /*-------------------------------------------------------------------*
  * est_tilt()
@@ -55,3 +58,5 @@ float est_tilt(             /* o  : tilt of the code             */
     return tilt_code;
 }
 
+
+} // end of namespace

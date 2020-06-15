@@ -11,6 +11,9 @@
 #include "basop_util.h"
 #include "basop_proto_func.h"
 
+namespace evs { 
+
+
 /*---------------------------------------------------------------------*
  * tcq_core_LR_enc()
  *
@@ -434,3 +437,5 @@ void tcq_core_LR_dec(
 
     return;
 }
+
+} // end of namespace

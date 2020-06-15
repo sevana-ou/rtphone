@@ -10,6 +10,9 @@
 #include "prot.h"
 #include "rom_com.h"
 
+namespace evs { 
+
+
 
 /*---------------------------------------------------------------------*
  * Function prototypes
@@ -431,3 +434,5 @@ void cldfb_synth_set_bandsToZero(
 
     return;
 }
+
+} // end of namespace

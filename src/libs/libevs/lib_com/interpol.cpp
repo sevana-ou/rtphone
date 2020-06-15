@@ -5,6 +5,9 @@
 #include "options.h"
 #include "prot.h"
 
+namespace evs { 
+
+
 
 /*-------------------------------------------------------------------*
  * interpolation()
@@ -39,3 +42,5 @@ float interpolation(      /* o  : interpolated value   */
 
     return s;
 }
+
+} // end of namespace

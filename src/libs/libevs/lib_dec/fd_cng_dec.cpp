@@ -9,6 +9,9 @@
 #include "prot.h"
 #include "rom_com.h"
 
+namespace evs { 
+
+
 #define DELTA_MASKING_NOISE 1e-20f
 
 /*-------------------------------------------------------------------
@@ -1131,3 +1134,5 @@ void generate_masking_noise_mdct(
 
     return;
 }
+
+} // end of namespace

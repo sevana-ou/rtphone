@@ -7,6 +7,9 @@
 #include "rom_com.h"
 #include "prot.h"
 
+namespace evs { 
+
+
 /*--------------------------------------------------------------------------*
  * evs_dec()
  *
@@ -1022,3 +1025,5 @@ void evs_dec(
 
     return;
 }
+
+} // end of namespace

@@ -13,6 +13,9 @@
 #include "prot.h"
 #include "rom_com.h"
 
+namespace evs { 
+
+
 /* compare two positive normalized 16 bit mantissa/exponent values */
 /* return value: positive if first value greater, negative if second value greater, zero if equal */
 static Word16 compMantExp16Unorm(Word16 m1, Word16 e1, Word16 m2, Word16 e2)
@@ -405,3 +408,5 @@ void basop_PsychAdaptLowFreqDeemph(Word32 x[],
 
 
 
+
+} // end of namespace

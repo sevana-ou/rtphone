@@ -10,6 +10,7 @@
 #include "stat_enc.h"
 #include "cnst.h"
 
+namespace evs {
 /*----------------------------------------------------------------------------------*
  * General tables
  *----------------------------------------------------------------------------------*/
@@ -142,6 +143,7 @@ extern const float LT_MIN_SILENCE_SNR[3];
 extern const int startLineWB[11];
 extern const int startLineSWB[9];
 
+} // end of namespace
 
 #endif
 

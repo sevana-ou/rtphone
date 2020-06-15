@@ -8,6 +8,9 @@
 #include "rom_com.h"
 #include "cnst.h"
 
+namespace evs { 
+
+
 /*-------------------------------------------------------------------*
  * updt_dec()
  *
@@ -581,3 +584,5 @@ void update_decoder_LPD_cng(
 
     return;
 }
+
+} // end of namespace

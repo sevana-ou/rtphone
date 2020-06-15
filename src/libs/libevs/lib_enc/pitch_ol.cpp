@@ -8,6 +8,9 @@
 #include "rom_com.h"
 #include "rom_enc.h"
 
+namespace evs { 
+
+
 /*---------------------------------------------------------------------*
  * Local constants
  *---------------------------------------------------------------------*/
@@ -958,3 +961,5 @@ static void lp_decim2(
     return;
 }
 
+
+} // end of namespace

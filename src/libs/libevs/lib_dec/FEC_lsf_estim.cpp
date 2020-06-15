@@ -7,6 +7,9 @@
 #include "rom_com.h"
 #include "prot.h"
 
+namespace evs { 
+
+
 /*-------------------------------------------------------------------*
  * FEC_lsf_estim()
  *
@@ -54,3 +57,5 @@ void FEC_lsf2lsp_interp(
 
     return;
 }
+
+} // end of namespace

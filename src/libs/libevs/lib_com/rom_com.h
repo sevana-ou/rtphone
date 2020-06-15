@@ -12,6 +12,8 @@
 #include "stl.h"
 #include "basop_util.h"
 
+namespace evs {
+
 typedef struct
 {
     int fin;       /* input frequency                   */
@@ -1225,6 +1227,8 @@ extern const int low_mask[10];
 extern const int indx_fact[10];
 extern const int index_len[3];
 extern const int index_mask_ACELP[3];
+
+} // end of namespace
 
 #endif
 

@@ -7,6 +7,9 @@
 #include "prot.h"
 #include "rom_com.h"
 
+namespace evs { 
+
+
 
 /*-------------------------------------------------------------------*
  * Local functions
@@ -735,3 +738,5 @@ void D_ACELP_decode_43bit(unsigned short idxs[], float code[], int *pulsestrack)
     return;
 }
 
+
+} // end of namespace

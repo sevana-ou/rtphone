@@ -7,6 +7,9 @@
 #include <math.h>
 #include "prot.h"
 
+namespace evs { 
+
+
 /*-------------------------------------------------------------------*
  * decod_unvoiced()
  *
@@ -80,3 +83,5 @@ void decod_unvoiced(
 
     return;
 }
+
+} // end of namespace

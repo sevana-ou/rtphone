@@ -6,6 +6,9 @@
 #include <assert.h>
 #include "prot.h"
 
+namespace evs { 
+
+
 
 
 void tfaCalcEnv(const float* shb_speech, float* enr)
@@ -65,3 +68,5 @@ short tfaEnc_TBE(float* enr, short last_core, float* voicing, float* pitch_buf)
 
     return tfa_flag;
 }
+
+} // end of namespace

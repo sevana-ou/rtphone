@@ -8,6 +8,9 @@
 #include "rom_com.h"
 #include "prot.h"
 
+namespace evs { 
+
+
 
 /*--------------------------------------------------------------------------*
  * env_adj()
@@ -131,3 +134,5 @@ void env_adj (
 
     return;
 }
+
+} // end of namespace

@@ -11,6 +11,9 @@
 #include "prot.h"
 #include "basop_proto_func.h"
 
+namespace evs { 
+
+
 /*-----------------------------------------------------------------*
  * Local constants
  *-----------------------------------------------------------------*/
@@ -1947,3 +1950,5 @@ static void lsf_mid_enc(
 
     return;
 }
+
+} // end of namespace

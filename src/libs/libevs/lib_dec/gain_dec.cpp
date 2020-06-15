@@ -8,6 +8,9 @@
 #include "rom_com.h"
 #include "prot.h"
 
+namespace evs { 
+
+
 
 /*---------------------------------------------------------------------*
  * Es_pred_dec()
@@ -650,3 +653,5 @@ float gain_dec_gaus(            /* o  : quantized codebook gain         */
 
     return gain;
 }
+
+} // end of namespace

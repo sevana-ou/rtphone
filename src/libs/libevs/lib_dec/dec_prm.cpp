@@ -12,6 +12,9 @@
 #include "rom_com.h"
 #include "prot.h"
 
+namespace evs { 
+
+
 /*-----------------------------------------------------------------*
  * dec_prm_hm()
  *
@@ -943,3 +946,5 @@ void dec_prm(
     }
     return;
 }
+
+} // end of namespace

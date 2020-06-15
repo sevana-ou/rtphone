@@ -11,6 +11,9 @@
 #include "rom_com.h"
 #include "stat_dec.h"
 
+namespace evs { 
+
+
 /*-------------------------------------------------------------------*
  * Local constants
  *-------------------------------------------------------------------*/
@@ -793,3 +796,5 @@ short FEC_pos_dec(
 
     return T0;
 }
+
+} // end of namespace

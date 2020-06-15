@@ -8,6 +8,9 @@
 #include "rom_com.h"
 #include "prot.h"
 
+namespace evs { 
+
+
 /*----------------------------------------------------------------------------------*
  * CNG_reset_dec()
  *
@@ -56,3 +59,5 @@ void CNG_reset_dec(
 
     return;
 }
+
+} // end of namespace

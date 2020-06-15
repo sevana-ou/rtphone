@@ -9,6 +9,9 @@
 #include "rom_com.h"
 #include "prot.h"
 
+namespace evs { 
+
+
 
 /*-----------------------------------------------------------------*
  * Local constants
@@ -485,3 +488,5 @@ static short sub_VQ(        /* o  : selected codebook vector index      */
     }
     return index;
 }
+
+} // end of namespace

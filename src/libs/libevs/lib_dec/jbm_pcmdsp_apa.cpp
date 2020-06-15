@@ -18,6 +18,9 @@
 #include "jbm_types.h"
 #include "cnst.h"
 
+namespace evs { 
+
+
 
 /*
 ********************************************************************************
@@ -1300,3 +1303,5 @@ static bool_t extend_frm (apa_state_t * ps,
     return 0;
 }
 
+
+} // end of namespace

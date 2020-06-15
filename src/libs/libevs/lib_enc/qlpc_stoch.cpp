@@ -12,6 +12,9 @@
 #include "rom_enc.h"
 #include "basop_proto_func.h"
 
+namespace evs { 
+
+
 /*-------------------------------------------------------------------*
 * lpc_quantization()
 *
@@ -312,3 +315,5 @@ void Unified_weighting(
     return;
 }
 
+
+} // end of namespace

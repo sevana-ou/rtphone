@@ -8,6 +8,9 @@
 #include "prot.h"
 #include "cnst.h"
 
+namespace evs { 
+
+
 /*-------------------------------------------------------------------*
 * Local constants
 *-------------------------------------------------------------------*/
@@ -211,3 +214,5 @@ void gp_clip_test_gain_pit(
 
     return;
 }
+
+} // end of namespace

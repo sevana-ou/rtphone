@@ -6,6 +6,9 @@
 #include "cnst.h"
 #include "prot.h"
 
+namespace evs { 
+
+
 /*--------------------------------------------------------------------------*
  * mdct_classifier()
  *
@@ -244,3 +247,5 @@ short mdct_classifier(      /* o  : HQ_CORE/TCX_20_CORE decision            */
 }
 
 
+
+} // end of namespace

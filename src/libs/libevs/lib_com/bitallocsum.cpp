@@ -6,6 +6,9 @@
 #include "cnst.h"
 #include "prot.h"
 
+namespace evs { 
+
+
 
 /*--------------------------------------------------------------------------
  *  bitallocsum()
@@ -58,3 +61,5 @@ void bitallocsum(
 
     return;
 }
+
+} // end of namespace

@@ -6,6 +6,9 @@
 #include "cnst.h"
 #include "prot.h"
 
+namespace evs { 
+
+
 
 /*-----------------------------------------------------------------*
  * Local constants
@@ -285,3 +288,5 @@ short multi_harm(                  /* o  : frame multi-harmonicity (1-harmonic, 
 
     return harm;
 }
+
+} // end of namespace

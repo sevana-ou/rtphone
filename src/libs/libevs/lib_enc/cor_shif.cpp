@@ -5,6 +5,9 @@
 #include <math.h>
 #include "prot.h"
 
+namespace evs { 
+
+
 /*-------------------------------------------------------------------*
  * Correlation_shift
  *
@@ -34,3 +37,5 @@ float correlation_shift(       /* o  : noise dependent voicing correction     */
     }
     return corr_shift;
 }
+
+} // end of namespace

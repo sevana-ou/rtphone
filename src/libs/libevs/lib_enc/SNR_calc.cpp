@@ -7,6 +7,9 @@
 #include "prot.h"
 #include "rom_enc.h"
 
+namespace evs { 
+
+
 
 
 
@@ -182,3 +185,5 @@ void calc_lf_snr(float *lf_snr_smooth,       /*(o) smoothed lf_snr*/
     *lf_snr = l_snr;
 }
 
+
+} // end of namespace

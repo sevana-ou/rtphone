@@ -8,6 +8,9 @@
 #include "cnst.h"
 #include "stat_com.h"
 
+namespace evs { 
+
+
 
 /* PLC: [Common: Fade-out]
  * PLC: and for PLC fade out */
@@ -285,3 +288,5 @@ int GetPLCModeDecision(Decoder_State *st   /* i/o:    decoder memory state point
     }
     return core;
 }
+
+} // end of namespace

@@ -7,6 +7,9 @@
 #include "cnst.h"
 #include "prot.h"
 
+namespace evs { 
+
+
 
 /*------------------------------------------------------------------*
 * lsf_weight_2st()
@@ -55,3 +58,5 @@ void lsf_weight_2st(
 
     return;
 }
+
+} // end of namespace

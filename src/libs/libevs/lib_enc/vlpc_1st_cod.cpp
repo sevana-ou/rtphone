@@ -7,6 +7,9 @@
 #include "cnst.h"
 #include "prot.h"
 
+namespace evs { 
+
+
 
 extern float const dico_lsf_abs_8b[];
 
@@ -117,3 +120,5 @@ int vlpc_1st_cod(       /* output: codebook index                  */
 
     return index;
 }
+
+} // end of namespace

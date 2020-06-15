@@ -12,6 +12,9 @@
 #include <stdarg.h>
 #include <math.h>
 
+namespace evs { 
+
+
 
 
 #define MIN_BLOCK_ENERGY 107.37f
@@ -596,3 +599,5 @@ static void CalculateSubblockEnergies(float const * input, int nSamplesAvailable
 
     return;
 }
+
+} // end of namespace

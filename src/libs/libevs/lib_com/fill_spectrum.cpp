@@ -9,6 +9,9 @@
 #include "rom_com.h"
 #include "prot.h"
 
+namespace evs { 
+
+
 /*--------------------------------------------------------------------------*
  * fill_spectrum()
  *
@@ -234,3 +237,5 @@ void fill_spectrum(
 
     return;
 }
+
+} // end of namespace

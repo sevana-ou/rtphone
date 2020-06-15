@@ -8,6 +8,9 @@
 #include "cnst.h"
 #include "prot.h"
 
+namespace evs { 
+
+
 /*---------------------------------------------------------------------*
  * Local constants
  *---------------------------------------------------------------------*/
@@ -309,3 +312,5 @@ short signal_clas(               /* o  : classification for current frames      
 
     return clas;
 }
+
+} // end of namespace

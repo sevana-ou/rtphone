@@ -6,6 +6,9 @@
 #include <stdlib.h>
 #include "prot.h"
 
+namespace evs { 
+
+
 
 /*-------------------------------------------------------------*
  * procedure lerp()                                            *
@@ -140,3 +143,5 @@ void lerp_proc(
 
     return;
 }
+
+} // end of namespace

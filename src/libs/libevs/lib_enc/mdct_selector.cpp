@@ -11,6 +11,9 @@
 #include "prot.h"
 #include <assert.h>
 
+namespace evs { 
+
+
 /*-----------------------------------------------------------------*
  * Local constants
  *-----------------------------------------------------------------*/
@@ -257,3 +260,5 @@ void MDCT_selector_reset(
 
     return;
 }
+
+} // end of namespace

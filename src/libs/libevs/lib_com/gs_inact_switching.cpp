@@ -8,6 +8,9 @@
 #include "rom_com.h"
 #include "prot.h"
 
+namespace evs { 
+
+
 /*-------------------------------------------------------------------*
  * Local constants
  *-------------------------------------------------------------------*/
@@ -105,3 +108,5 @@ void inact_switch_ematch(
 
     return;
 }
+
+} // end of namespace

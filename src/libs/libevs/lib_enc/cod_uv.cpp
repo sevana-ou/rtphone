@@ -8,6 +8,9 @@
 #include <assert.h>
 #include "prot.h"
 
+namespace evs { 
+
+
 
 /*-------------------------------------------------------------------*
  * gauss_L2:
@@ -61,3 +64,5 @@ void gauss_L2(
 
     return;
 }
+
+} // end of namespace

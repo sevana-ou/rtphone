@@ -15,6 +15,7 @@
 #include "cnst.h"
 #include "stl.h"
 
+namespace evs {
 
 /*----------------------------------------------------------------------------------*
  * Prototypes of global macros
@@ -9772,5 +9773,6 @@ void blend_subfr2(
 );
 
 
+} // end of namespace
 
 #endif

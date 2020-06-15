@@ -7,6 +7,9 @@
 #include "prot.h"
 #include "cnst.h"
 
+namespace evs { 
+
+
 /*-------------------------------------------------------------------*
  * corr_xh()
  *
@@ -39,3 +42,5 @@ void corr_xh(
 
     return;
 }
+
+} // end of namespace

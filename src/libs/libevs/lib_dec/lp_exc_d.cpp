@@ -6,6 +6,9 @@
 #include "cnst.h"
 #include "prot.h"
 
+namespace evs { 
+
+
 /*---------------------------------------------------------------------*
  * lp_filt_exc_dec()
  *
@@ -75,3 +78,5 @@ void lp_filt_exc_dec(
 
     return;
 }
+
+} // end of namespace

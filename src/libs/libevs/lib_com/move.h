@@ -9,6 +9,9 @@
 
 #include "stl.h"
 
+namespace evs {
+
+
 static __inline void move16( void)
 {
 }
@@ -38,5 +41,7 @@ static __inline void logic32( void)
 /*-------- end legacy ----------*/
 
 #define cast16 move16
+
+}
 
 #endif /* _MOVE_H */

@@ -9,6 +9,9 @@
 #include "cnst.h"
 #include "rom_com.h"
 
+namespace evs { 
+
+
 
 /*-------------------------------------------------------------------------*
  * Local functions                                                         *
@@ -365,3 +368,5 @@ static int gain_enc_gacelp_uv(
 
     return index;
 }
+
+} // end of namespace

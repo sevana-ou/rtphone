@@ -8,6 +8,9 @@
 #include "cnst.h"
 #include "rom_com.h"
 
+namespace evs { 
+
+
 /*-------------------------------------------------------------------*
  * Local constants
  *-------------------------------------------------------------------*/
@@ -128,3 +131,5 @@ void adapt_lag_wind(
 
     return;
 }
+
+} // end of namespace

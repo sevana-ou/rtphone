@@ -10,6 +10,9 @@
 #include "prot.h"
 #include "rom_dec.h"
 
+namespace evs { 
+
+
 
 /*-----------------------------------------------------------------*
  * con_tcx()
@@ -547,3 +550,5 @@ void con_tcx(
 
     return;
 }
+
+} // end of namespace

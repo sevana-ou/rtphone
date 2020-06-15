@@ -10,6 +10,8 @@
 /* local headers */
 #include "jbm_types.h"
 
+namespace evs {
+
 /*
 ********************************************************************************
 *
@@ -116,5 +118,7 @@ Float normalized_cross_correlation_self(const int16_t * signal,
 
 /* Splits the signal into segments and checks if all of them have very low energy. */
 bool_t isSilence(const int16_t * signal, uint32_t len, uint32_t segments);
+
+}
 
 #endif /* JBM_PCMDSP_SIMILARITYESTIMATION_H */

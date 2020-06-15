@@ -5,6 +5,9 @@
 #include "prot.h"
 #include "rom_com.h"
 
+namespace evs { 
+
+
 
 /*-------------------------------------------------------------------*
  * Local function
@@ -299,3 +302,5 @@ static void reorder_lsfs(
 
     return;
 }
+
+} // end of namespace

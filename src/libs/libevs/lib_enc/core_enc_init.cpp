@@ -9,6 +9,9 @@
 #include "prot.h"
 #include "rom_com.h"
 
+namespace evs { 
+
+
 
 /*-----------------------------------------------------------------------*
  * Local functions
@@ -718,3 +721,5 @@ static void init_modes(
 
     return;
 }
+
+} // end of namespace

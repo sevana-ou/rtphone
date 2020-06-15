@@ -7,6 +7,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+namespace evs { 
+
+
 
 /*------------------------------------------------------------------*
 * dlpc_avq()
@@ -244,3 +247,5 @@ int decode_lpc_avq(
 
     return st->next_bit_pos - start_bit_pos;
 }
+
+} // end of namespace

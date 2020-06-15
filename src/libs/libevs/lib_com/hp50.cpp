@@ -7,6 +7,9 @@
 #include "options.h"
 #include "prot.h"
 
+namespace evs { 
+
+
 
 
 
@@ -103,3 +106,5 @@ void hp20(Float32 signal[], Word32 lg, Float32 mem[], Word32 fs)
     return;
 }
 
+
+} // end of namespace

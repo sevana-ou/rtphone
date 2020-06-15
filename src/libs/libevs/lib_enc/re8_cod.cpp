@@ -5,6 +5,9 @@
 #include "options.h"
 #include "prot.h"
 
+namespace evs { 
+
+
 
 /*------------------------------------------------------------------------
  * re8_cod()
@@ -52,3 +55,5 @@ void re8_cod(
 
     return;
 }
+
+} // end of namespace

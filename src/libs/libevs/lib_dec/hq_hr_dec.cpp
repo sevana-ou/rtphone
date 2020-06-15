@@ -8,6 +8,9 @@
 #include "rom_com.h"
 #include "prot.h"
 
+namespace evs { 
+
+
 /*--------------------------------------------------------------------------*
  * hq_pred_hb_bws()
  *
@@ -269,3 +272,5 @@ void hq_hr_dec(
 
     return;
 }
+
+} // end of namespace

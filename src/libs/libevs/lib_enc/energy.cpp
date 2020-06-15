@@ -9,6 +9,9 @@
 #include "cnst.h"
 #include "rom_enc.h"
 
+namespace evs { 
+
+
 
 
 void background_update(T_CldfbVadState *st,
@@ -207,3 +210,5 @@ void est_energy(float sb_power[],                  /*(o) energy of sub-band divi
     *p_frame_energy2 = frame_energy2;
     *p_frame_energy = frame_energy2 + (sb_power_scale[bw]*sb_power[0] / (32768.f * 32768.f));
 }
+
+} // end of namespace

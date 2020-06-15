@@ -10,6 +10,9 @@
 #include "prot.h"
 #include "rom_com.h"
 
+namespace evs { 
+
+
 
 /*-------------------------------------------------------------------*
  * enc_acelp_tcx_main()
@@ -101,3 +104,5 @@ void enc_acelp_tcx_main(
 
     return;
 }
+
+} // end of namespace

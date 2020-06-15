@@ -7,6 +7,9 @@
 #include "prot.h"
 #include "rom_com.h"
 
+namespace evs { 
+
+
 
 /*---------------------------------------------------------------------*
  * inov_encode()
@@ -264,3 +267,5 @@ void inov_encode(
 
     return;
 }
+
+} // end of namespace

@@ -14,6 +14,9 @@
 #include "EvsRXlib.h"
 #include "g192.h"
 
+namespace evs { 
+
+
 
 /*------------------------------------------------------------------------------------------*
  * Global variables
@@ -271,3 +274,5 @@ int decodeVoip(
 }
 
 
+
+} // end of namespace

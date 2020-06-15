@@ -7,6 +7,9 @@
 #include "prot.h"
 #include "rom_com.h"
 
+namespace evs { 
+
+
 /*--------------------------------------------------------------------*
  * residu()
  *
@@ -62,3 +65,5 @@ void calc_residu(
     }
     return;
 }
+
+} // end of namespace

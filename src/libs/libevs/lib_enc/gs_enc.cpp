@@ -8,6 +8,9 @@
 #include "rom_com.h"
 #include "prot.h"
 
+namespace evs { 
+
+
 /*-------------------------------------------------------------------*
  * Local functions
  *-------------------------------------------------------------------*/
@@ -467,3 +470,5 @@ static float edyn(         /* o  : ratio of max to mean    */
 
     return dyn;
 }
+
+} // end of namespace

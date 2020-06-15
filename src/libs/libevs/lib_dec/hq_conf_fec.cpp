@@ -9,6 +9,9 @@
 #include "rom_com.h"
 #include "prot.h"
 
+namespace evs { 
+
+
 
 /*--------------------------------------------------------------------------*
  * hq_configure_bfi()
@@ -34,3 +37,5 @@ void hq_configure_bfi(
 
     return;
 }
+
+} // end of namespace

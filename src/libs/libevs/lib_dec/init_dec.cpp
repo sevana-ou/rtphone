@@ -8,6 +8,9 @@
 #include "prot.h"
 #include <string.h>
 
+namespace evs { 
+
+
 
 /*----------------------------------------------------------------------*
  * init_decoder()
@@ -653,3 +656,5 @@ void destroy_decoder(
 
     return;
 }
+
+} // end of namespace

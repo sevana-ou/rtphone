@@ -6,6 +6,9 @@
 #include "rom_com.h"
 #include "prot.h"
 
+namespace evs { 
+
+
 /*--------------------------------------------------------------------------
  * normalizecoefs()
  *
@@ -35,3 +38,5 @@ void normalizecoefs(
 
     return;
 }
+
+} // end of namespace

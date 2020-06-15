@@ -11,6 +11,9 @@
 #include "rom_com.h"
 #include "basop_proto_func.h"
 
+namespace evs { 
+
+
 /*-------------------------------------------------------------------*
  * Local functions
  *-------------------------------------------------------------------*/
@@ -1190,3 +1193,5 @@ static void BITS_ALLOC_TCX_config_rf(
     }
     return;
 }
+
+} // end of namespace

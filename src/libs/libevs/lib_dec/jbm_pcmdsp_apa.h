@@ -9,6 +9,8 @@
 
 #include "jbm_types.h"
 
+namespace evs {
+
 /*
 ********************************************************************************
 *                         DEFINITION OF CONSTANTS
@@ -101,5 +103,7 @@ uint8_t apa_exec(
     uint16_t      maxScaling,
     int16_t       a_out[],
     uint16_t     *l_out);
+
+} // end of namespace
 
 #endif /* JBM_PCMDSP_APA_H */

@@ -13,6 +13,7 @@
 #include "typedef.h"
 #include "cnst.h"
 
+namespace evs {
 
 /*----------------------------------------------------------------------------------*
  * Declaration of structures
@@ -639,5 +640,7 @@ typedef struct
     int                 *peakIndices, *holeIndices;
     int                 numPeakIndices, numHoleIndices;
 } CONTEXT_HM_CONFIG;
+
+} // end of namespace
 
 #endif

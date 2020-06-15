@@ -23,6 +23,9 @@ typedef signed __int64     int64_t;
 #include "options.h"
 #include "g192.h"
 
+namespace evs { 
+
+
 
 #ifdef _MSC_VER
 #pragma warning( disable : 4996 )
@@ -251,3 +254,5 @@ G192_Reader_Close(G192_HANDLE* phG192)
     return G192_NO_ERROR;
 }
 
+
+} // end of namespace

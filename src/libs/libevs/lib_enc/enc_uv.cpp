@@ -6,6 +6,9 @@
 #include "cnst.h"
 #include "prot.h"
 
+namespace evs { 
+
+
 /*-------------------------------------------------------------------*
  * encod_unvoiced()
  *
@@ -106,3 +109,5 @@ void encod_unvoiced(
 
     return;
 }
+
+} // end of namespace

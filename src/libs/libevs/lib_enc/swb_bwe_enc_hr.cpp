@@ -7,6 +7,9 @@
 #include "prot.h"
 #include "rom_com.h"
 
+namespace evs { 
+
+
 /*-------------------------------------------------------------------*
  * en_band_quant()
  *
@@ -471,3 +474,5 @@ void swb_bwe_enc_hr(
 
     return;
 }
+
+} // end of namespace

@@ -7,6 +7,8 @@
 #ifndef JBM_TYPES_H
 #define JBM_TYPES_H JBM_TYPES_H
 
+namespace evs {
+
 /**************************
 * internally used types
 ***************************/
@@ -64,6 +66,8 @@ typedef unsigned char      bool_t;
 #define false (0)
 
 typedef float              Float;
+
+} // end of namespace
 
 #include "typedef.h"
 

@@ -10,6 +10,9 @@
 #include "rom_com.h"
 #include "basop_proto_func.h"
 
+namespace evs { 
+
+
 /*------------------------------------------------------------------*
 * lpc_unquantize()
 *
@@ -103,3 +106,5 @@ void lpc_unquantize(
 
     return;
 }
+
+} // end of namespace

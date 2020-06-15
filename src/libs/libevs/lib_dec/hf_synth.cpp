@@ -9,6 +9,9 @@
 #include "prot.h"
 #include "rom_com.h"
 
+namespace evs { 
+
+
 /*---------------------------------------------------------------------*
  * Local functions
  *---------------------------------------------------------------------*/
@@ -1209,3 +1212,5 @@ static void filt_6k_7k(
 
     return;
 }
+
+} // end of namespace

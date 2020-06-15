@@ -11,6 +11,9 @@
 #include "prot.h"
 #include "stl.h"
 
+namespace evs { 
+
+
 static short get_pvq_splits( Decoder_State *st, const short band_bits, const short sfmsize, short *bits );
 
 static  void densitySymbolIndexDecode(Decoder_State *st,  short density, short  opp_sz, short  near_sz,short *index_phi);
@@ -426,3 +429,5 @@ static short get_pvq_splits(              /* o  : Number of segments           *
 }
 
 
+
+} // end of namespace

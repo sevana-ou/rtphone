@@ -8,6 +8,9 @@
 #include "prot.h"
 #include "rom_com.h"
 
+namespace evs { 
+
+
 
 /*-------------------------------------------------------------------*
 * Local constants
@@ -2249,3 +2252,5 @@ void DTFS_peaktoaverage(
     }
 }
 
+
+} // end of namespace

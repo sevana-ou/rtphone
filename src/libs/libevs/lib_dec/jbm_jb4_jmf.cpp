@@ -12,6 +12,9 @@
 /* local includes */
 #include "jbm_jb4_jmf.h"
 #include "jbm_jb4_circularbuffer.h"
+
+namespace evs { 
+
 /* instrumentation */
 
 
@@ -261,3 +264,5 @@ static void JB4_JMF_popFront( JB4_JMF_HANDLE h )
 
 }
 
+
+} // end of namespace

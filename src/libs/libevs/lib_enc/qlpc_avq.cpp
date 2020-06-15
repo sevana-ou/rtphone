@@ -6,6 +6,9 @@
 #include <stdio.h>
 #include "prot.h"
 
+namespace evs { 
+
+
 
 /*-------------------------------------------------------------------*
 * qlpc_avq()
@@ -327,3 +330,5 @@ int encode_lpc_avq(
 
     return(nb_bits);
 }
+
+} // end of namespace

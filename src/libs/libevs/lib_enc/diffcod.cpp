@@ -6,6 +6,9 @@
 #include "prot.h"
 #include "rom_com.h"
 
+namespace evs { 
+
+
 
 /*--------------------------------------------------------------------------*/
 /*  Function  diffcod                                                       */
@@ -123,3 +126,5 @@ void diffcod_lrmdct(
     return;
 }
 
+
+} // end of namespace

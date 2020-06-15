@@ -10,6 +10,9 @@
 #include "prot.h"
 #include "stl.h"
 
+namespace evs { 
+
+
 /*-------------------------------------------------------------------*
  * Local definitions
  *-------------------------------------------------------------------*/
@@ -886,3 +889,5 @@ Word16 atan2_fx(  /* o: Angle between 0 and EVS_PI/2 radian (Q14) */
     }
     return angle;  /* Q14 between 0 and EVS_PI/2 radian. */
 }
+
+} // end of namespace

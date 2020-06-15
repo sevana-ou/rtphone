@@ -10,6 +10,9 @@
 #include "options.h"
 #include "rom_com.h"
 
+namespace evs { 
+
+
 /*-------------------------------------------------------------------*
  * coder_acelp()
  *
@@ -427,3 +430,5 @@ void coder_acelp(
 
     return;
 }
+
+} // end of namespace

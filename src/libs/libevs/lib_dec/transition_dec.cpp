@@ -8,6 +8,9 @@
 #include "rom_com.h"
 #include "prot.h"
 
+namespace evs { 
+
+
 /*----------------------------------------------------------------------*
  * Local functions
  *----------------------------------------------------------------------*/
@@ -741,3 +744,5 @@ short tc_classif(
 
     return( tc_subfr );
 }
+
+} // end of namespace

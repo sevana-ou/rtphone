@@ -9,6 +9,9 @@
 #include "cnst.h"
 #include "prot.h"
 
+namespace evs { 
+
+
 /*------------------------------------------------------------------*
 * vlpc_2st_cod()
 *
@@ -104,3 +107,5 @@ int vlpc_2st_cod(   /* output: number of allocated bits        */
 
     return( nbits );
 }
+
+} // end of namespace

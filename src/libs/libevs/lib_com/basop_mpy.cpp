@@ -6,6 +6,9 @@
 #include "basop_mpy.h"
 #include "options.h"
 
+namespace evs { 
+
+
 Word32 Mpy_32_16_1(Word32 x, Word16 y)
 {
     Word32 mh;
@@ -52,3 +55,5 @@ Word32 Mpy_32_32(Word32 x, Word32 y)
     return (mh);
 }
 
+
+} // end of namespace

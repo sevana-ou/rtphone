@@ -9,6 +9,9 @@
 #include "prot.h"
 #include "rom_com.h"
 
+namespace evs { 
+
+
 
 /*---------------------------------------------------------------------*
  * Local functions
@@ -955,3 +958,5 @@ short E_ACELP_code43bit(const float code[], long unsigned *ps, int *p, unsigned 
     return saved_bits;
 }
 
+
+} // end of namespace

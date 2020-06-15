@@ -8,6 +8,9 @@
 #include "rom_com.h"
 #include "prot.h"
 
+namespace evs { 
+
+
 
 /*-------------------------------------------------------------------*
  * gs_noisf()
@@ -684,3 +687,5 @@ void highband_exc_dct_in(
 
     return;
 }
+
+} // end of namespace

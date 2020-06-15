@@ -11,6 +11,9 @@
 #include "rom_com.h"
 #include "cnst.h"
 
+namespace evs { 
+
+
 
 
 /* compute noise-measure flags for spectrum filling and quantization (0: tonal, 1: noise-like) */
@@ -1216,3 +1219,5 @@ void attenuateNbSpectrum(int L_frame, float *spectrum)
 
     return;
 }
+
+} // end of namespace

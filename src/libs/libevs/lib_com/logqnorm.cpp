@@ -9,6 +9,9 @@
 #include "rom_com.h"
 #include "prot.h"        /* Function prototypes                      */
 
+namespace evs { 
+
+
 /*--------------------------------------------------------------------------
  * logqnorm()
  *
@@ -161,3 +164,5 @@ void calc_norm(
 
     return;
 }
+
+} // end of namespace

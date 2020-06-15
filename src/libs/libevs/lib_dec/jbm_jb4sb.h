@@ -9,6 +9,8 @@
 
 #include "jbm_types.h"
 
+namespace evs {
+
 /** handle for jitter buffer */
 typedef struct JB4* JB4_HANDLE;
 
@@ -64,5 +66,7 @@ short JB4_FECoffset(JB4_HANDLE h);
 
 /** function to get the number of data units contained in the buffer */
 unsigned int JB4_bufferedDataUnits( const JB4_HANDLE h );
+
+} // end of namespace
 
 #endif /* JBM_JB4SB_H */

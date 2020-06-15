@@ -9,6 +9,9 @@
 #include "rom_com.h"
 #include "prot.h"
 
+namespace evs { 
+
+
 /*-----------------------------------------------------------------*
  * Local functions
  *-----------------------------------------------------------------*/
@@ -975,3 +978,5 @@ static void gain_trans_enc(
 
     return;
 }
+
+} // end of namespace

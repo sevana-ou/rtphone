@@ -13,6 +13,9 @@
 #include "basop_proto_func.h"
 #include "stat_com.h"
 
+namespace evs { 
+
+
 #if defined(_MSC_VER) && (_MSC_VER <= 1200)  /* disable global optimizations to overcome an internal compiler error */
 #pragma optimize("g", off)
 #endif
@@ -780,3 +783,5 @@ void decoder_LPD(
 
     return;
 }
+
+} // end of namespace

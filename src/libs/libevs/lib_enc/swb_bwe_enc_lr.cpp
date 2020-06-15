@@ -10,6 +10,9 @@
 #include "rom_com.h"
 #include "stat_com.h"
 
+namespace evs { 
+
+
 /*--------------------------------------------------------------------------*
  * GetSubbandCorrIndex2_har()
  *
@@ -671,3 +674,5 @@ void swb_bwe_enc_lr(
     return;
 }
 
+
+} // end of namespace

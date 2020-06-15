@@ -8,6 +8,9 @@
 #include "prot.h"
 #include "rom_com.h"
 
+namespace evs { 
+
+
 /*-----------------------------------------------------------------*
  * Local constants
  *-----------------------------------------------------------------*/
@@ -500,3 +503,5 @@ static void hvq_classifier(
 }
 
 
+
+} // end of namespace

@@ -8,6 +8,8 @@
 /* local headers */
 #include "stat_dec.h"
 
+namespace evs {
+
 /*
  * ENUMS
  */
@@ -82,4 +84,5 @@ EVS_RX_IsEmpty(EVS_RX_HANDLE hEvsRX );
 EVS_RX_ERROR
 EVS_RX_Close(EVS_RX_HANDLE* phEvsRX );
 
+} // end of namespace
 #endif

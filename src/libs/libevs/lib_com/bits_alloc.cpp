@@ -9,6 +9,9 @@
 #include "rom_com.h"
 #include "prot.h"
 
+namespace evs { 
+
+
 /*-------------------------------------------------------------------*
 * Local function
 *--------------------------------------------------------------------*/
@@ -306,3 +309,5 @@ static int BITS_ALLOC_adjust_acelp_fixed_cdk(
 
     return bitsused;
 }
+
+} // end of namespace

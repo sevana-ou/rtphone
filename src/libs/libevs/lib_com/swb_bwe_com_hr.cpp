@@ -6,6 +6,9 @@
 #include "options.h"
 #include "prot.h"
 
+namespace evs { 
+
+
 /*-------------------------------------------------------------------*
  * swb_hr_nonzero_subband_noise_fill()
  *
@@ -283,3 +286,5 @@ float td_postprocess(           /* o  : gain                        */
 
     return( gain );
 }
+
+} // end of namespace

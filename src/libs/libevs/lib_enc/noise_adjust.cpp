@@ -8,6 +8,9 @@
 #include "rom_com.h"
 #include "prot.h"
 
+namespace evs { 
+
+
 /*--------------------------------------------------------------------------*
  * noise_adjust()
  *
@@ -79,3 +82,5 @@ short noise_adjust(                 /* o  : index of noise attenuation */
 
     return nf_idx;
 }
+
+} // end of namespace

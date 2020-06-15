@@ -8,6 +8,9 @@
 #include "rom_com.h"
 #include "prot.h"
 
+namespace evs { 
+
+
 /*-------------------------------------------------------------------*
  * Local constants
  *-------------------------------------------------------------------*/
@@ -984,3 +987,5 @@ void gain_enc_lbr(
 
     return;
 }
+
+} // end of namespace

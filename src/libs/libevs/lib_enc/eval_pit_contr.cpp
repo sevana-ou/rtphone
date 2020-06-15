@@ -8,6 +8,9 @@
 #include "rom_com.h"
 #include "prot.h"
 
+namespace evs { 
+
+
 
 /*-------------------------------------------------------------------*
  * Local constantes
@@ -315,3 +318,5 @@ short Pit_exc_contribution_len(   /* o  : bin where pitch contribution is signif
 
     return last_pit_bin;
 }
+
+} // end of namespace

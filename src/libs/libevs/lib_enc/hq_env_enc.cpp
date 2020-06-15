@@ -9,6 +9,9 @@
 #include "rom_com.h"
 #include "rom_enc.h"
 
+namespace evs { 
+
+
 /*--------------------------------------------------------------------------------------*
  * encode_envelope_indices()
  *
@@ -526,3 +529,5 @@ void diff_envelope_coding(
 
     return;
 }
+
+} // end of namespace

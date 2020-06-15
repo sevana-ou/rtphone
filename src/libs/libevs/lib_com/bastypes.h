@@ -5,6 +5,9 @@
 #ifndef __BASTYPES_H
 #define __BASTYPES_H
 
+namespace evs {
+
+
 typedef unsigned char  BYTE;
 typedef unsigned short WORD;
 #if defined(__alpha__) || defined(__alpha) || defined(__sgi)
@@ -42,5 +45,7 @@ typedef unsigned long int ULINT;
 #endif
 
 #define INVALID_HANDLE NULL
+
+} // end of namespace
 
 #endif

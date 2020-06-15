@@ -13,6 +13,9 @@
 #include "cnst.h"
 #include "stat_enc.h"
 
+namespace evs { 
+
+
 /**********************************************************************/ /*
 write single bit to stream
 **************************************************************************/
@@ -864,3 +867,5 @@ void IGFEncApplyMono(const IGF_ENC_INSTANCE_HANDLE                   hInstance, 
         igfGridIdx);                            /* i: IGF grid index                            */
 }
 
+
+} // end of namespace

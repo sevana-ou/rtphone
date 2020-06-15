@@ -7,8 +7,8 @@
 *
 * lookup AMRWB IO mode
 *-------------------------------------------------------------------*/
-
-static Word16 rate2AMRWB_IOmode(
+namespace evs {
+extern Word16 rate2AMRWB_IOmode(
     Word32 rate                    /* i: bit rate */
 );
 
@@ -35,6 +35,7 @@ extern Word16 EVSmode2rate(
 #define CMR_ON		0
 #define CMR_ONLY	1
 
+}
 
 static const std::map<int, std::set<int>> BitrateToBandwidth_Tab{
     {5900,     {NB, WB}},
@@ -144,7 +145,7 @@ EVSCodec::EVSCodec(const StreamParameters &sp)
 {
 	EVSCodec::sp = sp;
 
-    if ((st_dec = (Decoder_State*)malloc(sizeof(Decoder_State))) == NULL)
+    if ((st_dec = (evs::Decoder_State*)malloc(sizeof(evs::Decoder_State))) == NULL)
 	{
 		std::stringstream out;
 		out << "Can not allocate memory for decoder state structure\n";
@@ -217,7 +218,7 @@ int EVSCodec::decode(const void* input, int input_length, void* output, int outp
 	/*if we have FixedPayload without ToC*/
     if (FixedPayload_EVSPrimary.find(input_length * 8) != FixedPayload_EVSPrimary.end())
     {
-        char c = rate2EVSmode(FixedPayload_EVSPrimary.find(input_length * 8)->second);
+        char c = evs::rate2EVSmode(FixedPayload_EVSPrimary.find(input_length * 8)->second);
         /* Add ToC byte.
          * WARNING maybe it will be work incorrect with 56bit payload,
          * see 3GPP TS 26.445 Annex A, A.2.1.3 */
@@ -233,7 +234,7 @@ int EVSCodec::decode(const void* input, int input_length, void* output, int outp
     /* Decode process */
     size_t buffer_processed = 0;
 
-    while (st_dec->bitstreamformat == G192 ? read_indices(st_dec, buffer.c_str(), buffer.size(), &buffer_processed, 0) : read_indices_mime(st_dec, buffer.c_str(), buffer.size(), &buffer_processed, 0))
+    while (st_dec->bitstreamformat == evs::G192 ? read_indices(st_dec, buffer.c_str(), buffer.size(), &buffer_processed, 0) : read_indices_mime(st_dec, buffer.c_str(), buffer.size(), &buffer_processed, 0))
 	{
 		if (st_dec->codec_mode == MODE1)
 		{
@@ -243,23 +244,23 @@ int EVSCodec::decode(const void* input, int input_length, void* output, int outp
 			}
 			else
 			{
-                evs_dec(st_dec, data, FRAMEMODE_NORMAL);
+                evs_dec(st_dec, data, evs::FRAMEMODE_NORMAL);
 			}
 		}
 		else
 		{
             if (!st_dec->bfi)
 			{
-                evs_dec(st_dec, data, FRAMEMODE_NORMAL);
+                evs_dec(st_dec, data, evs::FRAMEMODE_NORMAL);
 			}
 			else
 			{
-                evs_dec(st_dec, data, FRAMEMODE_MISSING);
+                evs_dec(st_dec, data, evs::FRAMEMODE_MISSING);
 			}
 		}
 
 		/* convert 'float' output data to 'short' */
-        syn_output(data, this->pcmLength(), static_cast<short*>(output) + offset);
+        evs::syn_output(data, this->pcmLength(), static_cast<short*>(output) + offset);
 		offset += this->pcmLength();
         if (st_dec->ini_frame < MAX_FRAME_COUNTER)
 		{
@@ -284,12 +285,12 @@ void EVSCodec::initDecoder(const StreamParameters& sp)
     st_dec->Opt_AMR_WB = 0;
     st_dec->Opt_VOIP = 0;
 
-	st_dec->bitstreamformat = G192;
+    st_dec->bitstreamformat = evs::G192;
 	st_dec->amrwb_rfc4867_flag = -1;
 
 	/*Set MIME type*/
 	if (sp.mime) {
-		st_dec->bitstreamformat = MIME;
+        st_dec->bitstreamformat = evs::MIME;
 		st_dec->amrwb_rfc4867_flag = 0;
 	}
 	/*Set Bandwidth*/
@@ -318,7 +319,6 @@ void EVSCodec::initDecoder(const StreamParameters& sp)
     reset_indices_dec(st_dec);
 
     srand(static_cast<unsigned int>(time(nullptr)));
-
 }
 
 } // end of namespace MT

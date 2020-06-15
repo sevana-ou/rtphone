@@ -12,6 +12,9 @@
 #include "stl.h"
 #include "basop_proto_func.h"
 
+namespace evs { 
+
+
 /*---------------------------------------------------------------------*
  * midlsf_dec()
  *
@@ -145,3 +148,5 @@ int lsf_ind_is_active(
 
     return sub(min_distance, min_distance_thr[narrowband][cdk]) < 0;
 }
+
+} // end of namespace

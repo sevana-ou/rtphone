@@ -10,6 +10,9 @@
 /* local headers */
 #include "jbm_types.h"
 
+namespace evs {
+
+
 /** handle for FIFO with fixed capacity */
 typedef struct PCMDSP_FIFO *PCMDSP_FIFO_HANDLE;
 
@@ -40,5 +43,7 @@ int pcmdsp_fifo_read( PCMDSP_FIFO_HANDLE h, unsigned int nSamplesPerChannel, uin
 
 /** Returns the number of samples per channel that can be read (number of currently stored samples). */
 unsigned int pcmdsp_fifo_nReadableSamples( const PCMDSP_FIFO_HANDLE h );
+
+} // end of namespace
 
 #endif /* JBM_PCMDSP_FIFO_H */

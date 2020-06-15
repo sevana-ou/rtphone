@@ -5,6 +5,9 @@
 #include "options.h"
 #include "prot.h"
 
+namespace evs { 
+
+
 /*-------------------------------------------------------------------*
  * deemph()
  *
@@ -35,3 +38,5 @@ void deemph(
 
     return;
 }
+
+} // end of namespace

@@ -11,6 +11,9 @@
 #include "options.h"
 #include "prot.h"
 
+namespace evs { 
+
+
 
 /*------------------------------------------------------------------*
  * own_random()
@@ -1456,3 +1459,5 @@ short is_numeric_float(
 }
 
 
+
+} // end of namespace

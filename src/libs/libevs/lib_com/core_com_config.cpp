@@ -11,6 +11,9 @@
 #include "rom_com.h"
 #include "prot.h"
 
+namespace evs { 
+
+
 /*-------------------------------------------------------------------*
  * getTcxonly()
  *
@@ -417,3 +420,5 @@ short getTcxLpcShapedAri(
 
     return tcx_lpc_shaped_ari;
 }
+
+} // end of namespace

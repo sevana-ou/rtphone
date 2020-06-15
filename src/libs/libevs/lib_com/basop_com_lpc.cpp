@@ -14,6 +14,9 @@
 #include "basop_util.h"
 #include "stl.h"
 
+namespace evs { 
+
+
 #define UNROLL_CHEBYSHEV_INNER_LOOP
 #define NC_MAX 8
 #define GUESS_TBL_SZ 256
@@ -235,3 +238,5 @@ void basop_lsf2lsp(const Word16 lsf[], Word16 lsp[])
 
     return;
 }
+
+} // end of namespace

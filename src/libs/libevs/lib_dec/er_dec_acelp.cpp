@@ -9,6 +9,9 @@
 #include "prot.h"
 #include "options.h"
 
+namespace evs { 
+
+
 
 /*-------------------------------------------------------------------*
 * con_acelp()
@@ -690,3 +693,5 @@ void con_acelp(
 
     return;
 }
+
+} // end of namespace

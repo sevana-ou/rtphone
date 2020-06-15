@@ -8,6 +8,9 @@
 #include "prot.h"
 #include "rom_com.h"
 
+namespace evs { 
+
+
 /*------------------------------------------------------------------------*
  * Local functions
  *------------------------------------------------------------------------*/
@@ -501,3 +504,5 @@ static short sparse_dec_pos(
 
     return bits;
 }
+
+} // end of namespace

@@ -8,6 +8,9 @@
 #include "cnst.h"
 #include "prot.h"
 
+namespace evs { 
+
+
 
 /*------------------------------------------------------------------------*
  * FEC_pitch_estim()
@@ -54,3 +57,5 @@ void FEC_pitch_estim(
 
     return;
 }
+
+} // end of namespace

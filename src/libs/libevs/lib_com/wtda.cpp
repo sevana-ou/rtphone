@@ -8,6 +8,9 @@
 #include "rom_com.h"
 #include <assert.h>
 
+namespace evs { 
+
+
 
 /*--------------------------------------------------------------------------*
 *  mvr2r_inv()
@@ -327,3 +330,5 @@ void wtda(
 
     return;
 }
+
+} // end of namespace

@@ -8,6 +8,9 @@
 #include "rom_com.h"
 #include "prot.h"
 
+namespace evs { 
+
+
 /*-------------------------------------------------------------------*
  * pre_proc()
  *
@@ -897,3 +900,5 @@ void pre_proc(
 
     return;
 }
+
+} // end of namespace

@@ -7,6 +7,9 @@
 #include "prot.h"
 #include "rom_com.h"
 
+namespace evs { 
+
+
 
 /*-------------------------------------------------------------------
  * direct_transform()
@@ -139,3 +142,5 @@ void direct_transform(
 
     return;
 }
+
+} // end of namespace

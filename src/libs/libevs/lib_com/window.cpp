@@ -7,6 +7,9 @@
 #include "options.h"
 #include "prot.h"
 
+namespace evs { 
+
+
 /*-------------------------------------------------------------------
  * ham_cos_window()
  *
@@ -37,3 +40,5 @@ void ham_cos_window(
     }
     return;
 }
+
+} // end of namespace

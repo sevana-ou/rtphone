@@ -11,6 +11,9 @@
 #include "rom_com.h"
 #include "rom_dec.h"
 
+namespace evs { 
+
+
 /*---------------------------------------------------------------------*
  * reconfig_decoder_LPD()
  *
@@ -148,3 +151,5 @@ void reconfig_decoder_LPD(
 
     return;
 }
+
+} // end of namespace

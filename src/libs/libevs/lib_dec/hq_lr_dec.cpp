@@ -10,6 +10,9 @@
 #include "stl.h"
 #include "basop_util.h"
 
+namespace evs { 
+
+
 /*--------------------------------------------------------------------------*
  * Local functions
  *--------------------------------------------------------------------------*/
@@ -1290,3 +1293,5 @@ static void spt_shorten_domain_set_dec(
 
     return;
 }
+
+} // end of namespace

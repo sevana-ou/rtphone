@@ -9,6 +9,9 @@
 #include "rom_com.h"
 #include "prot.h"
 
+namespace evs { 
+
+
 
 static short rc_dec_read( Decoder_State *st );
 
@@ -190,3 +193,5 @@ static short rc_dec_read(Decoder_State *st)
     }
 }
 
+
+} // end of namespace

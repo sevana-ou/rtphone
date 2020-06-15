@@ -9,6 +9,8 @@
 #include "stat_com.h"          /* Common structures                      */
 #include "cnst.h"
 
+namespace evs {
+
 typedef enum _DEC_MODE
 {
     DEC_NO_FRAM_LOSS         = 0x0,
@@ -1009,6 +1011,8 @@ typedef struct Decoder_State
 
 
 } Decoder_State;
+
+} // end of namespace
 
 #endif
 

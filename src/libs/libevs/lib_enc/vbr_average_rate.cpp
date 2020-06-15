@@ -8,6 +8,9 @@
 #include "prot.h"
 #include "rom_com.h"
 
+namespace evs { 
+
+
 
 /*------------------------------------------------------------------*
  * Local constants
@@ -166,3 +169,5 @@ void update_average_rate(
 }
 
 
+
+} // end of namespace

@@ -8,6 +8,8 @@
 #include "stl.h"
 #include "basop_mpy.h"
 
+namespace evs {
+
 #define _LONG                long
 #define _SHORT               short
 #ifdef _WIN32
@@ -81,5 +83,7 @@ typedef struct
         Word16 im;
     } v;
 } PWord16;
+
+} // end of namespace
 
 #endif /* __BASOP_SETTINGS_H */

@@ -9,6 +9,9 @@
 #include "prot.h"
 #include "rom_com.h"
 
+namespace evs { 
+
+
 /*-----------------------------------------------------------------------*
  * open_decoder_LPD()
  *
@@ -668,3 +671,5 @@ void open_decoder_LPD(
     return;
 }
 
+
+} // end of namespace

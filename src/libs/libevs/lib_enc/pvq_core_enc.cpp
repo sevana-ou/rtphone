@@ -11,6 +11,9 @@
 #include "prot.h"
 #include "stl.h"
 
+namespace evs { 
+
+
 /*-------------------------------------------------------------------*
 * Local functions
 *--------------------------------------------------------------------*/
@@ -510,3 +513,5 @@ void obtainEnergyParameter(
 #undef EPSILON_obtainEnergyParameter
 
 
+
+} // end of namespace

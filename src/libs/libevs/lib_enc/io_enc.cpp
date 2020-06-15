@@ -11,6 +11,9 @@
 #include "rom_com.h"
 #include "mime.h"
 
+namespace evs { 
+
+
 
 /*-------------------------------------------------------------------*
  * Local functions
@@ -1006,3 +1009,5 @@ static void usage_enc( void )
 
     exit(-1);
 }
+
+} // end of namespace

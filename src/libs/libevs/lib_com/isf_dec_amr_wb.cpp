@@ -7,6 +7,9 @@
 #include "rom_com.h"
 #include "prot.h"
 
+namespace evs { 
+
+
 /*---------------------------------------------------------------------*
 * isf_dec_amr_wb()
 *
@@ -251,3 +254,5 @@ void disf_2s_36b(
 
     return;
 }
+
+} // end of namespace

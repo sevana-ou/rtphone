@@ -5,6 +5,9 @@
 #include "options.h"
 #include "cnst.h"
 
+namespace evs { 
+
+
 const short hangover_hd_tbl[3] = {1, 1, 3};
 const short hangover_sf_tbl[6] = {1, 3, 4, 1, 1, 2};
 const short bwd_start_bin[BWD_N_BINS_MAX] = {1, 3, 6, 11};
@@ -700,3 +703,5 @@ const float hann_window_320[BWD_TOTAL_WIDTH/2] =
  *----------------------------------------------------------------------------------*/
 const int startLineWB[11]  = { 8, 23, 36, 45, 66, 128 /* 13.2kbps */, 200, 320, 320, 320 /* 48kbps */, 320 };
 const int startLineSWB[9] = { 8, 44,  96 /* 13.2kbps */, 160, 320, 320, 256 /* 48kbps */, 341, 640 };
+
+} // end of namespace

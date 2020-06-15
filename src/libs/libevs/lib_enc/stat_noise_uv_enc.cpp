@@ -6,6 +6,9 @@
 #include "prot.h"
 #include "rom_com.h"
 
+namespace evs { 
+
+
 /*-----------------------------------------------------------------*
  * stat_noise_uv_enc()
  *
@@ -69,3 +72,5 @@ void stat_noise_uv_enc(
 
     return;
 }
+
+} // end of namespace

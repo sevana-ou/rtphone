@@ -7,6 +7,9 @@
 #include "prot.h"
 #include "rom_com.h"
 
+namespace evs { 
+
+
 /*--------------------------------------------------------------------------*
  * interleave_spectrum()
  *
@@ -160,3 +163,5 @@ void de_interleave_spectrum(
 
     return;
 }
+
+} // end of namespace

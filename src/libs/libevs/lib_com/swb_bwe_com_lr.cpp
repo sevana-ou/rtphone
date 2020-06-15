@@ -9,6 +9,9 @@
 #include "prot.h"
 #include "rom_com.h"
 
+namespace evs { 
+
+
 
 /*-------------------------------------------------------------------*
  * hf_parinitiz()
@@ -2045,3 +2048,5 @@ void updat_prev_frm(
 
     return;
 }
+
+} // end of namespace

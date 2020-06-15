@@ -10,6 +10,9 @@
 #include "prot.h"
 #include "rom_com.h"
 
+namespace evs { 
+
+
 /*-------------------------------------------------------------------*
  * WB_BWE_gain_pred()
  *
@@ -1516,3 +1519,5 @@ void save_old_syn(
     return;
 }
 
+
+} // end of namespace

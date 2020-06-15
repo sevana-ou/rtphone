@@ -10,6 +10,9 @@
 #include "string.h"
 #include <assert.h>
 
+namespace evs { 
+
+
 #if defined __ICL
 #define restrict __restrict
 #else
@@ -801,3 +804,5 @@ int cldfb_reset_memory(
 
     return 0;
 }
+
+} // end of namespace

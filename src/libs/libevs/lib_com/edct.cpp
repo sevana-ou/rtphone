@@ -9,6 +9,9 @@
 #include "rom_com.h"
 #include "prot.h"
 
+namespace evs { 
+
+
 static float const * get_edct_table(short length)
 {
     float const * edct_table = NULL;
@@ -191,3 +194,5 @@ void iedct_short(
 
     return;
 }
+
+} // end of namespace

@@ -7,6 +7,9 @@
 #include "rom_com.h"
 #include "cnst.h"
 
+namespace evs { 
+
+
 /*-----------------------------------------------------------------*
  * Local functions
  *-----------------------------------------------------------------*/
@@ -741,3 +744,5 @@ int c2idx(
         return skip + c2idx( n-p0-1, p+1, k-1 );
     }
 }
+
+} // end of namespace

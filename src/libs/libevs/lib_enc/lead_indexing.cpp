@@ -8,6 +8,9 @@
 #include "rom_com.h"
 #include "prot.h"
 
+namespace evs { 
+
+
 
 /*-------------------------------------------------------------------*
  * Local function prototypes
@@ -174,3 +177,5 @@ static int fcb_encode_pos(      /* o  : Code index              */
 
     return code_index;
 }
+
+} // end of namespace

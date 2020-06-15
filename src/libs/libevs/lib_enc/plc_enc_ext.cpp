@@ -9,6 +9,9 @@
 #include "cnst.h"
 #include "rom_com.h"
 
+namespace evs { 
+
+
 
 #define NBITS_GACELP              5
 
@@ -107,3 +110,5 @@ void gPLC_encInfo(
 
     return;
 }
+
+} // end of namespace

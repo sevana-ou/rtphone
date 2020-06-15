@@ -7,6 +7,9 @@
 #include "cnst.h"
 #include "rom_com.h"
 
+namespace evs { 
+
+
 
 /*--------------------------------------------------------------------------
  * hp_filter()
@@ -226,3 +229,5 @@ short detect_transient(                /* o  : transient flag           */
 
     return IsTransient;
 }
+
+} // end of namespace

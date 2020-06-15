@@ -11,6 +11,9 @@
 #include "rom_com.h"
 #include "basop_proto_func.h"
 
+namespace evs { 
+
+
 /*---------------------------------------------------------------------*
  * lsf_msvq_ma_decprm()
  *
@@ -260,3 +263,5 @@ int dec_lsf_tcxlpc(          /* (O) number of bits read */
     return st->next_bit_pos - start_bit_pos;
 }
 
+
+} // end of namespace

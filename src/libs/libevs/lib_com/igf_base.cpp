@@ -7,6 +7,9 @@
 #include "prot.h"
 #include "rom_com.h"
 
+namespace evs { 
+
+
 /*---------------------------------------------------------------------*
  * IGF_ApplyTransFac()
  *
@@ -638,3 +641,5 @@ int IGFCommonFuncsIGFGetCFTables(            /**< out:    | error value: 0 -> er
 
     return retValue;
 }
+
+} // end of namespace

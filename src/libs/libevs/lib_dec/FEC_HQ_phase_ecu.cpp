@@ -10,6 +10,9 @@
 #include "prot.h"
 #include "assert.h"
 
+namespace evs { 
+
+
 
 /*---------------------------------------------------------------------*
  * Local constants
@@ -1758,3 +1761,5 @@ void hq_ecu(
 
     return;
 }
+
+} // end of namespace

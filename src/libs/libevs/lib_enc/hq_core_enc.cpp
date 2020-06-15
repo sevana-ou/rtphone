@@ -8,6 +8,9 @@
 #include "prot.h"
 #include "rom_com.h"
 
+namespace evs { 
+
+
 /*--------------------------------------------------------------------------
  * hq_core_enc()
  *
@@ -156,3 +159,5 @@ void hq_core_enc(
     return;
 }
 
+
+} // end of namespace

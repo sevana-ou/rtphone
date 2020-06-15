@@ -10,6 +10,9 @@
 #include "control.h"
 #include "basop_util.h"
 
+namespace evs { 
+
+
 #define NC_MAX 8
 
 static Word16 E_LPC_f_lsp_pol_get(const Word16 lsp[], Word32 f[],  const Word16 n, const Word16 past_Ovf, const Word16 isMODE1);
@@ -260,3 +263,5 @@ Word16 E_LPC_f_lsp_pol_get(const Word16 lsp[], Word32 f[],  const Word16 n, cons
     }
     return Ovf;
 }
+
+} // end of namespace

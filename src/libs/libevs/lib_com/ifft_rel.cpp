@@ -6,6 +6,9 @@
 #include "prot.h"
 #include "rom_com.h"
 
+namespace evs { 
+
+
 
 /*-----------------------------------------------------------------*
  * Local constants
@@ -253,3 +256,5 @@ void ifft_rel(
 
     return;
 }
+
+} // end of namespace

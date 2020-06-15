@@ -8,6 +8,9 @@
 #include "rom_com.h"
 #include "prot.h"
 
+namespace evs { 
+
+
 
 /*--------------------------------------------------------------------------*
  * fine_gain_pred()
@@ -161,3 +164,5 @@ void fine_gain_dec
 }
 
 
+
+} // end of namespace

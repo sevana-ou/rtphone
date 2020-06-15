@@ -9,6 +9,9 @@
 #include "rom_com.h"
 #include "basop_proto_func.h"
 
+namespace evs { 
+
+
 /*-------------------------------------------------------------------*
  * Local functions
  *-------------------------------------------------------------------*/
@@ -2312,3 +2315,5 @@ void a2isf(
     return;
 }
 
+
+} // end of namespace

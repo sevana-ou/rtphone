@@ -7,6 +7,9 @@
 #include <math.h>
 #include "prot.h"
 
+namespace evs { 
+
+
 /*------------------------------------------------------------------*
 * vlpc_2st_dec()
 *
@@ -40,3 +43,5 @@ void vlpc_2st_dec(
 
     return;
 }
+
+} // end of namespace

@@ -7,6 +7,9 @@
 #include "prot.h"
 #include "rom_com.h"
 
+namespace evs { 
+
+
 
 /*-------------------------------------------------------------------*
  * encod_gen_voic()
@@ -306,3 +309,5 @@ void encod_gen_voic(
 
     return;
 }
+
+} // end of namespace

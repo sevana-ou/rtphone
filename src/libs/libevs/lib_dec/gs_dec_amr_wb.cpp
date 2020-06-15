@@ -8,6 +8,9 @@
 #include "rom_com.h"
 #include "prot.h"
 
+namespace evs { 
+
+
 
 /*-------------------------------------------------------------------*
  * Local constants
@@ -391,3 +394,5 @@ void improv_amr_wb_gs(
 
     return;
 }
+
+} // end of namespace

@@ -8,6 +8,9 @@
 #include "prot.h"
 #include "rom_com.h"
 
+namespace evs { 
+
+
 
 /*-------------------------------------------------------------------*
  * modify_Fs()
@@ -855,3 +858,5 @@ void retro_interp5_4( float *pst_old_syn )
     return;
 }
 
+
+} // end of namespace

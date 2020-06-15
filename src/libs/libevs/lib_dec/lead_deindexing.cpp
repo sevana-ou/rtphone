@@ -8,6 +8,9 @@
 #include "rom_com.h"
 #include "rom_dec.h"
 
+namespace evs { 
+
+
 /*-------------------------------------------------------------------*
  * Local function prototype
  *-------------------------------------------------------------------*/
@@ -230,3 +233,5 @@ void fcb_decode_pos(
 
     return;
 }
+
+} // end of namespace

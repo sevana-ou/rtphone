@@ -7,6 +7,9 @@
 #include "rom_com.h"
 #include "prot.h"
 
+namespace evs { 
+
+
 /*-------------------------------------------------------------------*
  * dequantize_uvg()
  *
@@ -118,3 +121,5 @@ void generate_nelp_excitation(
     }
 
 }
+
+} // end of namespace

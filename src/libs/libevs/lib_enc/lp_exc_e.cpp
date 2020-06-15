@@ -6,6 +6,9 @@
 #include "cnst.h"
 #include "prot.h"
 
+namespace evs { 
+
+
 /*-------------------------------------------------------------------*
  * Local constants
  *-------------------------------------------------------------------*/
@@ -283,3 +286,5 @@ float corr_xy1(            /* o  : pitch gain  (0..GAIN_PIT_MAX)         */
 
     return gain;
 }
+
+} // end of namespace

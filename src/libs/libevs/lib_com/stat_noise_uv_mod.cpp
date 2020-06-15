@@ -6,6 +6,9 @@
 #include "options.h"
 #include "prot.h"
 
+namespace evs { 
+
+
 
 /*---------------------------------------------------------------------*
  * Local constants
@@ -198,3 +201,5 @@ static float calc_tilt(
 
     return r1/r0;
 }
+
+} // end of namespace

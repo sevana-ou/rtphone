@@ -7,6 +7,9 @@
 #include "cnst.h"
 #include "rom_com.h"
 
+namespace evs { 
+
+
 
 /*--------------------------------------------------------------------------*
  * recovernorm()
@@ -48,3 +51,5 @@ void recovernorm(
 
     return;
 }
+
+} // end of namespace

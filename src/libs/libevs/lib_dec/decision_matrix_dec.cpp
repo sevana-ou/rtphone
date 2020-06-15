@@ -8,6 +8,9 @@
 #include "rom_com.h"
 #include "prot.h"
 
+namespace evs { 
+
+
 /*-----------------------------------------------------------------*
  * decision_matrix_dec()
  *
@@ -523,3 +526,5 @@ void decision_matrix_dec(
 
     return;
 }
+
+} // end of namespace

@@ -9,6 +9,9 @@
 #include "rom_enc.h"
 #include "rom_com.h"
 
+namespace evs { 
+
+
 /*--------------------------------------------------------------------------*
  * hq_hr_enc()
  *
@@ -194,3 +197,5 @@ void hq_hr_enc(
 
     return;
 }
+
+} // end of namespace

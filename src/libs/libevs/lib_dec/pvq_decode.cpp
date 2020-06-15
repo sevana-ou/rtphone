@@ -7,6 +7,9 @@
 #include "rom_com.h"
 #include "math.h"
 
+namespace evs { 
+
+
 
 /*-------------------------------------------------------------------*
  * Function pvq_decode()                                             *
@@ -72,3 +75,5 @@ void pvq_decode(
 
     return;
 }
+
+} // end of namespace

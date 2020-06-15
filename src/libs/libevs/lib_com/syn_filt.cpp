@@ -8,6 +8,9 @@
 #include "prot.h"
 #include "rom_com.h"
 
+namespace evs { 
+
+
 /*------------------------------------------------------------------*
  * syn_filt()
  *
@@ -120,3 +123,5 @@ void synth_mem_updt2(
     return;
 }
 
+
+} // end of namespace

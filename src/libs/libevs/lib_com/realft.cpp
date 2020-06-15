@@ -7,6 +7,9 @@
 #include "options.h"
 #include "prot.h"
 
+namespace evs { 
+
+
 /*-------------------------------------------------------------------*
  * four1()
  *
@@ -162,3 +165,5 @@ void realft(
 
     return;
 }
+
+} // end of namespace

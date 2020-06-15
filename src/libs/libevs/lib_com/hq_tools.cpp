@@ -8,6 +8,9 @@
 #include "prot.h"
 #include "rom_com.h"
 
+namespace evs { 
+
+
 /*--------------------------------------------------------------------------*
  * Local functions
  *--------------------------------------------------------------------------*/
@@ -1729,3 +1732,5 @@ void floating_point_add(
     return;
 }
 
+
+} // end of namespace

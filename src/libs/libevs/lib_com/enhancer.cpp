@@ -8,6 +8,9 @@
 #include "prot.h"
 #include "rom_com.h"
 
+namespace evs { 
+
+
 /*---------------------------------------------------------------------*
  * Local functions
  *---------------------------------------------------------------------*/
@@ -241,3 +244,5 @@ static void agc2(
 
     return;
 }
+
+} // end of namespace

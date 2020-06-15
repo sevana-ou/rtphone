@@ -8,6 +8,9 @@
 #include "cnst.h"
 #include "prot.h"
 
+namespace evs { 
+
+
 
 /*-------------------------------------------------------------------*
  * TCX_MDCT()
@@ -134,3 +137,5 @@ void TCX_MDCT_Inverse(
 
     return;
 }
+
+} // end of namespace

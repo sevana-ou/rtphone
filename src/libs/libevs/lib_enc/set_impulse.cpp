@@ -6,6 +6,9 @@
 #include "rom_com.h"
 #include "prot.h"
 
+namespace evs { 
+
+
 /*-----------------------------------------------------------------*
  * Local constant
  *-----------------------------------------------------------------*/
@@ -299,3 +302,5 @@ static void correlate_tc(
 
     return;
 }
+
+} // end of namespace

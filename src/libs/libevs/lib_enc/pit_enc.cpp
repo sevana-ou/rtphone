@@ -11,6 +11,9 @@
 #include "rom_enc.h"
 #include "rom_com.h"
 
+namespace evs { 
+
+
 
 /*------------------------------------------------------------------*
  * pit_encode()
@@ -1317,3 +1320,5 @@ void Mode2_delta_pit_enc(
 
     return;
 }
+
+} // end of namespace

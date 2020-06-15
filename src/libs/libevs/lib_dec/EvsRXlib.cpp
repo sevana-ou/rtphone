@@ -15,6 +15,9 @@
 #include "jbm_pcmdsp_fifo.h"
 #include "cnst.h"
 
+namespace evs { 
+
+
 
 struct EVS_RX
 {
@@ -481,3 +484,5 @@ static int isSidFrame( unsigned int size )
     }
     return ret;
 }
+
+} // end of namespace

@@ -9,6 +9,9 @@
 #include "prot.h"
 #include "rom_com.h"
 
+namespace evs { 
+
+
 /*-------------------------------------------------------------------*
  * Local constants
  *-------------------------------------------------------------------*/
@@ -655,3 +658,5 @@ void dtx_hangover_control(
 
     return;
 }
+
+} // end of namespace

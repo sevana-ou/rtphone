@@ -6,6 +6,9 @@
 #include <stdio.h>
 #include <math.h>
 
+namespace evs { 
+
+
 
 
 void bg_music_decision(T_CldfbVadState *st,
@@ -246,3 +249,5 @@ int update_decision(T_CldfbVadState *st,
     return update_flag;
 }
 
+
+} // end of namespace

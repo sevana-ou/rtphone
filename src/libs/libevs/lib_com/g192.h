@@ -7,6 +7,8 @@
 
 #include <stdio.h>
 
+namespace evs {
+
 /*
  * ENUMS
  */
@@ -62,5 +64,7 @@ G192_ReadVoipFrame_short(G192_HANDLE const hG192,
 
 G192_ERROR
 G192_Reader_Close(G192_HANDLE* phG192);
+
+} // end of namespace
 
 #endif /* G192_H */

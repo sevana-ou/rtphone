@@ -9,6 +9,7 @@
 
 #include "jbm_types.h"
 
+namespace evs {
 /** Handle for RTP input buffer with fixed capacity. */
 /** Implemented as priority queue using an array based sorted circular buffer. */
 typedef struct JB4_INPUTBUFFER *JB4_INPUTBUFFER_HANDLE;
@@ -44,5 +45,7 @@ JB4_INPUTBUFFER_ELEMENT JB4_INPUTBUFFER_Element( const JB4_INPUTBUFFER_HANDLE h,
 int JB4_INPUTBUFFER_IsEmpty( const JB4_INPUTBUFFER_HANDLE h );
 int JB4_INPUTBUFFER_IsFull( const JB4_INPUTBUFFER_HANDLE h );
 unsigned int JB4_INPUTBUFFER_Size( const JB4_INPUTBUFFER_HANDLE h );
+
+} // end of namespace
 
 #endif /* JBM_JB4_INPUTBUFFER_H */

@@ -12,6 +12,9 @@
 #include "rom_com.h"
 #include "mime.h"
 
+namespace evs { 
+
+
 
 
 
@@ -20,7 +23,7 @@
 *
 * insert a bit into packed octet
 *-------------------------------------------------------------------*/
-static void pack_bit(
+void pack_bit(
     const Word16 bit,    /* i:   bit to be packed */
     UWord8 **pt,         /* i/o: pointer to octet array into which bit will be placed */
     UWord8 *omask        /* i/o: output mask to indicate where in the octet the bit is to be written */
@@ -49,7 +52,7 @@ static void pack_bit(
 *
 * unpack a bit from packed octet
 *-------------------------------------------------------------------*/
-static Word16 unpack_bit(
+Word16 unpack_bit(
     UWord8 **pt,         /* i/o: pointer to octet array from which bit will be read */
     UWord8 *mask         /* i/o: mask to indicate the bit in the octet */
 )
@@ -73,7 +76,7 @@ static Word16 unpack_bit(
 * lookup AMRWB IO mode
 *-------------------------------------------------------------------*/
 
-static Word16 rate2AMRWB_IOmode(
+Word16 rate2AMRWB_IOmode(
     Word32 rate                    /* i: bit rate */
 )
 {
@@ -110,7 +113,7 @@ static Word16 rate2AMRWB_IOmode(
 *
 * lookup EVS mode
 *-------------------------------------------------------------------*/
-static Word16 rate2EVSmode(
+Word16 rate2EVSmode(
     Word32 rate                    /* i: bit rate */
 )
 {
@@ -2192,3 +2195,5 @@ void evs_dec_previewFrame(
     return;
 }
 
+
+} // end of namespace

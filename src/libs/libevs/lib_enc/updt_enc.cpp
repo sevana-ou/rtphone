@@ -7,6 +7,9 @@
 #include "rom_com.h"
 #include "prot.h"
 
+namespace evs { 
+
+
 /*-------------------------------------------------------------------*
  * updt_enc()
  *
@@ -231,3 +234,5 @@ void updt_IO_switch_enc(
 
     return;
 }
+
+} // end of namespace

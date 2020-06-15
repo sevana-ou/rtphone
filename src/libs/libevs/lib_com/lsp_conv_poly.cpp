@@ -8,6 +8,9 @@
 #include "rom_com.h"
 #include "prot.h"
 
+namespace evs { 
+
+
 
 /*-------------------------------------------------------------------*
  * Local constants
@@ -627,3 +630,5 @@ static void cheb2poly(
 
     return;
 }
+
+} // end of namespace

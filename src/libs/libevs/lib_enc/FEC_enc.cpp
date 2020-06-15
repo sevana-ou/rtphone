@@ -8,6 +8,9 @@
 #include "prot.h"
 #include "rom_com.h"
 
+namespace evs { 
+
+
 /*-------------------------------------------------------------------*
  * FEC_encode()
  *
@@ -237,3 +240,5 @@ void FEC_lsf_estim_enc(
 
     return;
 }
+
+} // end of namespace

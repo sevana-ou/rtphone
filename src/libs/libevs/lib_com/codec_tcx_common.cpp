@@ -6,6 +6,9 @@
 #include "prot.h"
 #include "options.h"
 
+namespace evs { 
+
+
 /*-------------------------------------------------------------------*
  * tcxGetNoiseFillingTilt()
  *
@@ -171,3 +174,5 @@ void tcxInvertWindowGrouping(
 
     return;
 }
+
+} // end of namespace

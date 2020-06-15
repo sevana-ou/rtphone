@@ -7,6 +7,9 @@
 #include "prot.h"
 #include "rom_com.h"
 
+namespace evs { 
+
+
 
 /*-------------------------------------------------------------------*
  * encod_amr_wb()
@@ -196,3 +199,5 @@ void encod_amr_wb(
 
     return;
 }
+
+} // end of namespace

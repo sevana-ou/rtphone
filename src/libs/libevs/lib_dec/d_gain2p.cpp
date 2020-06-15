@@ -11,6 +11,9 @@
 #include "cnst.h"
 #include "rom_com.h"
 
+namespace evs { 
+
+
 
 /*--------------------------------------------------------------------------*
 * Mode2_gain_dec_mless
@@ -257,3 +260,5 @@ void decode_acelp_gains(
 
     return;
 }
+
+} // end of namespace

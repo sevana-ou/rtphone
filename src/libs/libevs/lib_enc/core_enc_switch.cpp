@@ -10,6 +10,9 @@
 #include "prot.h"
 #include "rom_com.h"
 
+namespace evs { 
+
+
 /*-------------------------------------------------------------------*
  * core_coder_mode_switch()
  *
@@ -163,3 +166,5 @@ void core_coder_mode_switch(
 
     return;
 }
+
+} // end of namespace

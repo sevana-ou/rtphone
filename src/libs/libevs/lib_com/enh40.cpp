@@ -65,6 +65,9 @@
 #include <stdlib.h>
 #include "stl.h"
 
+namespace evs { 
+
+
 /*****************************************************************************
  *
  *  Local Functions
@@ -1067,3 +1070,5 @@ Word40 L40_shl_r( Word40 L40_var1, Word16 var2)
 
 
 /* end of file */
+
+} // end of namespace

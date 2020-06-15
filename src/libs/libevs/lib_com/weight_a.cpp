@@ -5,6 +5,9 @@
 #include "options.h"
 #include "prot.h"
 
+namespace evs { 
+
+
 /*------------------------------------------------------------------
  * weight_a()
  *
@@ -71,3 +74,5 @@ void weight_a_subfr(
 
     return;
 }
+
+} // end of namespace

@@ -6,6 +6,9 @@
 #include "options.h"
 #include "prot.h"
 
+namespace evs { 
+
+
 /*--------------------------------------------------------------------------*
  * hq2_noise_inject()
  *
@@ -241,3 +244,5 @@ void hq2_noise_inject(
     return;
 }
 
+
+} // end of namespace

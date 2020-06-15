@@ -11,6 +11,9 @@
 #include "prot.h"
 #include "rom_enc.h"
 
+namespace evs { 
+
+
 
 /*-------------------------------------------------------------------*
  * vad_init()
@@ -262,3 +265,5 @@ short vad_proc(
     return vad_flag;
 }
 
+
+} // end of namespace

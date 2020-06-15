@@ -36,6 +36,9 @@
 #ifndef TYPEDEF_H
 #define TYPEDEF_H
 
+namespace evs {
+
+
 /*
  * This is the original code from the file typedef.h
  */
@@ -83,6 +86,8 @@ typedef int Flag;
 #endif
 
 typedef float Float32;
+
+} // end of namespace
 
 #endif /* ifndef _TYPEDEF_H */
 

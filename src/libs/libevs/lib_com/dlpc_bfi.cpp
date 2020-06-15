@@ -9,6 +9,9 @@
 #include "prot.h"
 #include "rom_com.h"
 
+namespace evs { 
+
+
 
 /*---------------------------------------------------------------------*
 * routine:   dlpc_bfi()
@@ -46,3 +49,5 @@ void dlpc_bfi(
 
     return;
 }
+
+} // end of namespace

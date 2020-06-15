@@ -7,6 +7,9 @@
 #include "rom_com.h"
 #include "prot.h"
 
+namespace evs { 
+
+
 
 /*-------------------------------------------------------------------*
  * dec_pit_exc()
@@ -194,3 +197,5 @@ void dec_pit_exc(
 
     return;
 }
+
+} // end of namespace

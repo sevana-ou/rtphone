@@ -6,6 +6,9 @@
 #include "cnst.h"
 #include "prot.h"
 
+namespace evs { 
+
+
 
 /*-------------------------------------------------------------------*
  * cb_shape()
@@ -86,3 +89,5 @@ void cb_shape(
 
     return;
 }
+
+} // end of namespace

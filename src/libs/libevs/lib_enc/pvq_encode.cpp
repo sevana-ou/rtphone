@@ -8,6 +8,9 @@
 #include "prot.h"
 #include "math.h"
 
+namespace evs { 
+
+
 static void pyramidSearch(const float  *s, short L, short  Ptot, float A,  short *ztak, float *stak ) ;
 
 void pvq_encode(
@@ -159,3 +162,5 @@ void pyramidSearch(const float  *s,
     }
     return;
 }
+
+} // end of namespace

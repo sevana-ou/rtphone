@@ -10,6 +10,9 @@
 #include "rom_com.h"
 #include "prot.h"
 
+namespace evs { 
+
+
 /*---------------------------------------------------------------------*
  * Local prototypes
  *---------------------------------------------------------------------*/
@@ -1442,3 +1445,5 @@ void Next_good_after_burst_erasures(
 
     return;
 }
+
+} // end of namespace

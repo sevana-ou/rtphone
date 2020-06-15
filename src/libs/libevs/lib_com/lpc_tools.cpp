@@ -9,6 +9,9 @@
 #include "prot.h"
 #include "rom_com.h"
 
+namespace evs { 
+
+
 
 /*-----------------------------------------------------------------*
  * Local constants
@@ -298,3 +301,5 @@ int E_LPC_lsp_unweight(
     return 0;
 }
 
+
+} // end of namespace

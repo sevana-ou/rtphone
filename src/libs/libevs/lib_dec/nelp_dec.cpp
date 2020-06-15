@@ -9,6 +9,9 @@
 #include "prot.h"
 #include "rom_com.h"
 
+namespace evs { 
+
+
 /*-------------------------------------------------------------------*
  * nelp_decoder()
  *
@@ -181,3 +184,5 @@ void nelp_decoder(
 
     return;
 }
+
+} // end of namespace

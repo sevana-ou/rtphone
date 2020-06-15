@@ -9,6 +9,9 @@
 #include "rom_com.h"
 #include "prot.h"
 
+namespace evs { 
+
+
 /*---------------------------------------------------------------------*
  * Local constants
  *---------------------------------------------------------------------*/
@@ -999,3 +1002,5 @@ static short shb_DTX(
 
     return (update);
 }
+
+} // end of namespace

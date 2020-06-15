@@ -7,6 +7,9 @@
 #include "rom_com.h"
 #include "prot.h"
 
+namespace evs { 
+
+
 /*-----------------------------------------------------------------*
  * Local functions
  *-----------------------------------------------------------------*/
@@ -731,3 +734,5 @@ static void divide_64_32(
 
     return;
 }
+
+} // end of namespace

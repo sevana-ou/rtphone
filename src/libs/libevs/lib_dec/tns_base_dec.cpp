@@ -9,6 +9,9 @@
 #include <math.h>
 #include <assert.h>
 
+namespace evs { 
+
+
 
 
 /** Linear prediction analysis/synthesis filter definition.
@@ -69,3 +72,5 @@ int DecodeTnsData(STnsConfig const * pTnsConfig, int const * stream, int * pnSiz
     return (pTnsData->nFilters > 0) ? TRUE : FALSE;
 }
 
+
+} // end of namespace

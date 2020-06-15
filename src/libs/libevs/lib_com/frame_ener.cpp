@@ -7,6 +7,9 @@
 #include "cnst.h"
 #include "prot.h"
 
+namespace evs { 
+
+
 
 /*----------------------------------------------------------------------------------*
 * fer_energy()
@@ -94,3 +97,5 @@ float frame_energy(
 
     return enern;
 }
+
+} // end of namespace

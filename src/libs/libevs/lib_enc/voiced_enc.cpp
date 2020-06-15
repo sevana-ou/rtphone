@@ -8,6 +8,9 @@
 #include "cnst.h"
 #include "rom_com.h"
 
+namespace evs { 
+
+
 
 /*-------------------------------------------------------------------*
  * Local functions
@@ -645,3 +648,5 @@ static void SynthesisFilter(
     return;
 }
 
+
+} // end of namespace

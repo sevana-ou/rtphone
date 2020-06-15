@@ -7,6 +7,9 @@
 #include "prot.h"
 #include "rom_com.h"
 
+namespace evs { 
+
+
 /*---------------------------------------------------------------------*
  * int_lsp()
  *
@@ -137,3 +140,5 @@ void int_lsp4(
 
     return;
 }
+
+} // end of namespace

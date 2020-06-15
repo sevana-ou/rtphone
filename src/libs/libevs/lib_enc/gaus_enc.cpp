@@ -8,6 +8,9 @@
 #include "rom_com.h"
 #include "prot.h"
 
+namespace evs { 
+
+
 /*-------------------------------------------------------------------*
  * Local constants
  *-------------------------------------------------------------------*/
@@ -427,3 +430,5 @@ static short cod_2pos(  /* o  : codebook quantization index   */
 
     return index;
 }
+
+} // end of namespace

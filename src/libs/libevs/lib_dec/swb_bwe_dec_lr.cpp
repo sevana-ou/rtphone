@@ -9,6 +9,9 @@
 #include "rom_com.h"
 #include "stat_com.h"
 
+namespace evs { 
+
+
 
 
 /*-------------------------------------------------------------------*
@@ -277,3 +280,5 @@ void swb_bwe_dec_lr(
     return;
 }
 
+
+} // end of namespace

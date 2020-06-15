@@ -8,6 +8,9 @@
 #include "cnst.h"
 #include "prot.h"
 
+namespace evs { 
+
+
 /*-------------------------------------------------------------------*
  * vad_param_updt()
  *
@@ -116,3 +119,5 @@ void vad_param_updt(
     return;
 }
 
+
+} // end of namespace

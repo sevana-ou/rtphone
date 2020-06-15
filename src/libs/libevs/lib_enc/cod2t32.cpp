@@ -6,6 +6,9 @@
 #include "cnst.h"
 #include "prot.h"
 
+namespace evs { 
+
+
 
 /*---------------------------------------------------------------------*
  * Local constants
@@ -302,3 +305,5 @@ void acelp_1t64(
 
     return;
 }
+
+} // end of namespace

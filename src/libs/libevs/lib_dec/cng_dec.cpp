@@ -8,6 +8,9 @@
 #include "prot.h"
 #include "rom_com.h"
 
+namespace evs { 
+
+
 /*---------------------------------------------------------------------*
  * Local function
  *---------------------------------------------------------------------*/
@@ -692,3 +695,5 @@ static void shb_CNG_decod(
     ResetSHBbuffer_Dec( st );
     return;
 }
+
+} // end of namespace

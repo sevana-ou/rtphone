@@ -6,6 +6,9 @@
 #include "prot.h"
 #include <assert.h>
 
+namespace evs { 
+
+
 
 
 
@@ -169,3 +172,5 @@ void ReadFromBitstream(ParamsBitMap const * paramsBitMap, int nArrayLength, Deco
     }
     *pnSize += nParams*nArrayLength;
 }
+
+} // end of namespace

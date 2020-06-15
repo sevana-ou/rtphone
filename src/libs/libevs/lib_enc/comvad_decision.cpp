@@ -8,6 +8,9 @@
 #include "prot.h"
 #include "rom_enc.h"
 
+namespace evs { 
+
+
 
 
 static int comvad_hangover(
@@ -817,3 +820,5 @@ static int comvad_hangover(float lt_snr_org,              /*(i)original long tim
 }
 
 
+
+} // end of namespace

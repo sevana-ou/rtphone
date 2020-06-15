@@ -8,6 +8,9 @@
 #include "prot.h"
 #include "rom_com.h"
 
+namespace evs { 
+
+
 /*--------------------------------------------------------------------------*/
 /*  Function  hvq_pvq_bitalloc                                              */
 /*  ~~~~~~~~~~~~~~~~~~~~~~~~                                                */
@@ -155,3 +158,5 @@ short hvq_pvq_bitalloc(
     return num_bands;
 }
 
+
+} // end of namespace

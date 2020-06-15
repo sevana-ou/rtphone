@@ -6,6 +6,9 @@
 #include "cnst.h"
 #include "prot.h"
 
+namespace evs { 
+
+
 
 /*----------------------------------------------------------------------------------*
  * dec_acelp_2t32()
@@ -88,3 +91,5 @@ void dec_acelp_1t64(
 
     return;
 }
+
+} // end of namespace

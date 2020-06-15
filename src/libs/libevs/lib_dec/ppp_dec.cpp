@@ -8,6 +8,9 @@
 #include "prot.h"
 #include "rom_com.h"
 
+namespace evs { 
+
+
 /*-------------------------------------------------------------------
  * ppp_quarter_decoder()
  *
@@ -74,3 +77,5 @@ void ppp_quarter_decoder(
 
     return;
 }
+
+} // end of namespace

@@ -10,6 +10,9 @@
 #include "prot.h"
 #include "rom_enc.h"
 
+namespace evs { 
+
+
 
 
 /* Iterations: nb_pos_ix*16 */
@@ -471,3 +474,5 @@ void E_ACELP_4tsearchx(
     return;
 
 }
+
+} // end of namespace

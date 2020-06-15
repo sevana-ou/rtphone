@@ -8,6 +8,9 @@
 #include "prot.h"
 #include "rom_com.h"
 
+namespace evs { 
+
+
 
 /*---------------------------------------------------------------------*
  * Local functions
@@ -329,3 +332,5 @@ short gain_quant(           /* o:   quantization index            */
 
     return(index);
 }
+
+} // end of namespace

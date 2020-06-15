@@ -10,6 +10,9 @@
 #include "prot.h"
 #include "basop_proto_func.h"
 
+namespace evs { 
+
+
 /*---------------------------------------------------------------------*
  * Local functions
  *---------------------------------------------------------------------*/
@@ -706,3 +709,5 @@ static void dqlsf_CNG(
     }
     return;
 }
+
+} // end of namespace

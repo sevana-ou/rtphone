@@ -7,6 +7,9 @@
 #include "rom_com.h"
 #include "assert.h"
 
+namespace evs { 
+
+
 
 /*-------------------------------------------------------------------
  * Local constants
@@ -749,3 +752,5 @@ void tcx_ltp_post(
 
     return;
 }
+
+} // end of namespace

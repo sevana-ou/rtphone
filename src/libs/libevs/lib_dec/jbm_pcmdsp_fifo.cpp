@@ -12,6 +12,9 @@
 /* local headers */
 #include "jbm_pcmdsp_fifo.h"
 
+namespace evs { 
+
+
 
 /** Ringbuffer (FIFO) with fixed capacity for audio samples. */
 struct PCMDSP_FIFO
@@ -161,3 +164,5 @@ unsigned int pcmdsp_fifo_nReadableSamples( const PCMDSP_FIFO_HANDLE h )
     return h->size;
 }
 
+
+} // end of namespace

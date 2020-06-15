@@ -8,6 +8,9 @@
 #include "rom_enc.h"
 #include "prot.h"
 
+namespace evs { 
+
+
 
 /*-----------------------------------------------------------------------*
  * init_encoder()
@@ -729,3 +732,5 @@ void destroy_encoder(
 
     return;
 }
+
+} // end of namespace

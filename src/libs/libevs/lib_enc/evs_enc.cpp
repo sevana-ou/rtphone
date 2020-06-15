@@ -7,6 +7,9 @@
 #include "rom_com.h"
 #include "prot.h"
 
+namespace evs { 
+
+
 /*-------------------------------------------------------------------*
 * Local functions
 *-------------------------------------------------------------------*/
@@ -699,3 +702,5 @@ static void configure_core_coder(
 
     return;
 }
+
+} // end of namespace

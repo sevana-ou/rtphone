@@ -8,6 +8,9 @@
 #include "rom_com.h"
 #include "rom_dec.h"
 
+namespace evs { 
+
+
 /*--------------------------------------------------------------------------*/
 /*  Function  decode_huff_context                                           */
 /*  ~~~~~~~~~~~~~~~~~                                                       */
@@ -366,3 +369,5 @@ void hdecnrm_tran(
 }
 
 
+
+} // end of namespace

@@ -11,6 +11,9 @@
 #include "rom_com.h"
 #include "rom_enc.h"
 
+namespace evs { 
+
+
 
 /*-----------------------------------------------------------------*
  * Funtion  core_coder_reconfig                                    *
@@ -172,3 +175,5 @@ void core_coder_reconfig(
     return;
 }
 
+
+} // end of namespace

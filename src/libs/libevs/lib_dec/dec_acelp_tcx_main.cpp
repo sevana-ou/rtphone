@@ -8,6 +8,9 @@
 #include "rom_com.h"
 #include "options.h"
 
+namespace evs { 
+
+
 
 /*-------------------------------------------------------------------*
 * decode_frame_type()
@@ -440,3 +443,5 @@ void dec_acelp_tcx_frame(
 
     return;
 }
+
+} // end of namespace

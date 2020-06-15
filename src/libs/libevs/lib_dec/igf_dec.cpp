@@ -13,6 +13,9 @@
 #include "cnst.h"
 #include "stat_dec.h"
 
+namespace evs { 
+
+
 /**********************************************************************/ /*
 measures TCX noise
 **************************************************************************/
@@ -943,3 +946,5 @@ void IGFDecRestoreTCX10SubFrameData(const IGF_DEC_INSTANCE_HANDLE    hInstance, 
     hInstance->flatteningTrigger = hPrivateData->igf_flatteningTrigger_subframe[subFrameIdx];
 }
 
+
+} // end of namespace

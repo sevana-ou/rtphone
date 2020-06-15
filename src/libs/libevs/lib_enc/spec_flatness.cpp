@@ -7,6 +7,9 @@
 
 #include <assert.h>
 
+namespace evs { 
+
+
 
 /*-------------------------------------------------------------------*
  * spec_flatness()
@@ -95,3 +98,5 @@ void spec_flatness(
 
     return;
 }
+
+} // end of namespace

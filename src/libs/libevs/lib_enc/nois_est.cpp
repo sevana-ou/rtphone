@@ -7,6 +7,9 @@
 #include "cnst.h"
 #include "prot.h"
 
+namespace evs { 
+
+
 /*-----------------------------------------------------------------*
  * Local constants
  *-----------------------------------------------------------------*/
@@ -881,3 +884,5 @@ void noise_est(
     st->lt_aEn_zero = 0.2f * (st->aEn==0) + (1-0.2f)*st->lt_aEn_zero;
     return ;
 }
+
+} // end of namespace

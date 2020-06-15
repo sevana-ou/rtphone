@@ -9,6 +9,9 @@
 #include "prot.h"
 #include "rom_com.h"
 
+namespace evs { 
+
+
 /*--------------------------------------------------------------------------
  * Local functions
  *--------------------------------------------------------------------------*/
@@ -591,3 +594,5 @@ static short hvq_code_pos(
     return bits;
 }
 
+
+} // end of namespace

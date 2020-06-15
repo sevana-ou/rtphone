@@ -12,6 +12,9 @@
 #include "basop_util.h"
 #include "basop_proto_func.h"
 
+namespace evs { 
+
+
 /*---------------------------------------------------------------------*
  * Local functions
  *---------------------------------------------------------------------*/
@@ -1725,3 +1728,5 @@ void hq_generic_hf_encoding(
 
     return;
 }
+
+} // end of namespace

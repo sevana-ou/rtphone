@@ -6,6 +6,9 @@
 #include "prot.h"
 #include "rom_enc.h"
 
+namespace evs { 
+
+
 
 
 
@@ -184,3 +187,5 @@ void subband_FFT(
 
 
 
+
+} // end of namespace

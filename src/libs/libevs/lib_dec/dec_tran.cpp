@@ -6,6 +6,9 @@
 #include "cnst.h"
 #include "prot.h"
 
+namespace evs { 
+
+
 /*-------------------------------------------------------------------*
  * decod_tran()
  *
@@ -164,3 +167,5 @@ void decod_tran(
 
     return;
 }
+
+} // end of namespace

@@ -7,6 +7,9 @@
 #include "rom_com.h"
 #include "prot.h"
 
+namespace evs { 
+
+
 
 /*-------------------------------------------------------------------*
  * pred_lt4()
@@ -123,3 +126,5 @@ void pred_lt4_tc(
 
     return;
 }
+
+} // end of namespace

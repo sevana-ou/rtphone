@@ -5,6 +5,9 @@
 #include "options.h"
 #include "prot.h"
 
+namespace evs { 
+
+
 
 /*--------------------------------------------------------------------------
  *  get_delay()
@@ -37,3 +40,5 @@ float get_delay(                /* o  : delay value in ms                       
 
     return delay;
 }
+
+} // end of namespace

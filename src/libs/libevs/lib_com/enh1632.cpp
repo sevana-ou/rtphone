@@ -58,6 +58,9 @@
 #include <stdlib.h>
 #include "stl.h"
 
+namespace evs { 
+
+
 /*****************************************************************************
  *
  *   Constants and Globals
@@ -633,3 +636,5 @@ Word32 L_rotl( Word32 L_var1, Word16 var2, Word16 *var3)
 
 
 /* end of file */
+
+} // end of namespace

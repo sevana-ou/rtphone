@@ -9,6 +9,9 @@
 #include "stat_com.h"
 #include "cnst.h"
 
+namespace evs { 
+
+
 /*---------------------------------------------------------------------*
  * IGFSCFEncoderOpen()
  *
@@ -360,3 +363,5 @@ void IGFSCFEncoderRestoreContextState(
 
     return;
 }
+
+} // end of namespace

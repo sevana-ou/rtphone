@@ -11,6 +11,9 @@
 #include "rom_com.h"
 #include "rom_enc.h"
 
+namespace evs { 
+
+
 
 
 /*---------------------------------------------------------------------*
@@ -1451,3 +1454,5 @@ void fcb_pulse_track_joint( unsigned short *idxs, int wordcnt, long unsigned *in
 
     return;
 }
+
+} // end of namespace

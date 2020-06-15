@@ -9,6 +9,9 @@
 #include "rom_com.h"
 #include "prot.h"
 
+namespace evs { 
+
+
 /*---------------------------------------------------------------------*
  * core_switching_pre_dec()
  *
@@ -822,3 +825,5 @@ void bw_switching_pre_proc(
 
     return;
 }
+
+} // end of namespace

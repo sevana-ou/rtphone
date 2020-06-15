@@ -8,6 +8,9 @@
 #include "rom_com.h"
 #include <math.h>
 
+namespace evs { 
+
+
 
 /*--------------------------------------------------------------------------*
  * env_stab_transient_detect()
@@ -121,3 +124,5 @@ void env_stab_transient_detect(
 
     return;
 }
+
+} // end of namespace

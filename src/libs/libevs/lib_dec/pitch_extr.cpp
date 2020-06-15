@@ -11,6 +11,9 @@
 #include "options.h"
 #include "basop_util.h"
 
+namespace evs { 
+
+
 
 
 
@@ -296,3 +299,5 @@ void get_subframe_pitch(
 
     return;
 }
+
+} // end of namespace

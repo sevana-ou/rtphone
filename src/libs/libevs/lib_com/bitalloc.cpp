@@ -9,6 +9,9 @@
 #include "basop_util.h"
 #include "basop_proto_func.h"
 
+namespace evs { 
+
+
 
 /*--------------------------------------------------------------------------
  * bitalloc()
@@ -971,3 +974,5 @@ short BitAllocWB (
 
     return (Word16)t_fx;
 }
+
+} // end of namespace

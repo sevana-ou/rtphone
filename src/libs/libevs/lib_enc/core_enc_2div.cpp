@@ -11,6 +11,9 @@
 #include "prot.h"
 #include "rom_com.h"
 
+namespace evs { 
+
+
 
 /*-------------------------------------------------------------------*
  * core_encode_twodiv()
@@ -226,3 +229,5 @@ void core_encode_twodiv(
     return;
 
 }
+
+} // end of namespace

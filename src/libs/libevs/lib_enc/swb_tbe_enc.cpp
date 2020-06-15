@@ -10,6 +10,9 @@
 #include "rom_com.h"
 #include "rom_enc.h"
 
+namespace evs { 
+
+
 /*-----------------------------------------------------------------*
  * Local functions
  *-----------------------------------------------------------------*/
@@ -2027,3 +2030,5 @@ void TBEreset_enc(
     return;
 }
 
+
+} // end of namespace

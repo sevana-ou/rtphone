@@ -8,6 +8,9 @@
 #include "rom_com.h"
 #include <math.h>
 
+namespace evs { 
+
+
 /*--------------------------------------------------------------------------*
  * Local constants
  *--------------------------------------------------------------------------*/
@@ -166,3 +169,5 @@ float env_stab_smo(
 
     return state;
 }
+
+} // end of namespace

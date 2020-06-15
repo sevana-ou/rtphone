@@ -10,6 +10,9 @@
 #include "stl.h"
 #include "basop_util.h"
 
+namespace evs { 
+
+
 /*--------------------------------------------------------------------------*
  * Local functions
  *--------------------------------------------------------------------------*/
@@ -1674,3 +1677,5 @@ static void mdct_spectrum_fine_gain_enc(
 
     return;
 }
+
+} // end of namespace

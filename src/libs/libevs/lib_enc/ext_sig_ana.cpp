@@ -9,6 +9,9 @@
 #include "prot.h"
 #include "rom_com.h"
 
+namespace evs { 
+
+
 
 /*-------------------------------------------------------------------*
 * core_signal_analysis_high_bitrate()
@@ -254,3 +257,5 @@ void core_signal_analysis_high_bitrate(
 }
 
 
+
+} // end of namespace

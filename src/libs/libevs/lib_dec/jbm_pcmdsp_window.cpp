@@ -8,6 +8,9 @@
 #include "jbm_pcmdsp_window.h"
 #include "cnst.h"
 
+namespace evs { 
+
+
 /*-----------------------------------------------------------------------*
 * hannWindow()
 *
@@ -86,3 +89,5 @@ void overlapAdd(
 
     return;
 }
+
+} // end of namespace

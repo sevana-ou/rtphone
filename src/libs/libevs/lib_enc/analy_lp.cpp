@@ -143,4 +143,4 @@ void analy_lp_AMR_WB(
     return;
 }
 
-// end of namespace
+} // end of namespace

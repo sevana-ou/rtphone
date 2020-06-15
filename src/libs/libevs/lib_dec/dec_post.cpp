@@ -9,6 +9,9 @@
 #include "rom_com.h"
 #include "prot.h"
 
+namespace evs { 
+
+
 /*---------------------------------------------------------------------*
  * Local constants
  *---------------------------------------------------------------------*/
@@ -964,3 +967,5 @@ static void modify_pst_param(
 
     return;
 }
+
+} // end of namespace

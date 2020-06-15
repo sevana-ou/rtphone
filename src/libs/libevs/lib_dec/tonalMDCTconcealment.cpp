@@ -10,6 +10,9 @@
 #include "options.h"
 #include "prot.h"
 
+namespace evs { 
+
+
 
 
 
@@ -703,3 +706,5 @@ static void CalcPowerSpec(float const * mdctSpec, float const * mdstSpec,
     return;
 }
 
+
+} // end of namespace

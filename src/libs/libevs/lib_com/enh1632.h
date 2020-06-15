@@ -36,6 +36,7 @@
 #include "stl.h"
 
 
+namespace evs {
 /*****************************************************************************
  *
  *  Prototypes for enhanced 16/32 bit arithmetic operators
@@ -508,7 +509,7 @@ static __inline Word32 L_xor( Word32 L_var1, Word32 L_var2)
 
 
 
-
+} // end of namespace
 
 
 

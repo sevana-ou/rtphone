@@ -11,6 +11,9 @@
 #include "prot.h"
 #include "rom_com.h"
 
+namespace evs { 
+
+
 
 
 /*---------------------------------------------------------------------*
@@ -210,3 +213,5 @@ float bass_pf_enc(
     return(snr);
 
 }
+
+} // end of namespace

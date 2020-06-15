@@ -6,6 +6,9 @@
 #include <assert.h>
 #include "prot.h"
 
+namespace evs { 
+
+
 
 
 
@@ -160,3 +163,5 @@ void longshiftleft(unsigned short a[], int b, unsigned short d[], int len)
     }
     return;
 }
+
+} // end of namespace

@@ -7,6 +7,9 @@
 #include "rom_enc.h"
 #include "rom_com.h"
 
+namespace evs { 
+
+
 
 
 
@@ -419,3 +422,5 @@ void tcx_ltp_encode( int tcxltp_on,
 
 }
 
+
+} // end of namespace

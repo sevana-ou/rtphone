@@ -8,6 +8,9 @@
 #include "rom_com.h"
 #include "prot.h"
 
+namespace evs { 
+
+
 
 /*-------------------------------------------------------------------*
  * Local constants
@@ -92,3 +95,5 @@ void pre_echo_att(
 
     return;
 }
+
+} // end of namespace

@@ -6,6 +6,9 @@
 #include "rom_com.h"
 #include "prot.h"
 
+namespace evs { 
+
+
 
 /*--------------------------------------------------------------------------
  * subband_gain_bits()
@@ -98,3 +101,5 @@ short assign_gain_bits(              /* o  : Number of assigned gain bits      *
 
     return gain_bits_tot;
 }
+
+} // end of namespace

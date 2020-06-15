@@ -8,6 +8,9 @@
 #include "rom_com.h"
 #include "prot.h"
 
+namespace evs { 
+
+
 /*--------------------------------------------------------------------------*
  * sfm2mqb()
  *
@@ -332,3 +335,5 @@ void map_quant_weight(
 
     return;
 }
+
+} // end of namespace

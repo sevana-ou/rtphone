@@ -8,6 +8,7 @@
 #include "stl.h"
 #include "options.h"
 
+namespace evs {
 /**
  * \brief   32*16 Bit fractional Multiplication using 40 bit OPS
  *          Performs a multiplication of a 32-bit variable x by
@@ -64,4 +65,5 @@ Word32 Mpy_32_16_r(Word32 x, Word16 y);
 Word32 Mpy_32_32(Word32 x,
                  Word32 y);
 
+}
 #endif /* __BASOP_SETTINGS_H */

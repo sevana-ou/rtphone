@@ -5,6 +5,9 @@
 #include "stat_enc.h"
 #include "prot.h"
 
+namespace evs { 
+
+
 
 /*-------------------------------------------------------------------*
 * coderLookAheadInnovation()
@@ -365,3 +368,5 @@ void getConcealedlsf(
 
     return;
 }
+
+} // end of namespace

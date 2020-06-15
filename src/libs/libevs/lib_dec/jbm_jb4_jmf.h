@@ -9,6 +9,8 @@
 
 #include "jbm_types.h"
 
+namespace evs {
+
 /** handle for jitter measure fifo - a fifo used for windowed measure of network status */
 typedef struct JB4_JMF *JB4_JMF_HANDLE;
 
@@ -38,5 +40,7 @@ int JB4_JMF_Jitter( const JB4_JMF_HANDLE h, uint32_t *jitter );
  *  @param[out] offset the minimum offset in microseconds */
 int JB4_JMF_MinOffset( const JB4_JMF_HANDLE h, int32_t *offset );
 /**@} */
+
+} // end of namespace
 
 #endif /* JBM_JB4_JMF_H */

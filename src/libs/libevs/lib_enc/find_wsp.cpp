@@ -6,6 +6,9 @@
 #include "cnst.h"
 #include "prot.h"
 
+namespace evs { 
+
+
 /*-------------------------------------------------------------------*
  * find_wsp()
  *
@@ -59,3 +62,5 @@ void find_wsp(
 
     return;
 }
+
+} // end of namespace

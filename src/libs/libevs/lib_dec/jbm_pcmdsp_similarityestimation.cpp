@@ -11,6 +11,9 @@
 /* local headers */
 #include "jbm_pcmdsp_similarityestimation.h"
 
+namespace evs { 
+
+
 
 /* Calculates cross correlation coefficient for template segment. */
 Float cross_correlation_self(const int16_t * signal,
@@ -99,3 +102,5 @@ bool_t isSilence(const int16_t * signal, uint32_t len, uint32_t segments)
     return true;
 }
 
+
+} // end of namespace

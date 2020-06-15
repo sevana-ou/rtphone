@@ -8,6 +8,9 @@
 #include "prot.h"
 #include "rom_com.h"
 
+namespace evs { 
+
+
 
 /*-------------------------------------------------------------------*
  * Interpol_delay()
@@ -81,3 +84,5 @@ void deemph_lpc(
 
     return;
 }
+
+} // end of namespace

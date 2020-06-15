@@ -11,6 +11,9 @@
 #include <limits.h>
 #include <assert.h>
 
+namespace evs { 
+
+
 
 #define NB_PULSES_MAX                         15
 
@@ -300,3 +303,5 @@ void PulseResynchronization(float const * src_exc, float * dst_exc, int nFrameLe
 }
 
 
+
+} // end of namespace

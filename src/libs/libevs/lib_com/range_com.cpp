@@ -9,6 +9,9 @@
 #include "rom_com.h"
 #include "prot.h"
 
+namespace evs { 
+
+
 /*-------------------------------------------------------------------*
  * rc_get_bits2()
  *
@@ -70,3 +73,5 @@ void rangeCoderFinalizationFBits(
     return;
 }
 
+
+} // end of namespace

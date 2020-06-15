@@ -10,6 +10,9 @@
 #include "stat_enc.h"
 #include "options.h"
 
+namespace evs { 
+
+
 /*-------------------------------------------------------------------*
 * createFdCngEnc()
 *
@@ -746,3 +749,5 @@ void generate_comfort_noise_enc( Encoder_State *stcod )
 
     return;
 }
+
+} // end of namespace

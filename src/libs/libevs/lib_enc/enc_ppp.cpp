@@ -8,6 +8,9 @@
 #include "cnst.h"
 #include "prot.h"
 
+namespace evs { 
+
+
 /*-------------------------------------------------------------------
  * encod_ppp()
  *
@@ -163,3 +166,5 @@ void encod_ppp(
 
     return;
 }
+
+} // end of namespace

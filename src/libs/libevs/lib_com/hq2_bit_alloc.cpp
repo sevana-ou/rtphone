@@ -10,6 +10,9 @@
 #include "basop_mpy.h"
 #include "stl.h"
 
+namespace evs { 
+
+
 
 /*-------------------------------------------------------------------
  * Local constants
@@ -991,3 +994,5 @@ void hq2_bit_alloc (
 }
 
 
+
+} // end of namespace

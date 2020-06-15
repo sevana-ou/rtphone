@@ -6,6 +6,9 @@
 #include "cnst.h"
 #include "prot.h"
 
+namespace evs { 
+
+
 /*-------------------------------------------------------------------*
 * decod_nelp()
 *
@@ -55,3 +58,5 @@ void decod_nelp(
 
     return;
 }
+
+} // end of namespace

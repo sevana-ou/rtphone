@@ -11,6 +11,9 @@
 #include "basop_util.h"
 #include "basop_proto_func.h"
 
+namespace evs { 
+
+
 /*--------------------------------------------------------------------------*
  * mdct_spectrum_denorm()
  *
@@ -548,3 +551,5 @@ void spt_swb_peakpos_tmp_save(
     }
     return;
 }
+
+} // end of namespace

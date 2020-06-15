@@ -8,6 +8,9 @@
 #include "rom_com.h"
 #include "prot.h"
 
+namespace evs { 
+
+
 /*--------------------------------------------------------------------------
 * window_ola()
 *
@@ -434,3 +437,5 @@ void sinq(
     return;
 }
 
+
+} // end of namespace

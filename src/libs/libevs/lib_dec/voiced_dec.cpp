@@ -8,6 +8,9 @@
 #include "cnst.h"
 #include "rom_com.h"
 
+namespace evs { 
+
+
 /*-------------------------------------------------------------------*
  * ppp_voiced_decoder()
  *
@@ -185,3 +188,5 @@ void ppp_voiced_decoder(
 
     return;
 }
+
+} // end of namespace

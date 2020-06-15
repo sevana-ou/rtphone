@@ -5,6 +5,9 @@
 #include "options.h"
 #include "prot.h"
 
+namespace evs { 
+
+
 
 /*---------------------------------------------------------*
  * stat_noise_uv_dec()
@@ -73,3 +76,5 @@ void stat_noise_uv_dec(
 
     return;
 }
+
+} // end of namespace

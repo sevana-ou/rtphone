@@ -6,6 +6,9 @@
 #include "cnst.h"
 #include "prot.h"
 
+namespace evs { 
+
+
 /*-------------------------------------------------------------------*
  * Local functions
  *-------------------------------------------------------------------*/
@@ -176,3 +179,5 @@ static void nearest_neighbor_2D8(
 
     return;
 }
+
+} // end of namespace

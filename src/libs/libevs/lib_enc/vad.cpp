@@ -8,6 +8,9 @@
 #include "prot.h"
 #include "rom_enc.h"
 
+namespace evs { 
+
+
 
 /*-----------------------------------------------------------------*
  * Local constants
@@ -1007,3 +1010,5 @@ short wb_vad(
 
     return flag;
 }
+
+} // end of namespace

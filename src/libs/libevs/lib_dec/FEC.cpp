@@ -10,6 +10,9 @@
 #include "rom_dec.h"
 #include "prot.h"
 
+namespace evs { 
+
+
 /*-------------------------------------------------------------------*
  * Local functions
  *-------------------------------------------------------------------*/
@@ -531,3 +534,5 @@ static void pulseRes_preCalc(
 
     return;
 }
+
+} // end of namespace

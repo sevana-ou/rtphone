@@ -6,6 +6,9 @@
 #include "options.h"
 #include "prot.h"
 
+namespace evs { 
+
+
 int print_disclaimer(FILE *fPtr)
 {
 
@@ -15,3 +18,5 @@ int print_disclaimer(FILE *fPtr)
 
     return 0;
 }
+
+} // end of namespace

@@ -25,6 +25,7 @@
 
 #include "stl.h"
 
+namespace evs {
 
 #ifdef _MSC_VER
 #define MAX_40 (0x0000007fffffffff)
@@ -336,41 +337,7 @@ static __inline Word16 msu_r40( Word40 L40_var1, Word16 var2, Word16 var3)
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+} // end of namespace
 
 
 

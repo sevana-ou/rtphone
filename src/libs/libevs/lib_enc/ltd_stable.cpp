@@ -5,6 +5,9 @@
 #include <math.h>
 #include "prot.h"
 
+namespace evs { 
+
+
 
 /*-------------------------------------------------------------------*
  * ltd_stable()
@@ -97,3 +100,5 @@ void ltd_stable(
 
     return;
 }
+
+} // end of namespace

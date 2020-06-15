@@ -10,6 +10,7 @@
 #include "basop32.h"
 #include "basop_mpy.h"
 
+namespace evs {
 
 #define LD_DATA_SCALE     (6)
 
@@ -382,5 +383,7 @@ Word32 dotWord32_16_guards(const Word32 * X, const Word16 * Y, Word16 n, Word16 
 
 
 Word32 Sqrt_l(Word32 L_x, Word16 *exp);
+
+} // end of namespace
 
 #endif /* __BASOP_UTIL_H__ */

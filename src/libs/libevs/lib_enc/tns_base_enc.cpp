@@ -10,6 +10,9 @@
 #include <math.h>
 #include <assert.h>
 
+namespace evs { 
+
+
 
 #define HLM_MIN_NRG (32768.0f * 2*NORM_MDCT_FACTOR / (640*640))
 
@@ -313,3 +316,5 @@ static void Parcor2Index(const float parCoeff[], int index[], int order)
     }
 }
 
+
+} // end of namespace

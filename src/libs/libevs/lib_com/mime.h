@@ -2,6 +2,7 @@
     EVS Codec 3GPP TS26.443 Nov 13, 2018. Version 12.11.0 / 13.7.0 / 14.3.0 / 15.1.0
   ====================================================================================*/
 
+namespace evs {
 
 #define AMRWB_MAGIC_NUMBER "#!AMR-WB\n"             /* defined in  RFC4867  */
 #define EVS_MAGIC_NUMBER   "#!EVS_MC1.0\n"          /* defined in 26.445    */
@@ -421,3 +422,5 @@ static const Word16 amrwb_4bit_cmr[8] =
     0x05,  /* AMRWB_1825 */
     0x0f   /* invalid */
 };
+
+} // end of namespace

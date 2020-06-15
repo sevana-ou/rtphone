@@ -9,6 +9,9 @@
 #include <assert.h>
 #include "prot.h"
 
+namespace evs { 
+
+
 
 /*-------------------------------------------------------------------*
 * HBAutocorrelation()
@@ -1334,3 +1337,5 @@ void coder_tcx_post(
 
     return;
 }
+
+} // end of namespace

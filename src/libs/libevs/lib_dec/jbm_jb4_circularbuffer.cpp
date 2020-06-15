@@ -11,6 +11,9 @@
 #include "options.h"
 /* local includes */
 #include "jbm_jb4_circularbuffer.h"
+
+namespace evs { 
+
 /* instrumentation */
 
 
@@ -422,3 +425,5 @@ static void JB4_CIRCULARBUFFER_calcPercentile( JB4_CIRCULARBUFFER_ELEMENT *eleme
 
 }
 
+
+} // end of namespace

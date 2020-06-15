@@ -8,6 +8,9 @@
 #include "prot.h"
 #include "rom_com.h"
 
+namespace evs { 
+
+
 /*------------------------------------------------------------------------*
  * decode_envelope_indices()
  *
@@ -164,3 +167,5 @@ void dequantize_norms(         /* o  : Number of bits                    */
 
     return;
 }
+
+} // end of namespace

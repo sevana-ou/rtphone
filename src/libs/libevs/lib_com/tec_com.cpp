@@ -10,6 +10,9 @@
 #include "prot.h"
 #include "stat_dec.h"
 
+namespace evs { 
+
+
 /*-------------------------------------------------------------------
  * Local constants
  *-------------------------------------------------------------------*/
@@ -927,3 +930,5 @@ void tecEnc_TBE(
 
     return;
 }
+
+} // end of namespace

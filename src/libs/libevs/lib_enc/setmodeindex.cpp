@@ -12,6 +12,9 @@
 #include "rom_com.h"
 #include "rom_enc.h"
 
+namespace evs { 
+
+
 
 /*---------------------------------------------------------------------------
 
@@ -38,3 +41,5 @@ void SetModeIndex(
 
     return;
 }
+
+} // end of namespace

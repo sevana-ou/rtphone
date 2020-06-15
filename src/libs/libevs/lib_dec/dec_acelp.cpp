@@ -8,6 +8,9 @@
 #include "prot.h"
 #include "rom_com.h"
 
+namespace evs { 
+
+
 
 /*---------------------------------------------------------------------*
 * Local functions
@@ -330,3 +333,5 @@ void fcb_pulse_track_joint_decode(unsigned short *idxs, int wordcnt, long unsign
 
     return;
 }
+
+} // end of namespace

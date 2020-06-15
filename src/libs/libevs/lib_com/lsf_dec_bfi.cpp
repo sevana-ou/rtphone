@@ -10,6 +10,9 @@
 #include "prot.h"
 #include "rom_com.h"
 
+namespace evs { 
+
+
 /*---------------------------------------------------------------------*
 * routine:   lsf_dec_bfi()
 *
@@ -265,3 +268,5 @@ float const * PlcGetlsfBase(
     /* narrowBand == 1 is left */
     return GENB_Ave;
 }
+
+} // end of namespace

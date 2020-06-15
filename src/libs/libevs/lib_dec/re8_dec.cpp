@@ -5,6 +5,9 @@
 #include "options.h"
 #include "prot.h"
 
+namespace evs { 
+
+
 /*-------------------------------------------------------------------*
  * Function prototypes
  *-------------------------------------------------------------------*/
@@ -70,3 +73,5 @@ void re8_dec(int n, long I, int k[], int y[])
 
     return;
 }
+
+} // end of namespace

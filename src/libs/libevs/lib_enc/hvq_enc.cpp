@@ -9,6 +9,9 @@
 #include "rom_enc.h"
 #include "rom_com.h"
 
+namespace evs { 
+
+
 /*--------------------------------------------------------------------------*
  * hvq_enc()
  *
@@ -115,3 +118,5 @@ short hvq_enc(                      /* o  : Consumed bits                   */
 
     return bits_used;
 }
+
+} // end of namespace

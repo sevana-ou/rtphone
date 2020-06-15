@@ -9,6 +9,9 @@
 #include "prot.h"
 #include "rom_com.h"
 
+namespace evs { 
+
+
 
 /*-------------------------------------------------------------------
  * mdct_window_sine()
@@ -186,3 +189,5 @@ void mdct_window_aldo(
 
     return;
 }
+
+} // end of namespace

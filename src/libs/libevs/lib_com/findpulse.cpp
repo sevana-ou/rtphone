@@ -7,6 +7,9 @@
 #include "prot.h"
 #include "cnst.h"
 
+namespace evs { 
+
+
 
 /*----------------------------------------------------------------------------------*
  *  findpulse()
@@ -104,3 +107,5 @@ short findpulse(              /* o  : pulse position        */
 
     return(maxi);
 }
+
+} // end of namespace

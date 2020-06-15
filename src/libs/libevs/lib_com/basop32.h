@@ -46,6 +46,7 @@
 #ifndef _BASIC_OP_H
 #define _BASIC_OP_H
 
+namespace evs {
 /* #define BASOP_OVERFLOW2 */
 
 /*___________________________________________________________________________
@@ -132,6 +133,7 @@ Word32 L_mult0(Word16 v1, Word16 v2); /* 32-bit Multiply w/o shift         1 */
 Word32 L_mac0(Word32 L_v3, Word16 v1, Word16 v2); /* 32-bit Mac w/o shift  1 */
 Word32 L_msu0(Word32 L_v3, Word16 v1, Word16 v2); /* 32-bit Msu w/o shift  1 */
 
+}
 
 #endif /* ifndef _BASIC_OP_H */
 

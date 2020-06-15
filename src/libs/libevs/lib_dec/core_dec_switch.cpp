@@ -10,6 +10,9 @@
 #include "prot.h"
 #include "rom_com.h"
 
+namespace evs { 
+
+
 
 /*-------------------------------------------------------------*
  * mode_switch_decoder_LPD()
@@ -176,3 +179,5 @@ void mode_switch_decoder_LPD(
 
     return;
 }
+
+} // end of namespace

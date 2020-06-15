@@ -6,6 +6,9 @@
 #include "cnst.h"
 #include "prot.h"
 
+namespace evs { 
+
+
 /*-------------------------------------------------------------------*
  * enr_1_Az()
  *
@@ -28,3 +31,5 @@ float enr_1_Az(        /* o  : impulse response energy */
 
     return enr_LP;
 }
+
+} // end of namespace

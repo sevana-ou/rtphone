@@ -9,6 +9,9 @@
 #include "rom_dec.h"
 #include "prot.h"
 
+namespace evs { 
+
+
 
 /*-------------------------------------------------------------------------
  * FEC_synchro_exc()
@@ -458,3 +461,5 @@ short FEC_enhACB(
     return do_WI;
 }
 
+
+} // end of namespace

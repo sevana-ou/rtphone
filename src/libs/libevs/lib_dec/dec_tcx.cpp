@@ -11,6 +11,9 @@
 #include "stat_com.h"
 #include "cnst.h"
 
+namespace evs { 
+
+
 
 /*-----------------------------------------------------------------*
  * Local functions
@@ -1322,3 +1325,5 @@ static void IMDCT(
 
     return;
 }
+
+} // end of namespace

@@ -10,6 +10,9 @@
 #include "math.h"
 #include "assert.h"
 
+namespace evs { 
+
+
 /*---------------------------------------------------------------------*
  * core_switching_pre_enc()
  *
@@ -416,3 +419,5 @@ void core_switching_hq_prepare_enc(
     return;
 }
 
+
+} // end of namespace

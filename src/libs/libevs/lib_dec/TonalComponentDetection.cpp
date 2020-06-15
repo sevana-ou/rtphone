@@ -12,6 +12,9 @@
 #include "cnst.h"
 #include "stat_com.h"
 
+namespace evs { 
+
+
 
 
 /***********************************************************************************/
@@ -774,3 +777,5 @@ static void findTonalComponents(unsigned short int * indexOfTonalPeak, /* OUT */
 
 }
 
+
+} // end of namespace

@@ -5,6 +5,9 @@
 #include "options.h"
 #include "cnst.h"
 
+namespace evs { 
+
+
 /*----------------------------------------------------------------------------------*
  * LP filter for filtering periodic part of excitation in artificial onset
  * construction after frame error concealment
@@ -212,3 +215,5 @@ const float w_hamm_sana16k_2[L_PROT_HAMM_LEN2_16k] =
 const float h_high3_32[L_FIR_FER2]   = {-0.0517f, -0.0587f, -0.0820f, -0.1024f, -0.1164f,  0.8786f, -0.1164f, -0.1024f, -0.0820f, -0.0587f, -0.0517f};
 const float h_high3_16[L_FIR_FER2]   = { 0.f,     -0.0205f, -0.0651f, -0.1256f, -0.1792f,  0.8028f, -0.1792f, -0.1256f, -0.0651f, -0.0205f,  0.f    };
 
+
+} // end of namespace

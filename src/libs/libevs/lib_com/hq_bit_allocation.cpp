@@ -8,6 +8,9 @@
 #include "prot.h"
 #include "rom_com.h"
 
+namespace evs { 
+
+
 
 /*--------------------------------------------------------------------------*
  * hq_bit_allocation()
@@ -187,3 +190,5 @@ void hq_bit_allocation(
 
     return;
 }
+
+} // end of namespace

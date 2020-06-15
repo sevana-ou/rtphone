@@ -12,6 +12,9 @@
 #include "basop_util.h"
 #include "basop_proto_func.h"
 
+namespace evs { 
+
+
 void bitstream_save_bit(PBITSTREAM pBS, int bit);
 unsigned int bitstream_load_bit(PBITSTREAM pBS);
 void bitstream_rollback(PBITSTREAM pBS, int numBits);
@@ -2014,3 +2017,5 @@ void RestoreTCQ( float * magn, int size, short *bcount, float *mbuffer)
     return;
 }
 
+
+} // end of namespace

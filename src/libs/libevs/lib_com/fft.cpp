@@ -9,6 +9,9 @@
 #include "prot.h"
 #include "rom_com.h"
 
+namespace evs { 
+
+
 /*-----------------------------------------------------------------*
  * Local functions
  *-----------------------------------------------------------------*/
@@ -3596,3 +3599,5 @@ void BASOP_cfft(
 
     return;
 }
+
+} // end of namespace

@@ -5,6 +5,9 @@
 #include "options.h"
 #include "prot.h"
 
+namespace evs { 
+
+
 /*--------------------------------------------------------------------------*
  * reordvct()
  *
@@ -42,3 +45,5 @@ void reordvct(
 
     return;
 }
+
+} // end of namespace

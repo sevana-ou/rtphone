@@ -12,6 +12,9 @@
 #include "rom_com.h"
 #include "prot.h"
 
+namespace evs { 
+
+
 
 /*-------------------------------------------------------------------*
  * enc_prm_hm()
@@ -769,3 +772,5 @@ void enc_prm(
     return;
 }
 
+
+} // end of namespace

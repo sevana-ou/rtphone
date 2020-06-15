@@ -8,6 +8,9 @@
 #include "prot.h"
 #include "rom_com.h"
 
+namespace evs { 
+
+
 
 
 /*-------------------------------------------------------------------
@@ -1072,3 +1075,5 @@ void FdCng_exc(
 
     return;
 }
+
+} // end of namespace

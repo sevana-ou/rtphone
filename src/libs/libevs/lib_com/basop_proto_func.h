@@ -8,6 +8,7 @@
 #include "stl.h"
 #include "basop_util.h"
 
+namespace evs {
 
 /* tcx_lpc_cdk.h */
 #define LSF_GAP_VAL(x) (Word16)((x)*2.0f*1.28f)
@@ -35,5 +36,6 @@ void basop_lpc2mdct(Word16 *lpcCoeffs, Word16 lpcOrder,
 void basop_PsychAdaptLowFreqDeemph(Word32 x[], const Word16 lpcGains[], const Word16 lpcGains_e[], Word16 lf_deemph_factors[]);
 void basop_mdct_noiseShaping_interp(Word32 x[], Word16 lg, Word16 gains[], Word16 gains_exp[]);
 
+} // end of namespace
 
 #endif

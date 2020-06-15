@@ -6,6 +6,9 @@
 #include "cnst.h"
 #include "prot.h"
 
+namespace evs { 
+
+
 /*-------------------------------------------------------------------*
  * find_targets()
  *
@@ -84,3 +87,5 @@ void find_targets(
 
     return;
 }
+
+} // end of namespace

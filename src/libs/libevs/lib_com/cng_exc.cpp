@@ -9,6 +9,9 @@
 #include "prot.h"
 #include "rom_com.h"
 
+namespace evs { 
+
+
 /*---------------------------------------------------------------------*
  * Local constants
  *---------------------------------------------------------------------*/
@@ -555,3 +558,5 @@ void cng_params_upd(
 
     return;
 }
+
+} // end of namespace

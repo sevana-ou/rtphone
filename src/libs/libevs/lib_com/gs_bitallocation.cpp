@@ -8,6 +8,9 @@
 #include "rom_com.h"
 #include "prot.h"
 
+namespace evs { 
+
+
 
 /*-------------------------------------------------------------------*
  * Local functions
@@ -449,3 +452,5 @@ static float Find_bit_frac(
 
     return (var_out);
 }
+
+} // end of namespace

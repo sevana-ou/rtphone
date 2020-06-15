@@ -7,6 +7,9 @@
 #include "cnst.h"
 #include "rom_com.h"
 
+namespace evs { 
+
+
 /*--------------------------------------------------------------------------*/
 /*  Function  reordernorm                                                   */
 /*  ~~~~~~~~~~~~~~~~~~~~~                                                   */
@@ -55,3 +58,5 @@ void reordernorm(
 
     return;
 }
+
+} // end of namespace

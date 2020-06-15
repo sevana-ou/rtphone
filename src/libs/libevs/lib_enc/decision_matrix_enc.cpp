@@ -10,6 +10,9 @@
 #include "stat_dec.h"
 #include "rom_com.h"
 
+namespace evs { 
+
+
 
 /*-----------------------------------------------------------------*
  * decision_matrix_enc()
@@ -634,3 +637,5 @@ void signalling_enc_rf(
 
     return;
 }
+
+} // end of namespace

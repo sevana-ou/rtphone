@@ -63,7 +63,7 @@ public:
     int plc(int lostFrames, void* output, int outputCapacity) ;
 
 private:
-    Decoder_State* st_dec;
+    evs::Decoder_State* st_dec;
     //Encoder_State_fx* st_enc;
     StreamParameters sp;
     void initDecoder(const StreamParameters& sp);

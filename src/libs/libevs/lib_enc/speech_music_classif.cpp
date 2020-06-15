@@ -11,6 +11,9 @@
 #include "rom_enc.h"
 #include "rom_com.h"    /* Common static table prototypes         */
 
+namespace evs { 
+
+
 
 /*---------------------------------------------------------------------*
  * Local constants
@@ -1891,3 +1894,5 @@ static void order_spectrum( float *vec, short len )
 }
 
 
+
+} // end of namespace

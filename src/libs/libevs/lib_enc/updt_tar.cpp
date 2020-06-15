@@ -5,6 +5,9 @@
 #include "options.h"
 #include "prot.h"
 
+namespace evs { 
+
+
 /*----------------------------------------------------------------------------------*
  * procedure updt_tar:
  *
@@ -26,3 +29,5 @@ void updt_tar(
         x2[i] = x[i] - gain*y[i];
     }
 }
+
+} // end of namespace

@@ -5,6 +5,9 @@
 #include "options.h"
 #include "prot.h"
 
+namespace evs { 
+
+
 
 /*----------------------------------------------------------------------------------*
 *  get_gain()
@@ -35,3 +38,5 @@ float get_gain(     /* output: codebook gain (adaptive or fixed)    */
 
     return(corr/ener);
 }
+
+} // end of namespace

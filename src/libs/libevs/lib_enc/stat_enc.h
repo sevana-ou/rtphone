@@ -9,6 +9,7 @@
 #include "stat_com.h"          /* Common structures                      */
 #include "cnst.h"
 
+namespace evs {
 
 /*------------------------------------------------------------------------------------------*
  * Indice
@@ -1226,5 +1227,6 @@ typedef struct
 struct PLC_ENC_EVS;
 typedef struct PLC_ENC_EVS * HANDLE_PLC_ENC_EVS;
 
+} // end of namespace
 
 #endif

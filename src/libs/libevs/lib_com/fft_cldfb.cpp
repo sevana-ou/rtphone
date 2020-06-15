@@ -6,6 +6,9 @@
 #include <assert.h>
 #include "prot.h"
 
+namespace evs { 
+
+
 
 
 #if defined __ICL
@@ -1192,3 +1195,5 @@ void fft_cldfb (
     }
 }
 
+
+} // end of namespace

@@ -11,6 +11,9 @@
 #include "options.h"
 #include "stat_dec.h"
 
+namespace evs { 
+
+
 
 /*---------------------------------------------------------------------*
  * IGFSCFDecoderOpen()
@@ -324,3 +327,5 @@ void IGFSCFDecoderDecode(
 
     return;
 }
+
+} // end of namespace

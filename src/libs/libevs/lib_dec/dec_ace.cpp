@@ -10,6 +10,9 @@
 #include "options.h"
 #include "rom_com.h"
 
+namespace evs { 
+
+
 
 /*-------------------------------------------------------------------*
  * decoder_acelp()
@@ -547,3 +550,5 @@ void decoder_acelp(
 
     return;
 }
+
+} // end of namespace

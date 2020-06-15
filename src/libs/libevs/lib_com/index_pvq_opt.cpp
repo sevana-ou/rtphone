@@ -10,6 +10,9 @@
 #include "rom_com.h"
 #include "prot.h"
 
+namespace evs { 
+
+
 
 /*-------------------------------------------------------------------*
  *  LOCAL DEFINITIONS
@@ -1157,3 +1160,5 @@ void mpvq_decode_vec(               /* o :  void                        */
 
 
 #endif
+
+} // end of namespace

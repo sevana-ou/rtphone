@@ -10,6 +10,9 @@
 #include "rom_com.h"
 #include "rom_dec.h"
 
+namespace evs { 
+
+
 /*-----------------------------------------------------------------*
  * Local functions
  *-----------------------------------------------------------------*/
@@ -1961,3 +1964,5 @@ void TBEreset_dec(
 
     return;
 }
+
+} // end of namespace

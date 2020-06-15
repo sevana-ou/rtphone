@@ -9,6 +9,9 @@
 
 #include "stl.h"
 
+namespace evs {
+
+
 #define FOR( a) if( incrFor(), 0); else for( a)
 static __inline void incrFor( void)
 {
@@ -38,5 +41,7 @@ static __inline void incrSwitch( void)
 #define BREAK break
 
 #define GOTO goto
+
+}
 
 #endif /* _CONTROL_H */

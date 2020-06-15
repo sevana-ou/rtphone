@@ -6,6 +6,9 @@
 #include "cnst.h"
 #include "prot.h"
 
+namespace evs { 
+
+
 /*-------------------------------------------------*
  * Local constants
  *-------------------------------------------------*/
@@ -198,3 +201,5 @@ void limit_T0_voiced(
 }
 
 
+
+} // end of namespace

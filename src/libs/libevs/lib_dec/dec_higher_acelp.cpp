@@ -8,6 +8,9 @@
 #include "prot.h"
 #include "rom_com.h"
 
+namespace evs { 
+
+
 /*-----------------------------------------------------------------*
  * Transform domain contribution decoding
  *-----------------------------------------------------------------*/
@@ -166,3 +169,5 @@ float gain_dequant(             /* o:   decoded gain                  */
     return( gain );
 
 }
+
+} // end of namespace

@@ -8,6 +8,9 @@
 #include <stdlib.h>
 #include "prot.h"
 
+namespace evs { 
+
+
 
 /*-------------------------------------------------------------------*
  * SFM_Cal()
@@ -41,3 +44,5 @@ float SFM_Cal(
 
     return (float)SFM;
 }
+
+} // end of namespace

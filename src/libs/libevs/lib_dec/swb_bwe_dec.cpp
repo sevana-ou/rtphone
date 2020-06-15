@@ -11,6 +11,9 @@
 #include "basop_util.h"
 #include "basop_proto_func.h"
 
+namespace evs { 
+
+
 
 /*-------------------------------------------------------------------*
  * para_pred_bws()
@@ -662,3 +665,5 @@ void swb_bwe_dec(
 
     return;
 }
+
+} // end of namespace

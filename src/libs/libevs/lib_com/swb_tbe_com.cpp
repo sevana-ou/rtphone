@@ -9,6 +9,9 @@
 #include "prot.h"
 #include "rom_com.h"
 
+namespace evs { 
+
+
 /*-----------------------------------------------------------------*
  * Local functions
  *-----------------------------------------------------------------*/
@@ -1721,3 +1724,5 @@ short get_tbe_bits(
 
     return bits;
 }
+
+} // end of namespace

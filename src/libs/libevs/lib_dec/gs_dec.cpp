@@ -8,6 +8,9 @@
 #include "rom_com.h"
 #include "prot.h"
 
+namespace evs { 
+
+
 /*-------------------------------------------------------------------*
  * decod_audio()
  *
@@ -511,3 +514,5 @@ void gsc_dec(
 
     return;
 }
+
+} // end of namespace

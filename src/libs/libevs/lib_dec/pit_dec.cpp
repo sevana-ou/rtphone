@@ -11,6 +11,9 @@
 #include "rom_com.h"
 #include "options.h"
 
+namespace evs { 
+
+
 
 /*----------------------------------------------------------*
  * pit_decode()
@@ -783,3 +786,5 @@ void Mode2_delta_pit_dec(
 
     return;
 }
+
+} // end of namespace

@@ -9,6 +9,9 @@
 #include "rom_com.h"
 #include "prot.h"
 
+namespace evs { 
+
+
 
 
 
@@ -733,3 +736,5 @@ int ITF_Detect(float const pSpectrum[],
     return 1;
 }
 
+
+} // end of namespace

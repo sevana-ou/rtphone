@@ -14,6 +14,9 @@
 /* local includes */
 #include "jbm_jb4_inputbuffer.h"
 
+namespace evs { 
+
+
 
 /** input buffer with fixed capacity */
 struct JB4_INPUTBUFFER
@@ -304,3 +307,5 @@ unsigned int JB4_INPUTBUFFER_Size( const JB4_INPUTBUFFER_HANDLE h )
     return ret;
 }
 
+
+} // end of namespace

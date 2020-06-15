@@ -8,6 +8,9 @@
 #include "rom_enc.h"
 #include "prot.h"
 
+namespace evs { 
+
+
 /*-------------------------------------------------------------------*
  * Local constants
  *-------------------------------------------------------------------*/
@@ -300,3 +303,5 @@ void pitchDoubling_det(
 
     return;
 }
+
+} // end of namespace

@@ -8,6 +8,9 @@
 #include "prot.h"
 #include "rom_com.h"
 
+namespace evs { 
+
+
 /*--------------------------------------------------------------------------*
  * hq_classifier_dec()
  *
@@ -62,3 +65,5 @@ short hq_classifier_dec(            /* o  : Consumed bits                   */
 
     return bits;
 }
+
+} // end of namespace

@@ -10,6 +10,9 @@
 #include "options.h"
 #include <assert.h>
 
+namespace evs { 
+
+
 /*---------------------------------------------------------------------*
  * Local constants
  *---------------------------------------------------------------------*/
@@ -468,3 +471,5 @@ void addBassPostFilter(
 
     return;
 }
+
+} // end of namespace

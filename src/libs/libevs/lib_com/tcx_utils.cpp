@@ -10,6 +10,9 @@
 #include "cnst.h"
 #include "prot.h"
 
+namespace evs { 
+
+
 /*-------------------------------------------------------------------*
 * tcx_get_windows()
 *
@@ -939,3 +942,5 @@ void SetTnsConfig(
     return;
 }
 
+
+} // end of namespace

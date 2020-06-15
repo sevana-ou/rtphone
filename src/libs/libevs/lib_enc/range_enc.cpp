@@ -10,6 +10,9 @@
 #include "rom_com.h"
 #include "prot.h"
 
+namespace evs { 
+
+
 /*-------------------------------------------------------------------*
  * Local functions
  *-------------------------------------------------------------------*/
@@ -288,3 +291,5 @@ static void rc_enc_write(
     return;
 }
 
+
+} // end of namespace

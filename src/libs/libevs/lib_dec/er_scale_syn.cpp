@@ -7,6 +7,9 @@
 #include "prot.h"
 #include "cnst.h"
 
+namespace evs { 
+
+
 
 
 
@@ -101,3 +104,5 @@ float Damping_fact( const short coder_type, int nbLostCmpt, short last_good, flo
     return alpha;
 }
 
+
+} // end of namespace

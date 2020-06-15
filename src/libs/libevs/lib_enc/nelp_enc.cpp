@@ -8,6 +8,9 @@
 #include "prot.h"
 #include "rom_com.h"
 
+namespace evs { 
+
+
 /*-------------------------------------------------------------------*
  * quantize_uvg()
  *
@@ -406,3 +409,5 @@ void nelp_encoder(
     }
     return;
 }
+
+} // end of namespace

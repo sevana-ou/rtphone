@@ -12,6 +12,9 @@
 #include "rom_enc.h"
 #include "basop_proto_func.h"
 
+namespace evs { 
+
+
 
 #define kMaxC    8
 
@@ -517,3 +520,5 @@ int lsf_bctcvq_encprm(
 
     return nbits_lpc;
 }
+
+} // end of namespace

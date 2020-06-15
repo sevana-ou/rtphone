@@ -8,6 +8,9 @@
 #include "prot.h"
 #include "rom_com.h"
 
+namespace evs { 
+
+
 
 /*-------------------------------------------------------------------*
  * reset_rf_indices()
@@ -381,3 +384,5 @@ void coder_acelp_rf(
 
     return;
 }
+
+} // end of namespace

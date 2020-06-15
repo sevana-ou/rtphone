@@ -8,6 +8,9 @@
 #include "prot.h"
 #include "rom_com.h"
 
+namespace evs { 
+
+
 
 /*-----------------------------------------------------------------------*
  * phase_dispersion()
@@ -121,3 +124,5 @@ void phase_dispersion(
 
     return;
 }
+
+} // end of namespace

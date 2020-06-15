@@ -12,6 +12,9 @@
 #include "rom_enc.h"
 #include "rom_com.h"
 
+namespace evs { 
+
+
 
 
 
@@ -233,3 +236,5 @@ Word32 E_GAIN_closed_loop_search(Float32 exc[],
 
 
 
+
+} // end of namespace

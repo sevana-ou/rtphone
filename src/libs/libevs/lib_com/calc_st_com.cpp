@@ -7,6 +7,9 @@
 #include "cnst.h"
 #include "prot.h"
 
+namespace evs { 
+
+
 
 
 /*----------------------------------------------------------------------------
@@ -271,3 +274,5 @@ void blend_subfr2( float *sigIn1, float *sigIn2, float *sigOut)
 
     return;
 }
+
+} // end of namespace

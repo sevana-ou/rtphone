@@ -5,6 +5,9 @@
 #include <math.h>
 #include "prot.h"
 
+namespace evs { 
+
+
 /*-------------------------------------------------------------------*
  * frame_spec_dif_cor_rate()
  *
@@ -60,3 +63,5 @@ void frame_spec_dif_cor_rate(
 
     return;
 }
+
+} // end of namespace

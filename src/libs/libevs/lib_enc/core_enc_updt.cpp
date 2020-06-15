@@ -11,6 +11,9 @@
 #include "rom_com.h"
 #include "cnst.h"
 
+namespace evs { 
+
+
 
 /*-------------------------------------------------------------------*
 * core_encode_update()
@@ -183,3 +186,5 @@ void core_encode_update_cng(
 
     return;
 }
+
+} // end of namespace

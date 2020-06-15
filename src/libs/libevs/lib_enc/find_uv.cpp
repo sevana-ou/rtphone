@@ -7,6 +7,9 @@
 #include "cnst.h"
 #include "prot.h"
 
+namespace evs { 
+
+
 /*-------------------------------------------------------------------*
  * Local constants
  *-------------------------------------------------------------------*/
@@ -411,3 +414,5 @@ short find_uv(                              /* o  : coding type                 
 
     return coder_type;
 }
+
+} // end of namespace
