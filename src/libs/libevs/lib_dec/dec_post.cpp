@@ -1,52 +1,52 @@
 /*====================================================================================
-    EVS Codec 3GPP TS26.442 Apr 03, 2018. Version 12.11.0 / 13.6.0 / 14.2.0
+    EVS Codec 3GPP TS26.443 Nov 13, 2018. Version 12.11.0 / 13.7.0 / 14.3.0 / 15.1.0
   ====================================================================================*/
 
 #include <assert.h>
+#include <math.h>
 #include "options.h"
-#include "prot_fx.h"
-#include "basop_util.h"
-#include "stl.h"            /* Weighted mops computation related code */
-#include "rom_dec_fx.h"
-#include "cnst_fx.h"
+#include "cnst.h"
+#include "rom_com.h"
+#include "prot.h"
 
-#define FORMAT_POST_FILT_G1 24576/*0.75f Q15*/ /*0.75f*/ /*denominator 0.9,0.75,0.15,0.9*/
-#define FORMAT_POST_FILT_G2 22938/*0.7f Q15*/ /*0.7f*/ /*numerator 0.75,0.7,0.1,0.7*/
-#define FORMAT_POST_FILT_G1_MAX 26214/*0.8f Q15*/ /*for low bit-rates on clean speech*/
-#define FORMAT_POST_FILT_G1_MIN 24576/*0.75f Q15*/ /*for high bit-rates on clean speech and noisy speech*/
+/*---------------------------------------------------------------------*
+ * Local constants
+ *---------------------------------------------------------------------*/
+
+#define FORMAT_POST_FILT_G1 0.75f           /*0.75f*/ /*denominator 0.9,0.75,0.15,0.9*/
+
 
 /*--------------------------------------------------------------------------
  * Local functions
  *--------------------------------------------------------------------------*/
 
-static void Dec_postfilt( PFSTAT * pfstat, const Word16 t0, const Word16 *signal_ptr, const Word16 *coeff,
-                          Word16 *sig_out, const Word16 gamma1, const Word16 gamma2, const Word16 Gain_factor, const Word16 disable_hpf );
+static void Dec_postfilt( const short L_subfr, PFSTAT *pfstat, const int t0, const float *signal_ptr, const float *coeff,
+                          float *sig_out, const float gamma1, const float gamma2, const float gain_factor, const short disable_hpf );
 
-static void pst_ltp( Word16 t0, Word16 * ptr_sig_in, Word16 * ptr_sig_pst0, Word16 gain_factor );
+static void pst_ltp( const int t0, const float *ptr_sig_in, float *ptr_sig_pst0, float gain_factor, const short L_subfr );
 
-static void search_del( Word16 t0, Word16 * ptr_sig_in, Word16 * ltpdel, Word16 * phase, Word16 * num_gltp, Word16 * den_gltp,
-                        Word16 * sh_num_gltp, Word16 * sh_den_gltp, Word16 * y_up, Word16 * off_yup );
+static void search_del( const int t0, const float *ptr_sig_in, int *ltpdel, int *phase, float *num_gltp, float *den_gltp,
+                        float *y_up, int *off_yup, const short L_subfr );
 
-static void filt_plt( Word16 * s_in, Word16 * s_ltp, Word16 * s_out, Word16 gain_plt );
+static void filt_plt( const float *s_in, const float *s_ltp, float *s_out, const float gain_plt, const short L_subfr );
 
-static void compute_ltp_l( Word16 * s_in, Word16 ltpdel, Word16 phase, Word16 * y_up, Word16 * num, Word16 * den, Word16 * sh_num, Word16 * sh_den );
+static void compute_ltp_l( const float *s_in, const int ltpdel, const int phase, float *y_up, float *num, float *den, const short L_subfr );
 
-static Word16 select_ltp( Word16 num1, Word16 den1, Word16 sh_num1, Word16 sh_den1, Word16 num2, Word16 den2, Word16 sh_num2, Word16 sh_den2 );
+static int select_ltp( const float num1, const float den1, const float num2, const float den2 );
 
-static void calc_st_filt( Word16 * apond2, Word16 * apond1, Word16 * parcor0, Word16 * sig_ltp_ptr, Word16 * mem_zero );
+static void modify_pst_param( const float psf_lp_noise, float *g1, float *g2, const short coder_type, float *gain_factor );
 
-static void modify_pst_param( const Word16 lp_noise, Word16 *g1, Word16 *g2, const Word16 coder_type, Word16 *gain_factor );
+static void Dec_formant_postfilt( PFSTAT *pfstat, const float *signal_ptr, const float *coeff, float *sig_out,
+                                  const float gamma1, const float gamma2, const short l_subfr );
 
-static void Dec_formant_postfilt( PFSTAT *pfstat, Word16 *signal_ptr, Word16 *coeff, Word16 *sig_out, Word16 gamma1, Word16 gamma2 );
-
-
-/*--------------------------------------------------------------------------
- *  Init_post_filter
+/*--------------------------------------------------------------------------*
+ *  Function  Init_post_filter()
  *
- *  post filter initialization
+ *  Post-filter initialization
  *--------------------------------------------------------------------------*/
+
 void Init_post_filter(
-    PFSTAT * pfstat          /* i : core decoder parameters */
+    PFSTAT * pfstat         /* i  : post-filter state memories  */
 )
 {
     /* It is off by default */
@@ -56,108 +56,218 @@ void Init_post_filter(
     pfstat->reset = 0;
 
     /* Initialize arrays and pointers */
-    set16_fx(pfstat->mem_pf_in, 0, L_SUBFR);
+    set_zero( pfstat->mem_pf_in, L_SUBFR );
 
     /* res2 =  A(gamma2) residual */
-    set16_fx(pfstat->mem_res2, 0, DECMEM_RES2);
+    set_zero( pfstat->mem_res2, DECMEM_RES2 );
 
     /* 1/A(gamma1) memory */
-    set16_fx(pfstat->mem_stp, 0, L_SUBFR);
+    set_zero( pfstat->mem_stp, L_SUBFR );
 
     /* null memory to compute i.r. of A(gamma2)/A(gamma1) */
-    set16_fx(pfstat->mem_zero, 0, M);
+    set_zero( pfstat->mem_zero, M );
 
     /* for gain adjustment */
-    pfstat->gain_prec = 16384; /*Q14*/                                          move16();
+    pfstat->gain_prec = 1.0f;
 
     return;
 }
 
+
 /*--------------------------------------------------------------------------
- *  NB_post_filt:
+ * nb_post_filt()
  *
- *  Main routine to perform post filtering on NB synthesis
+ * Main routine to perform post filtering of NB signals
  *--------------------------------------------------------------------------*/
+
 void nb_post_filt(
-    const Word16 L_frame,       /* i  : frame length                            */
-    PFSTAT *Pfstat,       /* i/o: Post filter related memories            */
-    Word16 *psf_lp_noise, /* i  : Long term noise                   Q8    */
-    const Word16 tmp_noise,     /* i  : noise energy                       Q0   */
-    Word16 *Synth,        /* i  : 12k8 synthesis                    Qsyn  */
-    const Word16 *Aq,           /* i  : LP filter coefficient             Q12   */
-    const Word16 *Pitch_buf,    /* i  : Fractionnal subframe pitch buffer Q6    */
-    const Word16 coder_type,    /* i  : coder_type                              */
-    const Word16 BER_detect,    /* i  : BER detect flag                         */
-    const Word16 disable_hpf    /* i  : flag to diabled HPF                     */
+    const short L_frame,       /* i  : frame length                       */
+    const short L_subfr,       /* i  : sub-frame length                   */
+    PFSTAT *pfstat,       /* i/o: Post filter related memories       */
+    float *psf_lp_noise, /* i/o: long term noise energy             */
+    const float tmp_noise,     /* i  : noise energy                       */
+    float *synth,        /* i/o: synthesis                          */
+    const float *Aq,           /* i  : LP filter coefficient              */
+    const float *pitch_buf,    /* i  : floating pitch for each subframe   */
+    const short coder_type,    /* i  : coder_type                         */
+    const short BER_detect,    /* i  : BER detect flag                    */
+    const short disable_hpf    /* i  : flag to disabled HPF               */
 )
 {
-    Word16 i, j, Post_G1, Post_G2, Gain_factor;
-    Word16 T0_first, *Pf_in;
-    const Word16 *p_Aq;
-    Word16 pf_in_buffer[M+L_FRAME16k];
+    short t0_first, i, j;
+    const float *p_Aq;
+    float *pf_in, post_G1, post_G2, gain_factor;
+    float pf_in_buffer[M+L_FRAME16k];
 
-    IF( BER_detect == 0 )
+    if(!BER_detect)
     {
         /* update long-term background noise energy during inactive frames */
-        IF( sub(coder_type,INACTIVE) == 0 )
+        if( coder_type == INACTIVE )
         {
-            *psf_lp_noise = round_fx(L_mac(L_mult(31130, *psf_lp_noise), 26214 /*0.05 Q19*/, shl(tmp_noise,4))); /*Q8*Q15 + Q19*Q4 -> Q8 */
+            *psf_lp_noise = 0.95f * *psf_lp_noise + 0.05f * tmp_noise;
         }
     }
 
-    modify_pst_param( *psf_lp_noise, &Post_G1, &Post_G2, coder_type, &Gain_factor );
+    /* set post-filter input */
+    modify_pst_param( *psf_lp_noise, &post_G1, &post_G2, coder_type, &gain_factor );
 
-    if(Pfstat->reset)
+
+    if( pfstat->reset )
     {
-        set16_fx(Pfstat->mem_res2, 0, DECMEM_RES2);
-        Copy( &Synth[L_frame-L_SYN_MEM], Pfstat->mem_pf_in, L_SYN_MEM);
-        Copy( &Synth[L_frame-L_SYN_MEM], Pfstat->mem_stp, L_SYN_MEM );
-        Pfstat->gain_prec = 16384;
-        move16();
-        Pfstat->reset = 0;
-        move16();
+        set_zero( pfstat->mem_res2, DECMEM_RES2 );
+        mvr2r( &synth[L_frame-L_SYN_MEM], pfstat->mem_pf_in, L_SYN_MEM );
+        mvr2r( &synth[L_frame-L_SYN_MEM], pfstat->mem_stp, L_SYN_MEM );
+        pfstat->gain_prec = 1.0f;
+        pfstat->reset = 0;
         return;
     }
-    Pf_in = &pf_in_buffer[M];
-    Copy( Pfstat->mem_pf_in+L_SYN_MEM-M, &Pf_in[-M], M );
-    Copy( Synth, Pf_in, L_frame );
-    Copy( &Synth[L_frame - L_SYN_MEM], Pfstat->mem_pf_in, L_SYN_MEM );
-    /* deactivation of the post filter in case of AUDIO because it causes problems to singing sequences */
-    if( sub(coder_type,AUDIO) == 0 )
-    {
-        Post_G1 = 32767;
-        move16();
-        Post_G2 = 32767;
-        move16();
-        Gain_factor = 32767;
-        move16();
-    }
 
+    pf_in = &pf_in_buffer[M];
+    mvr2r( pfstat->mem_pf_in+L_SYN_MEM-M, &pf_in[-M], M );
+    mvr2r( synth, pf_in, L_frame );
+    mvr2r( &synth[L_frame - L_SYN_MEM], pfstat->mem_pf_in, L_SYN_MEM );
+
+    /* deactivation of the post filter in case of AUDIO because it causes problems to singing sequences */
+    if( coder_type == AUDIO )
+    {
+        post_G1 = 1.f;
+        post_G2 = 1.f;
+        gain_factor = 1.f;
+    }
 
     /* run the post filter */
     p_Aq = Aq;
-    move16();
-    j = 0;
-    move16();
-    FOR (i = 0; i < L_frame; i += L_SUBFR)
+    for( i=0, j=0; i<L_frame; i+=L_subfr, j++ )
     {
-        T0_first = Pitch_buf[j];
+        t0_first = (short)(pitch_buf[j] + 0.5f);
 
-        Dec_postfilt( Pfstat, T0_first, &Pf_in[i], p_Aq, &Synth[i], Post_G1, Post_G2, Gain_factor, disable_hpf );
+        Dec_postfilt( L_subfr, pfstat, t0_first, &pf_in[i], p_Aq, &synth[i], post_G1, post_G2, gain_factor, disable_hpf );
 
         p_Aq += (M+1);
-        j = add(j,1);
     }
-
 
     return;
 }
+
+
+/*--------------------------------------------------------------------------
+ *  formant_post_filt:
+ *
+ *  WB and SWB formant post-filtering
+ *--------------------------------------------------------------------------*/
+
+void formant_post_filt(
+    PFSTAT *pfstat,        /* i/o: Post filter related memories    */
+    float *synth_in,      /* i  : 12k8 synthesis                  */
+    const float *Aq,            /* i  : LP filter coefficient           */
+    float *synth_out,     /* i/o: input signal                    */
+    const short L_frame,        /* i  : frame length                    */
+    const short L_subfr,        /* i  : sub-frame length                */
+    const float lp_noise,       /* i  : background noise energy         */
+    const long  rate,           /* i  : bit-rate                        */
+    const short off_flag        /* i  : off flag                        */
+)
+{
+    short i_subfr;
+    const float *p_Aq;
+    float post_G1, post_G2;
+
+    /*default parameter for noisy speech and high bit-rates*/
+    if ( L_frame == L_FRAME )
+    {
+        post_G2 = 0.7f;
+        if( lp_noise < LP_NOISE_THRESH )    /* Clean speech */
+        {
+            if( rate < ACELP_13k20 )   /*Low rates*/
+            {
+                post_G1 = 0.8f;
+            }
+            else if( rate < ACELP_24k40 )
+            {
+                post_G1 = 0.75f;
+            }
+            else
+            {
+                post_G1 = 0.72f;
+            }
+        }
+        else    /*Noisy speech*/
+        {
+            if( rate < ACELP_15k85 ) /*Low rates*/
+            {
+                post_G1 = 0.75f;
+            }
+            else    /*High rates*/
+            {
+                post_G1 = 0.7f;
+            }
+        }
+    }
+    else
+    {
+        post_G2 = 0.76f;
+        if ( lp_noise >= LP_NOISE_THRESH )
+        {
+            post_G1 = 0.76f;
+        }
+        else if( rate == ACELP_13k20 )
+        {
+            post_G1 = 0.82f;
+        }
+        else if( rate == ACELP_16k40 )
+        {
+            post_G1 = 0.80f;
+        }
+        else if( rate == ACELP_24k40 || rate == ACELP_32k )
+        {
+            post_G1 = 0.78f;
+        }
+        else
+        {
+            post_G1 = 0.76f;
+        }
+    }
+
+    /* Switch off post-filter*/
+    if( off_flag )
+    {
+        post_G1 = post_G2;
+    }
+
+    /* Reset post filter */
+    if( pfstat->reset )
+    {
+        pfstat->reset = 0;
+        mvr2r( &synth_in[L_frame-L_SYN_MEM], pfstat->mem_pf_in, L_SYN_MEM);
+        mvr2r( &synth_in[L_frame-L_SYN_MEM], pfstat->mem_stp, L_SYN_MEM );
+        pfstat->gain_prec = 1.f;
+        mvr2r( synth_in,synth_out, L_frame );
+
+        return;
+    }
+
+    /* input memory*/
+    mvr2r( pfstat->mem_pf_in, synth_in-L_SYN_MEM, L_SYN_MEM);
+    mvr2r( &synth_in[L_frame-L_SYN_MEM], pfstat->mem_pf_in, L_SYN_MEM);
+
+    /* run the post filter */
+    p_Aq = Aq;
+    for( i_subfr=0; i_subfr<L_frame; i_subfr+=L_subfr)
+    {
+        Dec_formant_postfilt( pfstat, &synth_in[i_subfr], p_Aq, &synth_out[i_subfr],post_G1, post_G2, L_subfr );
+
+        p_Aq += (M+1);
+    }
+
+    return;
+}
+
 
 /*----------------------------------------------------------------------------
  * Dec_postfilt()
  *
- * Post - adaptive postfilter main function
- *   Short term postfilter :
+ * Adaptive postfilter main function
+ *   Short-term postfilter :
  *     Hst(z) = Hst0(z) Hst1(z)
  *     Hst0(z) = 1/g0 A(gamma2)(z) / A(gamma1)(z)
  *     if {hi} = i.r. filter A(gamma2)/A(gamma1) (truncated)
@@ -167,7 +277,7 @@ void nb_post_filt(
  *     with mu = k1 * gamma3
  *     k1 = 1st parcor calculated on {hi}
  *     gamma3 = gamma3_minus if k1<0, gamma3_plus if k1>0
- *   Long term postfilter :
+ *   Long-term postfilter :
  *     harmonic postfilter :   H0(z) = gl * (1 + b * z-p)
  *       b = gamma_g * gain_ltp
  *       gl = 1 / 1 + b
@@ -176,213 +286,80 @@ void nb_post_filt(
  *       1. search around 1st subframe delay (3 integer values)
  *       2. search around best integer with fract. delays (1/8)
  *----------------------------------------------------------------------------*/
+
 static void Dec_postfilt(
-    PFSTAT * pfstat,      /* i/o: states strucure                              */
-    const Word16 t0,            /* i  : pitch delay given by coder                   */
-    const Word16 * signal_ptr,  /* i  : input signal (pointer to current subframe    */
-    const Word16 * coeff,       /* i  : LPC coefficients for current subframe        */
-    Word16 * sig_out,     /* o  : postfiltered output                          */
-    const Word16 gamma1,        /* i  : short term postfilt. den. weighting factor   */
-    const Word16 gamma2,        /* i  : short term postfilt. num. weighting factor   */
-    const Word16 Gain_factor,   /* i  : Gain Factor (Q15)                            */
-    const Word16 disable_hpf
+    const short L_subfr,      /* i  : sub-frame length                          */
+    PFSTAT *pfstat,      /* i/o: Post filter related memories              */
+    const int   t0,           /* i  : pitch delay given by coder                */
+    const float *signal_ptr,  /* i  : input signal (pointer to current subframe */
+    const float *coeff,       /* i  : LPC coefficients for current subframe     */
+    float *sig_out,     /* o  : postfiltered output                       */
+    const float gamma1,       /* i  : short term postfilt. den. weighting factor*/
+    const float gamma2,       /* i  : short term postfilt. num. weighting factor*/
+    const float gain_factor,  /* i  : Gain Factor                               */
+    const short disable_hpf   /* i  : flag to disable HPF                       */
 )
 {
-    /* Local variables and arrays */
-    Word16 apond1[M+1];  /* s.t. denominator coeff. */
-    Word16 apond2[LONG_H_ST];
-    Word16 sig_ltp[L_SUBFR+1]; /* H0 output signal  */
-    Word16 res2[SIZ_RES2];
-
-    Word16 *sig_ltp_ptr;
-    Word16 *res2_ptr;
-    Word16 *ptr_mem_stp;
-
-    Word16 parcor0;
-
+    float apond1[M+1];         /* s.t. denominator coeff. */
+    float apond2[LONG_H_ST];
+    float sig_ltp[L_SUBFR+1];  /* H0 output signal */
+    float res2[SIZ_RES2];
+    float *sig_ltp_ptr;
+    float *res2_ptr;
+    float *ptr_mem_stp;
+    float parcor0;
 
     /* Init pointers and restore memories */
     res2_ptr = res2 + DECMEM_RES2;
     ptr_mem_stp = pfstat->mem_stp + L_SYN_MEM - 1;
-    Copy(pfstat->mem_res2, res2, DECMEM_RES2);
+    mvr2r( pfstat->mem_res2, res2, DECMEM_RES2 );
 
     /* Compute weighted LPC coefficients */
-    weight_a_fx(coeff, apond1, gamma1, M);
-    weight_a_fx(coeff, apond2, gamma2, M);
-    set16_fx(&apond2[M+1], 0, LONG_H_ST-(M+1));
+    weight_a( coeff, apond1, gamma1, M );
+    weight_a( coeff, apond2, gamma2, M );
+    set_f( &apond2[M+1], 0, LONG_H_ST-(M+1) );
 
     /* Compute A(gamma2) residual */
-    Residu3_fx(apond2, signal_ptr, res2_ptr, L_SUBFR, 1);
+    residu( apond2, M, signal_ptr, res2_ptr, L_subfr );
 
     /* Harmonic filtering */
     sig_ltp_ptr = sig_ltp + 1;
 
-    IF (disable_hpf == 0)
+    if( !disable_hpf )
     {
-        pst_ltp( t0, res2_ptr, sig_ltp_ptr, Gain_factor );
+        pst_ltp( t0, res2_ptr, sig_ltp_ptr, gain_factor, L_subfr );
     }
-    ELSE
+    else
     {
-        Copy(res2_ptr, sig_ltp_ptr, L_SUBFR);
+        mvr2r( res2_ptr, sig_ltp_ptr, L_subfr );
     }
 
-    /* Save last output of 1/A(gamma1) */
-    /* (from preceding subframe)       */
+    /* Save last output of 1/A(gamma1)  */
+    /* (from preceding subframe)        */
     sig_ltp[0] = *ptr_mem_stp;
-    move16();
 
-    /* Controls short term pst filter gain and compute parcor0 */
-    calc_st_filt(apond2, apond1, &parcor0, sig_ltp_ptr, pfstat->mem_zero );
+    /* Controls short term pst filter gain and compute parcor0   */
+    calc_st_filt( apond2, apond1, &parcor0, sig_ltp_ptr, pfstat->mem_zero, L_subfr, -1 );
 
-    E_UTIL_synthesis(1, apond1, sig_ltp_ptr, sig_ltp_ptr, L_SUBFR, pfstat->mem_stp+L_SYN_MEM-M, 0, M);
-    Copy( sig_ltp_ptr+L_SUBFR-L_SYN_MEM, pfstat->mem_stp, L_SYN_MEM );
+    syn_filt( apond1, M,sig_ltp_ptr, sig_ltp_ptr, L_subfr, pfstat->mem_stp+L_SYN_MEM-M, 0 );
+    mvr2r( sig_ltp_ptr+L_SUBFR-L_SYN_MEM, pfstat->mem_stp, L_SYN_MEM );
 
     /* Tilt filtering */
-    Filt_mu(sig_ltp, sig_out, parcor0, L_SUBFR);
+    filt_mu( sig_ltp, sig_out, parcor0, L_subfr, -1 );
 
     /* Gain control */
-    scale_st(signal_ptr, sig_out, &pfstat->gain_prec, L_SUBFR);
+    scale_st( signal_ptr, sig_out, &(pfstat->gain_prec), L_subfr, -1 );
 
     /* Update for next subframe */
-    Copy(&res2[L_SUBFR], pfstat->mem_res2, DECMEM_RES2);
-
+    mvr2r( &res2[L_subfr], pfstat->mem_res2, DECMEM_RES2 );
 
     return;
 }
 
-/*--------------------------------------------------------------------------
- *  formant_post_filt:
- *
- *  Main routine to perform formant post filtering
- *--------------------------------------------------------------------------*/
-void formant_post_filt(
-    PFSTAT *pfstat,       /* i/o: Post filter related memories      */
-    Word16 *synth_in,        /* i  : 12k8 synthesis                    */
-    Word16 *Aq,           /* i  : LP filter coefficient             */
-    Word16 *synth_out,  /* i/o: input signal                      */
-    Word16 L_frame,
-    Word32 lp_noise,  /* (i) : background noise energy (15Q16) */
-    Word32 rate,         /* (i) : bit-rate */
-    const Word16 off_flag            /* i  : off flag                        */
-)
-{
-    Word16 i_subfr;
-    Word16 *p_Aq;
-    Word16 post_G1, post_G2;
 
-
-    /*default parameter for noisy speech and high bit-rates*/
-    IF (sub(L_frame, L_FRAME) == 0)
-    {
-        post_G2 = 22938/*0.7f Q15*/;
-        move16();
-        IF (L_sub(lp_noise, LP_NOISE_THRESH) < 0)
-        {
-            /*Clean speech*/
-            IF (L_sub(rate, ACELP_13k20) < 0)
-            {
-                /*Low rates*/
-
-                post_G1 = 26214/*0.8f Q15*/;
-                move16();
-            }
-            ELSE IF (L_sub(rate, ACELP_24k40) < 0)
-            {
-                /*Low rates*/
-
-                post_G1 = 24576/*0.75f Q15*/;
-                move16();
-            }
-            ELSE
-            {
-                post_G1 = 23593/*0.72f Q15*/;
-                move16();
-            }
-        }
-        ELSE   /*Noisy speech*/
-        {
-            post_G1 = 22938/*0.7f Q15*/;
-            move16();
-            if (L_sub(rate, ACELP_15k85) < 0)
-            {
-                /*Low rates*/
-                post_G1 = 24576/*0.75f Q15*/;
-                move16();
-            }
-        }
-    }
-    ELSE
-    {
-        post_G2 = 24904/*0.76f Q15*/;
-        move16();
-        test();
-        IF (L_sub(lp_noise, LP_NOISE_THRESH) >= 0)
-        {
-            post_G1 = 24904/*0.76f Q15*/;
-        }
-        ELSE IF (L_sub(rate, ACELP_13k20) == 0)
-        {
-            post_G1 = 26870/*0.82f Q15*/;
-            move16();
-        }
-        ELSE IF (L_sub(rate, ACELP_16k40) == 0)
-        {
-            post_G1 = 26214/*0.80f Q15*/;
-            move16();
-        }
-        ELSE IF (L_sub(rate, ACELP_24k40) == 0 || L_sub(rate, ACELP_32k) == 0)
-        {
-            post_G1 = 25559/*0.78f Q15*/;
-            move16();
-        }
-        ELSE
-        {
-            post_G1 = 24904/*0.76f Q15*/;
-            move16();
-        }
-    }
-
-    /* Switch off post-filter */
-    if( off_flag != 0 )
-    {
-        post_G1 = post_G2;
-        move16();
-    }
-
-    /* Reset post filter */
-    if( pfstat->reset != 0 )
-    {
-        post_G1 = MAX16B;
-        move16();
-        post_G2 = MAX16B;
-        move16();
-        pfstat->reset = 0;
-        move16();
-        Copy( &synth_in[L_frame-L_SYN_MEM], pfstat->mem_pf_in, L_SYN_MEM);
-        Copy( &synth_in[L_frame-L_SYN_MEM], pfstat->mem_stp, L_SYN_MEM );
-        pfstat->gain_prec = 16384;
-        move16();
-        Copy( synth_in,synth_out, L_frame );
-
-        return;
-    }
-
-    /* input memory*/
-    Copy( pfstat->mem_pf_in, synth_in-L_SYN_MEM, L_SYN_MEM);
-    Copy( &synth_in[L_frame-L_SYN_MEM], pfstat->mem_pf_in, L_SYN_MEM);
-
-    move16();
-    p_Aq = Aq;
-    FOR (i_subfr = 0; i_subfr < L_frame; i_subfr += L_SUBFR )
-    {
-        Dec_formant_postfilt( pfstat, &synth_in[i_subfr], p_Aq, &synth_out[i_subfr], post_G1, post_G2 );
-        p_Aq += (M+1);
-    }
-
-}
 
 /*----------------------------------------------------------------------------
- * Dec_postfilt
+ * Dec_formant_postfilt
  *
  * Post - adaptive postfilter main function
  *   Short term postfilter :
@@ -396,1137 +373,594 @@ void formant_post_filt(
  *     k1 = 1st parcor calculated on {hi}
  *     gamma3 = gamma3_minus if k1<0, gamma3_plus if k1>0
  *----------------------------------------------------------------------------*/
+
 static void Dec_formant_postfilt(
-    PFSTAT *pfstat,       /* i/o: states strucure                           */
-    Word16 *signal_ptr,   /* i  : input signal (pointer to current subframe */
-    Word16 *coeff,        /* i  : LPC coefficients for current subframe     */
-    Word16 *sig_out,      /* o  : postfiltered output                       */
-    Word16 gamma1,        /* i  : short term postfilt. den. weighting factor*/
-    Word16 gamma2         /* i  : short term postfilt. num. weighting factor*/
+    PFSTAT *pfstat,        /* i/o: states strucure                           */
+    const float *signal_ptr,    /* i  : input signal (pointer to current subframe */
+    const float *coeff,         /* i  : LPC coefficients for current subframe     */
+    float *sig_out,       /* o  : postfiltered output                       */
+    const float gamma1,         /* i  : short term postfilt. den. weighting factor*/
+    const float gamma2,         /* i  : short term postfilt. num. weighting factor*/
+    const short l_subfr         /* i  : subframe length                           */
 )
 {
     /* Local variables and arrays */
-    Word16 apond1[M+1];         /* s.t. denominator coeff. */
-    Word16 apond2[LONG_H_ST];
-    Word16 res2[L_SUBFR];
-    Word16 resynth[L_SUBFR+1];
-    Word16 parcor0;
-    Word16 i, max;
-    Word16 scale_down;
+    float apond1[M+1];         /* s.t. denominator coeff. */
+    float apond2[LONG_H_ST];
+    float res2[L_SUBFR];
+    float resynth[L_SUBFR+1];
+    float parcor0;
 
     /* Compute weighted LPC coefficients */
-    weight_a_fx(coeff, apond1, gamma1, M);
-    weight_a_fx(coeff, apond2, gamma2, M);
-    set16_fx(&apond2[M+1], 0, LONG_H_ST-(M+1));
+    weight_a( coeff, apond1, gamma1, M );
+    weight_a( coeff, apond2, gamma2, M );
 
-    max = abs_s(signal_ptr[0]);
-    FOR (i = 1; i < L_SUBFR; i++)
-    {
-        max = s_max(max, abs_s(signal_ptr[i]));
-    }
-    scale_down = 0;
-    move16();
-    if (sub(max, 16384) > 0)
-    {
-        scale_down = 1;
-        move16();
-    }
+    set_zero( &apond2[M+1], LONG_H_ST-(M+1) );
 
     /* Compute A(gamma2) residual */
-    IF (!scale_down)
-    {
-        Residu3_fx(apond2, signal_ptr, res2, L_SUBFR, 1);
-    }
-    ELSE
-    {
-        Residu3_fx(apond2, signal_ptr, res2, L_SUBFR, 0);
-        Scale_sig(pfstat->mem_stp, L_SYN_MEM, -1);
-    }
+    residu( apond2, M, signal_ptr, res2, l_subfr );
 
     /* Controls short term pst filter gain and compute parcor0 */
-    calc_st_filt(apond2, apond1, &parcor0, res2, pfstat->mem_zero );
+    calc_st_filt( apond2, apond1, &parcor0, res2, pfstat->mem_zero, l_subfr, -1 );
 
     /* 1/A(gamma1) filtering, mem_stp is updated */
-    resynth[0] = *(pfstat->mem_stp + sub(L_SYN_MEM, 1));
-    move16();
+    resynth[0] = *(pfstat->mem_stp + L_SYN_MEM - 1);
 
-    E_UTIL_synthesis(1, apond1, res2, &(resynth[1]), L_SUBFR, pfstat->mem_stp+L_SYN_MEM-M, 0, M);
+    syn_filt( apond1, M,res2, &(resynth[1]), l_subfr, pfstat->mem_stp+L_SYN_MEM-M, 0 );
 
-    IF (!scale_down)
-    {
-        Copy( &(resynth[1])+L_SUBFR-L_SYN_MEM, pfstat->mem_stp, L_SYN_MEM );
-    }
-    ELSE
-    {
-        Copy_Scale_sig( &(resynth[1])+L_SUBFR-L_SYN_MEM, pfstat->mem_stp, L_SYN_MEM, 1 );
-    }
+    mvr2r( &(resynth[1])+l_subfr-L_SYN_MEM, pfstat->mem_stp, L_SYN_MEM);
 
     /* Tilt filtering */
-    Filt_mu(resynth, sig_out, parcor0, L_SUBFR);
-    IF (scale_down)
-    {
-        Scale_sig(sig_out, L_SUBFR, 1);
-    }
+    filt_mu( resynth, sig_out, parcor0, l_subfr, -1 );
 
     /* Gain control */
-    scale_st(signal_ptr, sig_out, &pfstat->gain_prec, L_SUBFR);
-
-
-    return;
-}
-
-
-/*------------------------------------------------------------------------------------
- * modify_pst_param()
- *
- * Modify gamma1 and gamma2 values in function of the long term noise level
- *-----------------------------------------------------------------------------------*/
-
-static void modify_pst_param(
-    const Word16 lp_noise,     /* i  : Long term noise energy     Q8           */
-    Word16 *g1,          /* o  : Gamma1 used in post filter Q15          */
-    Word16 *g2,          /* o  : Gamma1 used in post filter Q15          */
-    const Word16 coder_type,   /* i  : Vad information decoded in UV frame     */
-    Word16 *gain_factor  /* o  : Gain factor applied in post filtering   */
-)
-{
-    Word16 tmp;
-    Word16 lp_noiseQ12;
-    Word32 L_tmp;
-
-
-    test();
-    IF( sub(coder_type,INACTIVE) != 0 && sub(lp_noise, LP_NOISE_THR_FX) < 0 )
-    {
-        lp_noiseQ12 = shl(lp_noise, 4); /* to go from Q8 to Q12 */
-
-        /* ftmp = lp_noise*BG1_FX + CG1_FX */
-        tmp = mac_r(CG1_FX*65536L, lp_noiseQ12, BG1_FX*8); /* x8 to go from Q12 to Q15 */
-        tmp = s_min(tmp, POST_G1_FX );
-        tmp = s_max(tmp, GAMMA1_PST12K_MIN_FX );
-
-        *g1 = tmp;
-        move16();
-
-        /* ftmp = lp_noise*BG2_FX + CG2_FX */
-        L_tmp = L_mac0(CG2_FX/2*65536L, lp_noiseQ12, BG2_FX*8);/* L_mac0 and /2 to go from Q12 to Q14 */
-        /* we go to Q30 to avoid overflow CG2_FX*/
-
-        L_tmp = L_min(L_tmp, POST_G2_FX*65536L/2); /* /2 because L_tmp is Q30 */
-        L_tmp = L_max(L_tmp, GAMMA2_PST12K_MIN_FX*65536L/2);
-
-        *g2 = extract_h(L_shl(L_tmp, 1));       /* Q30=>Q31=>Q15 */
-    }
-    ELSE
-    {
-        *g1 = GAMMA1_PST12K_NOIS_FX;
-        move16();
-        *g2 = GAMMA2_PST12K_NOIS_FX;
-        move16();
-    }
-
-    /* Set gain_factor of the harmonic filtering*/
-    /* ftmp = (lp_noise - K_LP_NOISE)*C_LP_NOISE_FX */
-    L_tmp = L_mac(-CK_LP_NOISE_FX, lp_noise, C_LP_NOISE_FX); /* tmp is in Q24 (from Q8) */
-
-    L_tmp = L_min(L_tmp, 64*65536L); /* 0.25 in Q24 */
-    L_tmp = L_max(L_tmp, 0);
-
-    *gain_factor = extract_h(L_shl(L_tmp, 7));      /* Q24=>Q31=>Q15 */
-
+    scale_st( signal_ptr, sig_out, &pfstat->gain_prec, l_subfr, -1 );
 
     return;
 }
+
 
 /*----------------------------------------------------------------------------
- * pst_ltp
+ * pst_ltp()
  *
  * Perform harmonic postfilter
  *----------------------------------------------------------------------------*/
+
 static void pst_ltp(
-    Word16 t0,              /* i  : pitch delay given by coder       */
-    Word16 * ptr_sig_in,    /* i  : postfilter i  filter (residu2)   */
-    Word16 * ptr_sig_pst0,  /* o  : harmonic postfilter o            */
-    Word16 gain_factor      /* i  : Gain Factor (Q15)                */
+    const   int t0,               /* i  : pitch delay given by coder          */
+    const float *ptr_sig_in,      /* i  : postfilter input filter (residu2)   */
+    float *ptr_sig_pst0,    /* o  : harmonic postfilter output          */
+    float gain_factor,      /* i  : gain factor                         */
+    const short L_subfr           /* i  : sub-frame length                    */
 )
 {
-    Word32 L_temp;
+    int ltpdel, phase;
+    float num_gltp, den_gltp;
+    float num2_gltp, den2_gltp;
+    float gain_plt;
+    float y_up[SIZ_Y_UP];
+    const float *ptr_y_up;
+    int off_yup;
 
-    Word16 y_up[SIZ_Y_UP];
-    Word16 sig_cadr[SIZ_RES2];
+    /* Suboptimal delay search */
+    search_del( t0, ptr_sig_in, &ltpdel, &phase, &num_gltp, &den_gltp, y_up, &off_yup, L_subfr );
 
-    Word16 *ptr_y_up;
-    Word16 *ptr_sig;
-    Word16 *ptr_sig_cadr;
-
-    Word16 i;
-    Word16 temp;
-    Word16 ltpdel, phase;
-    Word16 num_gltp, den_gltp;
-    Word16 num2_gltp, den2_gltp;
-    Word16 sh_num, sh_den;
-    Word16 sh_num2, sh_den2;
-    Word16 gain_plt;
-    Word16 off_yup;
-    Word16 nb_sh_sig;
-
-
-
-    /* i  signal justified on 13 bits */
-    ptr_sig = ptr_sig_in - DECMEM_RES2;
-    nb_sh_sig = getScaleFactor16(ptr_sig, add(DECMEM_RES2, L_SUBFR));
-    nb_sh_sig = sub(3, nb_sh_sig);
-
-    FOR (i = 0; i < DECMEM_RES2+L_SUBFR; i++)
+    if( num_gltp == 0.0f )
     {
-        /* nb_sh_sig may be >0, <0 or =0 */
-        sig_cadr[i] = shr(ptr_sig[i], nb_sh_sig);
-        move16();
+        mvr2r( ptr_sig_in, ptr_sig_pst0, L_subfr );
     }
-    ptr_sig_cadr = sig_cadr + DECMEM_RES2;
-
-    /* Sub optimal delay search */
-    search_del(t0, ptr_sig_cadr, &ltpdel, &phase, &num_gltp, &den_gltp, &sh_num, &sh_den, y_up, &off_yup);
-
-
-    IF (num_gltp == 0)
+    else
     {
-        Copy(ptr_sig_in, ptr_sig_pst0, L_SUBFR);
-    }
-    ELSE
-    {
-        IF (phase == 0)
+        if( phase == 0 )
         {
             ptr_y_up = ptr_sig_in - ltpdel;
         }
-        ELSE
+        else
         {
-            /* Filtering with long filter */
-            compute_ltp_l(ptr_sig_cadr, ltpdel, phase, ptr_sig_pst0, &num2_gltp, &den2_gltp, &sh_num2, &sh_den2);
+            /* filtering with long filter */
+            compute_ltp_l( ptr_sig_in, ltpdel, phase, ptr_sig_pst0, &num2_gltp, &den2_gltp, L_subfr );
 
-
-            IF (sub(select_ltp(num_gltp, den_gltp, sh_num, sh_den, num2_gltp, den2_gltp, sh_num2, sh_den2), 1) == 0)
+            if( select_ltp( num_gltp, den_gltp, num2_gltp, den2_gltp ) == 1 )
             {
                 /* select short filter */
-                temp = sub(phase, 1);
-                L_temp = L_mult0(temp, L_SUBFR + 1);
-                temp = extract_l(L_temp);
-                temp = add(temp, off_yup);
-
-                /* ptr_y_up = y_up + (phase-1) * (L_SUBFR+1) + off_yup */
-                ptr_y_up = y_up + temp;
+                ptr_y_up = y_up + ((phase - 1) * (L_subfr+1) + off_yup);
             }
-            ELSE
+            else
             {
                 /* select long filter */
                 num_gltp = num2_gltp;
-                move16();
                 den_gltp = den2_gltp;
-                move16();
-                sh_num = sh_num2;
-                move16();
-                sh_den = sh_den2;
-                move16();
                 ptr_y_up = ptr_sig_pst0;
             }
-
-            /* rescale y_up */
-            FOR (i = 0; i < L_SUBFR; i++)
-            {
-                /* nb_sh_sig may be >0, <0 or =0 */
-                ptr_y_up[i] = shl(ptr_y_up[i], nb_sh_sig);
-                move16();
-            }
         }
 
-        temp = sub(sh_num, sh_den);
-        IF (temp >= 0)
-        {
-            den_gltp = shr(den_gltp, temp);
-        }
-        ELSE
-        {
-            num_gltp = shl(num_gltp, temp); /* >> (-temp) */
-        }
-        IF (sub(num_gltp, den_gltp) >= 0)
+        if( num_gltp >= den_gltp )
         {
             /* beta bounded to 1 */
-            gain_plt = MIN_GPLT_FX;
-            move16();
+            gain_plt = MIN_GPLT;
         }
-        ELSE
+        else
         {
-            /* GAMMA_G = 0.5 */
-            /* gain_plt = den_gltp x 2**15 / (den_gltp + 0.5 num_gltp) */
-            /* shift 1 bit to avoid overflows in add */
-            num_gltp = shr(num_gltp, 2);
-            den_gltp = shr(den_gltp, 1);
-            temp = add(den_gltp, num_gltp);
-            gain_plt = div_s(den_gltp, temp); /* Q15 */
+            gain_plt = den_gltp / (den_gltp + ((float)0.5) * num_gltp);
         }
 
         /* decrease gain in noisy condition */
-        /* gain_plt += (1.0f-gain_plt) * gain_factor */
-        /* gain_plt = gain_plt + gain_factor - gain_plt*gain_factor */
-        gain_plt = msu_r(L_msu(L_deposit_h(gain_plt), gain_plt, gain_factor), -32768, gain_factor);
+        gain_plt += ((1.0f-gain_plt)*gain_factor);
 
-        /** filtering by H0(z) = harmonic filter **/
-        filt_plt(ptr_sig_in, ptr_y_up, ptr_sig_pst0, gain_plt);
+        /* filtering by H0(z) = harmonic filter */
+        filt_plt( ptr_sig_in, ptr_y_up, ptr_sig_pst0, gain_plt, L_subfr );
     }
 
+    return;
 }
 
 /*----------------------------------------------------------------------------
- * search_del:
+ * search_del()
  *
  * Computes best (shortest) integer LTP delay + fine search
  *---------------------------------------------------------------------------*/
+
 static void search_del(
-    Word16 t0,            /* i  : pitch delay given by coder        */
-    Word16 * ptr_sig_in,  /* i  : i  signal (with delay line)       */
-    Word16 * ltpdel,      /* o  : delay = *ltpdel - *phase / f_up   */
-    Word16 * phase,       /* o  : phase                             */
-    Word16 * num_gltp,    /* o  : 16 bits numerator of LTP gain     */
-    Word16 * den_gltp,    /* o  : 16 bits denominator of LTP gain   */
-    Word16 * sh_num_gltp, /* o  : justification for num_gltp        */
-    Word16 * sh_den_gltp, /* o  : justification for den_gltp        */
-    Word16 * y_up,        /* o  : LT delayed signal if fract. delay */
-    Word16 * off_yup      /* o  : offset in y_up                    */
+    const   int t0,            /* i  : pitch delay given by coder       */
+    const float *ptr_sig_in,   /* i  : input signal (with delay line)   */
+    int *ltpdel,       /* o  : delay = *ltpdel - *phase / f_up  */
+    int *phase,        /* o  : phase                            */
+    float *num_gltp,     /* o  : numerator of LTP gain            */
+    float *den_gltp,     /* o  : denominator of LTP gain          */
+    float *y_up,         /* o  : LT delayed signal if fract. delay*/
+    int *off_yup,      /* o  : offset in y_up                   */
+    const short L_subfr        /* i  : sub-frame length                 */
 )
 {
-    Word32 L_den0[F_UP_PST - 1];
-    Word32 L_den1[F_UP_PST - 1];
-
-    Word32 *ptr_L_den0, *ptr_L_den1;
-
-    Word32 L_num_int, L_den_int, L_den_max;
-    Word32 L_temp0, L_temp1;
-    Word32 L_acc;
-    Word32 L_temp;
-
-    const Word16 *ptr_h;
-    Word16 *ptr_sig_past, *ptr_sig_past0;
-    Word16 *ptr1, *ptr_y_up;
-
-    Word16 i, n;
-    Word16 num, den0, den1;
-    Word16 den_max, num_max;
-    Word32 L_numsq_max;
-    Word16 ener;
-    Word16 sh_num, sh_den, sh_ener;
-    Word16 i_max, lambda, phi, phi_max, ioff;
-    Word16 temp;
-
+    const float *ptr_h;
+    float tab_den0[F_UP_PST - 1], tab_den1[F_UP_PST - 1];
+    float *ptr_den0, *ptr_den1;
+    const float *ptr_sig_past, *ptr_sig_past0;
+    const float *ptr1;
+    int i, n, ioff, i_max;
+    float ener, num, numsq, den0, den1;
+    float den_int, num_int;
+    float den_max, num_max, numsq_max;
+    int phi_max;
+    int lambda, phi;
+    float temp0, temp1;
+    float *ptr_y_up;
 
     /*-------------------------------------
      * Computes energy of current signal
      *-------------------------------------*/
 
-    L_acc = L_mult(ptr_sig_in[0], ptr_sig_in[0]);
-    FOR(i = 1; i < L_SUBFR; i++)
+    ener = 0.0f;
+    for (i = 0; i < L_subfr; i++)
     {
-        L_acc = L_mac(L_acc, ptr_sig_in[i], ptr_sig_in[i]);
+        ener += ptr_sig_in[i] * ptr_sig_in[i];
     }
-    IF (L_acc == 0)
+
+    if (ener < 0.1f)
     {
-        *num_gltp = 0;
-        move16();
-        *den_gltp = 1;
-        move16();
+        *num_gltp = 0.0f;
+        *den_gltp = 1.0f;
         *ltpdel = 0;
-        move16();
         *phase = 0;
-        move16();
 
         return;
     }
-    sh_ener = sub(16, norm_l(L_acc));
-    /* save energy for final decision */
-    sh_ener = s_max(0, sh_ener);
-    ener = extract_l(L_shr(L_acc, sh_ener));
 
     /*-------------------------------------
      * Selects best of 3 integer delays
      * Maximum of 3 numerators around t0
      *-------------------------------------*/
-    lambda = sub(t0, 1);
+
+    lambda = t0 - 1;
     ptr_sig_past = ptr_sig_in - lambda;
-    L_num_int = L_deposit_l(-1);
+    num_int = -1.0e30f;
+    i_max = 0;
 
-    /* initialization used only to suppress Microsoft Visual C++ warnings */
-    i_max = (Word16) 0;
-    move16();
-
-    FOR (i = 0; i < 3; i++)
+    for (i = 0; i < 3; i++)
     {
-        L_acc = L_mult(ptr_sig_in[0], ptr_sig_past[0]);
-        FOR (n = 1; n < L_SUBFR; n++)
+        num = 0.0f;
+        for (n = 0; n < L_subfr; n++)
         {
-            L_acc = L_mac(L_acc, ptr_sig_in[n], ptr_sig_past[n]);
+            num += ptr_sig_in[n] * ptr_sig_past[n];
         }
-
-
-        L_acc = L_max(L_acc, 0);
-        L_temp = L_sub(L_acc, L_num_int);
-        if (L_temp > 0L)
+        if (num > num_int)
         {
-            i_max = (Word16) i;
-            move16();
+            i_max = i;
+            num_int = num;
         }
-        L_num_int = L_max(L_num_int, L_acc);
         ptr_sig_past--;
     }
 
-    IF (L_num_int == 0)
+    if (num_int <= 0.0f)
     {
-        *num_gltp = 0;
-        move16();
-        *den_gltp = 1;
-        move16();
+        *num_gltp = 0.0f;
+        *den_gltp = 1.0f;
         *ltpdel = 0;
-        move16();
         *phase = 0;
-        move16();
 
         return;
     }
 
-    /* Compute den for i_max */
-    lambda = add(lambda, (Word16) i_max);
+    /* Calculates denominator for i_max */
+    lambda += i_max;
     ptr_sig_past = ptr_sig_in - lambda;
-    temp = *ptr_sig_past++;
-    move16();
-    L_acc = L_mult(temp, temp);
-    FOR (i = 1; i < L_SUBFR; i++)
+    den_int = (float) 0.;
+    for (n = 0; n < L_subfr; n++)
     {
-        temp = *ptr_sig_past++;
-        move16();
-        L_acc = L_mac(L_acc, temp, temp);
+        den_int += ptr_sig_past[n] * ptr_sig_past[n];
     }
-    IF (L_acc == 0L)
-    {
-        *num_gltp = 0;
-        move16();
-        *den_gltp = 1;
-        move16();
-        *ltpdel = 0;
-        move16();
-        *phase = 0;
-        move16();
 
+    if (den_int < (float) 0.1)
+    {
+        *num_gltp = (float) 0.;
+        *den_gltp = (float) 1.;
+        *ltpdel = 0;
+        *phase = 0;
         return;
     }
-    L_den_int = L_add(0, L_acc); /* sets to 'L_acc' in 1 clock */
 
     /*----------------------------------
      * Select best phase around lambda
-     *----------------------------------
      * Compute y_up & denominators
      *----------------------------------*/
 
     ptr_y_up = y_up;
-    L_den_max = L_add(0, L_den_int); /* sets to 'L_acc' in 1 clock */
-    ptr_L_den0 = L_den0;
-    ptr_L_den1 = L_den1;
-    ptr_h = Tab_hup_s;
-    temp = sub(lambda, LH_UP_S - 1);
-    ptr_sig_past0 = ptr_sig_in - temp;
+    den_max = den_int;
+    ptr_den0 = tab_den0;
+    ptr_den1 = tab_den1;
+    ptr_h = tab_hup_s;
+    ptr_sig_past0 = ptr_sig_in + LH_UP_S - 1 - lambda;        /* points on lambda_max+1 */
 
-    /* Loop on phase */
-    FOR (phi = 1; phi < F_UP_PST; phi++)
+    /* loop on phase  */
+    for (phi = 1; phi < F_UP_PST; phi++)
     {
-        /* Compute y_up for lambda+1 - phi/F_UP_PST */
-        /* and lambda - phi/F_UP_PST */
-
+        /* Computes criterion for (lambda+1) - phi/F_UP_PST     */
+        /* and lambda - phi/F_UP_PST                            */
         ptr_sig_past = ptr_sig_past0;
-        FOR (n = 0; n <= L_SUBFR; n++)
+        /* computes y_up[n] */
+        for (n = 0; n <= L_subfr; n++)
         {
             ptr1 = ptr_sig_past++;
-
-            L_acc = L_mult(ptr_h[0], ptr1[0]);
-            FOR (i = 1; i < LH2_S; i++)
+            temp0 = (float) 0.;
+            for (i = 0; i < LH2_S; i++)
             {
-                L_acc = L_mac(L_acc, ptr_h[i], ptr1[-i]);
+                temp0 += ptr_h[i] * ptr1[-i];
             }
-            ptr_y_up[n] = round_fx(L_acc);
+            ptr_y_up[n] = temp0;
         }
 
         /* compute den0 (lambda+1) and den1 (lambda) */
-
         /* part common to den0 and den1 */
-        L_acc = L_mult(ptr_y_up[1], ptr_y_up[1]);
-        FOR (n = 2; n < L_SUBFR; n++)
+        temp0 = (float) 0.;
+        for (n = 1; n < L_subfr; n++)
         {
-            L_acc = L_mac(L_acc, ptr_y_up[n], ptr_y_up[n]);
+            temp0 += ptr_y_up[n] * ptr_y_up[n];
         }
-        L_temp0 = L_add(0, L_acc); /* sets to 'L_acc' in 1 clock (saved for den1) */
 
         /* den0 */
-        L_acc = L_mac(L_acc, ptr_y_up[0], ptr_y_up[0]);
-        *ptr_L_den0 = L_acc;
-        move32();
+        den0 = temp0 + ptr_y_up[0] * ptr_y_up[0];
+        *ptr_den0++ = den0;
 
         /* den1 */
-        L_acc = L_mac(L_temp0, ptr_y_up[L_SUBFR], ptr_y_up[L_SUBFR]);
-        *ptr_L_den1 = L_acc;
-        move32();
-
-        IF (sub(abs_s(ptr_y_up[0]), abs_s(ptr_y_up[L_SUBFR])) > 0)
+        den1 = temp0 + ptr_y_up[L_subfr] * ptr_y_up[L_subfr];
+        *ptr_den1++ = den1;
+        if (fabs (ptr_y_up[0]) > fabs (ptr_y_up[L_subfr]))
         {
-            L_den_max = L_max(*ptr_L_den0, L_den_max);
+            if (den0 > den_max)
+            {
+                den_max = den0;
+            }
         }
-        ELSE
+        else
         {
-            L_den_max = L_max(*ptr_L_den1, L_den_max);
+            if (den1 > den_max)
+            {
+                den_max = den1;
+            }
         }
-        ptr_L_den0++;
-        ptr_L_den1++;
-        ptr_y_up += (L_SUBFR+1);
+        ptr_y_up += (L_subfr+1);
         ptr_h += LH2_S;
     }
-
-    IF (L_den_max == 0)
+    if (den_max < 0.1f)
     {
-        *num_gltp = 0;
-        move16();
-        *den_gltp = 1;
-        move16();
+        *num_gltp = 0.0f;
+        *den_gltp = 1.0f;
         *ltpdel = 0;
-        move16();
         *phase = 0;
-        move16();
-
         return;
     }
 
-    sh_den = sub(16, norm_l(L_den_max));
-    /* if sh_den <= 0 : dynamic between current frame */
-    /* and delay line too high */
-    IF (sh_den <= 0)
-    {
-        *num_gltp = 0;
-        move16();
-        *den_gltp = 1;
-        move16();
-        *ltpdel = 0;
-        move16();
-        *phase = 0;
-        move16();
-
-        return;
-    }
-
-    /* search sh_num to justify correlations */
-    /* sh_num = Max(sh_den, sh_ener) */
-    sh_num = sh_ener;
-    move16();
-    if (sub(sh_den, sh_ener) >= 0)
-    {
-        sh_num = sh_den;
-        move16();
-    }
-
-    /* Computation of the numerators */
-    /* and selection of best num*num/den */
-    /* for non null phases */
+    /* Computation of the numerators                */
+    /* and selection of best num*num/den            */
+    /* for non null phases                          */
 
     /* Initialize with null phase */
-    L_acc = L_shr(L_den_int, sh_den); /* sh_den > 0 */
-    den_max = extract_l(L_acc);
-    L_acc = L_shr(L_num_int, sh_num); /* sh_num > 0 */
-    num_max = extract_l(L_acc);
-    L_numsq_max = L_mult(num_max, num_max);
-
+    num_max = num_int;
+    den_max = den_int;
+    numsq_max = num_max * num_max;
     phi_max = 0;
-    move16();
     ioff = 1;
-    move16();
 
-    ptr_L_den0 = L_den0;
-    ptr_L_den1 = L_den1;
+    ptr_den0 = tab_den0;
+    ptr_den1 = tab_den1;
     ptr_y_up = y_up;
-
 
     /* if den_max = 0 : will be selected and declared unvoiced */
     /* if num!=0 & den=0 : will be selected and declared unvoiced */
     /* degenerated seldom cases, switch off LT is OK */
 
     /* Loop on phase */
-    FOR (phi = 1; phi < F_UP_PST; phi++)
+    for (phi = 1; phi < F_UP_PST; phi++)
     {
-        /* compute num for lambda+1 - phi/F_UP_PST */
-        L_acc = L_mult(ptr_sig_in[0], ptr_y_up[0]);
-        FOR (n = 1; n < L_SUBFR; n++)
-        {
-            L_acc = L_mac(L_acc, ptr_sig_in[n], ptr_y_up[n]);
-        }
-        L_acc = L_shr(L_acc, sh_num); /* sh_num > 0 */
-        L_acc = L_max(0, L_acc);
-        num = extract_l(L_acc);
 
-        /* selection if num**2/den0 max */
-        L_temp1 = L_mult(num, num);
-        L_temp0 = Mpy_32_16_1(L_temp1, den_max);
-        L_acc = L_add(*ptr_L_den0++, 0);
-        L_acc = L_shr(L_acc, sh_den); /* sh_den > 0 */
-        den0 = extract_l(L_acc);
-        L_temp = Msub_32_16(L_temp0, L_numsq_max, den0);
-        IF (L_temp > 0L)
+        /* computes num for lambda+1 - phi/F_UP_PST */
+        num = 0.0f;
+        for (n = 0; n < L_subfr; n++)
+        {
+            num += ptr_sig_in[n] * ptr_y_up[n];
+        }
+        if (num < 0.0f)
+        {
+            num = 0.0f;
+        }
+        numsq = num * num;
+
+        /* selection if num/sqrt(den0) max */
+        den0 = *ptr_den0++;
+        temp0 = numsq * den_max;
+        temp1 = numsq_max * den0;
+        if (temp0 > temp1)
         {
             num_max = num;
-            move16();
-            L_numsq_max = L_add(0, L_temp1); /* sets to 'L_temp1' in 1 clock */
+            numsq_max = numsq;
             den_max = den0;
-            move16();
             ioff = 0;
-            move16();
             phi_max = phi;
-            move16();
         }
 
-        /* compute num for lambda - phi/F_UP_PST */
+        /* computes num for lambda_max - phi/F_UP_PST */
         ptr_y_up++;
-
-        L_acc = L_mult(ptr_sig_in[0], ptr_y_up[0]);
-        FOR (n = 1; n < L_SUBFR; n++)
+        num = (float) 0.;
+        for (n = 0; n < L_subfr; n++)
         {
-            L_acc = L_mac(L_acc, ptr_sig_in[n], ptr_y_up[n]);
+            num += ptr_sig_in[n] * ptr_y_up[n];
         }
-        L_acc = L_shr(L_acc, sh_num); /* sh_num > 0 */
-        L_acc = L_max(0, L_acc);
-        num = extract_l(L_acc);
+        if (num < (float) 0.)
+        {
+            num = (float) 0.;
+        }
+        numsq = num * num;
 
-        /* selection if num**2/den1 max */
-        L_temp1 = L_mult(num, num);
-        L_temp0 = Mpy_32_16_1(L_temp1, den_max);
-        L_acc = L_add(*ptr_L_den1++, 0);
-        L_acc = L_shr(L_acc, sh_den); /* sh_den > 0 */
-        den1 = extract_l(L_acc);
-        L_temp = Msub_32_16(L_temp0, L_numsq_max, den1);
-        IF (L_temp > 0L)
+        /* selection if num/sqrt(den1) max */
+        den1 = *ptr_den1++;
+        temp0 = numsq * den_max;
+        temp1 = numsq_max * den1;
+        if (temp0 > temp1)
         {
             num_max = num;
-            move16();
-            L_numsq_max = L_add(0, L_temp1); /* sets to 'L_temp1' in 1 clock */
+            numsq_max = numsq;
             den_max = den1;
-            move16();
             ioff = 1;
-            move16();
             phi_max = phi;
-            move16();
         }
-
-        ptr_y_up += L_SUBFR;
+        ptr_y_up += L_subfr;
     }
 
     /*---------------------------------------------------
      * test if normalized crit0[iopt] > THRESHCRIT
      *--------------------------------------------------*/
-    test();
-    IF (num_max == 0 || sub(den_max, 1) <= 0)
-    {
-        *num_gltp = 0;
-        move16();
-        *den_gltp = 1;
-        move16();
-        *ltpdel = 0;
-        move16();
-        *phase = 0;
-        move16();
 
+    if ((num_max == 0.0f) || (den_max <= 0.1f))
+    {
+        *num_gltp = 0.0f;
+        *den_gltp = 1.0f;
+        *ltpdel = 0;
+        *phase = 0;
         return;
     }
 
-    /* compare num**2 */
-    /* to ener * den * 0.5 */
-    /* (THRESHCRIT = 0.5) */
-    L_temp1 = L_mult(den_max, ener);
-
-    /* temp = 2 * sh_num - sh_den - sh_ener + 1 */
-    /* 16 bits with no overflows */
-    temp = shl(sh_num, 1);
-    temp = sub(temp, sh_den);
-    temp = sub(temp, sh_ener);
-    temp = add(temp, 1);
-    IF (temp < 0)
+    /* comparison num * num             */
+    /* with ener * den x THRESCRIT      */
+    temp1 = den_max * ener * THRESCRIT;
+    if (numsq_max >= temp1)
     {
-        temp = negate(temp); /* no overflow */
-        L_numsq_max = L_shr(L_numsq_max, temp);
-    }
-    ELSE
-    {
-        if (temp > 0)
-        {
-            L_temp1 = L_shr(L_temp1, temp);
-        }
-    }
-    L_temp = L_sub(L_numsq_max, L_temp1);
-    IF (L_temp >= 0L)
-    {
-        temp = add(lambda, 1);
-        *ltpdel = sub(temp, ioff);
+        *ltpdel = lambda + 1 - ioff;
         *off_yup = ioff;
-        move16();
         *phase = phi_max;
-        move16();
         *num_gltp = num_max;
-        move16();
         *den_gltp = den_max;
-        move16();
-        *sh_den_gltp = sh_den;
-        move16();
-        *sh_num_gltp = sh_num;
-        move16();
     }
-    ELSE
+    else
     {
-        *num_gltp = 0;
-        move16();
-        *den_gltp = 1;
-        move16();
+        *num_gltp = 0.0f;
+        *den_gltp = 1.0f;
         *ltpdel = 0;
-        move16();
         *phase = 0;
-        move16();
     }
-
 
     return;
 }
 
 /*----------------------------------------------------------------------------
- *  filt_plt:
+ * filt_plt()
  *
  * Perform long term postfilter
  *----------------------------------------------------------------------------*/
+
 static void filt_plt(
-    Word16 * s_in,      /* i  : i  signal with past         */
-    Word16 * s_ltp,     /* i  : filtered signal with gain 1 */
-    Word16 * s_out,     /* o  : signal                      */
-    Word16 gain_plt     /* i  : filter gain                 */
+    const float *s_in,      /* i  : input signal with past      */
+    const float *s_ltp,     /* i  : filtered signal with gain 1 */
+    float *s_out,     /* o  : output signal               */
+    const float gain_plt,   /* i  : filter gain                 */
+    const short L_subfr     /* i  : the length of subframe      */
 )
 {
+    int n;
+    float gain_plt_1;
 
-    /* Local variables */
-    Word32 L_acc;
+    gain_plt_1 = (float) 1. - gain_plt;
 
-    Word16 n;
-    Word16 gain_plt_1;
-
-
-    gain_plt_1 = sub(32767, gain_plt);
-    gain_plt_1 = add(gain_plt_1, 1); /* 2**15 (1 - g) */
-
-    FOR (n = 0; n < L_SUBFR; n++)
+    for (n = 0; n < L_subfr; n++)
     {
-        /* s_out(n) = gain_plt x s_in(n) + gain_plt_1 x s_ltp(n) */
-        L_acc = L_mult(gain_plt, s_in[n]);
-        s_out[n] = mac_r(L_acc, gain_plt_1, s_ltp[n]);
-        move16(); /* no overflow */
+        s_out[n] = gain_plt * s_in[n] + gain_plt_1 * s_ltp[n];
     }
-
 
     return;
 }
 
-
 /*----------------------------------------------------------------------------
- * compute_ltp_l :
+ * compute_ltp_l()
  *
  * compute delayed signal, num & den of gain for fractional delay
  * with long interpolation filter
  *----------------------------------------------------------------------------*/
+
 static void compute_ltp_l(
-    Word16 * s_in,      /* i/o: signal with past            */
-    Word16 ltpdel,      /* i  : delay factor                */
-    Word16 phase,       /* i  : phase factor                */
-    Word16 * y_up,      /* i  : delayed signal              */
-    Word16 * num,       /* i  : numerator of LTP gain       */
-    Word16 * den,       /* i  : denominator of LTP gain     */
-    Word16 * sh_num,    /* i  : justification factor of num */
-    Word16 * sh_den     /* i  : justification factor of den */
+    const float *s_in,    /* i  : input signal with past  */
+    const   int ltpdel,   /* i  : delay factor            */
+    const   int phase,    /* i  : phase factor            */
+    float *y_up,    /* o  : delayed signal          */
+    float *num,     /* o  : numerator of LTP gain   */
+    float *den,     /* o  : denominator of LTP gain */
+    const short L_subfr   /* i  : the length of subframe  */
 )
 {
-    Word32 L_acc;
-    Word16 *ptr2;
-    const Word16 *ptr_h;
-    Word16 n, i;
-    Word16 temp;
+    const float *ptr_h;
+    int n, i;
+    const float *ptr2;
+    float temp;
 
-    temp = sub(phase, 1);
-    temp = shl(temp, L2_LH2_L);
-    ptr_h = Tab_hup_l + temp; /* Tab_hup_l + LH2_L * (phase-1) */
-
-    temp = sub(LH_UP_L, ltpdel);
-    ptr2 = s_in + temp;
+    /* Filtering with long filter */
+    ptr_h = tab_hup_l + (phase - 1) * LH2_L;
+    ptr2 = s_in - ltpdel + LH_UP_L;
 
     /* Compute y_up */
-    FOR (n = 0; n < L_SUBFR; n++)
+    for (n = 0; n < L_subfr; n++)
     {
-        L_acc = L_mult(ptr_h[0], *ptr2--);
-
-        FOR (i = 1; i < LH2_L; i++)
+        temp = 0.0f;
+        for (i = 0; i < LH2_L; i++)
         {
-            L_acc = L_mac(L_acc, ptr_h[i], *ptr2--);
+            temp += ptr_h[i] **ptr2--;
         }
-        y_up[n] = round_fx(L_acc);
+        y_up[n] = temp;
         ptr2 += LH2_L_P1;
     }
 
     /* Compute num */
-    L_acc = L_mult(y_up[0], s_in[0]);
-    FOR (n = 1; n < L_SUBFR; n++)
+    *num = 0.0f;
+    for (n = 0; n < L_subfr; n++)
     {
-        L_acc = L_mac(L_acc, y_up[n], s_in[n]);
+        *num += y_up[n] * s_in[n];
     }
-    IF (L_acc < 0L)
+
+    if (*num < 0.0f)
     {
-        *num = 0;
-        move16();
-        *sh_num = 0;
-        move16();
-    }
-    ELSE
-    {
-        temp = sub(16, norm_l(L_acc));
-        temp = s_max(temp, 0);
-        L_acc = L_shr(L_acc, temp); /* with temp >= 0 */
-        *num = extract_l(L_acc);
-        *sh_num = temp;
-        move16();
+        *num = 0.0f;
     }
 
     /* Compute den */
-    L_acc = L_mult(y_up[0], y_up[0]);
-    FOR (n = 1; n < L_SUBFR; n++)
+    *den = 0.0f;
+    for (n = 0; n < L_subfr; n++)
     {
-        L_acc = L_mac(L_acc, y_up[n], y_up[n]);
+        *den += y_up[n] * y_up[n];
     }
-    temp = sub(16, norm_l(L_acc));
-    temp = s_max(temp, 0);
-    L_acc = L_shr(L_acc, temp); /* with temp >= 0 */
-    *den = extract_l(L_acc);
-    *sh_den = temp;
-    move16();
-
 
     return;
 }
 
 /*----------------------------------------------------------------------------
- *  select_ltp:
+ *  select_ltp()
  *
  *  selects best of (gain1, gain2)
  *  with gain1 = num1 * 2** sh_num1 / den1 * 2** sh_den1
  *  and  gain2 = num2 * 2** sh_num2 / den2 * 2** sh_den2
  *----------------------------------------------------------------------------*/
-static Word16 select_ltp(  /* o  : 1 = 1st gain, 2 = 2nd gain  */
-    Word16 num1,    /* i  : numerator of gain1          */
-    Word16 den1,    /* i  : denominator of gain1        */
-    Word16 sh_num1, /* i  : just. factor for num1       */
-    Word16 sh_den1, /* i  : just. factor for den1       */
-    Word16 num2,    /* i  : numerator of gain2          */
-    Word16 den2,    /* i  : denominator of gain2        */
-    Word16 sh_num2, /* i  : just. factor for num2       */
-    Word16 sh_den2  /* i  : just. factor for den2       */
+
+static int select_ltp( /* o  : 1 = 1st gain, 2 = 2nd gain */
+    const float num1,  /* i  : numerator of gain1   */
+    const float den1,  /* i  : denominator of gain1 */
+    const float num2,  /* i  : numerator of gain2   */
+    const float den2   /* i  : denominator of gain2 */
 )
 {
-    Word32 L_temp1, L_temp2;
-    Word32 L_temp;
-
-    Word16 temp1, temp2;
-
-
-    IF (den2 == 0)
+    if (den2 == (float) 0.)
     {
-        return 1;
+        return (1);
     }
 
-    /* compares criteria = num**2/den */
-    L_temp1 = L_mult(num1, num1);
-    L_temp1 = Mpy_32_16_1(L_temp1, den2);
-
-    L_temp2 = L_mult(num2, num2);
-    L_temp2 = Mpy_32_16_1(L_temp2, den1);
-
-    /* temp1 = sh_den2 + 2 * sh_num1 */
-    temp1 = shl(sh_num1, 1);
-    temp1 = add(temp1, sh_den2);
-    /* temp2 = sh_den1 + 2 * sh_num2; */
-    temp2 = shl(sh_num2, 1);
-    temp2 = add(temp2, sh_den1);
-
-    temp2 = sub(temp2, temp1);
-    if (temp2 > 0)
+    if (num2 * num2 * den1 > num1 * num1 * den2)
     {
-        L_temp1 = L_shr(L_temp1, temp2); /* temp2 > 0 */
+        return (2);
     }
-    if (temp2 < 0)
+    else
     {
-        L_temp2 = L_shl(L_temp2, temp2); /* temp2 < 0 */
+        return (1);
     }
-
-    L_temp = L_sub(L_temp2, L_temp1);
-    temp1 = 1;
-    move16();
-    if (L_temp > 0L)
-    {
-        temp1 = 2;
-        move16();
-    }
-
-    return temp1;
-}
-
-/*----------------------------------------------------------------------------
- * calc_st_filt
- *
- * computes impulse response of A(gamma2) / A(gamma1)
- * controls gain : computation of energy impulse response as
- *                 SUMn  (abs (h[n])) and computes parcor0
- *---------------------------------------------------------------------------- */
-static void calc_st_filt(
-    Word16 * apond2,      /* i  : coefficients of numerator             */
-    Word16 * apond1,      /* i  : coefficients of denominator           */
-    Word16 * parcor0,     /* o  : 1st parcor calcul. on composed filter */
-    Word16 * sig_ltp_ptr, /* i/o: i  of 1/A(gamma1) : scaled by 1/g0    */
-    Word16 * mem_zero     /* i  : All zero memory                       */
-)
-{
-    Word32 L_g0;
-
-    Word16 h[LONG_H_ST];
-
-    Word16 g0, temp;
-    Word16 i;
-
-
-    temp = sub( 2, norm_s( apond2[0] ) );
-
-    /* compute i.r. of composed filter apond2 / apond1 */
-    E_UTIL_synthesis(temp, apond1, apond2, h, LONG_H_ST, mem_zero, 0, M);
-
-    /* compute 1st parcor */
-    Calc_rc0_h(h, parcor0);
-
-    /* compute g0 */
-    L_g0 = L_mult0(1, abs_s(h[0]));
-    FOR (i = 1; i < LONG_H_ST; i++)
-    {
-        L_g0 = L_mac0(L_g0, 1, abs_s(h[i]));
-    }
-    g0 = extract_h(L_shl(L_g0, 14));
-
-    /* Scale signal i  of 1/A(gamma1) */
-    IF (sub(g0, 1024) > 0)
-    {
-        temp = div_s(1024, g0); /* temp = 2**15 / gain0 */
-        FOR (i = 0; i < L_SUBFR; i++)
-        {
-            sig_ltp_ptr[i] = mult_r(sig_ltp_ptr[i], temp);
-            move16();
-        }
-    }
-
-
-    return;
-}
-
-/*----------------------------------------------------------------------------
- * filt_mu
- *
- * tilt filtering with : (1 + mu z-1) * (1/1-|mu|)
- *      computes y[n] = (1/1-|mu|) (x[n]+mu*x[n-1])
- *---------------------------------------------------------------------------*/
-void Filt_mu(
-    Word16 * sig_in,        /* i  : signal (beginning at sample -1)     */
-    Word16 * sig_out,       /* o  : signal with tilt                    */
-    Word16 parcor0,         /* i  : parcor0 (mu = parcor0 * gamma3)     */
-    Word16 L_subfr          /* i  : the length of subframe              */
-)
-{
-    Word32 L_acc, L_temp, L_fact;
-
-    Word16 *ptrs;
-
-    Word16 n;
-    Word16 mu, mu2, ga, temp;
-    Word16 fact, sh_fact;
-
-
-    IF (parcor0 > 0)
-    {
-        mu = mult_r(parcor0, GAMMA3_PLUS_FX);
-        /* GAMMA3_PLUS_FX < 0.5 */
-        sh_fact = 14;
-        move16(); /* sh_fact */
-        fact = (Word16) 0x4000;
-        move16(); /* 2**sh_fact */
-        L_fact = (Word32) L_deposit_l(0x2000); /* fact >> 1 */
-    }
-    ELSE
-    {
-        mu = mult_r(parcor0, GAMMA3_MINUS_FX);
-        /* GAMMA3_MINUS_FX < 0.9375 */
-        sh_fact = 11;
-        move16(); /* sh_fact */
-        fact = (Word16) 0x0800;
-        move16(); /* 2**sh_fact */
-        L_fact = (Word32) L_deposit_l(0x0400); /* fact >> 1 */
-    }
-
-    temp = sub(1, abs_s(mu));
-    BASOP_SATURATE_WARNING_OFF;
-    mu2 = add(32767, temp); /* 2**15 (1 - |mu|) */
-    BASOP_SATURATE_WARNING_ON;
-    ga = div_s(fact, mu2); /* 2**sh_fact / (1 - |mu|) */
-
-    ptrs = sig_in; /* points on sig_in(-1) */
-
-    sh_fact = sub(sh_fact,16);  /* to remove the saturate(), should shl by 16 before rounding */
-
-    FOR (n = 0; n < L_subfr; n++)
-    {
-        L_acc = L_mult0(mu, *ptrs++);
-        L_temp = L_mac(L_acc, 16384, *ptrs); /* sig_in(n) * 2**15 */
-
-        L_temp = Madd_32_16(L_fact, L_temp, ga);
-        L_temp = L_shr(L_temp, sh_fact); /* mult. temp x ga */
-
-        BASOP_SATURATE_WARNING_OFF;
-        /*sig_out[n] = saturate(L_temp); move16();*/
-        sig_out[n] = round_fx(L_temp);
-        BASOP_SATURATE_WARNING_ON;
-    }
-
-
-    return;
 }
 
 
-/*----------------------------------------------------------------------------
- * scale_st()
+/*------------------------------------------------------------------------------------
+ * modify_pst_param()
  *
- * control of the subframe gain
- * gain[n] = AGC_FAC_FX * gain[n-1] + (1 - AGC_FAC_FX) g_in/g_out
- *---------------------------------------------------------------------------*/
-void scale_st(
-    const Word16 * sig_in,    /* i  : postfilter i signal             */
-    Word16 * sig_out,   /* i/o: postfilter o signal             */
-    Word16 * gain_prec, /* i/o: last value of gain for subframe */
-    Word16 L_subfr
+ * Modify gamma1 and gamma2 values in function of the long-term noise level
+ *-----------------------------------------------------------------------------------*/
+
+static void modify_pst_param(
+    const float psf_lp_noise, /* i  : Long term noise energy                */
+    float *g1,          /* o  : Gamma1 used in post filter            */
+    float *g2,          /* o  : Gamma2 used in post filter            */
+    const short coder_type,   /* i  : coder type                            */
+    float *gain_factor  /* o  : Gain factor applied in post filtering */
 )
 {
-    Word32 L_acc, L_temp;
+    float ftmp;
 
-    Word16 i;
-    Word16 scal_in, scal_out;
-    Word16 s_g_in, s_g_out, temp, sh_g0, g0;
-    Word16 gain = 0;
-
-
-    /* compute i  gain */
-    L_acc = L_deposit_l(0);
-    FOR (i = 0; i < L_subfr; i++)
+    if( coder_type != INACTIVE && psf_lp_noise < LP_NOISE_THR )
     {
-        if(sig_in[i] > 0)
+        ftmp = psf_lp_noise*BG1 + CG1;
+        if( ftmp > POST_G1 )
         {
-            L_acc = L_mac0(L_acc, 1, sig_in[i]);
+            ftmp  = POST_G1;
         }
-        if(sig_in[i] < 0)
+        else if( ftmp < POST_G1_MIN )
         {
-            L_acc = L_msu0(L_acc, 1, sig_in[i]);
+            ftmp  = POST_G1_MIN;
         }
+        *g1 = ftmp;
+
+        ftmp = psf_lp_noise*BG2 + CG2;
+        if( ftmp > POST_G2 )
+        {
+            ftmp  = POST_G2;
+        }
+        else if( ftmp < POST_G2_MIN )
+        {
+            ftmp  = POST_G2_MIN;
+        }
+        *g2 = ftmp;
+    }
+    else
+    {
+        *g1 = POST_G1_NOIS;
+        *g2 = POST_G2_NOIS;
     }
 
-    g0 = 0;
-    move16();
-    IF (L_acc != 0L)
+    /* Set gain_factor of the harmonic filtering */
+    ftmp = (psf_lp_noise - K_LP_NOISE) * C_LP_NOISE;
+
+    if( ftmp >= 0.25f )
     {
-        scal_in = norm_l(L_acc);
-        L_acc = L_shl(L_acc, scal_in);
-        s_g_in = extract_h(L_acc); /* normalized */
-
-        /* Compute o   gain */
-        L_acc = L_mult0(1, abs_s(sig_out[0]));
-        FOR (i = 1; i < L_subfr; i++)
-        {
-            L_acc = L_mac0(L_acc, 1, abs_s(sig_out[i]));
-        }
-        IF (L_acc == 0L)
-        {
-            *gain_prec = 0;
-            move16();
-
-            return;
-        }
-        scal_out = norm_l(L_acc);
-        L_acc = L_shl(L_acc, scal_out);
-        s_g_out = extract_h(L_acc); /* normalized */
-
-        sh_g0 = add(scal_in, 1);
-        sh_g0 = sub(sh_g0, scal_out); /* scal_in - scal_out + 1 */
-        IF (sub(s_g_in, s_g_out) < 0)
-        {
-            g0 = div_s(s_g_in, s_g_out); /* s_g_in/s_g_out in Q15 */
-        }
-        ELSE
-        {
-            temp = sub(s_g_in, s_g_out); /* sufficient since normalized */
-            g0 = shr(div_s(temp, s_g_out), 1);
-            g0 = add(g0, (Word16) 0x4000); /* s_g_in/s_g_out in Q14 */
-            sh_g0 = sub(sh_g0, 1);
-        }
-        /* L_gain_in/L_gain_out in Q14 */
-        /* overflows if L_gain_in > 2 * L_gain_out */
-        g0 = shr(g0, sh_g0); /* sh_g0 may be >0, <0, or =0 */
-
-        g0 = mult_r(g0, AGC_FAC1_FX); /* L_gain_in/L_gain_out * AGC_FAC1_FX */
+        /* the noise is really high */
+        *gain_factor = 0.25f;
     }
-
-    /* gain(n) = AGC_FAC gain(n-1) + AGC_FAC1 gain_in/gain_out */
-    /* sig_out(n) = gain(n) sig_out(n) */
-    gain = *gain_prec;
-    move16();
-    FOR (i = 0; i < L_subfr; i++)
+    else if ( ftmp < 0 )
     {
-        temp = mult_r(AGC_FAC_FX, gain);
-        gain = add(temp, g0); /* in Q14 */
-        L_temp = L_mult(gain, sig_out[i]);
-        L_temp = L_shl(L_temp, 1);
-        sig_out[i] = round_fx(L_temp);
+        *gain_factor = 0.0f;
     }
-    *gain_prec = gain;
-    move16();
-
-
-    return;
-}
-
-/*----------------------------------------------------------------------------
- * blend_subfr2()
- *
- *
- *---------------------------------------------------------------------------*/
-
-void blend_subfr2(
-    Word16 *sigIn1,
-    Word16 *sigIn2,
-    Word16 *sigOut
-)
-{
-    Word16 fac1 = 32768 - 512;
-    Word16 fac2 =     0 + 512;
-    Word16 step = 1024;
-    Word16 i;
-
-    FOR( i=0; i<L_SUBFR/2; i++ )
+    else
     {
-        sigOut[i] = mac_r(L_mult(fac1, sigIn1[i]), fac2, sigIn2[i]);
-        fac1 = sub(fac1, step);
-        fac2 = add(fac2, step);
+        *gain_factor = ftmp;
     }
 
     return;
 }
-

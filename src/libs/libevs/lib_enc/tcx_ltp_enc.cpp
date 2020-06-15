@@ -1,189 +1,118 @@
 /*====================================================================================
-    EVS Codec 3GPP TS26.442 Apr 03, 2018. Version 12.11.0 / 13.6.0 / 14.2.0
+    EVS Codec 3GPP TS26.443 Nov 13, 2018. Version 12.11.0 / 13.7.0 / 14.3.0 / 15.1.0
   ====================================================================================*/
 
-#include <assert.h>
 #include "options.h"
-#include "prot_fx.h"
-#include "stl.h"
-#include "cnst_fx.h"
-#include "basop_util.h"
-#include "rom_com_fx.h"
-
-static Word32 dot(const Word16 *X, const Word16 *Y, Word16 n)
-{
-    Word32 acc;
-    Word16 i;
+#include "prot.h"
+#include "rom_enc.h"
+#include "rom_com.h"
 
 
-    acc = L_deposit_l(0);
-
-    FOR (i = 0; i < n; i++)
-    {
-        acc = L_mac0(acc, X[i], Y[i]);
-    }
 
 
-    return acc;
-}
-
-static Word32 interpolate_corr(         /* o  : interpolated value   */
-    const Word32 *x,      /* i  : input vector         */
-    const Word16 frac,    /* i  : fraction of lag      */
-    const Word16 frac_max /* i  : max fraction         */
+static float interpolate_corr(          /* o  : interpolated value   */
+    const float *x,       /* i  : input vector         */
+    const short frac,     /* i  : fraction of lag      */
+    const short frac_max  /* i  : max fraction         */
 )
 {
-    Word32 s;
-    const Word16 *c, *win;
+    short i;
+    float s;
+    const float *c1, *c2, *x1, *x2, *win;
 
 
-    win = E_ROM_inter4_1;
-    if (sub(frac_max, 6) == 0) win = E_ROM_inter6_1;
+    if ( frac_max == 6 )
+    {
+        win = E_ROM_inter6_1;
+    }
+    else
+    {
+        win = E_ROM_inter4_1;
+    }
 
-
-    s = L_deposit_l(0);
-
-    c = &win[frac];
-    s = L_add(s, Mpy_32_16_1(x[0],  *c));
-    c += frac_max;
-    s = L_add(s, Mpy_32_16_1(x[-1], *c));
-    c += frac_max;
-    s = L_add(s, Mpy_32_16_1(x[-2], *c));
-    c += frac_max;
-    s = L_add(s, Mpy_32_16_1(x[-3], *c));
-
-    c = &win[frac_max-frac];
-    s = L_add(s, Mpy_32_16_1(x[1], *c));
-    c += frac_max;
-    s = L_add(s, Mpy_32_16_1(x[2], *c));
-    c += frac_max;
-    s = L_add(s, Mpy_32_16_1(x[3], *c));
-    c += frac_max;
-    s = L_add(s, Mpy_32_16_1(x[4], *c));
+    x1 = &x[0];
+    x2 = &x[1];
+    c1 = &win[frac];
+    c2 = &win[frac_max-frac];
+    s = 0.0f;
+    for(i=0; i<4; i++, c1+=frac_max, c2+=frac_max)
+    {
+        s+= (*x1--) * (*c1) + (*x2++) * (*c2);
+    }
 
 
     return s;
 }
 
-void tcx_ltp_pitch_search(
-    Word16 pitch_ol,
-    Word16 *pitch_int,
-    Word16 *pitch_fr,
-    Word16 *index,
-    Word16 *norm_corr,
-    const Word16 len,
-    Word16 *wsp,
-    Word16 pitmin,
-    Word16 pitfr1,
-    Word16 pitfr2,
-    Word16 pitmax,
-    Word16 pitres
+static void tcx_ltp_pitch_search(
+    int pitch_ol,
+    int *pitch_int,
+    int *pitch_fr,
+    int *index,
+    float *norm_corr,
+    const short len,
+    float *wsp,
+    int pitmin,
+    int pitfr1,
+    int pitfr2,
+    int pitmax,
+    int pitres
 )
 {
-    Word16 i, t, t0, t1, step, fraction, t0_min, t0_max, t_min, t_max, delta, temp_m, temp_e, s, s_wsp;
-    Word32 cor_max, cor[256], *pt_cor, temp;
-    Word16 wsp2[L_FRAME_PLUS+PIT_MAX_MAX+L_INTERPOL1];
+    short i, t, t0, t1, step, fraction, t0_min, t0_max, t_min, t_max, delta;
+    float temp, cor_max, cor[256], *pt_cor;
 
 
-
-    delta = 16;
-    move16();
-    if ( sub(pitres, 6) == 0 )
+    if ( pitres == 6 )
     {
         delta = 8;
-        move16();
+    }
+    else
+    {
+        delta = 16;
     }
 
-    t0_min = sub(pitch_ol, shr(delta, 1));
-    t0_max = sub(add(t0_min, delta), 1);
+    t0_min = (short)pitch_ol - (delta>>1);
+    t0_max = (short)pitch_ol + (delta>>1) - 1;
 
-    IF ( sub(t0_min, pitmin) < 0 )
+    if( t0_min < pitmin )
     {
         t0_min = pitmin;
-        move16();
-        t0_max = sub(add(t0_min, delta), 1);
+        t0_max = t0_min + delta - 1;
     }
-
-    IF ( sub(t0_max, pitmax) > 0 )
+    if( t0_max > pitmax )
     {
         t0_max = pitmax;
-        move16();
-        t0_min = add(sub(t0_max, delta), 1);
+        t0_min = t0_max - delta + 1;
     }
-
-    t_min = sub(t0_min, L_INTERPOL1);
-    t_max = add(t0_max, L_INTERPOL1);
-
-    /* normalize wsp */
-    assert(len+t_max <= L_FRAME_PLUS+PIT_MAX_MAX+L_INTERPOL1);
-    s_wsp = getScaleFactor16(wsp - t_max, add(len, t_max));
-    s_wsp = sub(s_wsp, 4);
-    FOR (t = negate(t_max); t < len; t++)
-    {
-        wsp2[t+t_max] = shl(wsp[t], s_wsp);
-        move16();
-    }
-    wsp = wsp2 + t_max;
+    t_min = t0_min - L_INTERPOL1;
+    t_max = t0_max + L_INTERPOL1;
 
     pt_cor = cor;
-
-    FOR ( t=t_min; t<=t_max; t++ )
+    for ( t=t_min; t<=t_max; t++ )
     {
-        *pt_cor = dot(wsp, wsp-t, len);
-        pt_cor++;
+        *pt_cor++ = dotp( wsp, wsp-t, len );
     }
 
     pt_cor = cor + L_INTERPOL1;
-    cor_max = L_add(*pt_cor++, 0);
+    cor_max = *pt_cor++;
     t1 = t0_min;
-    move16();
-
-    FOR ( t = add(t0_min, 1); t <= t0_max; t++ )
+    for ( t=t0_min+1; t<=t0_max; t++ )
     {
-        IF ( *pt_cor > cor_max  )
+        if ( *pt_cor > cor_max  )
         {
             cor_max = *pt_cor;
             t1 = t;
         }
         pt_cor++;
     }
-
-    temp = dot(wsp, wsp, len);
-    s = norm_l(temp);
-    temp_m = extract_h(L_shl(temp, s));
-    temp_e = negate(s);
-
-    temp = dot(wsp-t1, wsp-t1, len);
-    s = norm_l(temp);
-    temp_m = mult(temp_m, extract_h(L_shl(temp, s)));
-    temp_e = sub(temp_e, s);
-
-    temp_m = Sqrt16(temp_m, &temp_e);
-
-    if (temp_m == 0)
-    {
-        temp_m = 1;
-        move16();
-    }
-    s = sub(norm_l(cor_max), 1);
-    temp_m = divide1616(extract_h(L_shl(cor_max, s)), temp_m);
-    temp_e = sub(negate(s), temp_e);
-
-    BASOP_SATURATE_WARNING_OFF
-    *norm_corr = shl(temp_m, temp_e);
-    BASOP_SATURATE_WARNING_ON
-
-    IF ( sub(t1, pitfr1) >= 0 )
+    temp = dotp( wsp, wsp, len ) * dotp( wsp-t1, wsp-t1, len );
+    *norm_corr = cor_max / (float)sqrt( temp + 0.1f );
+    if ( t1 >= pitfr1 )
     {
         *pitch_int = t1;
-        move16();
         *pitch_fr = 0;
-        move16();
-
-        *index = add(sub(t1, pitfr1), extract_l(L_mac0(L_mult0(sub(pitfr2, pitmin), pitres),
-                                                sub(pitfr1, pitfr2), shr(pitres,1))));
-        move16();
-
+        *index = t1 - pitfr1 + ((pitfr2-pitmin)*pitres) + ((pitfr1-pitfr2)*(pitres>>1));
         return;
     }
 
@@ -193,422 +122,300 @@ void tcx_ltp_pitch_search(
      * the interpolated normalized correlation.
      *-----------------------------------------------------------------*/
 
-    pt_cor = cor + sub(L_INTERPOL1, t0_min);
+    pt_cor = cor + L_INTERPOL1 - t0_min;
     t0 = t1;
-    move16();
-
-    step = 1;
-    move16();
-    if (sub(t0, pitfr2) >= 0)
+    if ( t0 >= pitfr2 )
     {
         step = 2;
-        move16();
+        fraction = 2;
     }
-    fraction = step;
-    move16();
+    else
+    {
+        step = 1;
+        fraction = 1;
+    }
 
-    IF (sub(t0, t0_min) == 0)        /* Limit case */
+    if (t0 == t0_min)        /* Limit case */
     {
         fraction = 0;
-        move16();
         cor_max = interpolate_corr( &pt_cor[t0], fraction, pitres );
     }
-    ELSE                     /* Process negative fractions */
+    else                     /* Process negative fractions */
     {
-        t0 = sub(t0, 1);
+        t0--;
         cor_max = interpolate_corr( &pt_cor[t0], fraction, pitres );
-
-        FOR ( i = add(fraction, step); i < pitres; i += step )
+        for ( i=(fraction+step); i<=pitres-1; i=i+step )
         {
             temp = interpolate_corr( &pt_cor[t0], i, pitres );
-
-            IF (L_sub(temp, cor_max) > 0)
+            if (temp > cor_max)
             {
-                cor_max = L_add(temp, 0);
+                cor_max = temp;
                 fraction = i;
-                move16();
             }
         }
     }
 
-    i = 0;
-    FOR ( i = 0; i < pitres; i += step )     /* Process positive fractions */
+    for ( i=0; i<=pitres-1; i=i+step )     /* Process positive fractions */
     {
         temp = interpolate_corr( &pt_cor[t1], i, pitres );
-
-        IF (L_sub(temp, cor_max) > 0)
+        if (temp > cor_max)
         {
-            cor_max = L_add(temp, 0);
+            cor_max = temp;
             fraction = i;
-            move16();
             t0 = t1;
-            move16();
         }
     }
-
     *pitch_int = t0;
-    move16();
     *pitch_fr = fraction;
-    move16();
+    if ( t0 >= pitfr2 )
+    {
+        *index = t0*(pitres>>1) + (fraction>>1) - (pitfr2*(pitres>>1)) + ((pitfr2-pitmin)*pitres);
+    }
+    else
+    {
+        *index = t0*pitres + fraction - (pitmin*pitres);
+    }
 
-    IF ( sub(t0, pitfr2) >= 0 )
-    {
-        *index = add( extract_l(L_mac0(L_mult0(sub(t0, pitfr2), shr(pitres,1)),
-                                       sub(pitfr2, pitmin), pitres)), shr(fraction,1) );
-        move16();
-    }
-    ELSE
-    {
-        *index = add(imult1616(sub(t0, pitmin), pitres), fraction);
-        move16();
-    }
 
 }
 
-
-static void tcx_ltp_find_gain( Word16 *speech, Word16 *pred_speech, Word16 L_frame, Word16 *gain, Word16 *gain_index )
+static void tcx_ltp_find_gain( float *speech, float *pred_speech, int L_frame, float *gain, int *gain_index )
 {
-    Word32 corr, ener;
-    Word16 i, g, s1, s2, tmp;
+    int gainbits = 2;
 
-
-
-    s1 = sub(getScaleFactor16(speech, L_frame), 4);
-    s2 = sub(getScaleFactor16(pred_speech, L_frame), 4);
 
     /* Find gain */
-    corr = L_deposit_l(0);
-    ener = L_deposit_l(1);
-
-    FOR (i = 0; i < L_frame; i++)
-    {
-        tmp = shl(pred_speech[i], s2);
-        corr = L_mac0(corr, shl(speech[i], s1), tmp);
-        ener = L_mac0(ener, tmp, tmp);
-    }
-
-    s1 = sub(1, add(s1, s2));
-    s2 = sub(1, shl(s2, 1));
-
-    tmp = sub(norm_l(corr), 1);
-    corr = L_shl(corr, tmp);
-    s1 = sub(s1, tmp);
-
-    tmp = norm_l(ener);
-    ener = L_shl(ener, tmp);
-    s2 = sub(s2, tmp);
-
-    g = divide1616(round_fx(corr), round_fx(ener));
-    BASOP_SATURATE_WARNING_OFF
-    g = shl(g, sub(s1, s2));
-    BASOP_SATURATE_WARNING_ON
+    *gain = get_gain( speech, pred_speech, L_frame, NULL);
 
     /* Quantize gain */
-    g = shr(sub(g, 0x1000), 13);
-    g = s_max(g, -1);
-
-    *gain_index = g;
-    move16();
-
+    if (*gain >= 0.875f)
+    {
+        *gain_index = 3;  /* 1.00/2 */
+    }
+    else if (*gain >= 0.625f)
+    {
+        *gain_index = 2;  /* 0.75/2 */
+    }
+    else if (*gain >= 0.375f)
+    {
+        *gain_index = 1;  /* 0.50/2 */
+    }
+    else if (*gain >= 0.125f)
+    {
+        *gain_index = 0;  /* 0.25/2 */
+    }
+    else
+    {
+        *gain_index = -1; /* escape */
+    }
     /* Dequantize gain */
-    *gain = imult1616(add(g, 1), 0x1400);
-    move16();
-
+    *gain = (float)(*gain_index + 1) * 0.625f/(float)(1<<gainbits);
 
 }
 
-void tcx_ltp_encode( Word8 tcxltp_on,
-                     Word8 tcxOnly,
-                     Word16 tcxMode,
-                     Word16 L_frame,
-                     Word16 L_subfr,
-                     Word16 *speech,
-                     Word16 *speech_ltp,
-                     Word16 *wsp,
-                     Word16 Top,
-                     Word16 *ltp_param,
-                     Word16 *ltp_bits,
-                     Word16 *pitch_int,
-                     Word16 *pitch_fr,
-                     Word16 *gain,
-                     Word16 *pitch_int_past,
-                     Word16 *pitch_fr_past,
-                     Word16 *gain_past,
-                     Word16 *norm_corr_past,
-                     Word16 last_core,
-                     Word16 pitmin,
-                     Word16 pitfr1,
-                     Word16 pitfr2,
-                     Word16 pitmax,
-                     Word16 pitres,
+void tcx_ltp_encode( int tcxltp_on,
+                     int tcxOnly,
+                     int tcxMode,
+                     int L_frame,
+                     int L_subfr,
+                     float *speech,
+                     float *speech_ltp,
+                     float *wsp,
+                     int Top,
+                     int *ltp_param,
+                     int *ltp_bits,
+                     int *pitch_int,
+                     int *pitch_fr,
+                     float *gain,
+                     int *pitch_int_past,
+                     int *pitch_fr_past,
+                     float *gain_past,
+                     float *norm_corr_past,
+                     int last_core,
+                     int pitmin,
+                     int pitfr1,
+                     int pitfr2,
+                     int pitmax,
+                     int pitres,
                      struct TransientDetection const * pTransientDetection,
-                     Word8 SideInfoOnly,
-                     Word16 *A,
-                     Word16 lpcorder
+                     int SideInfoOnly,
+                     float *A,
+                     int lpcorder
                    )
 {
-    Word16 n;
-    Word16 norm_corr;
-    Word16 pred_speech[L_FRAME32k];
-    Word16 tempFlatness;
-    Word16 maxEnergyChange;
-    Word16 buf_zir[M+L_SUBFR], *zir;
-    Word16 Aest[M+1];
-    Word16 alpha, step;
+    int n;
+    float norm_corr=0.0f;
+    float pred_speech[L_FRAME_PLUS];
+    float tempFlatness;
+    float maxEnergyChange;
+    float buf_zir[M+L_FRAME_PLUS/4], *zir;
+    float r[M+1], Aest[M+1];
+    float alpha, step;
 
+#define L_frameTCX  L_frame
 
-
-    norm_corr = 0;
-    move16();
 
     /* Reset memory if past frame is acelp */
-    IF (last_core == ACELP_CORE)
+    if ( last_core == ACELP_CORE )
     {
-        *pitch_int_past = L_frame;
-        move16();
+        *pitch_int_past = L_frameTCX;
         *pitch_fr_past = 0;
-        move16();
-        *gain_past = 0;
-        move16();
+        *gain_past = 0.f;
     }
 
     /* By default, LTP is off */
     ltp_param[0] = 0;
-    move16();
 
-    test();
-    IF (tcxltp_on != 0 || SideInfoOnly != 0)
+    if ( tcxltp_on || SideInfoOnly )
     {
-        Word16 nPrevSubblocks;
-        Word8 isTCX10 = 0;
-
-        if (sub(tcxMode, TCX_10) == 0)
-        {
-            isTCX10 = 1;
-            move16();
-        }
-
         /* Find pitch lag */
         tcx_ltp_pitch_search( Top, pitch_int, pitch_fr, &ltp_param[1], &norm_corr, L_frame, wsp, pitmin, pitfr1, pitfr2, pitmax, pitres );
 
-        nPrevSubblocks = extract_h(L_mac(0x17fff, NSUBBLOCKS, div_s(*pitch_int, L_frame)));
-        nPrevSubblocks = add(s_min(nPrevSubblocks, NSUBBLOCKS), 1);
-
-        tempFlatness = GetTCXAvgTemporalFlatnessMeasure(pTransientDetection, NSUBBLOCKS, nPrevSubblocks);
+        tempFlatness = GetTCXAvgTemporalFlatnessMeasure(pTransientDetection, NSUBBLOCKS, 1+min(NSUBBLOCKS, (int)ceil(0.5f+NSUBBLOCKS*(1.0f*(*pitch_int)/L_frame))));
 
         maxEnergyChange = GetTCXMaxenergyChange(pTransientDetection,
-                                                (const Word8) isTCX10,
-                                                NSUBBLOCKS, nPrevSubblocks);
+                                                tcxMode == TCX_10,
+                                                NSUBBLOCKS, 1+min(NSUBBLOCKS, (int)ceil(0.5f+NSUBBLOCKS*(float)(*pitch_int)/(float)L_frame)));
 
         /* Switch LTP on */
-        test();
-        test();
-        test();
-        test();
-        test();
-        test();
-        test();
-        test();
-        test();
-        test();
-        test();
-        test();
-        test();
-        test();
-        test();
-        test();
-        BASOP_SATURATE_WARNING_OFF;
-        if ( (
-                    tcxOnly == 0 &&
-                    sub(tcxMode, TCX_20) == 0 &&
-                    sub(mult(norm_corr, *norm_corr_past), 0x2000) > 0 &&
-                    sub(tempFlatness, 448/*3.5f Q7*/) < 0
-                ) ||
-                (
-                    tcxOnly != 0 &&
-                    sub(tcxMode, TCX_10) == 0 &&
-                    sub(s_max(norm_corr, *norm_corr_past), 0x4000) > 0 &&
-                    sub(maxEnergyChange, 448/*3.5f Q7*/) < 0
-                ) ||
-                ( /* Use LTP for lower correlation when pitch lag is big, L_frame*(1.2f-norm_corr) < pitch_int <=> norm_corr > 1.2f-pitch_int/L_frame */
-                    tcxOnly != 0 &&
-                    sub(norm_corr, 14418/*0.44f Q15*/) > 0 &&
-                    L_msu(L_mult(L_frame, sub(19661/*1.2f Q14*/, shr(norm_corr, 1))), *pitch_int, 1<<14) < 0 /* L_frame*(1.2f-norm_corr) < pitch_int */
-                ) ||
-                (
-                    tcxOnly != 0 &&
-                    sub(tcxMode, TCX_20) == 0 &&
-                    sub(norm_corr, 14418/*0.44f Q15*/) > 0 &&
-                    (
-                        sub(tempFlatness, 768/*6.0f Q7*/) < 0 ||
-                        (
-                            sub(tempFlatness, 896/*7.0f Q7*/) < 0 &&
-                            sub(maxEnergyChange, 2816/*22.0f Q7*/) < 0
-                        )
-                    )
-                )
-           )
+        if ( ( tcxOnly == 0 && tcxMode == TCX_20 && norm_corr **norm_corr_past > 0.25f && tempFlatness < 3.5f ) ||
+                ( tcxOnly == 1 && tcxMode == TCX_10 && max(norm_corr, *norm_corr_past) > 0.5f && maxEnergyChange < 3.5f ) ||
+                /* Use LTP for lower correlation when pitch lag is big, L_frame*(1.2f-norm_corr) < *pitch_int <=> norm_corr > 1.2f-*pitch_int/L_frame */
+                ( tcxOnly == 1 && norm_corr > 0.44f && L_frameTCX*(1.2f-norm_corr) < *pitch_int) ||
+                ( tcxOnly == 1 && tcxMode == TCX_20 && norm_corr > 0.44f && (tempFlatness < 6.0f || (tempFlatness <  7.0f && maxEnergyChange < 22.0f)) ) )
         {
-            ltp_param[0] = 1;
-            move16();
+            {
+                ltp_param[0] = 1;
+            }
         }
-        BASOP_SATURATE_WARNING_ON;
     }
-
-    IF (ltp_param[0] != 0)
+    if ( ltp_param[0] )
     {
         /* Find predicted signal */
-        predict_signal( speech, pred_speech, *pitch_int, *pitch_fr, pitres, L_frame );
+        predict_signal( speech, pred_speech, *pitch_int, *pitch_fr, pitres, L_frameTCX );
 
         /* Find gain */
-        tcx_ltp_find_gain( speech, pred_speech, L_frame, gain, &ltp_param[2] );
+        tcx_ltp_find_gain( speech, pred_speech, L_frameTCX, gain, &ltp_param[2] );
 
         /* Total number of bits for LTP */
-        IF (add(ltp_param[2], 1) != 0)   /* gain > 0 */
+        if (ltp_param[2] + 1)   /* gain > 0 */
         {
             *ltp_bits = 12;
-            move16();
         }
-        ELSE   /* gain <= 0 -> turn off LTP */
+        else   /* gain <= 0 -> turn off LTP */
         {
             ltp_param[0] = 0;
-            move16();
         }
     }
-
-    IF (ltp_param[0] == 0)
+    if (!ltp_param[0])
     {
         /* No LTP -> set everything to zero */
-        *pitch_int = L_frame;
-        move16();
+        *pitch_int = L_frameTCX;
         *pitch_fr = 0;
-        move16();
         ltp_param[1] = 0;
-        move16();
-        set16_fx( pred_speech, 0, L_frame );
-        *gain = 0;
-        move16();
+        set_zero( pred_speech, L_frameTCX );
+        *gain = 0.f;
         ltp_param[2] = 0;
-        move16();
-
-        *ltp_bits = 0;
-        move16();
-        test();
-        if (tcxltp_on != 0 || SideInfoOnly != 0)
+        if ( tcxltp_on || SideInfoOnly)
         {
             *ltp_bits = 1;
-            move16();
+        }
+        else
+        {
+            *ltp_bits = 0;
         }
     }
 
-    if (SideInfoOnly != 0)
+    if (SideInfoOnly)
     {
-        *gain = 0;
-        move16();
+        *gain = 0.f;
     }
 
-    test();
-    IF (*gain_past == 0 && *gain == 0)
+    if ( *gain_past==0.f && *gain==0.f )
     {
-        Copy(speech, speech_ltp, L_subfr);
+        mvr2r( speech, speech_ltp, L_subfr );
     }
-    ELSE IF (*gain_past == 0)
+    else if ( *gain_past==0.f )
     {
-        alpha = 0;
-        move16();
-
-        /* step = 1.f/(float)(L_subfr); */
-        step = shl(2, norm_s(L_subfr));
-        if (s_and(L_subfr, sub(L_subfr, 1)) != 0)
+        alpha = 0.f;
+        step = 1.f/(float)(L_subfr);
+        for ( n=0; n<L_subfr; n++ )
         {
-            step = mult_r(step, 26214/*64.f/80.f Q15*/);
-        }
-
-        FOR (n = 0; n < L_subfr; n++)
-        {
-            speech_ltp[n] = sub(speech[n], mult_r(*gain, mult_r(alpha, pred_speech[n])));
-            move16();
-            BASOP_SATURATE_WARNING_OFF;
-            alpha = add(alpha, step);
-            BASOP_SATURATE_WARNING_ON;
+            speech_ltp[n] = speech[n] - alpha **gain * pred_speech[n];
+            alpha += step;
         }
     }
-    ELSE
+    else
     {
-        IF (A == NULL)
+        if ( A==NULL )
         {
-            tcx_ltp_get_lpc(speech-L_frame, L_frame, Aest, lpcorder);
+            int i,j;
+            float s;
+            for (i = 0; i <= lpcorder; i++)
+            {
+                s = 0.0;
+                for (j = 0; j < L_frameTCX-i; j++)
+                {
+                    s += speech[j-L_frameTCX]*speech[j+i-L_frameTCX];
+                }
+                r[i] = s;
+            }
+            if (r[0] < 100.0f)
+            {
+                r[0] = 100.0f;
+            }
+            r[0] *= 1.0001f;
+            lev_dur( Aest, r, lpcorder, NULL );
             A = Aest;
         }
-
-        IF (*gain > 0)
+        if ( *gain>0.f )
         {
-            predict_signal(speech-lpcorder, buf_zir, *pitch_int, *pitch_fr, pitres, lpcorder);
+            predict_signal( speech-lpcorder, buf_zir, *pitch_int, *pitch_fr, pitres, lpcorder );
         }
-        ELSE {
-            set16_fx(buf_zir, 0, lpcorder);
-        }
-
-        FOR (n = 0; n < lpcorder; n++)
+        else
         {
-            buf_zir[n] = add(sub(speech_ltp[n-lpcorder], speech[n-lpcorder]), mult_r(*gain, buf_zir[n]));
-            move16();
+            set_f( buf_zir, 0.0f, lpcorder );
         }
-
+        for ( n=0; n<lpcorder; n++ )
+        {
+            buf_zir[n] = speech_ltp[n-lpcorder] - speech[n-lpcorder] + *gain * buf_zir[n];
+        }
         zir = buf_zir + lpcorder;
-
-        set16_fx(zir, 0, L_subfr);
-
-        E_UTIL_synthesis(0, A, zir, zir, L_subfr, buf_zir, 0, lpcorder);
-
-        alpha = 0x7FFF;
-        /* step = 1.f/(float)(L_subfr/2); */
-        step = shl(4, norm_s(L_subfr));
-        if (s_and(L_subfr, sub(L_subfr, 1)) != 0)
+        set_f( zir, 0.0f, L_subfr );
+        syn_filt( A, lpcorder,zir, zir, L_subfr, buf_zir, 0);
+        alpha = 1.f;
+        step = 1.f/(float)(L_subfr/2);
+        for ( n=L_subfr/2; n<L_subfr; n++ )
         {
-            step = mult_r(step, 26214/*64.f/80.f Q15*/);
+            zir[n] *= alpha;
+            alpha -= step;
         }
-
-        FOR (n = shr(L_subfr, 1); n < L_subfr; n++)
+        for ( n=0; n<L_subfr; n++ )
         {
-            zir[n] = mult_r(zir[n], alpha);
-            move16();
-            alpha = sub(alpha, step);
-        }
-
-        FOR (n = 0; n < L_subfr; n++)
-        {
-            speech_ltp[n] = add(sub(speech[n], mult_r(*gain, pred_speech[n])), zir[n]);
-            move16();
+            speech_ltp[n] = ( speech[n] - *gain * pred_speech[n] ) + zir[n];
         }
     }
 
-    test();
-    IF ( SideInfoOnly || *gain == 0)
+    if ( SideInfoOnly || *gain == 0.0f)
     {
-        FOR ( n=L_subfr; n<L_frame; n++ )
+        for ( n=L_subfr; n<L_frameTCX; n++ )
         {
             speech_ltp[n] = speech[n];
-            move16();
         }
     }
-    ELSE
+    else
     {
-        FOR ( n=L_subfr; n<L_frame; n++ )
+        for ( n=L_subfr; n<L_frameTCX; n++ )
         {
-            speech_ltp[n] = sub(speech[n], mult(*gain, pred_speech[n]));
-            move16();
+            speech_ltp[n] = speech[n] - *gain * pred_speech[n];
         }
     }
 
     /* Update */
     *pitch_int_past = *pitch_int;
-    move16();
     *pitch_fr_past = *pitch_fr;
-    move16();
     *gain_past = *gain;
-    move16();
     *norm_corr_past = norm_corr;
-    move16();
 
 }
+

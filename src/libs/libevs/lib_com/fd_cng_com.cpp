@@ -1,1809 +1,1074 @@
 /*====================================================================================
-    EVS Codec 3GPP TS26.442 Apr 03, 2018. Version 12.11.0 / 13.6.0 / 14.2.0
+    EVS Codec 3GPP TS26.443 Nov 13, 2018. Version 12.11.0 / 13.7.0 / 14.3.0 / 15.1.0
   ====================================================================================*/
 
 #include <assert.h>
-#include "stl.h"
-#include "basop_util.h"
+#include <math.h>
 #include "options.h"
-#include "stl.h"
-#include "rom_basop_util.h"
-#include "rom_com_fx.h"
-#include "prot_fx.h"
-
-#define DELTA_SHIFT         2
-#define DELTA_SHIFT_LD64    67108864l/*DELTA_SHIFT/64.0 Q31*/
+#include "prot.h"
+#include "rom_com.h"
 
 
 
-/*****************************************
-* Create an instance of type FD_CNG_COM *
-*****************************************/
-void createFdCngCom(HANDLE_FD_CNG_COM * hFdCngCom)
+/*-------------------------------------------------------------------
+ * Local functions
+ *-------------------------------------------------------------------*/
+
+static void mhvals( int d, float * m );
+
+
+/*-------------------------------------------------------------------
+ * createFdCngCom()
+ *
+ * Create an instance of type FD_CNG_COM
+ *-------------------------------------------------------------------*/
+
+void createFdCngCom(
+    HANDLE_FD_CNG_COM * hFdCngCom
+)
 {
     HANDLE_FD_CNG_COM hs;
 
     /* Allocate memory */
     hs = (HANDLE_FD_CNG_COM) calloc(1, sizeof (FD_CNG_COM));
-    move16();
-
 
     *hFdCngCom = hs;
-    move16();
+
     return;
 }
 
-void initFdCngCom(HANDLE_FD_CNG_COM hs, Word16 scale)
+
+/*-------------------------------------------------------------------
+ * initFdCngCom()
+ *
+ *
+ *-------------------------------------------------------------------*/
+
+void initFdCngCom(
+    HANDLE_FD_CNG_COM hs,   /* i/o: Contains the variables related to the FD-based CNG process */
+    float scale
+)
 {
-    /* Calculate CLDFB scaling factor */
-    /* shl(i_mult2(scale, scale), 3) does not fit in 16 bit */
-    /*hs->scalingFactor = div_s(1, shl(i_mult2(scale, scale), 3));*/
-    assert(2048/*1.0/(1<<4) Q15*/ < mult(scale, scale));
-    /* Exponent invScalingFactor: -16 = -(2*7 (scale) + 2 (8.0) */
-    hs->invScalingFactor = shl(mult(scale,scale),1);
-    /* Exponent scalingFactor: -15 = -(2*7 (scale) + 2 (8.0) - 1 (1.0)) */
-    hs->scalingFactor = div_s(0x4000,hs->invScalingFactor);
+
+    /* Calculate FFT scaling factor */
+    hs->scalingFactor = 1 / (scale*scale*8.f);
 
     /* Initialize the overlap-add */
-    set16_fx( hs->timeDomainBuffer, 0, L_FRAME16k );
-    hs->olapBufferAna = NULL;
-    move16();
-    set16_fx( hs->olapBufferSynth, 0, FFTLEN );
-    hs->olapBufferSynth2 = NULL;
-    move16();
+    set_f( hs->timeDomainBuffer, 0.0f, L_FRAME16k );
+    set_f( hs->olapBufferAna, 0.0f, FFTLEN );
+    set_f( hs->olapBufferSynth, 0.0f, FFTLEN );
+    set_f( hs->olapBufferSynth2, 0.0f, FFTLEN );
 
     /* Initialize the comfort noise generation */
-    set32_fx( hs->fftBuffer, 0, FFTLEN );
-    set32_fx( hs->cngNoiseLevel, 0, FFTCLDFBLEN );
+    set_f( hs->fftBuffer, 0.0f, FFTLEN );
+    set_f( hs->cngNoiseLevel, 0.0f, FFTCLDFBLEN );
 
     /* Initialize quantizer */
-    set32_fx( hs->sidNoiseEst, 0, NPART );
-    set16_fx( hs->A_cng, 0, M+1 );
-    hs->A_cng[0] = 4096/*1.f Q12*/;   /* 3Q12 */                                  move16();
+    set_f( hs->sidNoiseEst, 0.0f, NPART );
+    set_f( hs->A_cng, 0.0f, M+1 );
+    hs->A_cng[0] = 1.f;
 
     /* Set some counters and flags */
-    hs->inactive_frame_counter  = 0; /* Either SID or zero frames */                  move16();
+    hs->inactive_frame_counter  = 0; /* Either SID or zero frames */
     hs->active_frame_counter    = 0;
-    move16();
     hs->frame_type_previous     = ACTIVE_FRAME;
-    move16();
     hs->flag_noisy_speech       = 0;
-    move16();
-    hs->likelihood_noisy_speech = 0;
-    move16();
+    hs->likelihood_noisy_speech = 0.f;
 
     /* Initialize noise estimation algorithm */
-    set32_fx( hs->periodog, 0, PERIODOGLEN );
+    set_f( hs->periodog, 0.0f, PERIODOGLEN );
     mhvals(MSNUMSUBFR*MSSUBFRLEN, &(hs->msM_win));
     mhvals(MSSUBFRLEN, &(hs->msM_subwin));
-    set32_fx( hs->msPeriodogSum, 0, 2 );
-    hs->msPeriodogSum_exp[0] = 0;
-    move16();
-    hs->msPeriodogSum_exp[1] = 0;
-    move16();
-    set32_fx( hs->msPsdSum, 0, 2 );
-    set16_fx( hs->msSlope, 0, 2 );
-    set32_fx( hs->msQeqInvAv, 0, 2 );
-    hs->msQeqInvAv_exp[0] = 0;
-    move16();
-    hs->msQeqInvAv_exp[1] = 0;
-    move16();
+    set_f( hs->msPeriodogSum, 0.0f, 2 );
+    set_f( hs->msPsdSum, 0.0f, 2 );
+    set_f( hs->msSlope, 0.0f, 2 );
+    set_f( hs->msQeqInvAv, 0.0f, 2 );
     hs->msFrCnt_init_counter = 0;
-    move16();
     hs->msFrCnt_init_thresh  = 1;
-    move16();
     hs->init_old             = 0;
-    move16();
     hs->offsetflag           = 0;
-    move16();
     hs->msFrCnt              = MSSUBFRLEN;
-    move16();
     hs->msMinBufferPtr       = 0;
-    move16();
-    hs->msAlphaCor[0] = 644245120l/*0.3f Q31*/;
-    move16();
-    hs->msAlphaCor[1] = 644245120l/*0.3f Q31*/;
-    move16();
-
-    /* Initialize exponents */
-    hs->exp_cldfb_periodog = 0;
-    move16();
+    set_f( hs->msAlphaCor, 0.3f, 2 );
 
     return;
 }
 
-/*****************************************
-* Delete an instance of type FD_CNG_COM *
-*****************************************/
-void deleteFdCngCom(HANDLE_FD_CNG_COM * hFdCngCom) /* i/o: Contains the variables related to the CLDFB-based CNG process */
+
+/*-------------------------------------------------------------------
+ * deleteFdCngCom()
+ *
+ * Delete an instance of type FD_CNG_COM
+ *-------------------------------------------------------------------*/
+
+void deleteFdCngCom(
+    HANDLE_FD_CNG_COM * hFdCngCom /* i/o: Contains the variables related to the FD-based CNG process */
+)
 {
-    HANDLE_FD_CNG_COM hsCom;
-    hsCom = *hFdCngCom;
-    move16();
-    IF (hsCom != NULL)
+    HANDLE_FD_CNG_COM hsCom = *hFdCngCom;
+    if (hsCom != NULL)
     {
         free(hsCom);
         *hFdCngCom = NULL;
-        move16();
     }
+
+    return;
 }
 
-/***************************************
-* Initialize the spectral partitioning *
-****************************************/
-void initPartitions( const Word16* part_in,
-                     Word16  npart_in,
-                     Word16  startBand,
-                     Word16  stopBand,
-                     Word16* part_out,
-                     Word16* npart_out,
-                     Word16* midband,
-                     Word16* psize,
-                     Word16* psize_norm,
-                     Word16* psize_norm_exp,
-                     Word16* psize_inv,
-                     Word16  stopBandFR
-                   )
+
+/*-------------------------------------------------------------------
+ * initPartitions()
+ *
+ * Initialize the spectral partitioning
+ *-------------------------------------------------------------------*/
+
+void initPartitions(
+    const int * part_in,
+    int npart_in,
+    int startBand,
+    int stopBand,
+    int * part_out,
+    int * npart_out,
+    int * midband,
+    float * psize,
+    float * psize_inv,
+    int stopBandFR
+)
 {
-    Word16 i, j, len_out, tmp16;
+    int i, j, len_out;
 
-
-    IF (part_in != NULL)
+    if (part_in != NULL)
     {
-        len_out = 0;
-        move16();
-        IF (sub(stopBandFR, startBand) > 0)
+        if (stopBandFR > startBand)
         {
-            len_out = sub(stopBandFR, startBand);
-            FOR(i = 0 ; i < len_out; i++)
+            len_out = stopBandFR - startBand;                                               /*part_out*/
+            for(i = 0 ; i < len_out ; i++)
             {
                 part_out[i] = i;
-                move16();
             }
         }
-        FOR(j=0 ; j < npart_in; j++)
+        else
         {
-            IF (sub(part_in[j], stopBand) >= 0)
+            len_out = 0;
+        }                                                                                 /*npart_in,part_out*/
+        for(j=0 ; j<npart_in && part_in[j]<stopBand ; j++)
+        {
+            if (part_in[j] >= stopBandFR && part_in[j] >= startBand)
             {
-                BREAK;
-            }
-            tmp16 = sub(part_in[j],startBand);
-            test();
-            if (sub(part_in[j],stopBandFR) >= 0 && tmp16 >= 0)
-            {
-                part_out[len_out++] = tmp16;
-                move16();
+                part_out[len_out++] = part_in[j] - startBand;
             }
         }
     }
-    ELSE
+    else
     {
-        len_out = sub(stopBand, startBand);
-        FOR (i = 0 ; i < len_out; i++)
+        len_out = stopBand - startBand;                                                   /*part_out*/
+        for (i = 0 ; i < len_out ; i++)
         {
             part_out[i] = i;
-            move16();
         }
     }
-
     *npart_out = len_out;
-    move16();
-    getmidbands(part_out, len_out, midband, psize, psize_norm, psize_norm_exp, psize_inv);
+    getmidbands(part_out, len_out, midband, psize, psize_inv);
 
+    return;
 }
 
-#define CNG_HS     4    /* 4 bit headroom for dot product */
-#define CNG_S      6    /* 1 sign bit, 6 bit integer part, 9 bit frational part for input and output data */
 
+/*-------------------------------------------------------------------
+ * compress_range()
+ *
+ * Apply some dynamic range compression based on the log
+ *-------------------------------------------------------------------*/
 
-
-
-/********************************************************
-* Apply some dynamic range compression based on the log *
-********************************************************/
 void compress_range(
-    Word32 *in,
-    Word16  in_exp,
-    Word16 *out,
-    Word16  len
+    float* in,
+    float* out,
+    int len
 )
 {
-    Word16 i;
-    Word32 in_s;
-    Word32 one_s;
-    Word32 in_exp32;
-    Word32 L_tmp;
-
+    float* ptrIn = in;
+    float* ptrOut = out;
+    int i;
 
     /* out = log2( 1 + in ) */
-    IF ( in_exp >= 0 )
+    for(i = 0 ; i < len ; i++)
     {
-        one_s = L_shr(1073741824l/*0.5 Q31*/,in_exp);
-        in_exp32 = L_shl(L_deposit_l(add(in_exp,1)),WORD32_BITS-1-LD_DATA_SCALE);
-        FOR (i=0; i < len; i++)
-        {
-            in_s = L_add(L_shr(in[i],1),one_s);
-            L_tmp = L_add(BASOP_Util_Log2(in_s),in_exp32);
-            if (in_s == 0)
-            {
-                out[i] = 0;
-                move16();
-            }
-            if (in_s != 0)
-            {
-                out[i] = extract_h(L_tmp);
-            }
-            if(out[i] == 0)
-            {
-                out[i] = 1;
-            }
-        }
+        *ptrOut = (float)log10(*ptrIn + 1.f);
+        ptrIn++;
+        ptrOut++;
     }
-    ELSE
-    {
-        in_exp = sub(in_exp,1);
-        in_exp32 = L_shl(L_deposit_l(1),WORD32_BITS-1-LD_DATA_SCALE);
-        FOR (i=0; i < len; i++)
-        {
-            L_tmp = L_add(BASOP_Util_Log2(L_add(L_shl(in[i],in_exp),1073741824l/*0.5 Q31*/)),in_exp32);
-            if (in[i] == 0)
-            {
-                out[i] = 0;
-                move16();
-            }
-            if (in[i] != 0)
-            {
-                out[i] = extract_h(L_tmp);
-            }
-            if (out[i] == 0)
-            {
-                out[i] = 1;
-            }
-        }
-    }
+    v_multc(out, 1.f/(float)log10(2.f), out, len);
 
+    /* Quantize to simulate a fixed-point representation 6Q9 */
+    v_multc(out, CNG_LOG_SCALING, out, len);
+    for(ptrOut = out ; ptrOut < out + len ; ptrOut++)
+    {
+        *ptrOut = (float)((int)(*ptrOut+0.5f));
+        if ( *ptrOut == 0.f )
+        {
+            *ptrOut = 1.f;
+        }
+    }
+    v_multc(out, 1./CNG_LOG_SCALING, out, len);
+
+    return;
 }
 
-/*************************************************************
-* Apply some dynamic range expansion to undo the compression *
-*************************************************************/
+
+/*-------------------------------------------------------------------
+ * expand_range()
+ *
+ * Apply some dynamic range expansion to undo the compression
+ *-------------------------------------------------------------------*/
+
 void expand_range(
-    Word16 *in,
-    Word32 *out,
-    Word16 *out_exp,
-    Word16  len
+    float* in,
+    float* out,
+    int len
 )
 {
-    Word16 i;
-    Word16 s;
-    Word16 tmp;
-    Word32 one_s, tmp32;
-    Word16 maxVal;
-    Word16 maxVal2;
+    float* ptrIn = in;
+    float* ptrOut = out;
+    int i;
 
-
-    maxVal = 0;
-    move16();
-    FOR (i=0; i < len; i++)
-    {
-        maxVal = s_max(maxVal,in[i]);
-    }
-
-    maxVal2 = maxVal;
-    move16();
-    s = 0;
-    move16();
-    WHILE ( maxVal >= 0 )
-    {
-        maxVal = sub(maxVal,512/*0.015625 Q15*/);
-        s = add(s,1);
-    }
-    tmp = sub(maxVal2,maxVal);
-
-    one_s = L_shr(1073741824l/*0.5 Q31*/,sub(s,1));
-    tmp32 = L_shr(726941l/*0.0003385080526823181 Q31*/,s);
     /* out = (2^(in) - 1) */
-    FOR (i=0; i < len; i++)
+    for(i = 0 ; i < len ; i++)
     {
-        out[i] = L_sub(BASOP_Util_InvLog2(L_deposit_h(sub(in[i],tmp))),one_s);
-        move32();
-        if ( out[i] == 0 )
+        *ptrOut = (float)pow(2.f,*ptrIn) - 1.f;
+        if ( *ptrOut < 0.0003385080526823181f )
         {
-            out[i] = tmp32;
-            move32();
+            *ptrOut = 0.0003385080526823181f;
         }
+        ptrIn++;
+        ptrOut++;
     }
-    *out_exp = s;
-    move16();
 
+    return;
 }
 
-/*************************************************
-* Noise estimation using Minimum Statistics (MS) *
-*************************************************/
-void minimum_statistics (
-    Word16  len,                    /* i  : Total number of partitions (CLDFB or FFT)                   */
-    Word16  lenFFT,                 /* i  : Number of FFT partitions                                  */
-    Word16 *psize,                  /* i  : Partition sizes, fractional                               */
-    Word16 *msPeriodog,             /* i  : Periodogram (energies)                                    */
-    Word16 *msNoiseFloor,           /* i/o: Noise floors (energies)                                   */
-    Word16 *msNoiseEst,             /* i/o: Noise estimates (energies)                                */
-    Word32 *msAlpha,                /* i/o: Forgetting factors                                        */
-    Word16 *msPsd,                  /* i/o: Power Spectral Density (smoothed periodogram => energies) */
-    Word16 *msPsdFirstMoment,       /* i/o: PSD statistics of 1st order (energy means)                */
-    Word32 *msPsdSecondMoment,      /* i/o: PSD statistics of 2nd order (energy variances)            */
-    Word32 *msMinBuf,               /* i/o: Buffer of minima (energies)                               */
-    Word32 *msBminWin,              /* o  : Bias correction factors                                   */
-    Word32 *msBminSubWin,           /* o  : Bias correction factors                                   */
-    Word32 *msCurrentMin,           /* i/o: Local minima (energies)                                   */
-    Word32 *msCurrentMinOut,        /* i/o: Local minima (energies)                                   */
-    Word32 *msCurrentMinSubWindow,  /* i/o: Local minima (energies)                                   */
-    Word16 *msLocalMinFlag,         /* i  : Binary flag                                               */
-    Word16 *msNewMinFlag,           /* i  : Binary flag                                               */
-    Word16 *msPeriodogBuf,          /* i/o: Buffer of periodograms (energies)                         */
-    Word16 *msPeriodogBufPtr,       /* i/o: Counter                                                   */
-    HANDLE_FD_CNG_COM st            /* i/o: FD_CNG structure containing buffers and variables         */
+
+/*-------------------------------------------------------------------
+ * minimum_statistics()
+ *
+ * Noise estimation using Minimum Statistics (MS)
+ *-------------------------------------------------------------------*/
+
+void minimum_statistics(
+    int len,                     /* i  : Vector length */
+    int lenFFT,                   /* i  : Length of the FFT part of the vectors */
+    float * psize,
+    float * msPeriodog,            /* i  : Periodograms */
+    float * msNoiseFloor,
+    float * msNoiseEst,            /* o  : Noise estimates */
+    float * msAlpha,
+    float * msPsd,
+    float * msPsdFirstMoment,
+    float * msPsdSecondMoment,
+    float * msMinBuf,
+    float * msBminWin,
+    float * msBminSubWin,
+    float * msCurrentMin,
+    float * msCurrentMinOut,
+    float * msCurrentMinSubWindow,
+    int   * msLocalMinFlag,
+    int   * msNewMinFlag,
+    float * msPeriodogBuf,
+    int   * msPeriodogBufPtr,
+    HANDLE_FD_CNG_COM st           /* i/o: FD_CNG structure containing all buffers and variables */
 )
 {
-    Word16 i,j,k,s,s1,s2,s3;
-    Word16 len2;
-    Word16 current_len;
-    Word16 start, stop, cnt;
-    Word16 totsize;
-    Word16 inv_totsize;
+    float msM_win          = st->msM_win;
+    float msM_subwin       = st->msM_subwin;
+    float * msPsdSum       = st->msPsdSum;
+    float * msPeriodogSum  = st->msPeriodogSum;
+    float slope;
+    float * ptr;
+    float msAlphaCorAlpha  = MSALPHACORALPHA;
+    float msAlphaCorAlpha2 = 1.f-MSALPHACORALPHA;
 
-    Word32  tmp, tmp0, tmp1;
-    Word32  scalar, scalar2, scalar3;
-    Word32  snr;
-    Word32  msAlphaHatMin2;
-    Word32  BminCorr;
-    Word32  QeqInvAv;
-    Word32 *ptr;
-    Word32 *msPsdSum;
-    Word32 *msPeriodogSum;
-
-    Word16 tmp16, tmp16_1;
-    Word16 beta;
-    Word16 slope;
-    Word16 QeqInv;
-    Word16 scalar16;
-    Word16 scalar216;
-    Word16 scalar316;
-    Word16 msM_win;
-    Word16 msM_subwin;
-    Word16 msAlphaCorAlpha;
-    Word16 msAlphaCorAlpha2;
-    Word16 msPeriodogSum16;
-    Word16 msNoiseFloor16;
-
-
-    len2 = i_mult(MSNUMSUBFR,len);
-
-    msM_win = st->msM_win;
-    move16();
-    msM_subwin = st->msM_subwin;
-    move16();
-
-    msAlphaCorAlpha = MSALPHACORALPHA;
-    move16();
-    msAlphaCorAlpha2 = MSALPHACORALPHA2;
-    move16();
-
-    msPsdSum = st->msPsdSum;
-    msPeriodogSum = st->msPeriodogSum;
+    short i,j,k;
+    float scalar, scalar2, scalar3;
+    float snr, BminCorr, QeqInv, QeqInvAv;
+    float beta;
+    float msAlphaHatMin2;
+    int   len2 = MSNUMSUBFR*len;
+    int   current_len;
+    short start, stop, cnt;
+    int   totsize;
 
     /* No minimum statistics at initialization */
-    IF ( sub(st->msFrCnt_init_counter,st->msFrCnt_init_thresh) < 0 )
+    if (st->msFrCnt_init_counter < st->msFrCnt_init_thresh)
     {
-        Copy(msPeriodog, msPsd, len);            /* 6Q9 */
-        Copy(msPeriodog, msNoiseFloor, len);     /* 6Q9 */
-        Copy(msPeriodog, msNoiseEst, len);       /* 6Q9 */
-        Copy(msPeriodog, msPsdFirstMoment, len); /* 6Q9 */
-
-        set32_fx(msPsdSecondMoment, 0l/*0.0 Q31*/, len);
-        msPeriodogSum[0] = dotp_s_fx(msPeriodog, psize, lenFFT, CNG_HS);
-        move32();
-        msPsdSum[0] = msPeriodogSum[0];   /* 16Q15 */                                                            move32();
-
-        IF ( sub(lenFFT,len) < 0 )
+        mvr2r(msPeriodog, msPsd, len);
+        mvr2r(msPeriodog, msNoiseFloor, len);
+        mvr2r(msPeriodog, msNoiseEst, len);
+        mvr2r(msPeriodog, msPsdFirstMoment, len);
+        set_f( msPsdSecondMoment, 0.0f, len);
+        msPeriodogSum[0] = dotp(msPeriodog, psize, lenFFT);
+        msPsdSum[0] = msPeriodogSum[0];
+        if (lenFFT<len)
         {
-            msPeriodogSum[1] = dotp_s_fx(msPeriodog+lenFFT, psize+lenFFT, sub(len,lenFFT), CNG_HS);
-            move32();
-            msPsdSum[1] = msPeriodogSum[1]; /* 16Q15 */                                                            move32();
+            msPeriodogSum[1] = dotp(msPeriodog+lenFFT, psize+lenFFT, len-lenFFT);
+            msPsdSum[1] = msPeriodogSum[1];
         }
 
         /* Increment frame counter at initialization */
         /* Some frames are sometimes zero at initialization => ignore them */
-        IF ( sub(msPeriodog[0],st->init_old) < 0 )
+        if (msPeriodog[0]<st->init_old)
         {
-            set32_fx(msCurrentMinOut, 2147483647l/*1.0 Q31*/, len);        /* 16Q15 */
-            set32_fx(msCurrentMin, 2147483647l/*1.0 Q31*/, len);           /* 16Q15 */
-            set32_fx(msMinBuf, 2147483647l/*1.0 Q31*/, len2);              /* 16Q15 */
-            set32_fx(msCurrentMinSubWindow, 2147483647l/*1.0 Q31*/, len);  /* 16Q15 */
-
-            st->msFrCnt_init_counter = add(st->msFrCnt_init_counter,1);
-            move16();
+            set_f(msCurrentMinOut, FLT_MAX, len);
+            set_f(msCurrentMin, FLT_MAX, len);
+            set_f(msMinBuf, FLT_MAX, len2);
+            set_f(msCurrentMinSubWindow, FLT_MAX, len);
+            st->msFrCnt_init_counter++;
         }
-        st->init_old = msPeriodog[0];                       /* 6Q9 */                                            move16();
+        st->init_old = msPeriodog[0];
     }
-    ELSE
+
+    else
     {
+
         /* Consider the FFT and CLDFB bands separately
            - first iteration for FFT bins,
            - second one for CLDFB bands in SWB mode */
-        cnt = 0;
-        move16();
         start = 0;
-        move16();
-        stop = lenFFT;
-        move16();
-        totsize = sub(st->stopFFTbin,st->startBand);
-        WHILE ( sub(stop,start) > 0 )
+        stop  = lenFFT;
+        totsize = st->stopFFTbin-st->startBand;
+        cnt   = 0;                                                                         /*msAlphaCor*/
+        while (stop > start)
         {
-            current_len = sub(stop,start);
+            current_len = stop-start;
 
             /* Compute smoothed correction factor for PSD smoothing */
-
-            /* msPeriodogSum[cnt] with format 16Q15 */
-            msPeriodogSum[cnt] = dotp_s_fx(msPeriodog+start, psize+start, current_len, CNG_HS);
-            move32();
-
-            IF ( msPeriodogSum[cnt] == 0 )
-            {
-                st->msAlphaCor[cnt] = Mpy_32_16_1(st->msAlphaCor[cnt], msAlphaCorAlpha);
-                move32();
-            }
-            ELSE
-            {
-                /* calculate scalar with normalized msPeriodogSum[cnt], exponent -2*s1 */
-                s1 = norm_l(msPeriodogSum[cnt]);
-                msPeriodogSum16 = round_fx(L_shl(msPeriodogSum[cnt],s1));
-                scalar = L_mult(msPeriodogSum16, msPeriodogSum16);
-
-                /* calculate difference, both elements in 16Q15 format, use absolute value
-                   to avoid -1.0 x -1.0 multiplications later */
-                scalar2 = L_abs(L_sub(msPsdSum[cnt], msPeriodogSum[cnt]));
-
-                s2 = WORD32_BITS-1;
-                move16();
-                if ( scalar2 != 0 )
-                {
-                    /* use absolute value to avoid -1.0 x -1.0 multiplications */
-                    s2 = norm_l(scalar2);
-                }
-                scalar216 = round_fx(L_shl(scalar2,s2));
-                scalar2 = L_mult(scalar216, scalar216);
-
-                /* find common exponent */
-                tmp16_1 = sub(s1,s2);
-                tmp16 = s_min(shl(abs_s(tmp16_1),1),WORD32_BITS-1);
-                if ( tmp16_1 < 0 )
-                {
-                    scalar2 = L_shr(scalar2,tmp16);
-                }
-                if(tmp16_1 > 0)
-                {
-                    scalar = L_shr(scalar,tmp16);
-                }
-
-
-                /* add scalar and scalar2, avoid overflows */
-                scalar  = L_shr(scalar,1);
-                scalar2 = L_shr(scalar2,1);
-                scalar3 = L_add(scalar,scalar2);
-
-                /* calculate division */
-                scalar16 = BASOP_Util_Divide3232_uu_1616_Scale(scalar, scalar3, &s3);
-                s3 = s_max(s3,-(WORD16_BITS-1));
-                scalar16 = shl(scalar16,s3);
-                scalar16 = s_max(scalar16, MSALPHACORMAX);
-
-                st->msAlphaCor[cnt] = L_add(Mpy_32_16_1(st->msAlphaCor[cnt], msAlphaCorAlpha),
-                L_mult(scalar16, msAlphaCorAlpha2));
-                move32();
-            }
+            msPeriodogSum[cnt] = dotp(msPeriodog+start, psize+start, current_len);
+            scalar      = msPeriodogSum[cnt]*msPeriodogSum[cnt] + DELTA;
+            scalar2     = msPsdSum[cnt] - msPeriodogSum[cnt];
+            scalar      = max(scalar / (scalar + scalar2*scalar2) , MSALPHACORMAX);
+            st->msAlphaCor[cnt] =   msAlphaCorAlpha*st->msAlphaCor[cnt] + msAlphaCorAlpha2*scalar;
 
             /* Compute SNR */
-
-            /* msPeriodogSum[cnt] with format 16Q15 */
-            snr = dotp_s_fx(msNoiseFloor+start, psize+start, current_len, CNG_HS);
-
-            IF ( L_sub(L_shr(Mpy_32_16_1(msPsdSum[cnt],18431/*0.56246299817 Q15*/),13),snr) > 0 )
+            snr = dotp(msNoiseFloor+start, psize+start, current_len);
+            snr = (msPsdSum[cnt] + DELTA) / (snr + DELTA);
+            snr = (float)pow(snr, MSSNREXP);
+            msAlphaHatMin2 = min( MSALPHAHATMIN, snr );
+            scalar = MSALPHAMAX * st->msAlphaCor[cnt];                                      /*msAlpha,msPsd,msPeriodog,msNoiseFloor*/
+            for(j=start ; j<stop ; j++)
             {
-                tmp0 = BASOP_Util_Log2(msPsdSum[cnt]);
-                tmp1 = BASOP_Util_Log2(snr);
-                tmp1 = L_sub(tmp0, tmp1);
-                tmp1 = Mpy_32_16_1(tmp1, MSSNREXP);
-                msAlphaHatMin2 = BASOP_Util_InvLog2(tmp1);
-            }
-            ELSE
-            {
-                msAlphaHatMin2 = MSALPHAHATMIN;
-                move32();
-            }
-            scalar = Mpy_32_16_1(st->msAlphaCor[cnt], MSALPHAMAX);
-
-            FOR (j=start; j<stop; j++)
-            {
-                /* Compute optimal smoothing parameter for PSD estimation */                                         test();
-                test();
-                IF ( (scalar == 0) || (msNoiseFloor[j] == 0) )
-                {
-                    msAlpha[j] = msAlphaHatMin2;
-                    move32();
-                }
-                ELSE
-                {
-                    /* calculate scalar2 with normalized msNoiseFloor[j], exponent -2*s1 */
-                    s1 = WORD16_BITS-1;
-                    move16();
-                    if ( msNoiseFloor[j] != 0 )
-                    {
-                        s1 = norm_s(msNoiseFloor[j]);
-                    }
-                    msNoiseFloor16 = shl(msNoiseFloor[j],s1);
-                    scalar2 = L_mult(msNoiseFloor16, msNoiseFloor16);
-
-                    /* calculate difference, both elements in 6Q9 format, use absolute value
-                       to avoid -1.0 x -1.0 multiplications later */
-                    scalar316 = abs_s(sub(msPsd[j],msNoiseFloor[j]));
-
-                    s2 = WORD16_BITS-1;
-                    move16();
-                    if ( scalar316 != 0 )
-                    {
-                        /* use absolute value to avoid -1.0 x -1.0 multiplications */
-                        s2 = norm_s(scalar316);
-                    }
-                    scalar316 = shl(scalar316,s2);
-                    scalar3 = L_mult(scalar316, scalar316);
-
-                    /* find common exponent */
-                    tmp16_1 = sub(s1,s2);
-                    tmp16 = s_min(shl(abs_s(tmp16_1),1),WORD32_BITS-1);
-                    if ( tmp16_1 < 0 )
-                    {
-                        scalar3 = L_shr(scalar3,tmp16);
-                    }
-                    if(tmp16_1 > 0)
-                    {
-                        scalar2 = L_shr(scalar2,tmp16);
-                    }
-
-                    /* add scalar2 and scalar3, avoid overflows */
-                    scalar2 = L_shr(scalar2,1);
-                    scalar3 = L_shr(scalar3,1);
-                    scalar3 = L_add(scalar2,scalar3);
-
-                    /* calculate division */
-                    tmp16 = BASOP_Util_Divide3232_uu_1616_Scale(scalar2, scalar3, &s3);
-                    scalar2 = Mpy_32_16_1(scalar, tmp16);
-                    s3 = s_max(s3,-(WORD32_BITS-1));
-                    scalar2 = L_shl(scalar2,s3);
-                    msAlpha[j] = L_max(scalar2, msAlphaHatMin2);
-                    move32();
-                }
+                /* Compute optimal smoothing parameter for PSD estimation */
+                scalar2    = msNoiseFloor[j] + DELTA;
+                scalar2   *= scalar2;
+                scalar3    = msPsd[j] - msNoiseFloor[j];
+                msAlpha[j] = max( (scalar*scalar2) / (scalar2 + scalar3*scalar3) , msAlphaHatMin2);
 
                 /* Compute the PSD (smoothed periodogram) in each band */
-                msPsd[j] = round_fx(L_add(Mpy_32_16_1(msAlpha[j], msPsd[j]),
-                                          Mpy_32_16_1(L_sub(2147483647l/*1.0 Q31*/,msAlpha[j]), msPeriodog[j])));
+                msPsd[j] = msAlpha[j] * msPsd[j] + (1.f-msAlpha[j]) * msPeriodog[j];
             }
-            msPsdSum[cnt] = dotp_s_fx(msPsd+start, psize+start, current_len, CNG_HS);
-            move32();
-
-            QeqInvAv = 0l/*0.0 Q31*/;
-            move32();
-
-            /* scalar: 7Q24 format */
-            tmp = 1191182336l/*(float)(MSNUMSUBFR*MSSUBFRLEN)-1.0 Q24*/;
-            move32();
-            scalar = L_sub(tmp, L_mult(round_fx(tmp), msM_win));
-
-            /* scalar2: 4Q27 format */
-            tmp = 1476395008l/*(float)MSSUBFRLEN-1.0 Q27*/;
-            move32();
-            scalar2 = L_sub(tmp, L_mult(round_fx(tmp), msM_subwin));
-
-            FOR (j=start; j<stop; j++)
+            msPsdSum[cnt] = dotp(msPsd+start, psize+start, current_len);
+            QeqInvAv = 0;
+            scalar  = ((float)(MSNUMSUBFR*MSSUBFRLEN)-1.f)*(1.f-msM_win);
+            scalar2 = ((float)MSSUBFRLEN-1.f)*(1.f-msM_subwin);                             /*msAlpha,msPsd,msPsdFirstMoment,msPsdSecondMoment,msNoiseFloor,msBminSubWin,msBminWin,psize*/
+            for(j=start ; j<stop ; j++)
             {
                 /* Compute variance of PSD */
-                tmp = L_min(msAlpha[j], MSBETAMAX_SQRT);
-
-                s1 = WORD32_BITS-1;
-                move16();
-                if ( tmp != 0 )
-                {
-                    s1 = norm_l(tmp);
-                }
-                s2 = shl(s1,1);
-
-                s2 = s_min(s2,WORD32_BITS-1);
-
-                /* beta: scaled by s2 */
-                tmp16 = round_fx(L_shl(tmp, s1));
-                beta = mult_r(tmp16, tmp16);
-
-                /* scalar3: scaled by s3 */
-                scalar3 = L_sub(L_deposit_l(msPsd[j]), L_deposit_l(msPsdFirstMoment[j]));
-                s3 = norm_l(scalar3);
-                scalar3 = L_shl( scalar3, s3 );
-
-                /* msPsdFirstMoment: 6Q9   */
-                tmp = L_msu(L_mult(beta, msPsdFirstMoment[j]), beta, msPsd[j]);
-                msPsdFirstMoment[j] = add(round_fx(L_shr(tmp, s2)), msPsd[j]);
-                move16();
-
-                /* msPsdSecondMoment: 12Q19   */
-                tmp0 = L_shr(Mpy_32_16_r(msPsdSecondMoment[j], beta), s2);
-                tmp1 = Mpy_32_32(scalar3, scalar3);
-                tmp1 = L_shr(L_sub(tmp1, L_shr(Mpy_32_16_r(tmp1, beta), s2)), sub(shl(s3,1),32));
-                msPsdSecondMoment[j] = L_add(tmp0, tmp1);
-                move32();
-
+                beta    = min( msAlpha[j]*msAlpha[j], MSBETAMAX );
+                scalar3 = msPsd[j]-msPsdFirstMoment[j];
+                msPsdFirstMoment[j]  = beta*msPsdFirstMoment[j] + (1.f - beta)*msPsd[j];
+                msPsdSecondMoment[j] = beta*msPsdSecondMoment[j] + (1.f - beta)*scalar3*scalar3;
                 /* Compute inverse of amount of degrees of freedom */
-                QeqInv = MSQEQINVMAX;
-                move16();
-
-                IF ( msNoiseFloor[j] != 0/*0.0 Q15*/ )
-                {
-                    tmp = L_mult(msNoiseFloor[j], msNoiseFloor[j]);
-                    tmp16 = BASOP_Util_Divide3232_uu_1616_Scale(msPsdSecondMoment[j], tmp, &s);
-                    /* consider factor of 2 */
-                    s = s_min(s_max(sub(s,1),-(WORD16_BITS-1)),(WORD16_BITS-1));
-                    if ( s < 0 )
-                    {
-                        QeqInv = shl(tmp16, s);
-                    }
-                    QeqInv = s_min(QeqInv, MSQEQINVMAX);
-                }
-                QeqInvAv = L_add(QeqInvAv, L_mult(QeqInv, psize[j]));
+                QeqInv = min( (msPsdSecondMoment[j] + DELTA) / (2.f * msNoiseFloor[j]*msNoiseFloor[j] + DELTA), MSQEQINVMAX );
+                QeqInvAv += QeqInv * psize[j];
 
                 /* Compute bias correction Bmin */
-                tmp0 = Mpy_32_16_1(scalar, QeqInv);
-                tmp1 = L_sub(1073741824l/*0.5 Q31*/, L_mult(msM_win, QeqInv));
-                tmp16 = BASOP_Util_Divide3232_uu_1616_Scale(tmp0, tmp1, &s);
-                msBminWin[j] = L_add(134217728l/*1.0 Q27*/, L_shl(L_deposit_h(tmp16),add(s,7-4)));
-                move32();
-
-                tmp0 = Mpy_32_16_1(scalar2, QeqInv);
-                tmp1 = L_sub(1073741824l/*0.5 Q31*/, L_mult(msM_subwin, QeqInv));
-                tmp16 = BASOP_Util_Divide3232_uu_1616_Scale(tmp0, tmp1, &s);
-                msBminSubWin[j] = L_add(134217728l/*1.0 Q27*/, L_shl(L_deposit_h(tmp16),s));
-                move32();
+                msBminWin[j]    = 1.f + scalar *QeqInv / (0.5f - msM_win   *QeqInv);
+                msBminSubWin[j] = 1.f + scalar2*QeqInv / (0.5f - msM_subwin*QeqInv);
             }
-
-            inv_totsize = BASOP_Util_Divide3232_uu_1616_Scale(1, totsize, &s);
-            QeqInvAv = Mpy_32_16_1(QeqInvAv, inv_totsize);
-            QeqInvAv = L_shl(QeqInvAv, s);
+            QeqInvAv /= totsize;
             st->msQeqInvAv[cnt] = QeqInvAv;
-            move32();
 
             /* New minimum? */
-
-            /* exponent QeqInvAv: CNG_S, exponent MSAV: (4>>1) */
-            s = CNG_S+2*MSAV_EXP;
-            move16();
-            BminCorr = Mpy_32_16_1(Sqrt32(QeqInvAv, &s), MSAV);
-            BminCorr = L_shl(BminCorr,sub(s,1));
-
-            /* exponent BminCorr: 1 */
-            BminCorr = L_add(BminCorr, 1073741824l/*0.5 Q31*/);
-
-            FOR (j=start; j<stop; j++)
+            BminCorr  = 1.f + MSAV * (float)sqrt(QeqInvAv);                                 /*msPsd,msBminWin,msNewMinFlag,msCurrentMin,msCurrentMinSubWindow*/
+            for(j=start ; j<stop; j++)
             {
-                /* exponent scalar: CNG_S+1 */
-                scalar = Mpy_32_16_1(BminCorr, msPsd[j]);
-
-                /* exponent scalar2: CNG_S+1+4 */
-                scalar2 = Mpy_32_32(scalar, msBminWin[j]);
-
-                msNewMinFlag[j] = 0;
-                move16();
-                IF ( L_sub(scalar2,msCurrentMin[j]) < 0l/*0.0 Q31*/ )
+                scalar  = BminCorr * msPsd[j];
+                scalar2 = scalar * msBminWin[j];
+                if (scalar2 < msCurrentMin[j])
                 {
-                    msNewMinFlag[j] = 1;
-                    move16();
-                    /* exponent msCurrentMin[j]: CNG_S+1+4 */
-                    msCurrentMin[j] = scalar2;
-                    move32();
-                    /* exponent msCurrentMinSubWindow[j]: CNG_S */
-                    BASOP_SATURATE_WARNING_OFF;
-                    msCurrentMinSubWindow[j] = L_shl(Mpy_32_32(scalar, msBminSubWin[j]),5);
-                    move32();
-                    BASOP_SATURATE_WARNING_ON;
+                    msNewMinFlag[j]          = 1;
+                    msCurrentMin[j]          = scalar2;
+                    msCurrentMinSubWindow[j] = scalar * msBminSubWin[j];
+                }
+                else
+                {
+                    msNewMinFlag[j]          = 0;
                 }
             }
 
             /* This is used later to identify local minima */
-            IF ( sub(st->msFrCnt,MSSUBFRLEN) >= 0 )
+            if (st->msFrCnt >= MSSUBFRLEN)
             {
-                FOR ( i = 0; i < 3; i++ )
+                i = 0;
+                while (i < 3)
                 {
-                    IF ( L_sub(st->msQeqInvAv[cnt],L_shr(L_deposit_h(msQeqInvAv_thresh[i]),CNG_S)) < 0l/*0.0 Q31*/ )
+                    if (st->msQeqInvAv[cnt] < msQeqInvAv_thresh[i])
                     {
-                        BREAK;
+                        break;
+                    }
+                    else
+                    {
+                        i++;
                     }
                 }
-                /* format 1Q30 */
                 st->msSlope[cnt] = msNoiseSlopeMax[i];
-                move32();
             }
 
             /* Consider the FFT and CLDFB bands separately */
             start = stop;
-            move16();
             stop  = len;
-            move16();
-            totsize = sub(st->stopBand,st->stopFFTbin);
-            cnt = add(cnt,1);
+            totsize = st->stopBand - st->stopFFTbin;
+            cnt++;
         } /*while (stop > start)*/
 
         /* Update minimum between sub windows */
-        test();
-        IF ( sub(st->msFrCnt,1) > 0 && sub(st->msFrCnt,MSSUBFRLEN) < 0 )
+        if( st->msFrCnt > 1 && st->msFrCnt < MSSUBFRLEN )
         {
-            FOR (j=0; j<len; j++)
+            /*msNewMinFlag,msCurrentMinSubWindow,msCurrentMinOut*/
+            for(j=0 ; j<len; j++)
             {
-                if ( msNewMinFlag[j] > 0 )
+                if (msNewMinFlag[j] > 0)
                 {
                     msLocalMinFlag[j] = 1;
-                    move16();
                 }
-                if ( L_sub(msCurrentMinSubWindow[j],msCurrentMinOut[j]) < 0l/*0.0 Q31*/ )
+                if (msCurrentMinSubWindow[j] < msCurrentMinOut[j])
                 {
-                    /* msCurrentMinOut[j] scaled with CNG_S */
                     msCurrentMinOut[j] = msCurrentMinSubWindow[j];
-                    move32();
                 }
             }
             /* Get the current noise floor */
-            Copy_Scale_sig_32_16(msCurrentMinOut, msNoiseFloor, len, -16);
+            mvr2r(msCurrentMinOut, msNoiseFloor, len);
         }
-        ELSE /* sub window complete */
+
+        /* sub window complete */
+        else
         {
-            IF ( sub(st->msFrCnt,MSSUBFRLEN) >= 0 )
+            if (st->msFrCnt >= MSSUBFRLEN)
             {
                 /* Collect buffers */
-                Copy32(msCurrentMinSubWindow, msMinBuf+len*st->msMinBufferPtr, len);
+                mvr2r(msCurrentMinSubWindow, msMinBuf+len*st->msMinBufferPtr, len);
 
                 /* Compute minimum among all buffers */
-                Copy32(msMinBuf, msCurrentMinOut, len);
+                mvr2r(msMinBuf, msCurrentMinOut, len);
                 ptr = msMinBuf + len;
-                FOR (i=1; i<MSNUMSUBFR; i++)
+                for (i=1 ; i<MSNUMSUBFR ; i++)
                 {
-                    FOR (j=0; j<len; j++)
+                    /*msCurrentMinOut*/
+                    for(j=0 ; j<len; j++)
                     {
-                        if ( L_sub(*ptr,msCurrentMinOut[j]) < 0l/*0.0 Q31*/ )
+                        if (*ptr < msCurrentMinOut[j])
                         {
                             msCurrentMinOut[j] = *ptr;
-                            move32();
                         }
                         ptr++;
                     }
                 }
 
                 /* Take over local minima */
-                slope = st->msSlope[0];
-                move16();
-                FOR (j=0; j<len; j++)
+                slope = st->msSlope[0];                                                       /*msLocalMinFlag,msNewMinFlag,msCurrentMinSubWindow,msCurrentMinOut*/
+                for(j=0 ; j<len ; j++)
                 {
-                    if ( sub(j,lenFFT) == 0 )
+                    if (j==lenFFT)
                     {
                         slope = st->msSlope[1];
-                        move16();
                     }
-                    test();
-                    test();
-                    test();
-                    IF (   ( msLocalMinFlag[j] != 0 )
-                           && ( msNewMinFlag[j] == 0 )
-                           && ( L_sub(L_shr(msCurrentMinSubWindow[j],1),Mpy_32_16_1(msCurrentMinOut[j],slope)) < 0l/*0.0 Q31*/ )
-                           && ( L_sub(msCurrentMinSubWindow[j],msCurrentMinOut[j]) > 0l/*0.0 Q31*/ )
-                       )
+                    if ( msLocalMinFlag[j] && !msNewMinFlag[j] &&
+                            msCurrentMinSubWindow[j]<slope*msCurrentMinOut[j] &&
+                            msCurrentMinSubWindow[j]>msCurrentMinOut[j] )
                     {
                         msCurrentMinOut[j] = msCurrentMinSubWindow[j];
-                        move32();
                         i = j;
-                        move16();
-                        FOR (k=0; k<MSNUMSUBFR; k++)
+                        for(k=0 ; k<MSNUMSUBFR; k++)
                         {
                             msMinBuf[i] = msCurrentMinOut[j];
-                            move32();
-                            i = add(i,len);
+                            i += len;
                         }
                     }
                 }
 
                 /* Reset */
-                set16_fx(msLocalMinFlag, 0, len);
-                set32_fx(msCurrentMin, 2147483647l/*1.0 Q31*/, len);
+                set_i  ( msLocalMinFlag, 0, len);
+                set_f( msCurrentMin, FLT_MAX, len);
 
                 /* Get the current noise floor */
-                Copy_Scale_sig_32_16(msCurrentMinOut, msNoiseFloor, len, -16);
+                mvr2r(msCurrentMinOut, msNoiseFloor, len);
             }
         }
 
-
         /* Detect sudden offsets based on the FFT bins (core bandwidth) */
-        IF ( L_sub(Mpy_32_16_1(msPsdSum[0],655/*0.02 Q15*/), msPeriodogSum[0]) > 0l/*0.0 Q31*/ )
+        if (msPsdSum[0]>50.f*msPeriodogSum[0])
         {
-            IF ( st->offsetflag > 0 )
+            if (st->offsetflag>0)
             {
-                Copy(msPeriodog, msPsd, len);
-                FOR (j=0; j < len; j++)
+                mvr2r(msPeriodog, msPsd, len);
+                mvr2r(msPeriodog, msCurrentMinOut, len);
+                set_f( st->msAlphaCor, 1.0f, cnt);
+                set_f( msAlpha, 0.0f, len);
+                mvr2r(msPeriodog, msPsdFirstMoment, len);
+                set_f( msPsdSecondMoment, 0.0f, len);
+                msPsdSum[0] = dotp(msPeriodog, psize, lenFFT);
+                if (lenFFT<len)
                 {
-                    msCurrentMinOut[j] = L_deposit_h(msPeriodog[j]);
-                }
-                set32_fx(st->msAlphaCor, 2147483647l/*1.0 Q31*/, cnt);
-                set32_fx(msAlpha, 0l/*0.0 Q31*/, len);
-                Copy(msPeriodog, msPsdFirstMoment, len);
-                set32_fx(msPsdSecondMoment, 0l/*0.0 Q31*/, len);
-
-                msPsdSum[0] = dotp_s_fx(msPeriodog, psize, lenFFT, CNG_HS);
-                move32();
-                IF ( sub(lenFFT,len) < 0 )
-                {
-                    msPsdSum[1] = dotp_s_fx(msPeriodog+lenFFT, psize+lenFFT, sub(len,lenFFT), CNG_HS);
-                    move32();
+                    msPsdSum[1] = dotp(msPeriodog+lenFFT, psize+lenFFT, len-lenFFT);
                 }
             }
             st->offsetflag = 1;
-            move16();
         }
-        ELSE
+        else
         {
             st->offsetflag = 0;
-            move16();
         }
 
 
         /* Increment frame counter */
-        IF ( sub(st->msFrCnt,MSSUBFRLEN) == 0)
+        if (st->msFrCnt == MSSUBFRLEN)
         {
             st->msFrCnt = 1;
-            move16();
-            st->msMinBufferPtr = add(st->msMinBufferPtr,1);
-            move16();
-            if ( sub(st->msMinBufferPtr,MSNUMSUBFR) == 0 )
+            st->msMinBufferPtr++;
+            if (st->msMinBufferPtr==MSNUMSUBFR)
             {
                 st->msMinBufferPtr = 0;
-                move16();
             }
         }
-        ELSE
+        else
         {
-            st->msFrCnt = add(st->msFrCnt,1);
+            (st->msFrCnt)++;
         }
 
-        /* Smooth noise estimate during CNG phases */
-        FOR (j=0; j<len; j++)
         {
-            msNoiseEst[j] = round_fx(L_mac(L_mult(31130/*0.95 Q15*/, msNoiseEst[j]), 1638/*0.05 Q15*/, msNoiseFloor[j]));
+            /* Smooth noise estimate during CNG phases */                                   /*msNoiseEst,msNoiseFloor*/
+            for(j=0 ; j<len ; j++)
+            {
+                msNoiseEst[j] = 0.95f*msNoiseEst[j] + 0.05f*msNoiseFloor[j];
+            }
         }
     }
 
-    /* Collect buffers */
-    Copy(msPeriodog, msPeriodogBuf+len*(*msPeriodogBufPtr), len);
-
-    *msPeriodogBufPtr = add(*msPeriodogBufPtr,1);
-    move16();
-    if ( sub(*msPeriodogBufPtr,MSBUFLEN) == 0 )
     {
-        (*msPeriodogBufPtr) = 0;
-        move16();
-    }
-
-    /* Upper limit the noise floors with the averaged input energy */
-    FOR (j=0; j<len; j++)
-    {
-        scalar = L_mult(msPeriodogBuf[j],6554/*1.0/MSBUFLEN Q15*/);
-
-        FOR (i=j+len; i<MSBUFLEN*len; i+=len)
+        /* Collect buffers */
+        mvr2r(msPeriodog, msPeriodogBuf+len*(*msPeriodogBufPtr), len);
+        (*msPeriodogBufPtr)++;
+        if ((*msPeriodogBufPtr)==MSBUFLEN)
         {
-            scalar = L_mac(scalar, msPeriodogBuf[i], 6554/*1.0/MSBUFLEN Q15*/);
-        }
-        scalar16 = round_fx(scalar);
-        if ( sub(msNoiseEst[j],scalar16) > 0/*0.0 Q15*/ )
-        {
-            msNoiseEst[j] = scalar16;
-            move16();
+            (*msPeriodogBufPtr) = 0;
         }
 
-        assert(msNoiseEst[j] >= 0/*0.0 Q15*/);
+        /* Upper limit the noise floors with the averaged input energy */                 /*msNoiseEst*/
+        for(j=0 ; j<len ; j++)
+        {
+            scalar = msPeriodogBuf[j];
+            for(i=j+len; i<MSBUFLEN*len; i+=len)
+            {
+                scalar += msPeriodogBuf[i];
+            }                                                                              /*division by a constant = multiplication by its (constant) inverse */
+            scalar *= (1.f/MSBUFLEN);
+            if (msNoiseEst[j]>scalar)
+            {
+                msNoiseEst[j] = scalar;
+            }
+            assert(msNoiseEst[j] >= 0);
+        }
     }
 
+    return;
 }
 
 
-/***********************************
-* Apply bitrate-dependant scale    *
-***********************************/
-void apply_scale(Word32 *scale, Word16 bwmode, Word32 bitrate)
+/*-------------------------------------------------------------------
+ * apply_scale()
+ *
+ * Apply bitrate-dependent scale
+ *-------------------------------------------------------------------*/
+
+void apply_scale(
+    float *scale,
+    int bandwidth,
+    int bitrate
+)
 {
-    Word16 i;
-    Word16 scaleTableSize = sizeof (scaleTable) / sizeof (scaleTable[0]);
+    int i;
+    int scaleTableSize = sizeof (scaleTable) / sizeof (scaleTable[0]);
 
-
-
-    FOR (i=0; i < scaleTableSize; i++)
+    for (i = 0 ; i < scaleTableSize ; i++)
     {
-        cast16();
-        IF ( s_and( sub(bwmode, (Word16)scaleTable[i].bwmode) == 0,
-                    s_and( L_sub(bitrate,scaleTable[i].bitrateFrom) >= 0,
-                           L_sub(bitrate,scaleTable[i].bitrateTo) < 0))
-           )
+        if ( (bandwidth == scaleTable[i].bwmode) &&
+                (bitrate >= scaleTable[i].bitrateFrom) &&
+                (bitrate < scaleTable[i].bitrateTo) )
         {
-            BREAK;
+            break;
         }
     }
 
-    {
-        *scale = L_add(*scale, L_deposit_h(scaleTable[i].scale));
-    }
+    *scale += scaleTable[i].scale;
 
+    return;
 }
 
 
-/***************************************
-* Compute the power for each partition *
-***************************************/
-void bandcombinepow(Word32* bandpow,                           /* i  : Power for each band */
-                    Word16  exp_bandpow,                       /* i  : exponent of bandpow */
-                    Word16  nband,                             /* i  : Number of bands */
-                    Word16* part,                              /* i  : Partition upper boundaries (band indices starting from 0) */
-                    Word16  npart,                             /* i  : Number of partitions */
-                    Word16* psize_inv,                         /* i  : Inverse partition sizes */
-                    Word32* partpow,                           /* o  : Power for each partition */
-                    Word16* exp_partpow)
+/*-------------------------------------------------------------------
+ * bandcombinepow()
+ *
+ * Compute the power for each partition
+ *-------------------------------------------------------------------*/
+
+void bandcombinepow(
+    float* bandpow,     /* i  : Power for each band                       */
+    int    nband,       /* i  : Number of bands                           */
+    int*   part,        /* i  : Partition upper boundaries (band indices starting from 0) */
+    int    npart,       /* i  : Number of partitions                      */
+    float* psize_inv,   /* i  : Inverse partition sizes                   */
+    float* partpow      /* o  : Power for each partition                  */
+)
 {
 
-    Word16 i, p;
-    Word32 temp;
-    Word16 smin, len, prev_part;
-    Word16 facTabExp[NPART_SHAPING];
+    int   i, p;
+    float temp;
 
-
-
-    IF (sub(nband, npart) == 0)
+    if (nband == npart)
     {
-        Copy32(bandpow, partpow, nband);
-        smin = 0;
-        move16();
+        mvr2r(bandpow, partpow, nband);
     }
-    ELSE
+    else
     {
         /* Compute the power in each partition */
-        prev_part = -1;
-        move16();
-        FOR (p=0; p < npart; p++)
-        {
-            len = sub(part[p],prev_part);
-            facTabExp[p] = getScaleFactor32 (&bandpow[prev_part+1], len);
-            move16();
-            prev_part = part[p];
-            move16();
-        }
-
-        smin = WORD32_BITS-1;
-        move16();
-        FOR (p=0; p < npart; p++)
-        {
-            smin = s_min(smin,facTabExp[p]);
-        }
-
-        i = 0;
-        move16();
-        FOR (p = 0; p < npart; p++)
+        i = 0;                                                                            /*part,partpow,psize_inv*/
+        for (p = 0; p < npart; p++)
         {
             /* Arithmetic averaging of power for all bins in partition */
-            temp = L_add(0,0);
-            FOR ( ; i <= part[p]; i++)
+            temp = 0;
+            for ( ; i <= part[p]; i++)
             {
-                temp = L_add(temp, Mpy_32_16_1(L_shl(bandpow[i],facTabExp[p]),psize_inv[p]));
+                temp += bandpow[i];
             }
-            partpow[p] = L_shr(temp,sub(facTabExp[p],smin));
-            move32();
+            partpow[p] = temp*psize_inv[p];
         }
-
     }
 
-    *exp_partpow = sub(exp_bandpow,smin);
-    move16();
+    return;
 }
 
 
-/************************************
-* Scale partitions (with smoothing) *
-************************************/
-void scalebands (Word32 *partpow,           /* i  : Power for each partition */
-                 Word16 *part,              /* i  : Partition upper boundaries (band indices starting from 0) */
-                 Word16  npart,             /* i  : Number of partitions */
-                 Word16 *midband,           /* i  : Central band of each partition */
-                 Word16  nFFTpart,          /* i  : Number of FFT partitions */
-                 Word16  nband,             /* i  : Number of bands */
-                 Word32 *bandpow,           /* o  : Power for each band */
-                 Word16  flag_fft_en
-                )
+/*-------------------------------------------------------------------
+ * scalebands()
+ *
+ * Scale partitions (with smoothing)
+ *-------------------------------------------------------------------*/
+
+void scalebands(
+    float* partpow,           /* i  : Power for each partition */
+    int*   part,              /* i  : Partition upper boundaries (band indices starting from 0) */
+    int    npart,             /* i  : Number of partitions */
+    int*   midband,           /* i  : Central band of each partition */
+    int    nFFTpart,          /* i  : Number of FFT partitions */
+    int    nband,             /* i  : Number of bands */
+    float* bandpow,           /* o  : Power for each band */
+    short  flag_fft_en
+)
 {
-    Word16 i, j, s, s1, nint, delta, delta_cmp, delta_s;
-    Word16 startBand, startPart, stopPart, stopPartM1;
-    Word32 tmp, val, partpowLD64, partpowLD64M1;
+    int   i, j=0, nint, startBand, startPart, stopPart;
+    float val, delta = 0.f;
 
-
-
-    j = 0;
-    move16();
-    delta = 0;
-    move16();
-    partpowLD64M1 = 0L;   /* to avoid compilation warnings */
 
     /* Interpolate the bin/band-wise levels from the partition levels */
-    IF ( sub(nband, npart) == 0 )
+    if (nband == npart)
     {
-        Copy32(partpow, bandpow, npart);
+        mvr2r(partpow, bandpow, npart);
     }
-    ELSE
+    else
     {
-        startBand  = 0;
-        move16();
-        startPart  = 0;
-        move16();
-        stopPart   = nFFTpart;
-        move16();
-
-        WHILE ( sub(startBand,nband) < 0 )
+        startBand = 0;
+        startPart = 0;
+        stopPart  = nFFTpart;
+        while (startBand < nband)
         {
-            stopPartM1 = sub(stopPart, 1);
-            test();
-            IF ( (flag_fft_en != 0) || (sub(startPart,nFFTpart) >= 0) )
+            if (flag_fft_en || startPart>=nFFTpart)
             {
+
                 /* first half partition */
                 j = startPart;
-                move16();
-
-                FOR (i=startBand; i <= midband[j]; i++)
+                val = partpow[j];
+                for (i = startBand; i <= midband[j]; i++)
                 {
-                    bandpow[i] = partpow[j];
-                    move32();
+                    bandpow[i] = val;
                 }
-                j = add(j, 1);
+                j++;
 
+                delta = 1;
                 /* inner partitions */
-                IF (j < stopPart)
+                for ( ; j < stopPart ; j++)
                 {
-                    partpowLD64M1 = BASOP_Util_Log2(partpow[j-1]);
-                }
-
-                /* Debug values to check this variable is set. */
-                delta = 0x4000;
-                move16();
-                delta_cmp = 0x4000;
-                move16();
-                s1 = 1;
-                move16();
-                s = 1;
-                move16();
-
-                FOR ( ; j < stopPart; j++)
-                {
-                    nint = sub(midband[j], midband[j-1]);
-
-                    /* log-linear interpolation */
-                    partpowLD64 = BASOP_Util_Log2(partpow[j]);
-                    tmp = L_sub(partpowLD64, partpowLD64M1);
-                    tmp = Mpy_32_16_1(tmp, getNormReciprocalWord16(nint));
-
-                    /* scale logarithmic value */
-                    tmp = L_sub(tmp, DELTA_SHIFT_LD64);
-                    delta_s = DELTA_SHIFT;
-                    move16();
-
-                    WHILE (tmp > 0)
+                    nint = midband[j] - midband[j-1];
+                    /* log-linear interpolation */                                                                        /* Only one new LOG needs to be computed per loop iteration */
+                    delta = (float)exp( (log(partpow[j]+DELTA) - log(partpow[j-1]+DELTA)) * normReciprocal[nint] );
+                    val = partpow[j-1];
+                    for ( ; i < midband[j]; i++)
                     {
-                        tmp = L_sub(tmp,33554432l/*0.015625 Q31*/);
-                        delta_s = add(delta_s,1);
+                        val *= delta;
+                        bandpow[i] = val;
                     }
-                    delta_cmp = shl(1, s_max(-15, sub(WORD16_BITS-1,delta_s)));
-
-                    tmp = BASOP_Util_InvLog2(tmp);
-                    s = norm_l(tmp);
-                    s1 = sub(delta_s, s);
-
-                    delta = round_fx(L_shl(tmp, s));
-
-                    /* Choose scale such that the interpolation start and end point both are representable and add 1 additional bit hr. */
-                    delta_s = sub(s_min(norm_l(partpow[j-1]), norm_l(partpow[j])), 1);
-                    val = L_shl(partpow[j-1], delta_s);
-                    FOR ( ; i < midband[j]; i++)
-                    {
-                        val = L_shl(Mpy_32_16_1(val, delta), s1);
-                        bandpow[i] = L_shr(val, delta_s);
-                        move32();
-                    }
-                    bandpow[i++]  = partpow[j];
-                    move32();
-                    partpowLD64M1 = L_add(0,partpowLD64);
+                    bandpow[i++] = partpow[j];
                 }
-
-                IF ( sub(shr(delta, s), delta_cmp) > 0 )
+                if ( delta>1.f )
                 {
-                    delta = 0x4000;
-                    move16();
-                    s1 = 1;
-                    move16();
+                    delta = 1.f;
                 }
 
                 /* last half partition */
-                val = L_add(0,partpow[stopPartM1]);
-                FOR ( ; i <= part[stopPartM1]; i++)
+                val = partpow[stopPart-1];
+                for ( ; i <= part[stopPart-1]; i++)
                 {
-                    val = L_shl(Mpy_32_16_1(val,delta), s1);
+                    val *= delta;
                     bandpow[i] = val;
-                    move32();
                 }
-
             }
-            startBand = add(part[stopPartM1], 1);
+            startBand = part[stopPart-1]+1;
             startPart = stopPart;
-            move16();
             stopPart  = npart;
-            move16();
         }
     }
 
+    return;
 }
 
 
-/**************************************
-* Get central band for each partition *
-**************************************/
-void getmidbands(Word16* part,              /* i  : Partition upper boundaries (band indices starting from 0) */
-                 Word16  npart,             /* i  : Number of partitions */
-                 Word16* midband,           /* o  : Central band of each partition */
-                 Word16* psize,             /* o  : Partition sizes */
-                 Word16* psize_norm,        /* o  : Partition sizes, fractional values */
-                 Word16* psize_norm_exp,    /* o  : Exponent for fractional partition sizes */
-                 Word16* psize_inv)         /* o  : Inverse of partition sizes */
+/*-------------------------------------------------------------------
+ * getmidbands()
+ *
+ * Get central band for each partition
+ *-------------------------------------------------------------------*/
+
+void getmidbands(
+    int*   part,              /* i  : Partition upper boundaries (band indices starting from 0) */
+    int    npart,             /* i  : Number of partitions */
+    int*   midband,           /* o  : Central band of each partition */
+    float* psize,             /* o  : Partition sizes */
+    float* psize_inv          /* o  : Inverse of partition sizes */
+)
 {
-    Word16   j, max_psize, shift;
+    int   j;
 
 
-    max_psize = psize[0];
-    move16();
-    /* first half partition */                                                        move16();
+    /* first half partition */
     midband[0] = part[0];
-    psize[0] = add(part[0], 1);
-    move16();
-    psize_inv[0] = getNormReciprocalWord16(psize[0]);
-    move16();
-    /* inner partitions */
-    FOR (j = 1; j < npart; j++)
+    psize[0] = (float)part[0] + 1.f;
+    psize_inv[0] = normReciprocal[part[0] + 1];
+    /* inner partitions */                                                              /*part,midband,psize_inv*/
+    for (j = 1; j < npart; j++)
     {
-        midband[j] = shr(add(add(part[j-1], 1), part[j]), 1);
-        move16();
-        psize[j]   = sub(part[j], part[j-1]);
-        move16();
-        psize_inv[j] = getNormReciprocalWord16(psize[j]);
-        move16();
-        if(sub(psize[j], max_psize) > 0)
-        {
-            max_psize = psize[j];
-            move16();
-        }
+        midband[j] = (part[j-1]+1 + part[j]) >> 1;
+        psize[j]   = (float)(part[j] - part[j-1]);
+        psize_inv[j] = normReciprocal[part[j] - part[j-1]];
     }
 
-    shift = 9;
-    move16();
-    *psize_norm_exp = sub(15, shift);
-    move16();
-    FOR(j=0; j < npart; j++)
-    {
-        psize_norm[j] = shl(psize[j], shift);
-        move16();
-    }
-    /* minimum_statistics needs fixed exponent of 6 */
-    assert(norm_s(-max_psize) >= 9 );
+    return;
 }
 
 
-/*
-   AnalysisSTFT
+/*-------------------------------------------------------------------
+ * AnalysisSTFT()
+ *
+ * STFT analysis filterbank
+ *-------------------------------------------------------------------*/
 
-    Parameters:
-
-    timeDomainInput,      i  : pointer to time signal
-    fftBuffer,            o  : FFT bins
-    fftBufferExp,         i  : exponent of FFT bins
-    st                    i/o: FD_CNG structure containing all buffers and variables
-
-    Function:
-    STFT analysis filterbank
-
-    Returns:
-    void
-*/
-void AnalysisSTFT (const Word16 *timeDomainInput, /* i  : pointer to time signal */
-                   Word16 Q,
-                   Word32 *fftBuffer,             /* o  : FFT bins */
-                   Word16 *fftBuffer_exp,         /* i  : exponent of FFT bins */
-                   HANDLE_FD_CNG_COM st          /* i/o: FD_CNG structure containing all buffers and variables */
-                  )
+void AnalysisSTFT(
+    const float *  timeDomainInput,
+    float *  fftBuffer,          /* o  : FFT bins */
+    HANDLE_FD_CNG_COM st        /* i/o: FD_CNG structure containing all buffers and variables */
+)
 {
-    Word16  i, len;
-    Word16  len2;
-    const PWord16 *olapWin;
-    Word16 *olapBuffer;
+    float *olapBuffer = st->olapBufferAna;
+    const float *olapWin = st->olapWinAna;
 
-
-
-    assert( (st->fftlen>>1) == st->frameSize);
-
-    /* pointer inititialization */
-    assert(st->olapBufferAna != NULL);
-    olapBuffer = st->olapBufferAna;
-    olapWin = st->olapWinAna;
-
-    /* olapWin factor is scaled with one bit */
-    *fftBuffer_exp = 1;
-    move16();
-    len = sub(st->fftlen,st->frameSize);
-    assert(len <= 320); /* see size of olapBuffer */
+    /* Shift and cascade for overlap-add */
+    mvr2r(olapBuffer+st->frameSize, olapBuffer, st->fftlen-st->frameSize);
+    mvr2r(timeDomainInput, olapBuffer+st->fftlen-st->frameSize, st->frameSize);
 
     /* Window the signal */
-    len2 = shr(len,1);
-    FOR (i=0; i < len2; i++)
-    {
-        move32();
-        move32();
-        fftBuffer[i]      = L_mult(olapBuffer[i],      mult_r(olapWin[i].v.im, 23170/*1.4142135623730950488016887242097 Q14*/));
-        fftBuffer[i+len2] = L_mult(olapBuffer[i+len2], mult_r(olapWin[len2-1-i].v.re, 23170/*1.4142135623730950488016887242097 Q14*/));
-    }
-    len2 = shr(st->frameSize,1);
-    FOR (i=0; i <len2 ; i++)
-    {
-        move32();
-        move32();
-        fftBuffer[i+len]      = L_mult(shr(timeDomainInput[i],Q),      mult_r(olapWin[i].v.re, 23170/*1.4142135623730950488016887242097 Q14*/));
-        fftBuffer[i+len+len2] = L_mult(shr(timeDomainInput[i+len2],Q), mult_r(olapWin[len2-1-i].v.im, 23170/*1.4142135623730950488016887242097 Q14*/));
-    }
+    v_mult(olapBuffer, olapWin, fftBuffer, st->fftlen);
+
 
     /* Perform FFT */
-    BASOP_rfft(fftBuffer, st->fftlen, fftBuffer_exp, -1);
+    RFFTN(fftBuffer, st->fftSineTab, st->fftlen, -1);
 
-    FOR (i=0; i <len ; i++)
-    {
-        olapBuffer[i] = shr( timeDomainInput[sub(st->frameSize,len)+i], Q );
-        move16();
-    }
-
+    return;
 }
 
 
-/*
-   SynthesisSTFT
+/*-------------------------------------------------------------------
+ * SynthesisSTFT()
+ *
+ * STFT synthesis filterbank
+ *-------------------------------------------------------------------*/
 
-    Parameters:
-
-    fftBuffer                 i    : pointer to FFT bins
-    fftBufferExp              i    : exponent of FFT bins
-    timeDomainOutput          o    : pointer to time domain signal
-    timeDomainOutputExp       o    : pointer to exponent of time domain output
-    olapBuffer                i/o  : pointer to overlap buffer
-    olapWin                   i    : pointer to overlap window
-    st                        i/o  : pointer to FD_CNG structure containing all buffers and variables
-
-    Function:
-    STFT synthesis filterbank
-
-    Returns:
-    void
-*/
-void
-SynthesisSTFT (Word32 *fftBuffer,           /* i    : pointer to FFT bins */
-               Word16  fftBufferExp,        /* i    : exponent of FFT bins */
-               Word16 *timeDomainOutput,    /* o    : pointer to time domain signal */
-               Word16 *olapBuffer,          /* i/o  : pointer to overlap buffer */
-               const  PWord16 *olapWin,     /* i    : pointer to overlap window */
-               Word16 tcx_transition,
-               HANDLE_FD_CNG_COM st,       /* i/o  : pointer to FD_CNG structure containing all buffers and variables */
-               Word16 gen_exc,
-               Word16 *Q_new
-              )
+void SynthesisSTFT(
+    float * fftBuffer,                    /* i  : FFT bins */
+    float * timeDomainOutput,
+    float * olapBuffer,
+    const float * olapWin,
+    int tcx_transition,
+    HANDLE_FD_CNG_COM st                  /* i/o: FD_CNG structure containing all buffers and variables */
+)
 {
-    Word16 i, len, scale, tmp;
-    Word16  len2, len3, len4;
-    Word16 buf[M+1+L_FRAME16k];
-
+    short i;
+    float buf[M+1+320], tmp;
 
     /* Perform IFFT */
-    scale = 0;
-    BASOP_rfft(fftBuffer, st->fftlen, &scale, 1);
-    fftBufferExp = add(fftBufferExp, scale);
-    fftBufferExp = add(fftBufferExp, st->fftlenShift);
+    RFFTN(fftBuffer, st->fftSineTab, st->fftlen, 1);
 
     /* Perform overlap-add */
-    Copy(olapBuffer+st->frameSize, olapBuffer, st->frameSize);
-    set16_fx(olapBuffer+st->frameSize, 0, st->frameSize);
-
-    len2 = shr(st->fftlen,2);
-    len4 = shr(st->fftlen,3);
-    len3 = add(len2,len4);
-    len = add(st->frameSize,len4);
-    IF ( tcx_transition )
+    mvr2r(olapBuffer+st->frameSize, olapBuffer, st->frameSize);
+    set_f( olapBuffer+st->frameSize, 0.0f, st->frameSize);                       /*olapBuffer, fftBuffer, olapWin*/
+    if ( tcx_transition )
     {
-        FOR (i=0; i < len; i++)
+        for (i=0 ; i<5*st->frameSize/4 ; i++)
         {
-            olapBuffer[i] = round_fx(L_shl(fftBuffer[i],fftBufferExp-15));
+            olapBuffer[i] = fftBuffer[i];
         }
     }
-    ELSE
+    else
     {
-        FOR (i=0; i < len4; i++)
+        for (i=st->frameSize/4 ; i<3*st->frameSize/4 ; i++)
         {
-            olapBuffer[i+1*len4] = add(olapBuffer[i+1*len4], mult_r(round_fx(L_shl(fftBuffer[i+1*len4],fftBufferExp-15)),olapWin[i].v.im));
-            move16();
-            olapBuffer[i+2*len4] = add(olapBuffer[i+2*len4], mult_r(round_fx(L_shl(fftBuffer[i+2*len4],fftBufferExp-15)),olapWin[len4-1-i].v.re));
-            move16();
+            olapBuffer[i] += fftBuffer[i] * olapWin[i-st->frameSize/4];
         }
-        FOR (i=len3; i < len; i++)
+        for ( ; i<5*st->frameSize/4 ; i++)
         {
-            olapBuffer[i] = round_fx(L_shl(fftBuffer[i],fftBufferExp-15));
+            olapBuffer[i] = fftBuffer[i];
         }
     }
-
-    FOR (i=0; i < len4; i++)
+    for ( ; i<7*st->frameSize/4 ; i++)
     {
-        olapBuffer[i+5*len4] = mult_r(round_fx(L_shl(fftBuffer[i+5*len4],fftBufferExp-15)),olapWin[i].v.re);
-        move16();
-        olapBuffer[i+6*len4] = mult_r(round_fx(L_shl(fftBuffer[i+6*len4],fftBufferExp-15)),olapWin[len4-1-i].v.im);
-        move16();
+        olapBuffer[i] = fftBuffer[i] * olapWin[i-3*st->frameSize/4];
     }
 
-    len = add( len, len2 );
-    FOR (i=len; i < st->fftlen ; i++)
+    for ( ; i<st->fftlen ; i++)
     {
         olapBuffer[i] = 0;
-        move16();
     }
 
     /* Get time-domain signal */
-    FOR (i=0; i < st->frameSize; i++)
-    {
-        timeDomainOutput[i] = mult_r( olapBuffer[i+len4], st->fftlenFac );
-        move16();
-    }
+    v_multc( olapBuffer+st->frameSize/4, (float)(st->fftlen/2), timeDomainOutput, st->frameSize);
 
-    /* Generate excitation */
-    IF ( sub( gen_exc, 1 ) == 0 )
-    {
-        FOR (i=0; i < M+1+st->frameSize; i++)
-        {
-            buf[i] = mult_r( olapBuffer[i+len4-M-1], st->fftlenFac );
-            move16();
-        }
-        tmp = buf[0];
-        E_UTIL_f_preemph2( *Q_new-1, buf+1, PREEMPH_FAC, M+st->frameSize, &tmp );
-        Residu3_fx( st->A_cng, buf+1+M, st->exc_cng, st->frameSize, 1 );
-    }
-    IF ( sub( gen_exc, 2 ) == 0 )
-    {
-        FOR (i=0; i < M+1+st->frameSize; i++)
-        {
-            buf[i] = mult_r( olapBuffer[i+len4-M-1], st->fftlenFac );
-            move16();
-        }
-        tmp = buf[0];
-        *Q_new = E_UTIL_f_preemph3( buf+1, PREEMPH_FAC, M+st->frameSize, &tmp, 1 );
-        Residu3_fx( st->A_cng, buf+1+M, st->exc_cng, st->frameSize, 1 );
-    }
+    /* Get excitation */
+    v_multc( olapBuffer+st->frameSize/4-(M+1), (float)(st->fftlen/2), buf, M+1+st->frameSize );
+    tmp = buf[0];
+    preemph( buf+1, PREEMPH_FAC, M+st->frameSize, &tmp );
+    residu( st->A_cng, M, buf+1+M, st->exc_cng, st->frameSize );
 
+    return;
 }
 
 
-/**************************************************************************************
-* Compute some values used in the bias correction of the minimum statistics algorithm *
-**************************************************************************************/
-void mhvals(Word16 d,
-            Word16 * m /*, float * h*/
-           )
+/*-------------------------------------------------------------------
+ * mhvals()
+ *
+ * Compute some values used in the bias correction of the minimum statistics algorithm
+ *-------------------------------------------------------------------*/
+
+static void mhvals(
+    int d,
+    float * m
+)
 {
-    Word16 i, j;
-    Word16 len = sizeof(d_array)/sizeof(Word16);
+    int i, j;
+    float qi, qj, q;
+    int len = sizeof(d_array)/sizeof(int);
 
-
-    assert( d==72 || d==12); /* function only tested for d==72 and d==12) */
     i = 0;
-    move16();
-    FOR (i=0 ; i < len ; i++)
+    for (i=0 ; i<len ; i++)
     {
-        IF (sub(d,d_array[i]) <= 0)
+        if (d<=d_array[i])
         {
-            BREAK;
+            break;
         }
     }
-    IF (sub(i, len) == 0)
+    if (i==len)
     {
-        i = sub(len, 1);
+        i = len-1;
         j = i;
-        move16();
     }
-    ELSE
+    else
     {
-        j = sub(i, 1);
+        j = i-1;
     }
-    IF (sub(d, d_array[i]) == 0)
+    if (d==d_array[i])
     {
         *m = m_array[i];
-        move16();
     }
-    ELSE
+    else
     {
-        Word32 qi_m, qj_m, q_m, tmp1_m, tmp2_m;
-        Word16 qi_e, qj_e, q_e, tmp1_e, tmp2_e, tmp1_w16_m, tmp1_w16_e, shift;
-
-
-        /* d_array has exponent 15 */
-        qj_e    = 15;
-        move16();
-        qj_m    = L_deposit_h(d_array[i-1]);
-
-        qi_e    = 15;
-        move16();
-        qi_m    = L_deposit_h(d_array[i]);
-
-        q_e     = 15;
-        move16();
-        q_m     = L_deposit_h(d);
-
-        qj_m = Sqrt32(qj_m, &qj_e);
-        qi_m = Sqrt32(qi_m, &qi_e);
-        q_m  = Sqrt32(q_m, &q_e);
-
-        tmp1_m = Mpy_32_32(qi_m, qj_m);
-        tmp1_e = add(qi_e, qj_e);
-        tmp1_m = L_deposit_h(BASOP_Util_Divide3232_Scale(tmp1_m, q_m, &shift));
-        tmp1_e = sub(tmp1_e, q_e);
-        tmp1_e = add(tmp1_e, shift);
-        tmp1_m = BASOP_Util_Add_Mant32Exp(tmp1_m, tmp1_e, L_negate(qj_m), qj_e, &tmp1_e);
-
-        tmp2_m     = BASOP_Util_Add_Mant32Exp (qi_m, qi_e, L_negate(qj_m), qj_e, &tmp2_e);
-        tmp1_w16_m = round_fx(tmp2_m);
-        tmp1_w16_e = tmp2_e;
-        move16();
-        BASOP_Util_Divide_MantExp(sub(m_array[j], m_array[i]), 0, tmp1_w16_m, tmp1_w16_e, &tmp1_w16_m, &tmp1_w16_e);
-
-        tmp2_m = Mpy_32_16_1(tmp1_m, tmp1_w16_m);
-        tmp2_e = add(tmp1_e, tmp1_w16_e);
-
-        tmp2_m = BASOP_Util_Add_Mant32Exp (tmp2_m, tmp2_e, L_deposit_h(m_array[i]), 0, &tmp2_e);
-        assert(tmp2_e == 0);
-        *m = extract_h(tmp2_m);
+        qj = (float)sqrt((float)d_array[i-1]);    /*interpolate using sqrt(d)*/
+        qi = (float)sqrt((float)d_array[i]);
+        q = (float)sqrt((float)d);
+        *m = m_array[i] + (qi*qj/q-qj)*(m_array[j]-m_array[i])/(qi-qj);
     }
+
+    return;
+}
+
+/*-------------------------------------------------------------------
+ * rand_gauss()
+ *
+ * Random generator with Gaussian distribution with mean 0 and std 1
+ *-------------------------------------------------------------------*/
+
+void rand_gauss(float *x, short *seed)
+{
+
+    float temp;
+    temp = (float)own_random(seed);
+    temp += (float)own_random(seed);
+    temp += (float)own_random(seed);
+    temp *= OUTMAX_INV;
+
+    *x = temp;
+
+    return;
 }
 
 
-/*
-   rand_gauss
+/*-------------------------------------------------------------------
+ * lpc_from_spectrum()
+ *
+ *
+ *-------------------------------------------------------------------*/
 
-    Parameters:
-
-    seed               i/o   : pointer to seed
-
-    Function:
-    Random generator with Gaussian distribution with mean 0 and std 1
-
-    Returns:
-    random signal format Q3.29
-*/
-Word32 rand_gauss (Word16 *seed)
+void lpc_from_spectrum(
+    float* powspec,
+    int start,
+    int stop,
+    int fftlen,
+    const float *fftSineTab,
+    float *A,
+    float preemph_fac
+)
 {
-    Word32 temp;
-    Word16 loc_seed;
-
-
-
-    /* This unrolled version reduces the cycles from 17 to 10 */
-    loc_seed = extract_l(L_mac0(13849, *seed, 31821));
-    temp = L_deposit_l(loc_seed);
-
-    loc_seed = extract_l(L_mac0(13849, loc_seed, 31821));
-    temp = L_msu0(temp,loc_seed,-1);
-
-    loc_seed = extract_l(L_mac0(13849, loc_seed, 31821));
-    temp = L_msu0(temp,loc_seed,-1);
-
-    *seed = loc_seed;
-    move16();
-    return L_shl(temp,WORD16_BITS-CNG_RAND_GAUSS_SHIFT);
-}
-
-
-/*
-   lpc_from_spectrum
-
-    Parameters:
-
-     powspec       i  : pointer to noise levels format Q5.27
-     start         i  : start band
-     stop          i  : stop band
-     fftlen        i  : size of fft
-     A             o  : lpc coefficients format Q3.12
-     s      i  : lpc order
-     preemph_fac   i  : preemphase factor format Q1.15
-
-
-    Function:
-    calculate lpc coefficients from the spectrum
-
-    Returns:
-    void
-*/
-void lpc_from_spectrum (Word32 *powspec,
-                        Word16  powspec_exp,
-                        Word16  start,
-                        Word16  stop,
-                        Word16  fftlen,
-                        Word16 *A,
-                        Word16  lpcorder,
-                        Word16  preemph_fac
-                       )
-{
-    Word16 i, s1, s2, s3, fftlen2, scale, fftlen4, fftlen8, len, step, preemph_fac2;
-    Word32 maxVal, r[32], fftBuffer[FFTLEN], *ptr, *pti, nf;
-    Word16 tmp, r_h[32], r_l[32];
-    const PWord16 *table;
-
-
-
-    scale = 0;
-    move16();
-    fftlen2 = shr(fftlen,1);
-    fftlen4 = shr(fftlen,2);
-    fftlen8 = shr(fftlen,3);
+    int i;
+    float r[32], nf;
+    float fftBuffer[FFTLEN], *ptr, *pti;
 
     /* Power Spectrum */
-    maxVal = L_add(0,0);
-    len = sub(stop, start);
-    FOR (i=0; i < len; i++)
-    {
-        maxVal = L_max(maxVal, L_abs(powspec[i]));
-    }
-    s1 = norm_l(maxVal);
-    nf = L_shr_r(1099511680l/*1e-3f Q40*/,add(sub(powspec_exp,s1),9));
-
     ptr = fftBuffer;
     pti = fftBuffer+1;
-
-    FOR (i=0; i < start; i++)
+    nf = 1e-3f;
+    for ( i = 0; i < start; i++ )
     {
         *ptr = nf;
-        move32();
-        *pti = L_deposit_l(0);
+        *pti = 0.f;
         ptr += 2;
         pti += 2;
     }
-
-    FOR ( ; i < stop; i++ )
+    for ( ; i < stop; i++ )
     {
-        *ptr = L_max( nf, L_shl(powspec[i-start], s1) );
-        move32();
-        *pti = L_deposit_l(0);
+        *ptr = max( nf, powspec[i-start] );
+        *pti = 0.f;
         ptr += 2;
         pti += 2;
     }
-
-    FOR ( ; i < fftlen2; i++ )
+    for ( ; i < fftlen/2; i++ )
     {
         *ptr = nf;
-        move32();
-        *pti = L_deposit_l(0);
+        *pti = 0.f;
         ptr += 2;
         pti += 2;
     }
-
     fftBuffer[1] = nf;
-    move32();
 
     /* Pre-emphasis */
-
-    BASOP_getTables(&table, NULL, &step, fftlen4);
-    tmp = round_fx(L_shr(L_add(0x40000000, L_mult0(preemph_fac, preemph_fac)),1));
-    preemph_fac2 = shr(preemph_fac,1);
     ptr = fftBuffer;
-    *ptr = Mpy_32_16_1( *ptr, sub( tmp, preemph_fac2 ) );
-    move32();
-    ptr += 2;
-    FOR ( i = 1; i < fftlen8; i++ )
+    for ( i = 0; i < fftlen/2; i++ )
     {
-        move32();
-        *ptr = Mpy_32_16_1( *ptr, sub( tmp, mult_r(preemph_fac2,add(shr(table[i-1].v.re,1),shr(table[i].v.re,1)) ) ) );
+        *ptr *= (1.f+preemph_fac*preemph_fac-2.0f*preemph_fac*(float)cos(-2.0f*EVS_PI*(float)i/(float)fftlen));
+
         ptr += 2;
     }
-    move32();
-    *ptr = Mpy_32_16_1( *ptr, sub( tmp, mult_r(preemph_fac2,add(shr(table[fftlen8-1].v.re,1),shr(table[fftlen8-1].v.im,1)) ) ) );
-    ptr += 2;
-    FOR ( i = 1; i < fftlen8; i++ )
-    {
-        move32();
-        *ptr = Mpy_32_16_1( *ptr, sub( tmp, mult_r(preemph_fac2,add(shr(table[fftlen8-i-1].v.im,1),shr(table[fftlen8-i].v.im,1)) ) ) );
-        ptr += 2;
-    }
-    move32();
-    *ptr = Mpy_32_16_1( *ptr, tmp );
-    ptr += 2;
-    FOR ( i = 1; i < fftlen8; i++ )
-    {
-        move32();
-        *ptr = Mpy_32_16_1( *ptr, add( tmp, mult_r(preemph_fac2,add(shr(table[i-1].v.im,1),shr(table[i].v.im,1)) ) ) );
-        ptr += 2;
-    }
-    move32();
-    *ptr = Mpy_32_16_1( *ptr, add( tmp, mult_r(preemph_fac2,add(shr(table[fftlen8-1].v.re,1),shr(table[fftlen8-1].v.im,1)) ) ) );
-    ptr += 2;
-    FOR ( i = 1; i < fftlen8; i++ )
-    {
-        move32();
-        *ptr = Mpy_32_16_1( *ptr, add( tmp, mult_r(preemph_fac2,add(shr(table[fftlen8-i-1].v.re,1),shr(table[fftlen8-i].v.re,1)) ) ) );
-        ptr += 2;
-    }
-    move32();
-    fftBuffer[1] = Mpy_32_16_1( fftBuffer[1], add( tmp, preemph_fac2 ) );
-    maxVal = L_add(0,0);
-    FOR (i=0; i < fftlen; i++)
-    {
-        maxVal = L_max(maxVal, L_abs(fftBuffer[i]));
-    }
-    s2 = norm_l(maxVal);
-    FOR (i=0; i < fftlen; i++)
-    {
-        fftBuffer[i] = L_shl( fftBuffer[i], s2 );
-        move32();
-    }
+    fftBuffer[1] *= (1.f+preemph_fac*preemph_fac+2.0f*preemph_fac);
 
     /* Autocorrelation */
-
-    BASOP_rfft(fftBuffer, fftlen, &scale, 1);
-
-    s3 = getScaleFactor32(fftBuffer, add(lpcorder,1));
-
-    FOR (i=0; i <= lpcorder; i++ )
+    RFFTN(fftBuffer, fftSineTab, fftlen, 1);
+    for ( i = 0; i <= M; i++ )
     {
-        r[i] = L_shl(fftBuffer[i], s3);
-        move32();
+        r[i] = fftBuffer[i] * (fftlen/2) * (fftlen/2);
+    }
+    if ( r[0] < 100.f )
+    {
+        r[0] = 100.f;
     }
 
-    r[0] = Mpy_32_32( r[0], 1074278656l/*1.0005f Q30*/ );
-    move32();
-    FOR (i=1; i <= lpcorder; i++ )
-    {
-        r[i] = Mpy_32_32( r[i], 1073741824l/*1.f Q30*/ );
-        move32();
-    }
-    s3 = getScaleFactor32(r, add(lpcorder,1));
-
-    FOR (i=0; i <= lpcorder; i++ )
-    {
-        r[i] = L_shl(r[i], s3);
-        move32();
-    }
-
-    FOR (i=0; i <= lpcorder; i++ )
-    {
-        L_Extract(r[i], &r_h[i], &r_l[i]);
-    }
+    r[0] *= 1.0005f;
 
     /* LPC */
+    lev_dur( A, r, M, NULL );
 
-    E_LPC_lev_dur(r_h, r_l, A, NULL, lpcorder, NULL);
-
-}
-
-/*
-   msvq_decoder
-
-    Parameters:
-
-    cb               i  : Codebook (indexed cb[stages][levels][p]) format Q9.7
-    stages           i  : Number of stages
-    N                i  : Vector dimension
-    maxN             i  : Codebook vector dimension
-    Idx              o  : Indices
-    uq[]             i  : Quantized vector format Q9.7
-
-
-    Function:
-    multi stage vector dequantisation
-
-    Returns:
-    void
-*/
-void msvq_decoder (const Word16 *const cb[],       /* i  : Codebook (indexed cb[*stages][levels][p]) */
-                   Word16 stages,     /* i  : Number of stages                          */
-                   Word16 N,          /* i  : Vector dimension                          */
-                   Word16 maxN,       /* i  : Codebook vector dimension                 */
-                   Word16 Idx[],      /* i  : Indices                                   */
-                   Word16 *uq         /* o  : quantized vector                          */
-                  )
-{
-    Word16 s, i, offset;
-
-
-
-    offset = i_mult(Idx[0], maxN);
-    FOR (i=0; i<N; i++)
-    {
-        uq[i] = cb[0][offset+i];
-        move16();
-    }
-
-    FOR (s=1; s<stages; s++)
-    {
-        offset = i_mult(Idx[s], maxN);
-
-        FOR (i=0; i<N; i++)
-        {
-            uq[i] = add(uq[i],cb[s][offset+i]);
-            move16();
-        }
-    }
+    return;
 
 }
+
+
+/*-------------------------------------------------------------------
+ * FdCng_exc()
+ *
+ * Generate FD-CNG as LP excitation
+ *-------------------------------------------------------------------*/
 
 void FdCng_exc(
     HANDLE_FD_CNG_COM hs,
-    Word16 *CNG_mode,
-    Word16 L_frame,
-    Word16 *lsp_old,
-    Word16 first_CNG,
-    Word16 *lspCNG,
-    Word16 *Aq,                    /* o:   LPC coeffs */
-    Word16 *lsp_new,               /* o:   lsp  */
-    Word16 *lsf_new,               /* o:   lsf  */
-    Word16 *exc,                   /* o:   LP excitation   */
-    Word16 *exc2,                  /* o:   LP excitation   */
-    Word16 *bwe_exc                /* o:   LP excitation for BWE */
+    short *CNG_mode,
+    short L_frame,
+    float *lsp_old,
+    short first_CNG,
+    float *lspCNG,
+    float *Aq,                    /* o:   LPC coeffs */
+    float *lsp_new,               /* o:   lsp  */
+    float *lsf_new,               /* o:   lsf  */
+    float *exc,                   /* o:   LP excitation   */
+    float *exc2,                  /* o:   LP excitation   */
+    float *bwe_exc                /* o:   LP excitation for BWE */
 )
 {
-    Word16 i;
-
+    short i;
     *CNG_mode = -1;
 
-    FOR(i=0; i<L_frame/L_SUBFR; i++)
+    /*Get excitation */
+    for(i=0; i<L_frame/L_SUBFR; i++)
     {
-        Copy( hs->A_cng, Aq+i*(M+1), M+1 );
+        mvr2r( hs->A_cng, Aq+i*(M+1), M+1 );
     }
-
-    E_LPC_a_lsp_conversion( Aq, lsp_new, lsp_old, M );
-
-    IF( first_CNG == 0 )
+    a2lsp_stab( Aq, lsp_new, lsp_old );
+    if( first_CNG == 0 )
     {
-        Copy( lsp_old, lspCNG, M );
+        mvr2r( lsp_old, lspCNG, M );
     }
-    FOR( i=0; i<M; i++ )
+    for( i=0; i<M; i++ )
     {
         /* AR low-pass filter  */
-        lspCNG[i] = mac_r(L_mult(CNG_ISF_FACT_FX,lspCNG[i]),32768-CNG_ISF_FACT_FX,lsp_new[i]);
-        move16(); /* Q15 (15+15+1-16) */
+        lspCNG[i] = CNG_ISF_FACT * lspCNG[i] + (1-CNG_ISF_FACT) * lsp_new[i];
+    }
+    if (L_frame == L_FRAME16k)
+    {
+        lsp2lsf( lsp_new, lsf_new, M, INT_FS_16k );
+    }
+    else
+    {
+        lsp2lsf( lsp_new, lsf_new, M, INT_FS_12k8 );
+    }
+    mvr2r( hs->exc_cng, exc, L_frame );
+    mvr2r( hs->exc_cng, exc2, L_frame );
+    if( L_frame == L_FRAME )
+    {
+        interp_code_5over2( exc2, bwe_exc, L_frame );
+    }
+    else
+    {
+        interp_code_4over2( exc2, bwe_exc, L_frame );
     }
 
-    IF(sub(L_frame, L_FRAME16k)== 0)
-    {
-        lsp2lsf_fx( lsp_new, lsf_new, M, INT_FS_16k_FX );
-    }
-    ELSE
-    {
-        E_LPC_lsp_lsf_conversion( lsp_new, lsf_new, M );
-    }
-    Copy( hs->exc_cng, exc, L_frame );
-    Copy( hs->exc_cng, exc2, L_frame );
-
-    IF( sub(L_frame,L_FRAME) == 0 )
-    {
-        interp_code_5over2_fx( exc2, bwe_exc, L_frame );
-    }
-    ELSE
-    {
-        interp_code_4over2_fx( exc2, bwe_exc, L_frame );
-    }
+    return;
 }
-

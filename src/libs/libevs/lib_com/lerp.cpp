@@ -1,43 +1,43 @@
 /*====================================================================================
-    EVS Codec 3GPP TS26.442 Apr 03, 2018. Version 12.11.0 / 13.6.0 / 14.2.0
+    EVS Codec 3GPP TS26.443 Nov 13, 2018. Version 12.11.0 / 13.7.0 / 14.3.0 / 15.1.0
   ====================================================================================*/
 
-#include "options.h"
-#include "basop_util.h"
-#include "prot_fx.h"
-#include <assert.h>
-#include "stl.h"
+#include <math.h>
+#include <stdlib.h>
+#include "prot.h"
 
 
+/*-------------------------------------------------------------*
+ * procedure lerp()                                            *
+ *                                                             *
+ *                                                             *
+ *-------------------------------------------------------------*/
 
-#define shift_e (16-1)
-#define pos_e   (16-1)
+static void lerp_proc(
+    float *f,
+    float *f_out,
+    int bufferNewSize,
+    int bufferOldSize
+);
 
-static void lerp_proc(Word16 *f, Word16 *f_out,  Word16 bufferNewSize, Word16 bufferOldSize);
 
-
-void lerp(Word16 *f, Word16 *f_out,  Word16 bufferNewSize, Word16 bufferOldSize)
+void lerp(
+    float *f,
+    float *f_out,
+    int bufferNewSize,
+    int bufferOldSize
+)
 {
-    Word16 tmp1, tmp2, tmpexp;
-    BASOP_Util_Divide_MantExp(bufferNewSize, 0, bufferOldSize, 0, &tmp1, &tmpexp);
-    tmp1 = shr(tmp1,3); /*Q12*/
-    tmp1 = shl(tmp1,tmpexp);
+    float maxFac;
 
-    BASOP_Util_Divide_MantExp(bufferOldSize, 0, bufferNewSize, 0, &tmp2, &tmpexp);
-    tmp2 = shr(tmp2,3); /*Q12*/
-    tmp2 = shl(tmp2,tmpexp);
-    test();
-    test();
-    IF(sub(tmp1,16224 /*3,9609375 in Q12*/) > 0)
+    maxFac = 507.0/128.0;
+
+    if( (float)bufferNewSize / bufferOldSize > maxFac )
     {
-        Word16 tmpNewSize = shl(bufferOldSize,1);
-        WHILE(sub(bufferNewSize, bufferOldSize) > 0)
+        int tmpNewSize = bufferOldSize*2;
+        while(bufferNewSize > bufferOldSize)
         {
-            BASOP_Util_Divide_MantExp(bufferNewSize, 0, bufferOldSize, 0, &tmp1, &tmpexp);
-            tmp1 = shr(tmp1,3); /*Q12*/
-            tmp1 = shl(tmp1,tmpexp);
-            test();
-            IF(sub(tmp1,16224 /*3,9609375 in Q12*/) <= 0)
+            if( (float)bufferNewSize / bufferOldSize <= maxFac )
             {
                 tmpNewSize = bufferNewSize;
             }
@@ -46,19 +46,15 @@ void lerp(Word16 *f, Word16 *f_out,  Word16 bufferNewSize, Word16 bufferOldSize)
 
             f = f_out;
             bufferOldSize = tmpNewSize;
-            tmpNewSize = shl(tmpNewSize,1);
+            tmpNewSize *= 2;
         }
     }
-    ELSE IF(sub(tmp2,16224 /*3,9609375 in Q12*/) > 0)
+    else if( (float)bufferOldSize / bufferNewSize > maxFac )
     {
-        Word16 tmpNewSize = shr(bufferOldSize,1);
-        WHILE(sub(bufferNewSize, bufferOldSize) < 0)
+        int tmpNewSize = bufferOldSize/2;
+        while(bufferNewSize < bufferOldSize)
         {
-            BASOP_Util_Divide_MantExp(bufferOldSize, 0, bufferNewSize, 0, &tmp2, &tmpexp);
-            tmp2 = shr(tmp2,3); /*Q12*/
-            tmp2 = shl(tmp2,tmpexp);
-            test();
-            IF(sub(tmp2,16224 /*3,9609375 in Q12*/) <= 0)
+            if( (float)bufferOldSize / bufferNewSize <= maxFac )
             {
                 tmpNewSize = bufferNewSize;
             }
@@ -67,7 +63,7 @@ void lerp(Word16 *f, Word16 *f_out,  Word16 bufferNewSize, Word16 bufferOldSize)
 
             f = f_out;
             bufferOldSize = tmpNewSize;
-            tmpNewSize = shr(tmpNewSize,1);
+            tmpNewSize /= 2;
         }
     }
     else
@@ -76,104 +72,71 @@ void lerp(Word16 *f, Word16 *f_out,  Word16 bufferNewSize, Word16 bufferOldSize)
     }
 }
 
-void lerp_proc(Word16 *f, Word16 *f_out,  Word16 bufferNewSize, Word16 bufferOldSize)
+void lerp_proc(
+    float *f,
+    float *f_out,
+    int bufferNewSize,
+    int bufferOldSize
+)
 {
-
-    Word16 i, idx, n;
-    Word16 diff;
-    Word32 pos, shift;
-    Word16 buf[2*L_FRAME_MAX];
-    Word16 *ptr;
+    int i, idx;
+    float pos, shift, diff;
+    float buf[2*L_FRAME_MAX];
 
 
-    ptr = f_out;
-    test();
-    test();
-    test();
-    if ( ((f <= f_out) && (f + bufferOldSize >= f_out)) || ((f_out <= f) && (f_out + bufferNewSize >= f)) )
+    if( bufferNewSize == bufferOldSize )
     {
-        ptr = buf;
-        move16();
-    }
-
-    IF( sub(bufferNewSize, bufferOldSize) == 0 )
-    {
-        Copy(f, f_out, bufferNewSize);
+        mvr2r( f, buf, bufferNewSize );
+        mvr2r( buf, f_out, bufferNewSize );
         return;
     }
 
-    shift = L_shl(L_deposit_l(div_s( bufferOldSize, shl(bufferNewSize, 4))), 4-shift_e+16);
+    /* Using the basop code to avoid reading beyond end of input for bufferOldSize=320, bufferNewSize=640 */
+    shift = (float)(L_shl(L_deposit_l(div_s( bufferOldSize, shl(bufferNewSize, 4))), 4-15+16))/65536.0f;
+    pos = 0.5f * shift - 0.5f;
 
-    pos = L_sub(L_shr(shift, 1), 32768l/*1.0f Q15*/);
-
-    /* Adjust interpolation shift to avoid accessing beyond end of input buffer. */
-    if ( L_sub(shift, 19661l/*0.3f Q16*/) < 0)
+    if (shift < 0.3f)
     {
-        pos = L_sub(pos, 8520l/*0.13f Q16*/);
+        pos = pos - 0.13f;
     }
-
-    assert(pos_e == shift_e);
 
     /* first point of interpolation */
-    IF (pos<0)
+    if( pos<0 )
     {
-
-        diff = shr(extract_l(pos), 1);
-        /*buf[0]=f[0]+pos*(f[1]-f[0]);*/
-        move16();
-        *ptr++ = add(f[0], msu_r(L_mult(diff, f[1]),diff, f[0]));
+        buf[0]=f[0]+pos*(f[1]-f[0]);
     }
-    ELSE
+    else
     {
-
-        idx=extract_h(pos);
-
-        diff = lshr(extract_l(pos), 1);
-
-        move16();
-        *ptr++ = add(f[idx], msu_r(L_mult(diff, f[idx+1]), diff, f[idx]));
+        idx=(int)pos;
+        diff = pos - idx;
+        buf[0] = f[idx] + diff * (f[idx+1]-f[idx]);
     }
 
-    pos = L_add(pos, shift);
-    idx = s_max(0, extract_h(pos));
+    pos += shift;
 
-    n = sub(bufferNewSize, 1);
-    FOR ( i=1; i<n; i++ )
+    for ( i=1; i<bufferNewSize-1; i++ )
     {
-        diff = lshr(extract_l(pos), 1);
-        if (pos < 0)
-        {
-            diff = sub(16384/*0.5f Q15*/, diff);
-        }
-        move16();
-        *ptr++ = add(f[idx], msu_r(L_mult(diff, f[idx+1]), diff, f[idx]));
+        idx = (int)pos;
+        diff = pos-idx;
 
-
-
-        pos = L_add(pos, shift);
-        idx = extract_h(pos);
+        buf[i] = f[idx]+diff*(f[idx+1]-f[idx]);
+        pos += shift;
     }
+
 
     /* last point */
+    idx = (int)pos;
 
-    if ( L_sub(pos, L_deposit_h(sub(bufferOldSize,1))) > 0 )
+    if( pos > bufferOldSize-1 )
     {
-        idx = sub(bufferOldSize,2);
-    }
-    assert(idx <= 2*L_FRAME_MAX);
-
-    /* diff = t - point;*/
-    diff = lshr(extract_l(L_shr(L_sub(pos, L_deposit_h(idx)), 1)), 1);
-
-    move16();
-    *ptr++ = add(f[idx], shl(msu_r(L_mult(diff, f[idx+1]), diff, f[idx]), 1));
-
-    test();
-    test();
-    test();
-    IF ( ((f <= f_out) && (f + bufferOldSize >= f_out)) || ((f_out <= f) && (f_out + bufferNewSize >= f)) )
-    {
-        Copy( buf, f_out, bufferNewSize );
+        idx=bufferOldSize-2;
     }
 
+    diff = pos - idx;
+
+    buf[bufferNewSize-1] = f[idx]+diff*(f[idx+1]-f[idx]);
+
+    mvr2r( buf, f_out, bufferNewSize );
+
+    return;
 }

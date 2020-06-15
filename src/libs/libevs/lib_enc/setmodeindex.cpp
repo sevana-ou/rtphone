@@ -1,18 +1,17 @@
 /*====================================================================================
-    EVS Codec 3GPP TS26.442 Apr 03, 2018. Version 12.11.0 / 13.6.0 / 14.2.0
+    EVS Codec 3GPP TS26.443 Nov 13, 2018. Version 12.11.0 / 13.7.0 / 14.3.0 / 15.1.0
   ====================================================================================*/
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
-
 #include "options.h"
-#include "stl.h"
-#include "prot_fx.h"
-#include "cnst_fx.h"
-#include "rom_com_fx.h"
-#include "rom_enc_fx.h"
+#include "prot.h"
+#include "cnst.h"
+#include "rom_com.h"
+#include "rom_enc.h"
+
 
 /*---------------------------------------------------------------------------
 
@@ -25,24 +24,15 @@
   ---------------------------------------------------------------------------*/
 
 void SetModeIndex(
-    Encoder_State_fx *st,
-    Word32    total_brate,
-    Word16    bwidth,
-    const Word16 shift)
+    Encoder_State *st,
+    const long    total_brate,
+    const short   bwidth)
 {
 
     /* Reconfigure the core coder */
-    test();
-    test();
-    test();
-    IF(
-        (L_sub(st->last_total_brate_fx,total_brate) != 0) ||
-        (sub(st->last_bwidth_fx,bwidth) != 0)  ||
-        (sub(st->last_codec_mode,MODE1) == 0 )
-        || (sub(st->rf_mode_last,st->rf_mode) != 0 )
-    )
+    if( (st->last_total_brate != total_brate) || (st->last_bwidth != bwidth) || (st->last_codec_mode == MODE1) || (st->rf_mode_last != st->rf_mode) )
     {
-        core_coder_mode_switch( st, st->bwidth_fx, total_brate, shift);
+        core_coder_mode_switch( st, st->bwidth, total_brate );
     }
 
 

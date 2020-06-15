@@ -1,112 +1,102 @@
 /*====================================================================================
-    EVS Codec 3GPP TS26.442 Apr 03, 2018. Version 12.11.0 / 13.6.0 / 14.2.0
+    EVS Codec 3GPP TS26.443 Nov 13, 2018. Version 12.11.0 / 13.7.0 / 14.3.0 / 15.1.0
   ====================================================================================*/
 
 #include <stdlib.h>
 #include <stdio.h>
+#include <math.h>
 #include <assert.h>
-#include "prot_fx.h"
 #include "options.h"
-#include "cnst_fx.h"
-#include "stl.h"
+#include "prot.h"
+#include "rom_com.h"
 
+
+/*-------------------------------------------------------------------*
+ * enc_acelp_tcx_main()
+ *
+ * encoder function for coding ACELP/TCX
+ *--------------------------------------------------------------------*/
 
 void enc_acelp_tcx_main(
-    const Word16 new_samples[],          /* i  : new samples                         */
-    Encoder_State_fx *st,                    /* i/o: encoder state structure             */
-    const Word16 coder_type,             /* i  : coding type                         */
-    const Word16 pitch[3],                /* i  : open-loop pitch values for quantiz. */
-    const Word16 voicing[3],             /* i  : open-loop pitch gains               */
-    Word16 Aw[NB_SUBFR16k*(M+1)],  /* i  : weighted A(z) unquant. for subframes*/
-    const Word16 lsp_new[M],             /* i  : LSPs at the end of the frame        */
-    const Word16 lsp_mid[M],             /* i  : LSPs at the middle of the frame     */
-    HANDLE_FD_CNG_ENC hFdCngEnc,      /* i/o: FD CNG handle                      */
-    Word32 bwe_exc_extended[],     /* i/o: bandwidth extended excitation       */
-    Word16 *voice_factors,         /* o  : voicing factors                     */
-    Word16 pitch_buf[],            /* o  : floating pitch for each subframe    */
-    Word16 vad_hover_flag,
-    Word16 *Q_new,
-    Word16 *shift
+    const float new_samples[],          /* i  : new samples                         */
+    Encoder_State *st,                    /* i/o: encoder state structure             */
+    const short coder_type,             /* i  : coding type                         */
+    const short pitch[3],               /* i  : open-loop pitch values for quantiz. */
+    const float voicing[3],             /* i  : open-loop pitch gains               */
+    float Aw[NB_SUBFR16k*(M+1)],  /* i  : weighted A(z) unquant. for subframes*/
+    const float lsp_new[M],             /* i  : LSPs at the end of the frame        */
+    const float lsp_mid[M],             /* i  : LSPs at the middle of the frame     */
+    HANDLE_FD_CNG_ENC hFdCngEnc,        /* i/o: FD CNG handle                       */
+    float bwe_exc_extended[],     /* i/o: bandwidth extended excitation       */
+    float *voice_factors,         /* o  : voicing factors                     */
+    float pitch_buf[],            /* o  : floating pitch for each subframe    */
+    short vad_hover_flag
 )
 {
-    Word16 old_bwe_exc[(PIT16k_MAX + (L_FRAME16k + 1) + L_SUBFR16k) * 2]; /* excitation buffer */
-    Word16 *ptr_bwe_exc;
+
+    float old_bwe_exc[(PIT16k_MAX + (L_FRAME16k + 1) + L_SUBFR16k) * 2]; /* excitation buffer */
+    float *ptr_bwe_exc;              /* pointer to BWE excitation signal in the current frame */
+
     ptr_bwe_exc = old_bwe_exc + PIT16k_MAX * 2;
 
-    IF( sub( st->last_core_fx, ACELP_CORE) == 0 )
+    if (st->last_core == ACELP_CORE)
     {
-        set16_fx( old_bwe_exc + PIT16k_MAX * 2, 0, ((L_FRAME16k + 1) + L_SUBFR16k) * 2 );
-        Copy( st->old_bwe_exc_fx, old_bwe_exc, PIT16k_MAX * 2 );
+        set_f( old_bwe_exc + PIT16k_MAX * 2, 0.f, ((L_FRAME16k + 1) + L_SUBFR16k) * 2 );
+        mvr2r( st->old_bwe_exc, old_bwe_exc, PIT16k_MAX * 2 );
     }
-    ELSE
+    else
     {
-        set16_fx( old_bwe_exc, 0, ((L_FRAME16k + 1) + L_SUBFR16k + PIT16k_MAX) * 2 );
+        set_f( old_bwe_exc, 0.f, ((L_FRAME16k + 1) + L_SUBFR16k + PIT16k_MAX) * 2 );
     }
 
-    /* PLC: [Guided ACELP PLC] */
-    gPLC_encInfo(&st->plcExt,
-                 st->total_brate_fx,
-                 st->bwidth_fx,
-                 st->clas_fx,
-                 coder_type
-                );
 
-    IF ( s_and(st->core_brate_fx!=FRAME_NO_DATA, st->core_brate_fx!=SID_2k40) )
+    /* Guided ACELP PLC */
+    gPLC_encInfo( &st->plcExt, st->total_brate, st->bwidth, st->clas, coder_type );
+
+    if( st->core_brate != FRAME__NO_DATA && st->core_brate != SID_2k40 )
     {
-
         /* Run Core Coder */
-        IF (st->tcxonly == 0)
+        if( st->tcxonly == 0 )
         {
-            core_encode_openloop( st, coder_type,
-                                  pitch,
-                                  voicing, Aw, lsp_new, lsp_mid,
-                                  pitch_buf, voice_factors, ptr_bwe_exc
-                                  , vad_hover_flag, *Q_new, *shift );
+            core_encode_openloop( st, coder_type, pitch, voicing, Aw, lsp_new, lsp_mid, pitch_buf, voice_factors, ptr_bwe_exc, vad_hover_flag );
         }
-        ELSE
+        else
         {
-            core_encode_twodiv( new_samples,
-            st, coder_type, pitch, voicing, Aw, Q_new, shift );
+            core_encode_twodiv( new_samples, st, coder_type, pitch, voicing, Aw );
         }
-        /*-----------------------------------------------------------------*
-         * Apply non linearity to the SHB excitation
-         *-----------------------------------------------------------------*/
 
-
-        test();
-        IF( sub( st->core_fx, ACELP_CORE ) == 0 && st->igf != 0 )
+        /* Apply non linearity to the SHB excitation */
+        if( st->core == ACELP_CORE && st->igf )
         {
-            non_linearity_fx( ptr_bwe_exc, bwe_exc_extended, L_FRAME32k, &st->bwe_non_lin_prev_scale_fx, *Q_new
-                              , coder_type, voice_factors, st->L_frame_fx
-                            );
+            non_linearity( ptr_bwe_exc, bwe_exc_extended, st->old_bwe_exc_extended, L_FRAME32k, &st->bwe_non_lin_prev_scale, coder_type, voice_factors, st->L_frame );
 
-            /* update the old BWE exe memory */
-            Copy( &old_bwe_exc[L_FRAME32k], st->old_bwe_exc_fx, PIT16k_MAX * 2 );
+            /* update the old_BWE_exc memory */
+            mvr2r( &old_bwe_exc[L_FRAME32k], st->old_bwe_exc, PIT16k_MAX * 2 );
         }
-        ELSE
+        else
         {
-            set16_fx( st->old_bwe_exc_extended_fx, 0, NL_BUFF_OFFSET );
-            set16_fx( st->old_bwe_exc_fx, 0, PIT16k_MAX * 2 );
-            st->bwe_non_lin_prev_scale_fx = 0;
+            set_f( st->old_bwe_exc_extended, 0, NL_BUFF_OFFSET );
+            set_f( st->old_bwe_exc, 0, PIT16k_MAX * 2 );   /* reset old non_linear exc during igf frames */
+            st->bwe_non_lin_prev_scale = 0.0f;
         }
     }
-    ELSE
+    else
     {
         /* Run SID Coder */
-        IF ( st->core_brate_fx == SID_2k40 )
+        if( st->core_brate == SID_2k40 )
         {
             FdCng_encodeSID( hFdCngEnc, st, st->preemph_fac );
         }
 
         /* Generate Comfort Noise */
-        generate_comfort_noise_enc( st, *Q_new, 1 );
+        generate_comfort_noise_enc( st );
 
         /* Update Core Encoder */
-        core_encode_update_cng( st, hFdCngEnc->hFdCngCom->timeDomainBuffer, hFdCngEnc->hFdCngCom->A_cng, Aw, *Q_new, *shift );
+        core_encode_update_cng( st, hFdCngEnc->hFdCngCom->timeDomainBuffer, hFdCngEnc->hFdCngCom->A_cng, Aw );
     }
 
-    /* coreSwitching update of MODE1 parameters in the last frame */
-    st->last_coder_type_fx = coder_type;
+    /* coreSwitching update of Mode 1 parameters in the last frame */
+    st->last_coder_type = coder_type;
 
 
     return;

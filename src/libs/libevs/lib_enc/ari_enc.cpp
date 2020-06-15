@@ -1,14 +1,17 @@
 /*====================================================================================
-    EVS Codec 3GPP TS26.442 Apr 03, 2018. Version 12.11.0 / 13.6.0 / 14.2.0
+    EVS Codec 3GPP TS26.443 Nov 13, 2018. Version 12.11.0 / 13.7.0 / 14.3.0 / 15.1.0
   ====================================================================================*/
 
+#include <math.h>
 #include <stdio.h>
+#include "cnst.h"
+#include "prot.h"
+#include "stat_com.h"
 #include "assert.h"
-#include "stl.h"
-#include "basop_mpy.h"
-#include "cnst_fx.h"
-#include "rom_com_fx.h"
-#include "prot_fx.h"
+#include "basop_util.h"
+
+
+
 
 /**
  * \brief 	Copy state
@@ -18,20 +21,16 @@
  *
  * \return none
  */
-void ari_copy_states(TastatEnc *source, TastatEnc *dest)
+void ari_copy_states(Tastat *source, Tastat *dest)
 {
     dest->low  = source->low;
-    move32();
     dest->high = source->high;
-    move32();
     dest->vobf = source->vobf;
-    move16();
 }
 
 /*---------------------------------------------------------------
   Ari encoder 14 bits routines
   -------------------------------------------------------------*/
-
 
 /**
  * \brief 	Start ArCo encoding
@@ -40,32 +39,12 @@ void ari_copy_states(TastatEnc *source, TastatEnc *dest)
  *
  * \return none
  */
-void ari_start_encoding_14bits(TastatEnc *s)
+void ari_start_encoding_14bits(Tastat *s)
 {
-    s->low  = L_deposit_l(0);
-    s->high = ari_q4new + 1;
-    move32();
+    /* : addressing is made with walking pointer s */
+    s->low  = 0;
+    s->high = ari_q4new;
     s->vobf = 0;
-    move16();
-}
-
-
-/* Returns: new bit-stream position */
-static Word16 ari_put_bit_plus_follow(
-    Word16 ptr[],          /* o: bit-stream                              */
-    Word16 bp,             /* i: bit-stream position                     */
-    Word16 bits_to_follow, /* i: number of opposite bits to follow 'bit' */
-    Word16 bit             /* i: bit to send                             */
-)
-{
-    assert(bit == 0 || bit == 1);
-    ptr[bp++] = bit;     /* send initially a zero or one */     move16();
-    bit = s_xor(bit, 1); /* invert bit to send           */
-    FOR ( ; bits_to_follow > 0; bits_to_follow--)
-    {
-        ptr[bp++] = bit; /* send inverted bit */                  move16();
-    }
-    return bp;
 }
 
 /**
@@ -77,19 +56,42 @@ static Word16 ari_put_bit_plus_follow(
  *
  * \return bit consumption
  */
-Word16 ari_done_encoding_14bits(Word16 *ptr, Word16 bp, TastatEnc *s)
+long ari_done_encoding_14bits(int *ptr,long bp,Tastat *s)
 {
-    Word16 bit;
+    long	low;
+    long	bits_to_follow;
 
-    bit = 0;
-    move16();
-    if ( L_sub(s->low,ari_q1new) >= 0 )
+
+
+
+    /*  not needed, s points to s->low */
+    low = s->low;
+    bits_to_follow = s->vobf+1;
+
+    if ( low < ari_q1new )
     {
-        bit = s_xor(bit,1);
+        ptr[bp++] = 0; /*send a zero*/
+        for(; bits_to_follow>0; bits_to_follow--)
+        {
+            ptr[bp++] = 1; /*send a one*/
+        }
     }
-    return ari_put_bit_plus_follow(ptr, bp, add(s->vobf, 1), bit);
-}
+    else
+    {
+        ptr[bp++] = 1;  /*send a one*/
+        for(; bits_to_follow>0; bits_to_follow--)
+        {
+            ptr[bp++] = 0;  /*send a zero*/
+        }
+    }
 
+    /*It is done so no need to save values-> no counting*/
+    /*s->low = low;
+    s->vobf = bits_to_follow;*/
+
+
+    return bp;
+}
 
 
 /**
@@ -103,141 +105,70 @@ Word16 ari_done_encoding_14bits(Word16 *ptr, Word16 bp, TastatEnc *s)
  *
  * \return bit consumption
  */
-Word16 ari_encode_14bits_ext(
-    Word16  *ptr,
-    Word16   bp,
-    TastatEnc *s,
-    Word32   symbol,
-    UWord16 const *cum_freq
-)
+long ari_encode_14bits_ext(int *ptr,long bp,Tastat *s,long symbol,const unsigned short *cum_freq)
 {
-    Word32 low;
-    Word32 high;
-    Word32 range;
-    Word16 bits_to_follow;
-    Word16 i;
-    UWord16 temp;
-    Word32 L_temp1, L_temp2;
+    long low, high, range;
+    long  bits_to_follow;
 
-    high  = L_add(s->high, 0);
-    low   = L_add(s->low, 0);
-    range = L_sub(high, low);
 
-    L_temp1 = L_shl(range,15-stat_bitsnew/*both are constants*/);
-    Mpy_32_16_ss(L_temp1, cum_freq[symbol+1], &L_temp2, &temp);
-    if (symbol != 0)   /* when symbol is 0, range remains unchanged */
-    {
-        Mpy_32_16_ss(L_temp1, cum_freq[symbol], &range, &temp);
-    }
-    high = L_add(low, range);
-    low = L_add(low, L_temp2);
+
+    /*for all operation using bit_ptr=&ptr[bp]   */
+    /* for reading s->high,low,vobf sequentially */
+    high=s->high;
+    low =s->low;
+    range = high-low+1;
+
+    high  = low + mul_sbc_14bits(range,cum_freq[symbol]) - 1;
+    low  += mul_sbc_14bits(range,cum_freq[symbol+1]);
 
     bits_to_follow = s->vobf;
-    move16();
 
-    FOR (i = 0; i < 0x7FFF; i++)
+    for (;;)
     {
-        IF (L_sub(high, ari_q2new) <= 0)
+        if ( high<ari_q2new )
         {
-            bp = ari_put_bit_plus_follow(ptr, bp, bits_to_follow, 0);
-            bits_to_follow = 0;
-            move16();
+            ptr[bp++] = 0; /*send a zero*/
+            for(; bits_to_follow>0; bits_to_follow--)
+            {
+                ptr[bp++] = 1; /*send a one*/
+            }
         }
-        ELSE IF (L_sub(low, ari_q2new) >= 0)
+        else
         {
-            bp = ari_put_bit_plus_follow(ptr, bp, bits_to_follow, 1);
-            bits_to_follow = 0;
-            move16();
-            low = L_sub(low, ari_q2new);
-            high = L_sub(high, ari_q2new); /* Subtract offset to top.  */
-        }
-        ELSE
-        {
-            test();
-            IF (L_sub(low, ari_q1new) >= 0 && L_sub(high, ari_q3new) <= 0)
+            if ( low>=ari_q2new )
+            {
+                ptr[bp++] = 1; /*send a one*/
+                for(; bits_to_follow>0; bits_to_follow--)
+                {
+                    ptr[bp++] = 0; /*send a zero*/
+                }
+                low -= ari_q2new;
+                high -= ari_q2new; /* Subtract offset to top.  */
+            }
+            else
             {
                 /* Output an opposite bit   */
-                /* later if in middle half. */
-                bits_to_follow = add(bits_to_follow, 1);
-                low = L_sub(low, ari_q1new); /* Subtract offset to middle*/
-                high = L_sub(high, ari_q1new);
-            }
-            ELSE {
-                BREAK; /* Otherwise exit loop.     */
+                if ( low>=ari_q1new && high<ari_q3new )   /* Output an opposite bit   */
+                {
+                    /* later if in middle half. */
+                    bits_to_follow += 1;
+                    low -= ari_q1new;    /* Subtract offset to middle*/
+                    high -= ari_q1new;
+                }
+                else
+                {
+                    break;  /* Otherwise exit loop. */
+                }
             }
         }
-
-        low = L_add(low, low);
-        high = L_add(high, high); /* Scale up code range.     */
+        low  += low;
+        high += high+1;                    /* Scale up code range.     */
     }
 
     s->low  = low;
-    move32();
     s->high = high;
-    move32();
     s->vobf = bits_to_follow;
-    move16();
 
-    return bp;
-}
-
-Word16 ari_encode_overflow(TastatEnc *s)
-{
-    return L_sub(L_sub(s->high, 1), s->low) <= 0;
-}
-
-
-static Word16 ari_encode_14bits_high_low(Word16 *ptr, Word16 bp, Word16 bits, TastatEnc *s, Word32 high, Word32 low)
-{
-    Word16 bits_to_follow, tmp;
-
-    bits_to_follow = s->vobf;
-    move16();
-
-    /* while there are more than 16 bits left */
-    tmp = sub(16, bits);
-    WHILE (add(add(bp, bits_to_follow), tmp) < 0)
-    {
-        IF (L_sub(high, ari_q2new) <= 0)
-        {
-            bp = ari_put_bit_plus_follow(ptr, bp, bits_to_follow, 0);
-            bits_to_follow = 0;
-            move16();
-        }
-        ELSE IF (L_sub(low, ari_q2new) >= 0)
-        {
-            bp = ari_put_bit_plus_follow(ptr, bp, bits_to_follow, 1);
-            bits_to_follow = 0;
-            move16();
-            low = L_sub(low, ari_q2new);
-            high = L_sub(high, ari_q2new); /* Subtract offset to top.  */
-        }
-        ELSE
-        {
-            test();
-            IF (L_sub(low, ari_q1new) >= 0 && L_sub(high, ari_q3new) <= 0)
-            {
-                /* Output an opposite bit   */
-                /* later if in middle half. */
-                bits_to_follow = add(bits_to_follow, 1);
-                low = L_sub(low, ari_q1new); /* Subtract offset to middle*/
-                high = L_sub(high, ari_q1new);
-            }
-            ELSE {
-                BREAK; /* Otherwise exit loop.     */
-            }
-        }
-
-        low = L_add(low, low);
-        high = L_add(high, high); /* Scale up code range.     */
-    }
-
-    s->low  = low;
-    move32();
-    s->high = high;
-    move32();
-    s->vobf = bits_to_follow;
-    move16();
 
     return bp;
 }
@@ -248,44 +179,153 @@ static Word16 ari_encode_14bits_high_low(Word16 *ptr, Word16 bp, Word16 bits, Ta
  * Encode an cumulative frequency interval.
  *-------------------------------------------------------------------------*/
 
-Word16 ari_encode_14bits_range(Word16 *ptr, Word16 bp, Word16 bits, TastatEnc *s, Word16 cum_freq_low, Word16 cum_freq_high)
+long ari_encode_14bits_range(int *ptr, long bp, long bits, Tastat *s, unsigned short cum_freq_low, unsigned short cum_freq_high)
 {
-    Word32 low, high, range;
+    long low, high, range;
+    long bits_to_follow;
 
-    range = L_sub(s->high, s->low);
 
-    high = L_add(s->low, mul_sbc_14bits(range, cum_freq_high));
-    low = L_add(s->low, mul_sbc_14bits(range, cum_freq_low));
 
-    return ari_encode_14bits_high_low(ptr, bp, bits, s, high, low);
+    /*  not needed, s points to s->low */
+    high = s->high;
+    high++;
+    low = s->low;
+    range = high - low;
+
+    high = low + mul_sbc_14bits(range, cum_freq_high);
+    low += mul_sbc_14bits(range, cum_freq_low);
+
+    bits_to_follow = s->vobf;
+
+    /* while there are more than 16 bits left */
+    for (; bp + 16 + bits_to_follow - bits < 0;)
+    {
+        if (high <= ari_q2new)
+        {
+            ptr[bp++] = 0; /*send a zero*/
+            for (; bits_to_follow > 0; bits_to_follow--)
+            {
+                ptr[bp++] = 1; /*send a one*/
+            }
+        }
+        else if (low >= ari_q2new)
+        {
+            /* to reach this branch */
+            ptr[bp++] = 1; /*send a one*/
+            for (; bits_to_follow > 0; bits_to_follow--)
+            {
+                ptr[bp++] = 0; /*send a zero*/
+            }
+            low -= ari_q2new;
+            high -= ari_q2new; /* Subtract offset to top.  */
+        }
+        else if (low >= ari_q1new && high <= ari_q3new)
+        {
+            /* to reach this branch */
+            /* Output an opposite bit   */
+            /* later if in middle half. */
+            bits_to_follow += 1;
+            low -= ari_q1new; /* Subtract offset to middle*/
+            high -= ari_q1new;
+        }
+        else
+        {
+            /* to reach this branch */
+            break; /* Otherwise exit loop.     */
+        }
+
+        low += low;
+        high += high; /* Scale up code range.     */
+    }
+    /* if there are <= 16 bits left */
+    if (bp + 16 + bits_to_follow - bits >= 0)
+    {
+        /* No need to do anyhing, but let's keep a place for a breakpoint */
+        s->vobf = -1;
+    }
+
+    s->low = low;
+    s->high = high - 1;
+    s->vobf = bits_to_follow;
+
+    return bp;
 }
-
 
 /*------------------------------------------------------------------------
  * Function: ari_encode_14bits_sign
  *
  * Encode a sign with equal probabilities.
  *-------------------------------------------------------------------------*/
-Word16 ari_encode_14bits_sign(Word16 *ptr, Word16 bp, Word16 bits, TastatEnc *s, Word16 sign)
+long ari_encode_14bits_sign(int *ptr, long bp, long bits, Tastat *s, long sign)
 {
-    Word32 low, high, range;
-    Word32 L_tmp;
+    long low, high, range;
+    long bits_to_follow;
 
-    high = L_add(s->high, 0);
-    low  = L_add(s->low, 0);
-    range = L_sub(high, low);
 
-    L_tmp = L_shr(range, 1);
-    if (sign != 0)
+
+    /*  not needed, s points to s->low */
+    high = s->high;
+    high++;
+    low = s->low;
+    range = high - low;
+
+    if (sign)
     {
-        high = L_add(low, L_tmp);
+        high = low + (range >> 1);
     }
-    if (sign == 0)
+    else
     {
-        low = L_add(low, L_tmp);
+        low += range >> 1;
     }
 
-    return ari_encode_14bits_high_low(ptr, bp, bits, s, high, low);
+    bits_to_follow = s->vobf;
+
+    /* while there are more than 16 bits left */
+    for (; bp + 16 + bits_to_follow - bits < 0;)
+    {
+        if (high <= ari_q2new)
+        {
+            ptr[bp++] = 0; /*send a zero*/
+            for (; bits_to_follow > 0; bits_to_follow--)
+            {
+                ptr[bp++] = 1; /*send a one*/
+            }
+        }
+        else if (low >= ari_q2new)
+        {
+            /* to reach this branch */
+            ptr[bp++] = 1; /*send a one*/
+            for (; bits_to_follow > 0; bits_to_follow--)
+            {
+                ptr[bp++] = 0; /*send a zero*/
+            }
+            low -= ari_q2new;
+            high -= ari_q2new; /* Subtract offset to top.  */
+        }
+        else if (low >= ari_q1new && high <= ari_q3new)
+        {
+            /* to reach this branch */
+            /* Output an opposite bit   */
+            /* later if in middle half. */
+            bits_to_follow += 1;
+            low -= ari_q1new; /* Subtract offset to middle*/
+            high -= ari_q1new;
+        }
+        else
+        {
+            /* to reach this branch */
+            break; /* Otherwise exit loop.     */
+        }
+
+        low += low;
+        high += high; /* Scale up code range.     */
+    }
+
+    s->low = low;
+    s->high = high - 1;
+    s->vobf = bits_to_follow;
+
+    return bp;
 }
 
 /*------------------------------------------------------------------------
@@ -293,28 +333,77 @@ Word16 ari_encode_14bits_sign(Word16 *ptr, Word16 bp, Word16 bits, TastatEnc *s,
  *
  * Finish up encoding in CBR mode.
  *-------------------------------------------------------------------------*/
-Word16 ari_done_cbr_encoding_14bits(Word16 *ptr, Word16 bp, Word16 bits, TastatEnc *s)
+long ari_done_cbr_encoding_14bits(int *ptr, long bp, long bits, Tastat *s)
 {
-    Word16 high, tmp, k;
 
-    tmp = sub(bits, 16);
-    WHILE (sub(sub(tmp, bp), s->vobf) > 0)
+    long high;
+    long bits_to_follow;
+    int k;
+
+
+    while (bits - bp - 16 - s->vobf > 0)
     {
         bp = ari_encode_14bits_sign(ptr, bp, bits, s, 0);
     }
 
-    high = extract_l(L_sub(s->high, 1));
+    /*  not needed, s points to s->low */
+    high = s->high;
+    bits_to_follow = s->vobf;
 
-    bp = ari_put_bit_plus_follow(ptr, bp, s->vobf, lshr(high, 15));
-    high = lshl(high, 1);
-
-    tmp = s_min(15, sub(bits, bp));
-    FOR (k=0; k<tmp; ++k)
+    if (bits_to_follow)
     {
-        ptr[bp++] = lshr(high, 15);
-        move16();
-        high = lshl(high, 1);
+        /* If in upper half, then output a one, bits_to_follow zeros, and the remaining bits, except the first one */
+        if (high < 0x8000)
+        {
+            ptr[bp++] = 0; /*send a zero*/
+            for (; bits_to_follow > 0; bits_to_follow--)
+            {
+                ptr[bp++] = 1; /*send a one*/
+            }
+        }
+        else
+        {
+            ptr[bp++] = 1; /*send a one*/
+            for (; bits_to_follow > 0; bits_to_follow--)
+            {
+                ptr[bp++] = 0; /*send a zero*/
+            }
+        }
+        /* write remaining bits */
+        for (k = 0x4000; k > 0; k >>= 1)
+        {
+            if (k & high)
+            {
+                ptr[bp++] = 1; /*send a one*/
+            }
+            else
+            {
+                ptr[bp++] = 0; /*send a zero*/
+            }
+            if (bp >= bits)
+                break;
+        }
+
     }
+    else
+    {
+        /* no carry-bits, just write all bits */
+        for (k = 0x8000; k > 0; k >>= 1)
+        {
+            if (k & high)
+            {
+                ptr[bp++] = 1; /*send a one*/
+            }
+            else
+            {
+                ptr[bp++] = 0; /*send a zero*/
+            }
+            if (bp >= bits)
+                break;
+        }
+
+    }
+
 
     return bp;
 }

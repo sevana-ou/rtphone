@@ -1,5 +1,5 @@
 /*====================================================================================
-    EVS Codec 3GPP TS26.442 Apr 03, 2018. Version 12.11.0 / 13.6.0 / 14.2.0
+    EVS Codec 3GPP TS26.443 Nov 13, 2018. Version 12.11.0 / 13.7.0 / 14.3.0 / 15.1.0
   ====================================================================================*/
 
 /** \file jbm_jb4_jmf.h jitter measure fifo - a fifo used for windowed measure of network status */
@@ -7,36 +7,36 @@
 #ifndef JBM_JB4_JMF_H
 #define JBM_JB4_JMF_H JBM_JB4_JMF_H
 
-#include "typedef.h"
+#include "jbm_types.h"
 
 /** handle for jitter measure fifo - a fifo used for windowed measure of network status */
 typedef struct JB4_JMF *JB4_JMF_HANDLE;
 
 /**@name functions to manage the fifo */
 /**@{ */
-Word16 JB4_JMF_Create( JB4_JMF_HANDLE *ph );
+int JB4_JMF_Create( JB4_JMF_HANDLE *ph );
 void JB4_JMF_Destroy( JB4_JMF_HANDLE *ph );
 /** function to set the window size of the fifo and the fraction which will be considered */
-/** @param timeScale scale of system time and RTP time stamps (designed and tested up to 500 pkts)
- *  @param windowSize the window size of the fifo in number of packets (designed and tested up to 10000ms (500*20ms))
+/** @param timeScale scale of system time and RTP time stamps
+ *  @param windowSize the window size of the fifo in number of packets
  *  @param windowDuration the window size of the fifo as time in sysTimeScale
  *  @param consideredFraction the considered fraction in 1/1000 units, e.g. 900 ignores 10% of the highest samples
  *  @return 0 on success */
-Word16 JB4_JMF_Init( JB4_JMF_HANDLE h, Word16 timeScale, Word16 windowSize,
-                     Word16 windowDuration, Word16 consideredFraction );
+int JB4_JMF_Init( JB4_JMF_HANDLE h, int timeScale, unsigned int windowSize,
+                  unsigned int windowDuration, unsigned int consideredFraction );
 /**@} */
 
 /**@name functions to push packets and get the current jitter rate */
 /**@{ */
 /** function to calculate jitter for the current packet */
-Word16 JB4_JMF_PushPacket( JB4_JMF_HANDLE h, Word32 sysTime, Word32 rtpTimeStamp );
+int JB4_JMF_PushPacket( JB4_JMF_HANDLE h, uint32_t sysTime, uint32_t rtpTimeStamp );
 /** function to get the current jitter */
-Word16 JB4_JMF_Jitter( const JB4_JMF_HANDLE h, Word32 *jitter );
+int JB4_JMF_Jitter( const JB4_JMF_HANDLE h, uint32_t *jitter );
 /** function to get the minimum offset between received time and time stamp of all entries in the fifo */
 /*! This value is the offset of the fastest transmitted packet of all packets currently
  *  contained in the fifo.
  *  @param[out] offset the minimum offset in microseconds */
-Word16 JB4_JMF_MinOffset( const JB4_JMF_HANDLE h, Word32 *offset );
+int JB4_JMF_MinOffset( const JB4_JMF_HANDLE h, int32_t *offset );
 /**@} */
 
 #endif /* JBM_JB4_JMF_H */

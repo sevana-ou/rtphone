@@ -1,64 +1,54 @@
 /*====================================================================================
-    EVS Codec 3GPP TS26.442 Apr 03, 2018. Version 12.11.0 / 13.6.0 / 14.2.0
+    EVS Codec 3GPP TS26.443 Nov 13, 2018. Version 12.11.0 / 13.7.0 / 14.3.0 / 15.1.0
   ====================================================================================*/
 
 #include <stdlib.h>
-#include "options.h"     /* Compilation switches                   */
-#include "cnst_fx.h"       /* Common constants                       */
-#include "prot_fx.h"       /* Function prototypes                    */
-#include "stl.h"
+#include <math.h>
+#include "options.h"
+#include "cnst.h"
+#include "prot.h"
 
 /*---------------------------------------------------------------------*
  * Local constants
  *---------------------------------------------------------------------*/
 
-#define K_COR_FX      23405  /* Q13    2.857 */
-#define C_COR_FX     -10535  /* Q13   -1.286 */
-
-#define K_EE_FX        1365  /* Q15  0.04167 */
-#define C_EE_FX           0
-
-#define K_ZC_FX       -1311  /* Q15   -0.04 */
-#define C_ZC_FX       19661  /* Q13    2.4  */
-
-#define K_RELE_FX      1638  /* Q15    0.05 */
-#define C_RELE_FX     14746  /* Q15    0.45 */
-
-#define K_PC_FX       -2341  /* Q15 -0.07143*/
-#define C_PC_FX       30425  /* Q1   1.857  */
-
-#define K_SNR_FX     3541    /* Q15 .1111    */
-#define C_SNR_FX     -10921  /* Q15 -0.3333f */
-
-
-#define THRES_EEN    514206  /* 251.077 =>  (10^(1/(K_EE*10)))  Q11*/
+#define K_COR_ENC           2.857f
+#define C_COR_ENC           -1.286f
+#define K_EE_ENC            0.04167f
+#define C_EE_ENC            0.0f
+#define K_ZC_ENC            -0.04f
+#define C_ZC_ENC            2.4f
+#define K_RELE_ENC          0.05f
+#define C_RELE_ENC          0.45f
+#define K_PC_ENC            -0.07143f
+#define C_PC_ENC            1.857f
+#define K_SNR_ENC           0.1111f
+#define C_SNR_ENC           -0.3333f
 
 /*-------------------------------------------------------------------*
- * signal_clas_fx()
+ * signal_clas()
  *
- * classification state machine for FEC
- * TC frames selection
+ * Classification state machine for FEC
+ * Coder type modification
  *-------------------------------------------------------------------*/
 
-Word16 signal_clas_fx(        /* o  : classification for current frames              */
-    Encoder_State_fx *st,         /* i/o: encoder state structure                           */
-    Word16 *coder_type, /* i/o: coder type                                        */
-    const Word16 voicing[3],  /* i  : normalized correlation for 3 half-frames          */
-    const Word16 *speech,     /* i  : pointer to speech signal for E computation        */
-    const Word16 localVAD,    /* i  : vad without hangover                              */
-    const Word16 pit[3],      /* i  : open loop pitch values for 3 half-frames          */
-    const Word32 *ee,         /* i  : lf/hf E ration for 2 half-frames                  */
-    const Word16 relE,        /* i  : frame relative E to the long term average         */
-    const Word16 L_look ,     /* i  : look-ahead                                        */
-    Word16 *uc_clas     /* o  : temporary classification used in music/speech class*/
+short signal_clas(               /* o  : classification for current frames                 */
+    Encoder_State *st,                   /* i/o: encoder state structure                           */
+    short *coder_type,           /* i/o: coder type                                        */
+    const float voicing[3],            /* i  : normalized correlation for 3 half-frames          */
+    const float *speech,               /* i  : pointer to speech signal for E computation        */
+    const short localVAD,              /* i  : vad without hangover                              */
+    const short pit[3],                /* i  : open loop pitch values for 3 half-frames          */
+    const float *ee,                   /* i  : lf/hf E ration for 2 half-frames                  */
+    const float relE,                  /* i  : frame relative E to the long term average         */
+    const short L_look,                /* i  : look-ahead                                        */
+    short *uc_clas               /* o  : flag for unvoiced class used in sp/mus classifier */
 )
 {
-    Word32 Ltmp;
-    Word16 mean_voi2, een, corn, zcn, relEn, pcn, fmerit1;
-    Word16 i, clas, pc, zc, lo, lo2, hi, hi2, exp_ee, frac_ee;
-    Word16 tmp16, tmpS;
-    const Word16 *pt1;
-    Word16 unmod_coder_type;
+    float mean_voi2, mean_ee2, tmp;
+    float een, corn, zcn, relEn, pcn, fmerit1;
+    short i, clas, pc, zc;
+    short unmod_coder_type;
 
     /*----------------------------------------------------------------*
      * Calculate average voicing
@@ -67,92 +57,87 @@ Word16 signal_clas_fx(        /* o  : classification for current frames         
      * Calculate pitch stability
      *----------------------------------------------------------------*/
 
-    /* average voicing on second half-frame and look-ahead */
-    Ltmp = L_mult(voicing[1], 16384);
-    mean_voi2 = mac_r(Ltmp, voicing[2], 16384);
+    /* average voicing on second half-frame and look-ahead  */
+    mean_voi2 = 0.5f * (voicing[1] + voicing[2]);
 
     /* average spectral tilt in dB */
-    lo = L_Extract_lc(ee[0], &hi);
-    lo2 = L_Extract_lc(ee[1], &hi2);
-    Ltmp = L_mult(lo, lo2);    /* Q5*Q5->Q11 */
+    tmp = ee[0] * ee[1];
+    if( tmp < 1.0f )
+    {
+        tmp = 1.0f;
+    }
 
-    test();
-    test();
-    IF (L_sub(Ltmp, 2048) < 0)
-    {
-        een = 0;
-        move16();
-    }
-    ELSE IF (L_sub(Ltmp, THRES_EEN) > 0 || hi > 0 || hi2 > 0)
-    {
-        een = 512;
-        move16();
-    }
-    ELSE
-    {
-        /* mean_ee2 = 0.5f * 20.0f * (float)log10( tmp ); */
-        /* een = K_EE_ENC * mean_ee2 + C_EE_ENC; */
-        exp_ee = norm_l(Ltmp);
-        frac_ee = Log2_norm_lc(L_shl(Ltmp, exp_ee));
-        exp_ee = sub(30-11, exp_ee);
-        Ltmp = Mpy_32_16(exp_ee, frac_ee, LG10);     /* Ltmp Q14 */
-        een = round_fx(L_shl(Ltmp, 16-5));          /* Q14 -> Q9 */
-        een = mac_r(C_EE_FX, een, K_EE_FX);
-    }
+    mean_ee2 = 0.5f * 20.0f * (float)log10( tmp );
 
     /* compute zero crossing rate */
-    pt1 = speech + L_look - 1;
-    tmpS = shr(*pt1, 15); /* sets 'tmpS to -1 if *pt1 < 0 */
-    Ltmp = L_deposit_l(0);
-    FOR (i = 0; i < L_FRAME; i++)
+    zc = 0;
+    for( i = L_look; i < L_FRAME + L_look; i++ )
     {
-        tmp16 = add(1, tmpS);
-        pt1++;
-        tmpS = shr(*pt1, 15); /* pt1 >=0 ---> 0 OTHERWISE -1   */
-        Ltmp = L_msu0(Ltmp, tmpS, tmp16);
+        if( speech[i] <= 0.0f && speech[i-1] > 0.0f )
+        {
+            zc++;
+        }
     }
-    zc = extract_l(Ltmp);
 
     /* compute pitch stability */
-    pc = add( abs_s(sub(pit[1], pit[0])), abs_s(sub(pit[2], pit[1])));
+    pc = (short)(abs(pit[1] - pit[0]) + abs(pit[2] - pit[1]));
 
     /*-----------------------------------------------------------------*
      * Transform parameters to the range <0:1>
      * Compute the merit function
      *-----------------------------------------------------------------*/
 
-    /* corn = K_COR * mean_voi2 + C_COR */
-    Ltmp = L_mult(C_COR_FX, 32767);
-    corn  = round_fx(L_shl(L_mac(Ltmp, mean_voi2, K_COR_FX),-4)); /*Q13+Q13*Q15 =>Q13->Q9*/
-    /* Limit [0, 1] */
-    corn = s_max(corn, 0);
-    corn = s_min(corn, 512);
+    een = K_EE_ENC * mean_ee2 + C_EE_ENC;
+    if( een > 1.0f )
+    {
+        een = 1.0f;
+    }
+    else if( een < 0.0f )
+    {
+        een = 0.0f;
+    }
 
-    Ltmp = L_mult(C_ZC_FX, 4);                                    /*Q13*Q2 -> Q16*/
-    zcn = round_fx(L_shl(L_mac(Ltmp, zc, K_ZC_FX),16-7));         /*Q0*Q15 + Q16*/
-    /* Limit [0, 1] */
-    zcn = s_max(zcn, 0);
-    zcn = s_min(zcn, 512);
+    corn = K_COR_ENC * mean_voi2 + C_COR_ENC;
+    if( corn > 1.0f )
+    {
+        corn = 1.0f;
+    }
+    else if( corn < 0.0f )
+    {
+        corn = 0.0f;
+    }
 
-    Ltmp = L_mult(C_RELE_FX, 256);                                /*Q15 ->Q24*/
-    relEn = round_fx(L_shl(L_mac(Ltmp, relE, K_RELE_FX), 1));     /*relE in Q8 but relEn in Q9*/
-    /* Limit [0.5, 1] */
-    relEn = s_max(relEn, 256);
-    relEn = s_min(relEn, 512);
+    zcn = K_ZC_ENC * zc + C_ZC_ENC;
+    if( zcn > 1.0f )
+    {
+        zcn = 1.0f;
+    }
+    else if( zcn < 0.0f )
+    {
+        zcn = 0.0f;
+    }
 
-    Ltmp = L_mult(C_PC_FX, 2);                                    /*Q14*Q1 -> Q16*/
-    pcn = round_fx(L_shl(L_mac(Ltmp, pc, K_PC_FX),16-7));         /*Q16 + Q0*Q15*/
-    /* Limit [0, 1] */
-    pcn = s_max(pcn, 0);
-    pcn = s_min(pcn, 512);
+    relEn = K_RELE_ENC * relE + C_RELE_ENC;
+    if( relEn > 1.0f )
+    {
+        relEn = 1.0f;
+    }
+    else if( relEn < 0.5f )
+    {
+        relEn = 0.5f;
+    }
 
-    Ltmp = L_mult(een, 10923);
-    Ltmp = L_mac(Ltmp, corn, 21845);
-    Ltmp = L_mac(Ltmp, zcn, 10923);
-    Ltmp = L_mac(Ltmp, relEn, 10923);
-    Ltmp = L_mac(Ltmp, pcn, 10923);
+    pcn = K_PC_ENC * pc + C_PC_ENC;
+    if( pcn > 1.0f )
+    {
+        pcn = 1.0f;
+    }
+    else if( pcn < 0.0f )
+    {
+        pcn = 0.0f;
+    }
 
-    fmerit1 = round_fx(L_shl(Ltmp, 16-10-1));  /* fmerit1 ->Q15 */
+    fmerit1 = (1.0f/6.0f) * (een + 2.0f*corn + zcn + relEn + pcn);
 
     /*-----------------------------------------------------------------*
      * FEC classification
@@ -161,82 +146,64 @@ Word16 signal_clas_fx(        /* o  : classification for current frames         
 
 
     /* FEC classification */
-    test();
-    test();
-    IF (localVAD == 0 || sub(*coder_type,UNVOICED) == 0 || sub(relE,-1536) < 0)
+    if( localVAD == 0 || *coder_type == UNVOICED || relE < -6.0f )
     {
         clas = UNVOICED_CLAS;
-        move16();
     }
-    ELSE
+    else
     {
-        SWITCH (st->last_clas_fx)
+        switch( st->last_clas )
         {
         case VOICED_CLAS:
         case ONSET:
         case VOICED_TRANSITION:
-
-            IF (sub(fmerit1, 16056) < 0)        /*0.49f*/
+            if( fmerit1 < 0.49f )
             {
                 clas = UNVOICED_CLAS;
-                move16();
             }
-            ELSE IF (sub(fmerit1, 21626) < 0)   /*0.66*/
+            else if( fmerit1 < 0.66f )
             {
                 clas = VOICED_TRANSITION;
-                move16();
             }
-            ELSE
+            else
             {
                 clas = VOICED_CLAS;
-                move16();
             }
-            BREAK;
+
+            break;
 
         case UNVOICED_CLAS:
         case UNVOICED_TRANSITION:
-            IF (sub(fmerit1, 20643) > 0)        /*0.63*/
+            if( fmerit1 > 0.63f )
             {
                 clas = ONSET;
-                move16();
             }
-            ELSE IF (sub(fmerit1, 19169) > 0)  /*0.585*/
+            else if( fmerit1 > 0.585f )
             {
                 clas = UNVOICED_TRANSITION;
-                move16();
             }
-            ELSE
+            else
             {
                 clas = UNVOICED_CLAS;
-                move16();
             }
-            BREAK;
+
+            break;
 
         default:
             clas = UNVOICED_CLAS;
-            move16();
-            BREAK;
+
+            break;
         }
     }
 
     /* set flag for unvoiced class, it will be used in sp/mus classifier */
     *uc_clas = clas;
-    move16();
-    test();
-    test();
-    test();
-    test();
-    test();
-    test();
-    test();
-    test();
-    if( ( (sub(*coder_type,UNVOICED) == 0) ||
-            (sub(st->input_bwidth_fx,NB) != 0 && sub(fmerit1,13435) < 0 && sub(st->mold_corr_fx,21299) > 0 ) ||                  /* WB case */
-            (sub(st->input_bwidth_fx,NB) == 0 && sub(mult_r(fmerit1,28836),13435) < 0 && sub(st->mold_corr_fx,18022) > 0 ) ) &&  /* NB case */
-            sub(relE,-3840) > 0 && sub(st->lt_dec_thres_fx,768) < 0 )       /* to compute unvoiced on frame that tends to speech */
+    if( ( ( *coder_type == UNVOICED ) ||
+            ( st->input_bwidth != NB && fmerit1 < 0.41f && st->mold_corr > 0.65f ) ||              /* WB case */
+            ( st->input_bwidth == NB && fmerit1 * 0.88f < 0.41f  && st->mold_corr > 0.55f ) ) &&   /* NB case */
+            relE > -15.0f && st->lt_dec_thres < 1.5f )
     {
-        *uc_clas  = UNVOICED_CLAS;
-        move16();
+        *uc_clas = UNVOICED_CLAS;
     }
 
     /* Onset classification */
@@ -246,26 +213,22 @@ Word16 signal_clas_fx(        /* o  : classification for current frames         
     /* tc_cnt ==  1: onset/transition frame, coded by GC mode */
     /* tc_cnt ==  2: frame after onset/transition frame, coded by TC mode */
 
-    if( sub(clas,UNVOICED_CLAS ) == 0)
+    if( clas == UNVOICED_CLAS )
     {
-        st->tc_cnt_fx = 0;
-        move16();
+        st->tc_cnt = 0;
     }
 
-    test();
-    if( sub(clas,VOICED_TRANSITION) >= 0 && st->tc_cnt_fx >= 0 )
+    if( clas >= VOICED_TRANSITION && st->tc_cnt >= 0 )
     {
-        st->tc_cnt_fx = add(st->tc_cnt_fx,1);
-        move16();
+        st->tc_cnt += 1;
     }
 
-    if( sub(st->tc_cnt_fx,2) > 0 )
+    if( st->tc_cnt > 2 )
     {
-        st->tc_cnt_fx = -1;
-        move16();
+        st->tc_cnt = -1;
     }
 
-    IF ( sub(st->codec_mode,MODE1) == 0 )
+    if ( st->codec_mode == MODE1 )
     {
         /*---------------------------------------------------------------------*
          * Coder type modification
@@ -276,101 +239,71 @@ Word16 signal_clas_fx(        /* o  : classification for current frames         
          *---------------------------------------------------------------------*/
 
         /* At higher rates, use GC coding instead of UC coding to improve quality */
-        test();
-        if( L_sub(st->total_brate_fx,ACELP_9k60) > 0 && sub(*coder_type,UNVOICED) == 0 )
+        if( st->total_brate > ACELP_9k60 && *coder_type == UNVOICED )
         {
             *coder_type = GENERIC;
-            move16();
         }
 
         /* Prevent UC coding on mixed content at 9.6 kb/s */
-        test();
-        test();
-        if( L_sub(st->total_brate_fx,ACELP_9k60) == 0 && sub(*coder_type,UNVOICED) == 0 && st->audio_frame_cnt_fx != 0 )
+        if( st->total_brate == ACELP_9k60 && *coder_type == UNVOICED && st->audio_frame_cnt != 0 )
         {
             *coder_type = GENERIC;
-            move16();
         }
 
         unmod_coder_type = *coder_type;
-        move16();
 
         /* Enforce GC mode on inactive signal (this can be later overwritten to INACTIVE) */
-        test();
-        test();
-        test();
-        test();
-        test();
-        test();
-        test();
-        if( localVAD == 0 && (
-                    (
-                        sub(*coder_type,UNVOICED) == 0
-                        && ( ( st->Opt_SC_VBR_fx == 0) || ( ( st->Opt_SC_VBR_fx == 1 ) && st->vbr_generic_ho_fx == 0 && sub(st->last_coder_type_fx,UNVOICED) > 0 ))  )
-                    || sub(*coder_type,TRANSITION) == 0 || sub(*coder_type,VOICED) == 0 )
-
+        if( localVAD == 0 && ( (*coder_type == UNVOICED && (!st->Opt_SC_VBR ||
+                                ( st->Opt_SC_VBR && st->vbr_generic_ho == 0 && st->last_coder_type > UNVOICED ))  )
+                               || *coder_type == TRANSITION || *coder_type == VOICED )
           )
         {
             *coder_type = GENERIC;
-            move16();
+        }
+        if( *coder_type == GENERIC && unmod_coder_type == UNVOICED && st->Opt_SC_VBR )
+        {
+            st->vbr_generic_ho = 1;
         }
 
-        test();
-        test();
-        if( sub(*coder_type,GENERIC) == 0 && sub(unmod_coder_type,UNVOICED) == 0 && ( st->Opt_SC_VBR_fx == 1 ) )
+        if ( *coder_type > UNVOICED && st->Opt_SC_VBR )
         {
-            st->vbr_generic_ho_fx = 1;
-            move16();
+            st->vbr_generic_ho = 0;
         }
 
-        test();
-        if ( sub(*coder_type,UNVOICED) > 0 && ( st->Opt_SC_VBR_fx == 1 ) )
+        if( localVAD == 0 && *coder_type == UNVOICED )
         {
-            st->vbr_generic_ho_fx = 0;
-            move16();
+            st->last_7k2_coder_type = GENERIC;
+        }
+        else
+        {
+            st->last_7k2_coder_type = *coder_type;
         }
 
-        st->last_7k2_coder_type_fx = *coder_type;
-        move16();
-        test();
-        if( localVAD == 0 && sub( *coder_type, UNVOICED ) == 0 )
+        /* Select TC mode for appropriate frames which is in general MODE1_VOICED_TRANSITION, VOICED_CLAS or MODE1_ONSET frames following UNVOICED_CLAS frames */
+        if( localVAD != 0 && st->tc_cnt >= 1 )
         {
-            st->last_7k2_coder_type_fx = GENERIC;
-            move16();
-        }
-
-        /* Select TC mode for appropriate frames which is in general VOICED_TRANSITION, VOICED_CLAS or MODE1_ONSET frames following UNVOICED_CLAS frames */
-        test();
-        IF( localVAD != 0 && sub(st->tc_cnt_fx,1) >= 0 )   /* TC mode is allowed only in active signal */
-        {
-            /* frame after onset/transition frame is coded by TC mode */
-            *coder_type = TRANSITION;
-            move16();
-            if ( sub(st->tc_cnt_fx,1) == 0 )
+            if ( st->tc_cnt == 1 )
             {
                 /* onset/transition frame is always coded using GC mode */
                 *coder_type = GENERIC;
-                move16();
+            }
+            else
+            {
+                /* frame after onset/transition frame is coded by TC mode */
+                *coder_type = TRANSITION;
             }
         }
 
         /* At higher rates and with 16kHz core, allow only GC and TC mode */
-        test();
-        test();
-        if( (L_sub(st->total_brate_fx,ACELP_24k40) >= 0) && sub(*coder_type,GENERIC) != 0 && sub(*coder_type,TRANSITION) != 0 )
+        if( st->total_brate >= ACELP_24k40 && *coder_type != GENERIC && *coder_type != TRANSITION )
         {
             *coder_type = GENERIC;
-            move16();
         }
 
         /* Patch for certain low-level signals for which the gain quantizer sometimes goes out of its dynamic range */
-        test();
-        test();
-        test();
-        if( sub(*coder_type,VOICED) == 0 && sub(st->input_bwidth_fx,NB) == 0 && sub(relE,-2560) < 0 && L_sub(st->total_brate_fx,ACELP_8k00) <= 0 )
+        if( *coder_type == VOICED && st->input_bwidth == NB && relE < -10.0f && st->total_brate <= ACELP_8k00 )
         {
             *coder_type = GENERIC;
-            move16();
         }
     }
 

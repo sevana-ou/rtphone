@@ -1,31 +1,35 @@
 /*====================================================================================
-    EVS Codec 3GPP TS26.442 Apr 03, 2018. Version 12.11.0 / 13.6.0 / 14.2.0
+    EVS Codec 3GPP TS26.443 Nov 13, 2018. Version 12.11.0 / 13.7.0 / 14.3.0 / 15.1.0
   ====================================================================================*/
 
-#include <stdlib.h>
-#include <string.h>
-#include <stdio.h>
+#include <math.h>
 #include <assert.h>
-
-#include "prot_fx.h"
-#include "basop_util.h"
 #include "options.h"
-#include "cnst_fx.h"
-#include "stl.h"
+#include "cnst.h"
+#include "prot.h"
+#include "basop_util.h"
+#include "basop_proto_func.h"
 
-/* Fixed point implementation of exp(negate()) */
-Word32 expfp(  /* o: Q31 */
-    Word16 x,           /* i: mantissa  Q-e */
-    Word16 x_e)         /* i: exponent  Q0  */
+
+
+
+/*-------------------------------------------------------*
+ * expfp()
+ *
+ * Fixed point implementation of exp()
+ *-------------------------------------------------------*/
+
+Word16 expfp(         /* o: Q15 */
+    Word16 x,           /* i: mantissa  Q15-e */
+    Word16 x_e)         /* i: exponent  Q0 */
 {
     Word16 xi, xf, tmp;
     Word16 b0, b1, b2, b3;
     Word32 y, L_tmp;
 
+    assert(x <= 0);
 
-    assert(x > 0);
-
-    L_tmp = L_shl(L_deposit_h(x), x_e);
+    L_tmp = L_negate(L_shl(L_deposit_h(x), sub(x_e, 15)));
 
     /* split into integer and fractional parts */
     xi = round_fx(L_tmp);
@@ -55,10 +59,10 @@ Word32 expfp(  /* o: Q31 */
     b2 = s_and(xi, 4);
     b3 = s_and(xi, 8);
 
-    if (b0 != 0) y = Mpy_32_16_1(y, 24109);   /* exp(-1) in -1Q16 */
-    if (b1 != 0) y = Mpy_32_16_1(y, 17739);   /* exp(-2) in -2Q17 */
-    if (b2 != 0) y = Mpy_32_16_1(y, 19205);   /* exp(-4) in -5Q20 */
-    if (b3 != 0) y = Mpy_32_16_1(y, 22513);   /* exp(-8) in -11Q26 */
+    if (b0 != 0) y = Mpy_32_16(y, 24109);   /* exp(-1) in -1Q16 */
+    if (b1 != 0) y = Mpy_32_16(y, 17739);   /* exp(-2) in -2Q17 */
+    if (b2 != 0) y = Mpy_32_16(y, 19205);   /* exp(-4) in -5Q20 */
+    if (b3 != 0) y = Mpy_32_16(y, 22513);   /* exp(-8) in -11Q26 */
 
     /* scaling: -1*b0 - 2*b1 -5*b2 -11*b3 */
     y = L_shr(y, add(add(xi, shr(xi, 2)), shr(b3, 3)));
@@ -67,22 +71,31 @@ Word32 expfp(  /* o: Q31 */
     if (shr(xi, 4) > 0)
     {
         y = L_deposit_l(0);
+        move16();
     }
 
-
-    return L_shl(y, 15);
+    return round_fx(L_shl(y, 15));
 }
 
-/* Fixed point implementation of pow(), where base is fixed point (16/16) and exponent a small *odd* integer
+
+/*-------------------------------------------------------*
+ * powfp_odd2()
+ *
+ * Fixed point implementation of pow(), where base is fixed point (16/16) and exponent a small *odd* integer
+ *-------------------------------------------------------*/
+/*
  *
  * Returns: *pout1 = ( (base/65536)^(2*exp - 1) ) * 65536
  *          *pout2 = ( (base/65536)^(2*exp + 1) ) * 65536
  *
  * NOTE: This function must be in sync with ari_decode_14bits_pow() */
-void powfp_odd2(Word16 base,     /* Q15 */
-                Word16 exp,      /* Q0  */
-                Word16 *pout1,   /* Q15 */
-                Word16 *pout2)   /* Q15 */
+
+void powfp_odd2(
+    Word16 base,     /* Q15 */
+    Word16 exp,      /* Q0  */
+    Word16 *pout1,   /* Q15 */
+    Word16 *pout2    /* Q15 */
+)
 {
     /* this version is in sync with ari_enc_14bits_pow()
      * that is, we have to start multiplication from the largest power-of-two, in order to
@@ -144,7 +157,9 @@ void powfp_odd2(Word16 base,     /* Q15 */
     *pout2 = out;
     move16();
 
+    return;
 }
+
 
 /*------------------------------------------------------------------------
  * Function: tcx_arith_scale_envelope
@@ -167,12 +182,13 @@ void powfp_odd2(Word16 base,     /* Q15 */
  * NOTE: This function must be bit-exact on all platforms such that encoder
  * and decoder remain synchronized.
  *-------------------------------------------------------------------------*/
+
 void tcx_arith_scale_envelope(
     Word16 L_spec_core,         /* i: number of lines to scale    Q0 */
     Word16 L_frame,             /* i: number of lines             Q0 */
     Word32 env[],               /* i: unscaled envelope           Q16 */
     Word16 target_bits,         /* i: number of available bits    Q0 */
-    Word16 low_complexity,      /* i: low-complexity flag         Q0 */
+    Word16 low_complexity,      /* i: low-complexity              Q0 */
     Word16 s_env[],             /* o: scaled envelope             Q15-e */
     Word16 *s_env_e             /* o: scaled envelope exponent    Q0 */
 )
@@ -186,7 +202,6 @@ void tcx_arith_scale_envelope(
     Word16 mean_e, tmp, tmp2;
 
 
-
     lob_bits = 0;
     move16();
     hib_bits = 0;
@@ -194,10 +209,10 @@ void tcx_arith_scale_envelope(
 
     /* Boosting to account for expected spectrum truncation (kMax) */
     /* target_bits = (int)(target_bits * (1.2f - 0.00045f * target_bits + 0.00000025f * target_bits * target_bits)); */
-    L_tmp = L_shr(Mpy_32_16_1(L_mult0(target_bits, target_bits), 17180), 6); /* Q15; 17180 -> 0.00000025f (Q36) */
+    L_tmp = L_shr(Mpy_32_16(L_mult0(target_bits, target_bits), 17180), 6); /* Q15; 17180 -> 0.00000025f (Q36) */
     L_tmp = L_sub(L_tmp, L_shr(L_mult0(target_bits, 30199), 11)); /* Q15; 30199 -> 0.00045f (Q26) */
     L_tmp = L_add(L_tmp, 39322); /* Q15; 39322 -> 1.2f (Q15) */
-    L_tmp = Mpy_32_16_1(L_tmp, target_bits); /* Q0 */
+    L_tmp = Mpy_32_16(L_tmp, target_bits); /* Q0 */
     assert(L_tmp < 32768);
     target_bits = extract_l(L_tmp);
 
@@ -216,12 +231,12 @@ void tcx_arith_scale_envelope(
     }
     tmp = norm_s(L_frame);
     tmp = shl(div_s(8192, shl(L_frame, tmp)), sub(tmp, 7));
-    mean = L_shr(Mpy_32_16_1(mean, tmp), 6); /* Q16 */
+    mean = L_shr(Mpy_32_16(mean, tmp), 6); /* Q16 */
 
     /* Rate dependent compensation to get closer to the target on average */
     /* mean = (float)pow(mean, (float)L_frame / (float)target_bits * 0.357f); */
     tmp = BASOP_Util_Divide1616_Scale(L_frame, target_bits, &tmp2);
-    tmp = mult_r(tmp, 11698/*0.357f Q15*/);
+    tmp = mult_r(tmp, FL2WORD16(0.357f));
     mean = BASOP_Util_fPow(mean, 15, L_deposit_h(tmp), tmp2, &mean_e);
 
     /* Find first-guess scaling coefficient "scale" such that if "mean" is the
@@ -231,23 +246,28 @@ void tcx_arith_scale_envelope(
      */
     /* a = 2*2.71828183f*mean*mean; */
     tmp = round_fx(mean);
-    a = L_mult(mult_r(tmp, 22268/*2.71828183f Q13*/), tmp);
+    a = L_mult(mult_r(tmp, FL2WORD16_SCALE(2.71828183f, 2)), tmp);
     a_e = add(shl(mean_e, 1), 3);
 
     /* b = (0.15f - (float)pow(2.0f, target_bits/(float)L_frame)) * mean; */
     tmp = BASOP_Util_Divide1616_Scale(target_bits, L_frame, &tmp2);
     tmp = round_fx(BASOP_util_Pow2(L_deposit_h(tmp), tmp2, &tmp2));
-    b_e = BASOP_Util_Add_MantExp(4915/*0.15f Q15*/, 0, negate(tmp), tmp2, &b);
+    b_e = BASOP_Util_Add_MantExp(FL2WORD16(0.15f), 0, negate(tmp), tmp2, &b);
     b = mult_r(b, round_fx(mean));
     b_e = add(b_e, mean_e);
 
     /* scale = (-b + (float)sqrt(b*b - 4.0f*a*0.035f)) / (2.0f * a); */
-    tmp = round_fx(BASOP_Util_Add_Mant32Exp(L_mult(b, b), shl(b_e, 1), Mpy_32_16_1(a, -4588/*-4.0f*0.035f Q15*/), a_e, &tmp2));
+    tmp = round_fx(BASOP_Util_Add_Mant32Exp(L_mult(b, b), shl(b_e, 1), Mpy_32_16(a, FL2WORD16(-4.0f*0.035f)), a_e, &tmp2));
 
     IF( tmp <= 0 )
     {
         tmp = 0;
-        set16_fx(s_env, 0, L_frame);
+
+        FOR( k=0; k<L_frame; k++ )
+        {
+            s_env[k] = 0;
+            move16();
+        }
     }
     ELSE
     {
@@ -285,24 +305,24 @@ void tcx_arith_scale_envelope(
 
         FOR (k = 0; k < L_frame; k++)
         {
-            s = Mpy_32_16_1(ienv[k], scale); /* Q16 */
+            s = Mpy_32_16(ienv[k], scale); /* Q16 */
 
-            IF (L_sub(s, 5243l/*0.08f Q16*/) <= 0)
+            IF (L_sub(s, FL2WORD32_SCALE(0.08f, 15)) <= 0)
             {
                 /* If s = 0.08, the expected bit-consumption is log2(1.0224). Below 0.08, the bit-consumption
                    estimate function becomes inaccurate, so use log2(1.0224) for all values below 0.08. */
                 /* round(state * 1.0224 * 32768) */
-                statesi = mult_r(statesi, 16751/*1.0224 Q14*/);
+                statesi = mult_r(statesi, FL2WORD16_SCALE(1.0224, 1));
                 tmp = norm_s(statesi);
                 statesi = shl(statesi, tmp);
                 bits = add(bits, sub(1, tmp));
             }
-            ELSE IF (L_sub(s, 16711680l/*255.0 Q16*/) <= 0)
+            ELSE IF (L_sub(s, FL2WORD32_SCALE(255.0, 15)) <= 0)
             {
                 /* a = 5.436564f * s + 0.15f + 0.035f * env[k] * iscale; */
-                L_tmp = L_shl(Mpy_32_16_1(s, 22268/*5.436564f Q12*/), 3);
-                L_tmp = L_add(L_tmp, 9830l/*0.15f Q16*/);
-                L_tmp = L_add(L_tmp, L_shl(Mpy_32_16_1(env[k], mult_r(1147/*0.035f Q15*/, iscale)), iscale_e));
+                L_tmp = L_shl(Mpy_32_16(s, FL2WORD16_SCALE(5.436564f, 3)), 3);
+                L_tmp = L_add(L_tmp, FL2WORD32_SCALE(0.15f, 15));
+                L_tmp = L_add(L_tmp, L_shl(Mpy_32_16(env[k], mult_r(FL2WORD16(0.035f), iscale)), iscale_e));
 
                 tmp = norm_l(L_tmp);
                 statesi = mult_r(statesi, round_fx(L_shl(L_tmp, tmp)));
@@ -317,13 +337,14 @@ void tcx_arith_scale_envelope(
                 /* for large envelope values, s > 255, bit consumption is approx log2(2*e*s)
                  * further, we use round(log2(x)) = floor(log2(x)+0.5) = floor(log2(x*sqrt(2))) */
                 /* a = 5.436564f * s; */
-                L_tmp = Mpy_32_16_1(s, 31492/*5.436564f * 1.4142f Q12*/); /* Q13 */
+                L_tmp = Mpy_32_16(s, FL2WORD16_SCALE(5.436564f * 1.4142f, 3)); /* Q13 */
                 bits = add(bits, sub(17, norm_l(L_tmp)));
             }
         }
 
-        IF (sub(bits, target_bits) <= 0)   /* Bits leftover => scale is too small */
+        IF (sub(bits, target_bits) <= 0)
         {
+            /* Bits leftover => scale is too small */
             lob      = scale;
             move16();
             lob_bits = bits;
@@ -334,17 +355,19 @@ void tcx_arith_scale_envelope(
                 adjust = div_s(sub(hib_bits, target_bits), sub(hib_bits, lob_bits));
                 scale = add(mult_r(sub(lob, hib), adjust), hib);
             }
-            ELSE   /* Initial scale adaptation */
+            ELSE
             {
+                /* Initial scale adaptation */
                 /* adjust = 1.05f * target_bits / (float)bits;
                    scale *= adjust; */
-                adjust = mult_r(17203/*1.05f Q14*/, target_bits);
+                adjust = mult_r(FL2WORD16_SCALE(1.05f, 1), target_bits);
                 adjust = BASOP_Util_Divide1616_Scale(adjust, bits, &tmp);
                 scale = shl(mult_r(scale, adjust), add(1, tmp));
             }
         }
-        ELSE   /* Ran out of bits => scale is too large */
+        ELSE
         {
+            /* Ran out of bits => scale is too large */
             hib      = scale;
             move16();
             hib_bits = bits;
@@ -355,13 +378,19 @@ void tcx_arith_scale_envelope(
                 adjust = div_s(sub(hib_bits, target_bits), sub(hib_bits, lob_bits));
                 scale = add(mult_r(sub(lob, hib), adjust), hib);
             }
-            ELSE { /* Initial scale adaptation */
+            ELSE
+            { /* Initial scale adaptation */
                 test();
                 IF( target_bits <= 0 || bits <= 0 ) /* safety check in case of bit errors */
                 {
                     adjust = 0;
                     move16();
-                    set16_fx( s_env, 0, L_frame );
+
+                    FOR( k=0; k<L_frame; k++ )
+                    {
+                        s_env[k] = 0;
+                        move16();
+                    }
                 }
                 ELSE
                 {
@@ -377,7 +406,12 @@ void tcx_arith_scale_envelope(
         {
             iscale = 0;
             move16();
-            set16_fx( s_env, 0, L_frame );
+
+            FOR( k=0; k<L_frame; k++ )
+            {
+                s_env[k] = 0;
+                move16();
+            }
         }
         ELSE
         {
@@ -396,11 +430,14 @@ void tcx_arith_scale_envelope(
 
     FOR (k = 0; k < L_frame; k++)
     {
-        L_tmp = Mpy_32_16_1(L_shl(env[k], tmp), iscale);
+        L_tmp = Mpy_32_16(L_shl(env[k], tmp), iscale);
         L_tmp = L_min(L_tmp, a);
         s_env[k] = round_fx(L_tmp);
+        move16();
     }
 
+
+    return;
 }
 
 /*------------------------------------------------------------------------
@@ -415,14 +452,15 @@ void tcx_arith_scale_envelope(
  * NOTE: This function must be bit-exact on all platforms such that encoder
  * and decoder remain synchronized.
  *-------------------------------------------------------------------------*/
+
 void tcx_arith_render_envelope(
-    const Word16 A_ind[],       /* i: LPC coefficients of signal envelope        */
-    Word16 L_frame,             /* i: number of spectral lines                   */
+    const Word16 A_ind[],         /* i: LPC coefficients of signal envelope        */
+    Word16 L_frame,               /* i: number of spectral lines                   */
     Word16 L_spec,
-    Word16 preemph_fac,         /* i: pre-emphasis factor                        */
-    Word16 gamma_w,             /* i: A_ind -> weighted envelope factor          */
-    Word16 gamma_uw,            /* i: A_ind -> non-weighted envelope factor      */
-    Word32 env[]                /* o: shaped signal envelope                     */
+    Word16 preemph_fac,           /* i: pre-emphasis factor                        */
+    Word16 gamma_w,               /* i: A_ind -> weighted envelope factor          */
+    Word16 gamma_uw,              /* i: A_ind -> non-weighted envelope factor      */
+    Word32 env[]                  /* o: shaped signal envelope                     */
 )
 {
     Word16 k;
@@ -431,15 +469,14 @@ void tcx_arith_render_envelope(
     Word16 gainlpc[FDNS_NPTS], gainlpc_e[FDNS_NPTS];
 
 
-
     /* Compute perceptual LPC envelope, transform it into freq.-domain gains */
-    weight_a_fx( A_ind, tmpA, gamma_w, M );
-    lpc2mdct( tmpA, M, NULL, NULL, gainlpc, gainlpc_e );
+    basop_weight_a(A_ind, tmpA, gamma_w);
+    basop_lpc2mdct(tmpA, M, NULL, NULL, gainlpc, gainlpc_e);
 
     /* Add pre-emphasis tilt to LPC envelope, transform LPC into MDCT gains */
-    E_LPC_a_weight_inv(A_ind, signal_env, gamma_uw, M);
-    E_LPC_a_add_tilt(signal_env, tmpA, preemph_fac, M);
-    lpc2mdct(tmpA, M+1, signal_env, signal_env_e, NULL, NULL);
+    basop_weight_a_inv(A_ind, signal_env, gamma_uw);
+    basop_E_LPC_a_add_tilt(signal_env, tmpA, preemph_fac);
+    basop_lpc2mdct(tmpA, M+1, signal_env, signal_env_e, NULL, NULL);
 
     /* Compute weighted signal envelope in perceptual domain */
     FOR (k = 0; k < FDNS_NPTS; k++)
@@ -451,15 +488,16 @@ void tcx_arith_render_envelope(
     }
 
     /* Adaptive low frequency emphasis */
-    set32_fx(env, 0x10000, L_frame);
+    FOR (k = 0; k < L_frame; k++)
+    {
+        env[k] = 0x10000;
+        move32();
+    }
 
-    AdaptLowFreqDeemph(env, 15,
-                       1,
-                       gainlpc, gainlpc_e,
-                       L_frame, NULL);
+    basop_PsychAdaptLowFreqDeemph(env, gainlpc, gainlpc_e, NULL);
 
     /* Scale from FDNS_NPTS to L_frame and multiply LFE gains */
-    mdct_noiseShaping_interp(env, L_frame, signal_env, signal_env_e);
+    basop_mdct_noiseShaping_interp(env, L_frame, signal_env, signal_env_e);
 
     FOR (k=L_frame; k<L_spec; ++k)
     {
@@ -467,5 +505,6 @@ void tcx_arith_render_envelope(
         move32();
     }
 
-}
 
+    return;
+}

@@ -1,44 +1,44 @@
 /*====================================================================================
-    EVS Codec 3GPP TS26.442 Apr 03, 2018. Version 12.11.0 / 13.6.0 / 14.2.0
+    EVS Codec 3GPP TS26.443 Nov 13, 2018. Version 12.11.0 / 13.7.0 / 14.3.0 / 15.1.0
   ====================================================================================*/
 
-/*! @file pcmdsp_fifo.h Ringbuffer (FIFO) with fixed capacity for audio samples. */
+/*! @file jbm_pcmdsp_fifo.h Ringbuffer (FIFO) with fixed capacity for audio samples. */
 
-#ifndef PCMDSP_FIFO_H
-#define PCMDSP_FIFO_H PCMDSP_FIFO_H
+#ifndef JBM_PCMDSP_FIFO_H
+#define JBM_PCMDSP_FIFO_H JBM_PCMDSP_FIFO_H
 
-/* instrumentation headers */
-#include "typedef.h"
+/* local headers */
+#include "jbm_types.h"
+
 /** handle for FIFO with fixed capacity */
 typedef struct PCMDSP_FIFO *PCMDSP_FIFO_HANDLE;
 
 /** Creates a FIFO.
  * @param[out] ph pointer to created handle
  * @return 0 if succeeded */
-Word16 pcmdsp_fifo_create( PCMDSP_FIFO_HANDLE *ph );
+int pcmdsp_fifo_create( PCMDSP_FIFO_HANDLE *ph );
 /** Destroys the FIFO. */
 void pcmdsp_fifo_destroy( PCMDSP_FIFO_HANDLE *ph );
 /** Initializes the FIFO with a fixed maximum allowed number of audio samples.
  * @param[in] nSamples maximum allowed number of samples per channel (capacity)
- * @note Word16 gives max capacity of 34 frames @ 48000 Hz
  * @param[in] nChannels number of audio channels
  * @param[in] nBytesPerSample size in bytes per sample per channel
  * @return 0 if succeeded */
-Word16 pcmdsp_fifo_init( PCMDSP_FIFO_HANDLE h, Word16 nSamples,
-                         Word16 nChannels, Word16 nBytesPerSample );
+int pcmdsp_fifo_init( PCMDSP_FIFO_HANDLE h, unsigned int nSamples,
+                      unsigned int nChannels, unsigned int nBytesPerSample );
 
 /** Writes the given audio data to the FIFO.
  * @param[in] samples pointer to audio samples to append
  * @param[in] nSamplesPerChannel the number of samples per channel to append
  * @return 0 if succeeded */
-Word16 pcmdsp_fifo_write( PCMDSP_FIFO_HANDLE h, const UWord8 *samples, Word16 nSamplesPerChannel );
+int pcmdsp_fifo_write( PCMDSP_FIFO_HANDLE h, const uint8_t *samples, unsigned int nSamplesPerChannel );
 /** Reads the given number of audio samples from the FIFO.
  * @param[in] nSamplesPerChannel the number of samples per channel to read from the FIFO
  * @param[in] samples pointer where the audio samples will be copied to
  * @return 0 if succeeded */
-Word16 pcmdsp_fifo_read( PCMDSP_FIFO_HANDLE h, Word16 nSamplesPerChannel, UWord8 *samples );
+int pcmdsp_fifo_read( PCMDSP_FIFO_HANDLE h, unsigned int nSamplesPerChannel, uint8_t *samples );
 
 /** Returns the number of samples per channel that can be read (number of currently stored samples). */
-Word16 pcmdsp_fifo_nReadableSamples( const PCMDSP_FIFO_HANDLE h );
+unsigned int pcmdsp_fifo_nReadableSamples( const PCMDSP_FIFO_HANDLE h );
 
-#endif /* PCMDSP_FIFO_H */
+#endif /* JBM_PCMDSP_FIFO_H */

@@ -1,16 +1,15 @@
 /*====================================================================================
-    EVS Codec 3GPP TS26.442 Apr 03, 2018. Version 12.11.0 / 13.6.0 / 14.2.0
+    EVS Codec 3GPP TS26.443 Nov 13, 2018. Version 12.11.0 / 13.7.0 / 14.3.0 / 15.1.0
   ====================================================================================*/
-
-/*BASOp version info: This file is up to date with trunk rev. 39929 */
 
 #include <stdlib.h>
 #include <stdio.h>
+#include <math.h>
 #include <assert.h>
+#include "prot.h"
 #include "options.h"
-#include "prot_fx.h"
-#include "basop_util.h"
-#include "stl.h"
+#include "rom_com.h"
+
 
 /*-------------------------------------------------------------------*
  * decoder_acelp()
@@ -19,216 +18,171 @@
  *-------------------------------------------------------------------*/
 
 void decoder_acelp(
-    Decoder_State_fx *st,
-    Word16 coder_type,            /* i  : coder type                     */
-    Word16 prm[],                 /* i  : parameters                     */
-    Word16 A[],                   /* i  : coefficients NxAz[M+1]         */
-    ACELP_config acelp_cfg,       /* i  : ACELP config                   */
-    Word16 synth[],               /* i/o: synth[-2*LFAC..L_DIV]    Q0    */
-    Word16 *pT,                   /* o  : pitch for all subframe   Q0    */
-    Word16 *pgainT,               /* o  : pitch gain for all subfr 1Q14  */
-    Word16 stab_fac,              /* i  : stability of isf               */
-    Word16 *pitch_buffer,         /* o  : pitch values for each subfr.   */
-    Word16 *voice_factors,        /* o  : voicing factors                */
-    const Word16 LSF_Q_prediction,  /* i  : LSF prediction mode            */
-    Word16 *bwe_exc               /* o  : excitation for SWB TBE         */
+    Decoder_State *st,            /* i/o: coder memory state          */
+    const short coder_type,     /* i  : coder type                  */
+    int   prm[],          /* i  : parameters                  */
+    const float A[],            /* i  : coefficients NxAz[M+1]      */
+    ACELP_config acelp_cfg,      /* i  : ACELP config                */
+    float synth[],        /* i/o: synthesis                   */
+    int   *pT,            /* o  : pitch for all subframe      */
+    float *pgainT,        /* o  : pitch gain for all subfr    */
+    const float stab_fac,       /* i  : stability of isf            */
+    float *pitch_buffer,  /* i/o: pitch values for each subfr.*/
+    float *voice_factors, /* o  : voicing factors             */
+    const short LSF_Q_prediction,/* i  : LSF prediction mode        */
+    float *bwe_exc        /* o  : excitation for SWB TBE      */
 )
 {
-    Word16 i, j, i_subfr;
-    Word16 T0, T0_frac, T0_min, T0_min_frac, T0_max, T0_max_frac, T0_res;
-    Word16 tmp, tmp2, gain_pit/*Q14*/, Es_pred, tmp_deemph;
-    Word32 Ltmp, Ltmp2, gain_code;
-    Word16 code[L_SUBFR];
-    Word16 mem_syn[M];
-    Word16 *syn, syn_buf[M+L_DIV_MAX+L_DIV_MAX/2];
-    Word16 *exc, exc_buf[L_EXC_MEM_DEC+L_DIV_MAX+1];
-    Word16 exc2[L_FRAME_16k];
-    Word16 *p_A;
-    Word32 pitch_buf[NB_SUBFR16k];
-    Word16 dummy_pitch_buf[NB_SUBFR16k];
-    Word16 gain_inov;
-    Word16 mem_back[M];
-    Word16 update_flg;
-    Word16 Q_mem_back;    /*Q format of mem_back*/
-    Word16 h1[L_FRAME_16k/4+1];
-    Word16 mem[M];
-    Word16 *pA;
+    short i, i_subfr, L_frame;
+    int   T0, T0_frac, T0_min, T0_min_frac, T0_max, T0_max_frac, T0_res;
+    float tmp, gain_pit, gain_code, Es_pred;
+    float code[L_SUBFR];
+    float mem_syn[M], *syn, syn_buf[M+L_FRAME16k+L_FRAME16k/2];
+    float *exc, exc_buf[L_EXC_MEM_DEC+L_FRAME16k+1];
+    float exc2[L_FRAME16k];
+    const float *p_A;
+    float *pt_pitch, pitch_buf[NB_SUBFR16k];
+    float gain_inov;
+    float mem_back[M];
+    float h1[L_FRAME16k/4+1];
+    float mem[M];
+    const float *pA;
+    float gain_code2;
+    float code2[L_SUBFR];
+    short lp_flag;
+    int offset;
+    float error = 0.0f;
+    float gain_preQ = 0;                /* Gain of prequantizer excitation   */
+    float code_preQ[L_SUBFR];           /* Prequantizer excitation           */
     PulseConfig config;
-    Word16 weights[5]; /* Q15 */
+    float weights[5];
 
-    Word16 reScaleLen_fx;    /* rescaling length for the BWE buffers */
-    Word16 reSampLen;
+    float prev_gain_pit;
+    float tmp_noise;   /* Long term temporary noise energy */
 
-    /*Q formats of buffers   */
-    Word16 prev_Q_syn;
-    Word32 gain_code2=0;
-    Word16 code2[L_SUBFR];
-    Word16 error = 0;
-    Word16 gain_preQ = 0;                /* Gain of prequantizer excitation   */
-    Word16 code_preQ[L_SUBFR];           /* Prequantizer excitation           */
-    Word16 lp_flag;
-
-
-    Word16 prev_gain_pit;
-    Word16 tmp_noise;   /* Long term temporary noise energy */
-    Word32 gain_code_tmp;
-    Word16 gain_pit_tmp;
-    Word32 gain_code_pre;
-    Word16 avoid_lpc_burst_on_recovery;
-    Word16 force_scale_syn;
-
-
-    gain_code_pre = 0;
-    move16();
-
-
-    set16_fx(code_preQ, 0, L_SUBFR);
+    float gain_code_tmp;
+    float gain_pit_tmp;
+    float gain_code_pre;
 
     gain_inov = 0;    /* to avoid compilation warnings */
     T0 = 0;           /* to avoid compilation warnings */
     T0_frac = 0;      /* to avoid compilation warnings */
     T0_res = 0;       /* to avoid compilation warnings */
-    prev_Q_syn = st->prev_Q_syn = st->Q_syn;
-    move16();
-    move16();
-    move16();
-    move16();
+
+    /*------------------------------------------------------------------------*
+     * Initializations                                                        *
+     *------------------------------------------------------------------------*/
+
+    gain_code_pre = 0;
+    set_f( code_preQ, 0.f, L_SUBFR );
+
     gain_pit = 0;
     gain_code = 0;
-    move16();
-    move16();
-    move16();
-    update_flg = 0;
-    move16();
-    gain_code2=0;
+    gain_code2 = 0.f;
 
     prev_gain_pit = 0;
     tmp_noise = 0;
 
-    IF(sub(st->nb_subfr,4)==0)
+    if( st->nb_subfr == NB_SUBFR )
     {
-        move16();
-        move16();
-        move16();
-        move16();
-        weights[0] = 3277/*0.1f Q15*/;
-        weights[1] = 6554/*0.2f Q15*/;
-        weights[2] = 9830/*0.3f Q15*/;
-        weights[3] = 13107/*0.4f Q15*/;
+        weights[0] = 0.1f;
+        weights[1] = 0.2f;
+        weights[2] = 0.3f;
+        weights[3] = 0.4f;
     }
-    ELSE  /*nb_subfr == 5*/
+    else  /*nb_subfr == NB_SUBFR16k */
     {
-        move16();
-        move16();
-        move16();
-        move16();
-        move16();
-        weights[0] = 2185/*(float)1/15 Q15*/;
-        weights[1] = 4369/*(float)2/15 Q15*/;
-        weights[2] = 6554/*(float)3/15 Q15*/;
-        weights[3] = 8738/*(float)4/15 Q15*/;
-        weights[4] = 10923/*(float)5/15 Q15*/;
-    }
-    st->Mode2_lp_gainp = L_deposit_l(0);
-    st->Mode2_lp_gainc = L_deposit_l(0);
-
-    avoid_lpc_burst_on_recovery = 0;
-    move16();
-    test();
-    test();
-    if (st->last_con_tcx && (sub(st->L_frameTCX_past, st->L_frame_fx) != 0) && (st->last_core_fx != 0))
-    {
-        avoid_lpc_burst_on_recovery = 1;
-        move16();
+        weights[0] = (float)1/15;
+        weights[1] = (float)2/15;
+        weights[2] = (float)3/15;
+        weights[3] = (float)4/15;
+        weights[4] = (float)5/15;
     }
 
+    st->lp_gainp = 0;
+    st->lp_gainc = 0;
+
+
+    /* Framing parameters */
+    L_frame = st->L_frame;
 
     /*------------------------------------------------------------------------*
      * Previous frame is TCX                                                  *
      *------------------------------------------------------------------------*/
-
-
     /* Reset phase dispersion */
-    IF ( st->last_core_bfi > ACELP_CORE )
+
+    if( st->last_core_bfi > ACELP_CORE )
     {
-        st->dm_fx.prev_gain_code = L_deposit_l(0);
-        set16_fx(st->dm_fx.prev_gain_pit, 0, 6);
-        st->dm_fx.prev_state = 0;
-        move16();
+        set_zero( st->dispMem, 8 );
     }
 
     /* Update of synthesis filter memories in case of 12k8 core */
-    test();
-    test();
-    IF ( st->prev_bfi_fx && st->last_con_tcx && sub(st->L_frame_fx, L_FRAME16k) < 0 )
+    if( st->prev_bfi && st->last_con_tcx && st->L_frame < L_FRAME16k )
     {
-        synth_mem_updt2( st->L_frame_fx, L_FRAME16k, st->old_exc_fx, st->mem_syn_r, st->mem_syn2_fx, NULL, DEC );
+        synth_mem_updt2( st->L_frame, L_FRAME16k, st->old_exc, st->mem_syn_r, st->mem_syn2, NULL, DEC );
     }
 
-    IF( st->last_con_tcx && st->old_enr_LP )
+    if( st->last_con_tcx && st->old_enr_LP )
     {
-        Word16 enr_LP, ratio;
+        float enr_LP, ratio;
 
         /* rescale excitation buffer if LPC energies differs too much */
-        enr_LP = Enr_1_Az_fx( A, L_SUBFR );
+        enr_LP = enr_1_Az( A, L_SUBFR );
 
-        IF(sub(st->old_enr_LP, enr_LP) < 0)
+        ratio = st->old_enr_LP/enr_LP;
+        if (ratio < 0.8)
         {
-            ratio = div_s(st->old_enr_LP,enr_LP); /* Q15 */
-            IF (sub(ratio, 26215) < 0)
-            {
-                FOR (i = 0; i < L_EXC_MEM_DEC; i++)
-                {
-                    st->old_exc_fx[i] = mult_r(st->old_exc_fx[i], ratio);
-                }
-            }
+            v_multc( st->old_exc, ratio, st->old_exc, L_EXC_MEM_DEC);
         }
     }
 
     /*------------------------------------------------------------------------*
      * Initialize buffers                                                     *
      *------------------------------------------------------------------------*/
-    Copy( st->mem_syn2_fx, mem_back, M);
-    move16();
-    Q_mem_back = st->Q_syn;
+
+    mvr2r( st->mem_syn2, mem_back, M );
+
     /* set ACELP synthesis memory */
-    Copy( st->mem_syn2_fx, mem_syn, M );
+    mvr2r( st->mem_syn2, mem_syn, M );
 
     /* set excitation memory*/
     exc=exc_buf+L_EXC_MEM_DEC;
-    Copy( st->old_exc_fx, exc_buf, L_EXC_MEM_DEC);
-    *(exc+st->L_frame_fx) = 0;
+    mvr2r( st->old_exc, exc_buf, L_EXC_MEM_DEC );
+    *(exc+L_frame) = 0.f;
 
     /* Init syn buffer */
     syn = syn_buf + M;
-    Copy( st->mem_syn2_fx, syn_buf, M );
+    mvr2r( st->mem_syn2, syn_buf, M );
 
     /*------------------------------------------------------------------------*
      * Fast recovery flag
      *------------------------------------------------------------------------*/
-    test();
-    if(st->prev_bfi_fx && sub(coder_type,VOICED)==0)
+
+    if( st->prev_bfi && coder_type == VOICED )
     {
         /*Force BPF to be applied fully*/
-        st->bpf_gain_param=3;
-        move16();
+        st->bpf_gain_param = 3;
     }
 
     /*------------------------------------------------------------------------*
      * - decode mean_ener_code for gain decoder (d_gain2.c)                   *
      *------------------------------------------------------------------------*/
-    Es_pred = 0;
-    move16();
-    IF ( acelp_cfg.nrg_mode>0 )
+
+    if ( acelp_cfg.nrg_mode > 0 )
     {
-        d_gain_pred(acelp_cfg.nrg_mode, &Es_pred, &prm );
+        Es_pred_dec( &Es_pred, prm[0], acelp_cfg.nrg_bits,acelp_cfg.nrg_mode>1 );
+        prm++;
+    }
+    else
+    {
+        Es_pred = 0.f;
     }
 
     /*------------------------------------------------------------------------*
      *          Loop for every subframe in the analysis frame                 *
      *------------------------------------------------------------------------*
      *  To find the pitch and innovation parameters. The subframe size is     *
-     *  L_subfr and the loop is repeated L_ACELP/L_subfr times.               *
+     *  L_SUBFR and the loop is repeated L_frame/L_SUBFR times.               *
      *     - compute impulse response of weighted synthesis filter (h1[])     *
      *     - compute the target signal for pitch search                       *
      *     - find the closed-loop pitch parameters                            *
@@ -244,35 +198,30 @@ void decoder_acelp(
      *------------------------------------------------------------------------*/
 
     p_A = A;
+    pt_pitch = pitch_buf;
 
-    FOR (i_subfr = 0; i_subfr < st->L_frame_fx; i_subfr += L_SUBFR)
+    for( i_subfr = 0; i_subfr < L_frame; i_subfr += L_SUBFR )
     {
-
-        test();
-        IF( sub(st->use_partial_copy,1)== 0 && sub(st->rf_frame_type,RF_NELP) == 0 )
+        if( st->use_partial_copy && st->rf_frame_type == RF_NELP )
         {
-            IF( i_subfr == 0 )
+            if( i_subfr == 0 )
             {
-                decod_nelp_fx( st, UNVOICED, &tmp_noise, dummy_pitch_buf, exc, exc2, voice_factors, bwe_exc, &st->Q_exc, st->bfi_fx, pgainT );
-
-                set32_fx(pitch_buf, L_SUBFR_Q16, NB_SUBFR);
-                set16_fx(pitch_buffer, 4096, NB_SUBFR);  /* L_SUBFR_Q16 in Q6 */
+                decod_nelp( st, UNVOICED, &tmp_noise, pt_pitch, exc, exc2, voice_factors, bwe_exc, 0 /*st->bfi*/, pgainT );
+                set_f(pitch_buffer, L_SUBFR, NB_SUBFR);
             }
         }
-        ELSE
+        else
         {
-
             /*-------------------------------------------------------*
              * - Decode adaptive codebook.                           *
              *-------------------------------------------------------*/
 
-            test();
-            IF( sub(st->use_partial_copy,1)== 0 && st->acelp_cfg.gains_mode[i_subfr/L_SUBFR] == 0 )
+            if( st->use_partial_copy && st->acelp_cfg.gains_mode[i_subfr/L_SUBFR] == 0 )
             {
                 gain_pit = prev_gain_pit;
             }
 
-            IF ( acelp_cfg.ltp_bits != 0 )
+            if( acelp_cfg.ltp_bits != 0 )
             {
                 /*if( st->use_partial_copy
                     && st->rf_frame_type == RF_GENPRED
@@ -283,490 +232,318 @@ void decoder_acelp(
                 else*/
                 {
                     /* pitch lag decoding */
-                    pitch_buf[i_subfr/L_SUBFR] = Mode2_pit_decode(  acelp_cfg.ltp_mode,
-                    i_subfr,
-                    L_SUBFR,
-                    &prm,
-                    &T0,
-                    &T0_frac,
-                    &T0_res,
-                    &T0_min,
-                    &T0_min_frac,
-                    &T0_max,
-                    &T0_max_frac,
-                    st->pit_min,
-                    st->pit_fr1,
-                    st->pit_fr1b,
-                    st->pit_fr2,
-                    st->pit_max,
-                    st->pit_res_max);
+                    *pt_pitch = Mode2_pit_decode( acelp_cfg.ltp_mode, i_subfr, L_SUBFR, &prm, &T0, &T0_frac, &T0_res,
+                                                  &T0_min, &T0_min_frac, &T0_max, &T0_max_frac, st->pit_min,
+                                                  st->pit_fr1, st->pit_fr1b, st->pit_fr2, st->pit_max, st->pit_res_max );
                 }
+
                 /* find pitch excitation */
-                test();
-                IF( sub(st->pit_res_max,6) == 0 && !(st->use_partial_copy) )
+                if( st->pit_res_max == 6 && !(st->use_partial_copy) )
                 {
-                    IF ( sub(T0_res, shr(st->pit_res_max, 1)) == 0)
+                    if ( T0_res == (st->pit_res_max>>1) )
                     {
-                        pred_lt4( &exc[i_subfr], &exc[i_subfr], T0, shl(T0_frac,1), L_SUBFR+1, pitch_inter6_2, PIT_L_INTERPOL6_2, PIT_UP_SAMP6 );
+                        pred_lt4( &exc[i_subfr], &exc[i_subfr], T0, T0_frac<<1, L_SUBFR+1, inter6_2, PIT_L_INTERPOL6_2, PIT_UP_SAMP6 );
                     }
-                    ELSE
+                    else
                     {
-                        pred_lt4( &exc[i_subfr],&exc[i_subfr],  T0, T0_frac, L_SUBFR+1, pitch_inter6_2, PIT_L_INTERPOL6_2, PIT_UP_SAMP6 );
+                        pred_lt4( &exc[i_subfr], &exc[i_subfr], T0, T0_frac, L_SUBFR+1, inter6_2, PIT_L_INTERPOL6_2, PIT_UP_SAMP6 );
                     }
                 }
-                ELSE
+                else
                 {
-                    IF ( sub(T0_res, shr(st->pit_res_max, 1)) == 0)
+                    if( T0_res == (st->pit_res_max>>1) )
                     {
-                        pred_lt4( &exc[i_subfr], &exc[i_subfr], T0, shl(T0_frac,1), L_SUBFR+1, pitch_inter4_2, L_INTERPOL2, PIT_UP_SAMP );
+                        pred_lt4( &exc[i_subfr], &exc[i_subfr], T0, T0_frac<<1, L_SUBFR+1, inter4_2, L_INTERPOL2, PIT_UP_SAMP );
                     }
-                    ELSE
+                    else
                     {
-                        pred_lt4( &exc[i_subfr], &exc[i_subfr], T0, T0_frac, L_SUBFR+1, pitch_inter4_2, L_INTERPOL2, PIT_UP_SAMP );
+                        pred_lt4( &exc[i_subfr], &exc[i_subfr], T0, T0_frac, L_SUBFR+1, inter4_2, L_INTERPOL2, PIT_UP_SAMP );
                     }
                 }
 
                 /* LP filtering of the adaptive excitation*/
                 lp_flag = acelp_cfg.ltf_mode;
-                move16();
 
-                IF( sub(acelp_cfg.ltf_mode, NORMAL_OPERATION) == 0 )
+                if( acelp_cfg.ltf_mode == NORMAL_OPERATION )
                 {
                     lp_flag = *prm;
-                    move16();
                     prm++;
                 }
 
-                lp_filt_exc_dec_fx( st, MODE2, st->core_brate_fx, 0, coder_type, i_subfr, L_SUBFR, st->L_frame_fx, lp_flag, exc );
-
+                lp_filt_exc_dec( st, MODE2, st->core_brate, 0, coder_type, i_subfr, L_SUBFR, L_frame, lp_flag, exc );
             }
-            ELSE
+            else
             {
                 /* No adaptive codebook (UC) */
-                set16_fx(&exc[i_subfr], 0, L_SUBFR);
+                set_zero( exc + i_subfr, L_SUBFR );
 
                 T0 = L_SUBFR;
                 T0_frac = 0;
                 T0_res = 1;
-                pitch_buf[i_subfr/L_SUBFR] = L_deposit_h(L_SUBFR);
+                pitch_buf[i_subfr/L_SUBFR] = (float)L_SUBFR;
             }
 
-            IF( st->igf != 0 )
+            if( st->igf )
             {
-                tbe_celp_exc(st->L_frame_fx, i_subfr, T0, T0_frac, &error, bwe_exc);
+                if( st->sr_core == 12800 )
+                {
+                    offset = T0 * HIBND_ACB_L_FAC + (int) ((float) T0_frac * 0.25f * HIBND_ACB_L_FAC + 2 * HIBND_ACB_L_FAC + 0.5f) - 2 * HIBND_ACB_L_FAC;
+                    for (i = 0; i < L_SUBFR * HIBND_ACB_L_FAC; i++)
+                    {
+                        bwe_exc[i + i_subfr * HIBND_ACB_L_FAC] = bwe_exc[i + i_subfr * HIBND_ACB_L_FAC - offset + (int) error];
+                    }
+                    error += (float) offset - (float) T0 * HIBND_ACB_L_FAC  - 0.25f * HIBND_ACB_L_FAC * (float) T0_frac;
+                }
+                else
+                {
+                    offset = T0 * 2 + (int) ((float) T0_frac * 0.5f + 4 + 0.5f) - 4;
+                    for (i=0; i<L_SUBFR * 2; i++)
+                    {
+                        bwe_exc[i + i_subfr * 2] = bwe_exc[i + i_subfr * 2 - offset + (int) error];
+                    }
+                    error += (float) offset - (float) T0 * 2 - 0.5f * (float) T0_frac;
+                }
             }
 
-            pitch_buffer[i_subfr/L_SUBFR] = shl(add(shl(T0,2),T0_frac), 4);
+            pitch_buffer[i_subfr/L_SUBFR] = (float)T0 + (float)T0_frac/(float)T0_res;
 
             /*-------------------------------------------------------*
              * - Decode innovative codebook.                         *
              *-------------------------------------------------------*/
-            test();
-            test();
-            test();
-            test();
-            IF( sub(st->use_partial_copy,1)==0 &&
-            ( sub(st->rf_frame_type,RF_ALLPRED) == 0 ||
-            ( sub(st->rf_frame_type,RF_GENPRED) == 0 &&
-            ( sub(i_subfr,L_SUBFR) == 0 || sub(i_subfr,3*L_SUBFR) == 0 )) ) )
+
+            if( st->use_partial_copy && ( st->rf_frame_type == RF_ALLPRED || ( st->rf_frame_type == RF_GENPRED && ( i_subfr == L_SUBFR || i_subfr == 3*L_SUBFR )) ) )
             {
-                set16_fx(code, 0, L_SUBFR);
+                set_f(code, 0.0f, L_SUBFR);
             }
-            ELSE
+            else
             {
                 config = PulseConfTable[acelp_cfg.fixed_cdk_index[i_subfr/L_SUBFR]];
                 D_ACELP_indexing( code, config, NB_TRACK_FCB_4T, prm, &st->BER_detect );
                 (prm) += 8;
-                /*-------------------------------------------------------*
-                 * - Add the fixed-gain pitch contribution to code[].    *
-                 *-------------------------------------------------------*/
 
-                cb_shape_fx( acelp_cfg.pre_emphasis, acelp_cfg.pitch_sharpening, acelp_cfg.phase_scrambling, acelp_cfg.formant_enh, acelp_cfg.formant_tilt,
-                acelp_cfg.formant_enh_num, acelp_cfg.formant_enh_den, p_A, code, st->tilt_code_fx, extract_h(L_add(pitch_buf[i_subfr/L_SUBFR],26216)), 1 );
+                /*-------------------------------------------------------*
+                * - Add the fixed-gain pitch contribution to code[].    *
+                *-------------------------------------------------------*/
+
+                cb_shape( acelp_cfg.pre_emphasis, acelp_cfg.pitch_sharpening, acelp_cfg.phase_scrambling, acelp_cfg.formant_enh,
+                          acelp_cfg.formant_tilt, acelp_cfg.formant_enh_num, acelp_cfg.formant_enh_den, p_A, code, st->tilt_code, pitch_buf[i_subfr/L_SUBFR] );
             }
+
             /*-------------------------------------------------------*
              * - Generate Gaussian excitation                        *
              *-------------------------------------------------------*/
-            test();
-            IF( sub(acelp_cfg.gains_mode[i_subfr/L_SUBFR],7)==0 && !st->use_partial_copy )
+
+            if( acelp_cfg.gains_mode[i_subfr/L_SUBFR] == 7 && !st->use_partial_copy )
             {
-                gaus_L2_dec( code2, st->tilt_code_fx, p_A, acelp_cfg.formant_enh_num, &(st->seed_acelp) );
+                gaus_L2_dec( code2, st->tilt_code, p_A, acelp_cfg.formant_enh_num, &(st->seed_acelp) );
             }
-            ELSE
+            else
             {
-                gain_code2 = L_deposit_l(0);
-                set16_fx(code2,0,L_SUBFR);
+                gain_code2 = 0.f;
+                set_zero( code2, L_SUBFR );
             }
 
             /*-------------------------------------------------*
              * - Decode codebooks gains.                       *
              *-------------------------------------------------*/
-            IF( st->acelp_cfg.gains_mode[i_subfr/L_SUBFR] != 0 )
-            {
-                decode_acelp_gains( code,
-                acelp_cfg.gains_mode[i_subfr/L_SUBFR],
-                Es_pred,
-                &gain_pit,
-                &gain_code,
-                &prm,
-                &(st->past_gpit),
-                &(st->past_gcode),
-                &gain_inov,
-                L_SUBFR,
-                code2,
-                &gain_code2
-                                  );
-            }
-            IF(st->use_partial_copy && st->rf_frame_type == RF_ALLPRED) st->past_gcode = 0;
-            IF(st->use_partial_copy && st->rf_frame_type == RF_NOPRED ) st->past_gpit = 67;
-            IF( st->igf != 0 )
-            {
-                /* Rescaling for 12.8k and 16k cores related to BWE */
-                IF ( sub(st->L_frame_fx, L_FRAME) == 0 )
-                {
-                    /* 5/2 times resampled past memories*/
-                    reScaleLen_fx = add(shl(i_subfr, 1), shr(i_subfr, 1));
-                    reSampLen = (L_SUBFR * HIBND_ACB_L_FAC);
-                }
-                ELSE
-                {
-                    /* 2 times resampled past memories*/
-                    reScaleLen_fx = shl(i_subfr, 1);
-                    reSampLen = (L_SUBFR * 2);
-                }
 
-                Rescale_exc(NULL, &exc[i_subfr], &bwe_exc[reScaleLen_fx],
-                            NULL, L_SUBFR, reSampLen, gain_code, &(st->Q_exc), st->Q_subfr,
-                            exc2, i_subfr, GENERIC);
-            }
-            ELSE
+            if( st->acelp_cfg.gains_mode[i_subfr/L_SUBFR] != 0 )
             {
-                Rescale_exc(NULL, &exc[i_subfr], NULL, NULL, L_SUBFR, 0,
-                gain_code, &(st->Q_exc), st->Q_subfr, exc2, i_subfr, GENERIC);
+                decode_acelp_gains( code, acelp_cfg.gains_mode[i_subfr/L_SUBFR], Es_pred, &gain_pit, &gain_code,
+                                    &prm, &(st->past_gpit), &(st->past_gcode), &gain_inov, L_SUBFR, code2, &gain_code2 );
+            }
+
+            if( st->use_partial_copy && st->rf_frame_type == RF_ALLPRED )
+            {
+                st->past_gcode = 0.0f;
+            }
+
+            if( st->use_partial_copy && st->rf_frame_type == RF_NOPRED )
+            {
+                st->past_gpit = 0.004089f;
             }
 
             /*----------------------------------------------------------*
              * Update parameters for the next subframe.                 *
              * - tilt of code: 0.0 (unvoiced) to 0.5 (voiced)           *
              *----------------------------------------------------------*/
-            E_UTIL_voice_factor( exc,
-            i_subfr,
-            code,
-            gain_pit,
-            gain_code,
-            &(st->voice_fac),
-            &(st->tilt_code_fx),
-            L_SUBFR,
-            acelp_cfg.voice_tilt,
-            st->Q_exc,
-            0
-                               );
+
+            st->tilt_code = est_tilt( exc+i_subfr, gain_pit, code, gain_code, &(st->voice_fac), L_SUBFR, acelp_cfg.voice_tilt );
 
             pgainT[i_subfr/L_SUBFR] = gain_pit;
-            move16();
 
             /*-------------------------------------------------------*
              * - Find the total excitation.                          *
              *-------------------------------------------------------*/
+
             gain_code_tmp = gain_code;
             gain_pit_tmp = gain_pit;
-            IF( i_subfr == 0 )
+            if ( st->core == ACELP_CORE && st->last_core == ACELP_CORE && ( st->use_partial_copy || st->prev_use_partial_copy))
             {
-                gain_code_pre = 0;
-            }
-            IF ( sub(st->core_fx,ACELP_CORE) == 0 && sub(st->last_core_fx,ACELP_CORE) == 0 && ( sub(st->use_partial_copy,1) == 0|| sub(st->prev_use_partial_copy, 1) == 0))
-            {
-                IF( i_subfr > 0 && sub(gain_pit,20152) > 0 && sub(st->prev_tilt_code_dec_fx,6553) > 0 && sub(st->next_coder_type,VOICED) == 0
-                &&( sub(st->use_partial_copy,1) == 0 || sub(st->prev_use_partial_copy, 1) ==0 ) )
+                if ( i_subfr > 0 && gain_pit > 1.23f && st->prev_tilt_code_dec > 0.2f && st->next_coder_type == VOICED && (st->use_partial_copy || st->prev_use_partial_copy ) )
                 {
-                    gain_pit = mult(gain_pit,sub(26214, mult(i_subfr,51)));
+                    gain_pit *= (0.8f - i_subfr/640.0f);
                 }
-                ELSE IF( !st->prev_use_partial_copy && sub(st->last_coder_type_fx,UNVOICED) == 0 && sub(st->next_coder_type,UNVOICED) != 0 && L_sub(gain_code,gain_code_pre)< 0)
 
+                else if( !st->prev_use_partial_copy && st->last_coder_type == UNVOICED && st->next_coder_type != UNVOICED && gain_code < gain_code_pre)
                 {
-                    gain_code = 0;
+                    gain_code = 0.0f;
                 }
             }
+
             gain_code_pre = gain_code;
-            st->tilt_code_dec_fx[i_subfr/L_SUBFR] = st->tilt_code_fx;
+            st->tilt_code_dec[i_subfr/L_SUBFR] = st->tilt_code;
 
-
-            tmp2 = shr(L_SUBFR, 1);
-            FOR (j = 0; j < 2; j++)
+            for( i = 0; i < L_SUBFR; i++ )
             {
-                FOR (i = sub(tmp2, shr(L_SUBFR, 1)); i < tmp2; i++)
-                {
-                    /* code in Q9, gain_pit in Q14, gain_code in Q16; exc Q_new */
-                    Ltmp = Mpy_32_16_1(gain_code2, code2[i]);
-                    Ltmp = L_shl(Ltmp, add(5,st->Q_exc));
-                    Ltmp = L_mac(Ltmp, gain_pit, exc[i+i_subfr]);
-                    exc2[i + i_subfr] = round_fx(L_shl(Ltmp, 1));
-
-                    Ltmp2 = Mpy_32_16_1(gain_code, code[i]);
-                    Ltmp2 = L_shl(Ltmp2, add(5,st->Q_exc));
-                    Ltmp = L_add(Ltmp, Ltmp2);
-                    BASOP_SATURATE_WARNING_OFF
-                    Ltmp = L_shl(Ltmp, 1);       /* saturation can occur here */
-                    BASOP_SATURATE_WARNING_ON
-                    exc[i + i_subfr] = round_fx(Ltmp);
-                }
-                tmp2 = L_SUBFR;
-                move16();
+                exc2[i+i_subfr] = gain_pit*exc[i+i_subfr];
+                exc2[i+i_subfr] +=  gain_code2*code2[i];
+                exc[i+i_subfr] = exc2[i+i_subfr] + gain_code*code[i];
             }
 
             /*-----------------------------------------------------------------*
              * Prepare TBE excitation
              *-----------------------------------------------------------------*/
+
             gain_code = gain_code_tmp;
             gain_pit = gain_pit_tmp;
-            IF( st->igf != 0 )
+
+            if( st->igf != 0 )
             {
-                prep_tbe_exc_fx( st->L_frame_fx,
-                                 i_subfr,
-                                 gain_pit,
-                                 gain_code,
-                                 code,
-                                 st->voice_fac,
-                                 &voice_factors[i_subfr/L_SUBFR],
-                                 bwe_exc,
-                                 gain_preQ,
-                                 code_preQ,
-                                 st->Q_exc,
-                                 T0,
-                                 T0_frac,
-                                 coder_type,
-                                 st->core_brate_fx);
+                prep_tbe_exc( L_frame, i_subfr, gain_pit, gain_code, code, st->voice_fac, &voice_factors[i_subfr/L_SUBFR],
+                              bwe_exc, gain_preQ, code_preQ, T0, coder_type, st->core_brate );
             }
 
             /*---------------------------------------------------------*
              * Enhance the excitation                                  *
              *---------------------------------------------------------*/
-            E_UTIL_enhancer(  st->voice_fac,
-                              stab_fac,
-                              st->past_gcode,
-                              gain_inov,
-                              &(st->gc_threshold_fx),
-                              code,
-                              &exc2[i_subfr],
-                              gain_pit,
-                              &st->dm_fx.prev_gain_code,
-                              st->dm_fx.prev_gain_pit,
-                              &st->dm_fx.prev_state,
-                              coder_type,
-                              acelp_cfg.fixed_cdk_index[i_subfr/L_SUBFR],
-                              L_SUBFR,
-                              st->L_frame_fx,
-                              st->Q_exc
-                           );
+
+            enhancer( MODE2, -1, acelp_cfg.fixed_cdk_index[i_subfr/L_SUBFR], 0, coder_type, L_frame, st->voice_fac, stab_fac,
+                      st->past_gcode, gain_inov, &(st->gc_threshold), code, &exc2[i_subfr], gain_pit, st->dispMem );
 
         } /* !RF_NELP frame partial copy */
+
         /*----------------------------------------------------------*
          * - compute the synthesis speech                           *
          *----------------------------------------------------------*/
-        rescale_mem(&st->Q_exc, &prev_Q_syn, &st->Q_syn, mem_syn, syn, M, i_subfr);
 
-        E_UTIL_synthesis(sub(st->Q_exc,st->Q_syn), p_A, &exc2[i_subfr], &syn[i_subfr], L_SUBFR, mem_syn, 1, M);
+        syn_filt( p_A, M,&exc2[i_subfr], &syn[i_subfr], L_SUBFR, mem_syn, 1 );
 
         /*-----------------------------------------------------------------*
          * update lp_filtered gains for the case of frame erasure
          *-----------------------------------------------------------------*/
 
-        st->Mode2_lp_gainp = L_add(st->Mode2_lp_gainp, L_mult0(st->past_gpit, weights[i_subfr/L_SUBFR])); /* 2Q29=1Q14*Q15 */       move32();
-        st->Mode2_lp_gainc = L_add(st->Mode2_lp_gainc, Mpy_32_16_1(st->past_gcode, weights[i_subfr/L_SUBFR]));  /* 15Q16=15Q16*Q15 */      move32();
+        st->lp_gainp += weights[i_subfr/L_SUBFR] * st->past_gpit;
+        st->lp_gainc += weights[i_subfr/L_SUBFR] * st->past_gcode;
 
         /*----------------------------------------------------------*
          * - update pitch lag for guided ACELP                      *
          *----------------------------------------------------------*/
-        test();
-        if( st->enableGplc && sub( shr(i_subfr,6), sub(st->nb_subfr,1) )==0 )
+
+        if( st->enableGplc && (i_subfr/L_SUBFR) == (L_frame/L_SUBFR)-1 )
         {
             st->T0_4th = T0;
-            move16();
         }
 
         /*----------------------------------------------------------*
          * - Update LPC coeffs                                      *
          *----------------------------------------------------------*/
-        p_A += (M+1);
 
+        p_A += (M+1);
+        pt_pitch++;
         /* copy current gain for next subframe use, in case there is no explicit encoding */
         prev_gain_pit = gain_pit;
+
     } /* end of subframe loop */
 
-    IF(st->BER_detect)
+    if(st->BER_detect)
     {
-        FOR (i=0; i<st->L_frame_fx; i++)
+        for (i=0; i<L_frame; i++)
         {
-            exc[i] = 0;
-            move16();
+            exc[i] = 0.0f;
+        }
+        int_lsp( L_frame, st->old_lsp_q_cng, st->lsp_q_cng, st->Aq_cng, M, interpol_frac_12k8, 0 );
+
+        p_A =st->Aq_cng;
+        if(st->last_good < UNVOICED_TRANSITION )
+        {
+            mvr2r(st->mem_syn2, mem_syn, M );
+        }
+        else
+        {
+            set_zero( mem_syn, M );
         }
 
-        int_lsp_fx( st->L_frame_fx, st->old_lsp_q_cng, st->lsp_q_cng, st->Aq_cng, M, interpol_frac_fx, 0 );
-
-        p_A = st->Aq_cng;
-        IF(st->last_good_fx < UNVOICED_TRANSITION )
+        for (i_subfr = 0; i_subfr < L_frame; i_subfr += L_SUBFR)
         {
-            Copy(st->mem_syn2_fx, mem_syn, M );
-        }
-        ELSE
-        {
-            set16_fx( mem_syn, 0, M );
-        }
-
-        FOR (i_subfr = 0; i_subfr < st->L_frame_fx; i_subfr += L_SUBFR)
-        {
-            E_UTIL_synthesis(sub(st->Q_exc,st->Q_syn), p_A, &exc[i_subfr], &syn[i_subfr], L_SUBFR, mem_syn, 1, M);
+            syn_filt(p_A, M,&exc[i_subfr], &syn[i_subfr], L_SUBFR, mem_syn, 1);
             p_A += (M+1);
         }
     }
 
     tmp = 0;
-    move16();
-    pA = A+(st->nb_subfr-1)*(M+1);
-    set16_fx(h1, 0, add(L_SUBFR,1));
-    set16_fx(mem, 0, M);
-    h1[0] = 32768/32;
-    move16();
-    E_UTIL_synthesis(0, pA, h1, h1, L_SUBFR, mem, 0, M);     /* impulse response of LPC     */
-    deemph_fx(h1, st->preemph_fac, L_SUBFR, &tmp);    /* impulse response of deemph  */
+    pA = A + (st->nb_subfr-1)*(M+1);
+    set_zero( h1, L_SUBFR+1 );
+    set_zero( mem, M );
+    h1[0] = 1.0f;
+    syn_filt( pA, M,h1, h1, L_SUBFR, mem, 0);     /* impulse response of LPC     */
+    deemph( h1, st->preemph_fac, L_SUBFR, &tmp);    /* impulse response of deemph  */
     /* impulse response level = gain introduced by synthesis+deemphasis */
-    Ltmp = Dot_productSq16HQ( 0, h1, L_SUBFR, &st->last_gain_syn_deemph_e);
-    st->last_gain_syn_deemph_e= add(st->last_gain_syn_deemph_e,10/*scaling of h1[0] and E_UTIL_synthesis * 2*/);
-    st->last_gain_syn_deemph = round_fx(Sqrt32(Ltmp,&st->last_gain_syn_deemph_e));
+    st->last_gain_syn_deemph = (float)sqrt(dotp( h1, h1, L_SUBFR) );
+
+    /*-----------------------------------------------------------*
+     * PLC: [ACELP: Fade-out]
+     * PLC: update the background level
+     *-----------------------------------------------------------*/
 
     /* Do the classification */
-    {
-        Word16 pit16[NB_SUBFR16k];
-        Word16 k;
-        FOR(k = 0 ; k < st->nb_subfr ; k++)
-        {
-            pit16[k] = shl(extract_h(pitch_buf[k]),6);/*Q6*/
-        }
-
-        FEC_clas_estim_fx(
-            st,
-            /*Opt_AMR_WB*/0, /*A*/
-            st->L_frame_fx,
-            &(st->clas_dec),
-            st->core_ext_mode,
-            pit16,
-            syn,
-            &st->lp_ener_FER_fx,
-            /**decision_hyst*/NULL,     /* i/o: hysteresis of the music/speech decision                               */
-            /**UV_cnt*/ NULL,           /* i/o: number of consecutives frames classified as UV                        */
-            /**LT_UV_cnt*/ NULL,        /* i/o: long term consecutives frames classified as UV                        */
-            /**Last_ener*/ NULL,        /* i/o: last_energy frame                                                     */
-            /**locattack*/ NULL,        /* i/o: detection of attack (mainly to localized speech burst)                */
-            /**lt_diff_etot*/NULL,      /* i/o: long-term total energy variation                                      */
-            /**amr_io_class*/ NULL,     /* i/o: classification for AMR-WB IO mode                                     */
-            /*bitrate*/ 0  ,            /* i  : Decoded bitrate                                                       */
-            st->Q_syn,                  /* i  : Synthesis scaling                                                     */
-            /**class_para*/ NULL,       /* o  : classification para. fmerit1                                          */
-            st->mem_syn_clas_estim_fx,  /* i/o: memory of the synthesis signal for frame class estimation             */
-            &st->classifier_Q_mem_syn,  /* i/o: exponent for memory of synthesis signal for frame class estimation    */
-            -32768/*-1.f Q15*/,         /* i  : LTP Gain                                                              */
-            0/*CLASSIFIER_ACELP*/,      /* i  : signal classifier mode                                                */
-            0/*bfi*/,                   /* i  : bad frame indicator                                                   */
-            st->last_core_brate_fx      /* i  : bitrate of previous frame                                             */
-        );
-    }
+    FEC_clas_estim( syn, pitch_buf, st->L_frame, st->core_ext_mode, st->codec_mode, st->mem_syn_clas_estim, &st->clas_dec,
+                    &st->lp_ener_bfi, st->core_brate, 0, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, -1.0f,
+                    st->narrowBand, (SIGNAL_CLASSIFIER_MODE)0,
+                    0, st->preemph_fac, st->tcxonly, st->last_core_brate );
 
     /* Update Pitch Lag memory */
+    mvr2r( &st->old_pitch_buf[L_frame/L_SUBFR], st->old_pitch_buf, L_frame/L_SUBFR );
+    mvr2r( pitch_buf, &st->old_pitch_buf[L_frame/L_SUBFR], L_frame/L_SUBFR );
 
-    Copy32(&st->old_pitch_buf_fx[st->nb_subfr], st->old_pitch_buf_fx, st->nb_subfr);
-    Copy32(pitch_buf, &st->old_pitch_buf_fx[st->nb_subfr], st->nb_subfr);
+    FEC_scale_syn( st->L_frame, st->clas_dec, st->last_good, syn, pitch_buf, st->enr_old, 0, coder_type,
+                   LSF_Q_prediction, &st->scaling_flag, &st->lp_ener_FEC_av, &st->lp_ener_FEC_max, st->bfi,
+                   st->total_brate, st->prev_bfi, st->last_core_brate, exc, exc2, A, &st->old_enr_LP, mem_back, mem_syn
+                   , st->last_con_tcx && (st->L_frameTCX_past != st->L_frame) && (st->last_core != 0)
+                   , (st->clas_dec == ONSET || (st->last_good >= VOICED_TRANSITION && st->last_good < INACTIVE_CLAS) ) );
 
-
-    {
-        Word16 pBuf_scaleSyn[NB_SUBFR16k];
-
-        FOR(i=0; i<(st->L_frame_fx/L_SUBFR); i++)
-        {
-            pBuf_scaleSyn[i] = round_fx(pitch_buf[i]);
-        }
-
-        Scale_sig(mem_back, M, sub(st->Q_syn,Q_mem_back));
-
-        force_scale_syn = 0;
-        move16();
-        test();
-        test();
-        test();
-        IF ( (sub(st->clas_dec,ONSET) == 0) || ((sub(st->last_good_fx,VOICED_TRANSITION) >= 0) && (sub(st->last_good_fx,INACTIVE_CLAS) < 0)) )
-        {
-            force_scale_syn = 1;
-            move16();
-        }
-
-        FEC_scale_syn_fx( st->L_frame_fx,
-                          &update_flg,
-                          st->clas_dec,
-                          st->last_good_fx,
-                          syn,
-                          pBuf_scaleSyn,
-                          st->enr_old_fx,
-                          0,
-                          coder_type,
-                          LSF_Q_prediction,
-                          &st->scaling_flag,
-                          &st->lp_ener_FEC_av,
-                          &st->lp_ener_FEC_max,
-                          st->bfi_fx,
-                          st->total_brate_fx,
-                          st->prev_bfi_fx,
-                          st->last_core_brate_fx,
-                          exc,
-                          exc2,
-                          A,
-                          &(st->old_enr_LP),
-                          mem_back,
-                          mem_syn,
-                          st->Q_exc,
-                          st->Q_syn
-                          , avoid_lpc_burst_on_recovery
-                          , force_scale_syn
-                        );
-    }
     /* update ACELP synthesis memory */
-    Copy( mem_syn, st->mem_syn2_fx, M );
-    Copy( syn+st->L_frame_fx-L_SYN_MEM, st->mem_syn_r, L_SYN_MEM );
+    mvr2r( mem_syn, st->mem_syn2, M );
+    mvr2r( syn+L_frame-L_SYN_MEM, st->mem_syn_r, L_SYN_MEM );
 
-    /* Deemphasis and output synth and ZIR */
-    tmp_deemph = st->syn[M];
-    move16();
-    E_UTIL_deemph2(st->Q_syn, syn, st->preemph_fac, st->L_frame_fx, &tmp_deemph); /* tmp_deemph and syn in Q0 starting from here*/
+    tmp = st->syn[M];
+    deemph( syn, st->preemph_fac, L_frame, &tmp );
+    mvr2r( syn+L_frame-(L_frame/2), st->old_syn_Overl, L_frame/2 );
+    mvr2r( syn+L_frame-M-1, st->syn, M+1 );
+    mvr2r( syn, synth, L_frame );
 
-    bufferCopyFx(syn+st->L_frame_fx- st->L_frame_fx/2, st->old_syn_Overl, shr(st->L_frame_fx, 1),0 /*Qf_syn*/, -1 /*Qf_old_xnq*/, 0 , 0 /*Q_old_xnq*/);
-
-    Copy(syn+st->L_frame_fx-M-1, st->syn, 1+M); /*Q0*/
-
-    Copy(syn, synth, st->L_frame_fx);
-
-    Copy( syn, st->old_core_synth_fx, st->L_frame_fx );
+    mvr2r( syn, st->old_core_synth, L_frame );
 
 
-    /* update old_Aq */
-    Copy(exc_buf+st->L_frame_fx, st->old_exc_fx,  L_EXC_MEM_DEC);
+    /* update old_exc */
+    mvr2r( exc_buf+L_frame, st->old_exc,  L_EXC_MEM_DEC );
 
     /* Output pitch parameters for bass post-filter */
-    FOR (i_subfr = 0; i_subfr < st->L_frame_fx; i_subfr += L_SUBFR)
+    for (i_subfr = 0; i_subfr < L_frame; i_subfr += L_SUBFR )
     {
-        *pT++ = round_fx(pitch_buf[i_subfr/L_SUBFR]);
+        *pT++ = (int)( pitch_buf[i_subfr/L_SUBFR] + 0.5f);
     }
 
-
-    st->tcxltp_last_gain_unmodified = 0;
+    /* Update TCX-LTP */
+    st->tcxltp_last_gain_unmodified = 0.f;
 
     /*Update MODE1*/
-    Copy( p_A-(M+1), st->old_Aq_12_8_fx, M+1 );
-    st->old_Es_pred_fx = Es_pred;
+    mvr2r( p_A-(M+1), st->old_Aq_12_8, M+1 );
+    st->old_Es_pred = Es_pred;
 
     st->tcxltp_third_last_pitch = st->tcxltp_second_last_pitch;
     st->tcxltp_second_last_pitch = st->old_fpitch;
-    st->old_fpitch = pitch_buf[(st->L_frame_fx/L_SUBFR) - 1];
-    move32();
-
+    st->old_fpitch = pitch_buf[(L_frame/L_SUBFR) - 1];
 
     return;
 }
-

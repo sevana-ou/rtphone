@@ -1,104 +1,67 @@
 /*====================================================================================
-    EVS Codec 3GPP TS26.442 Apr 03, 2018. Version 12.11.0 / 13.6.0 / 14.2.0
+    EVS Codec 3GPP TS26.443 Nov 13, 2018. Version 12.11.0 / 13.7.0 / 14.3.0 / 15.1.0
   ====================================================================================*/
 
 #include <math.h>
 #include <assert.h>
-#include "stl.h"
-#include "basop_util.h"
-#include "cnst_fx.h"
-#include "prot_fx.h"
+#include "prot.h"
 
 
-void tfaCalcEnv_fx(const Word16* shb_speech, Word32* enr)
+
+void tfaCalcEnv(const float* shb_speech, float* enr)
 {
-    Word16 i, j, k;
-
-    k = 0;
-    move16();
-    FOR (i=0; i<N_TEC_TFA_SUBFR; i++)
+    int i, j, k;
+    for (i=0, k=0; i<N_TEC_TFA_SUBFR; i++)
     {
-        enr[i] = L_deposit_l(0);
-        FOR (j=0; j<L_TEC_TFA_SUBFR16k; j++)
+        enr[i] = 1e-12f;
+        for(j=0; j<L_TEC_TFA_SUBFR16k; j++) /* XX/2 since Fs = 16kHz */
         {
-            enr[i] = L_mac0(enr[i], shb_speech[k], shb_speech[k]);
-            k = add(k, 1);
+            enr[i] += shb_speech[k] * shb_speech[k];
+            k++;
         }
     }
 }
 
-Word16 tfaEnc_TBE_fx(Word32* enr,
-                     Word16 last_core,
-                     Word16* voicing,   /* Q15 */
-                     Word16* pitch_buf, /* Q6 */
-                     Word16 Q_enr
-                    )
+short tfaEnc_TBE(float* enr, short last_core, float* voicing, float* pitch_buf)
 {
-    Word16 i;
-    Word32 m_g, m_a; /* m_g: geometrical mean, m_a: arithmetical mean */
-    Word16 voicing_sum;
-    Word16 pitch_buf_sum;
-    Word32 m_a_bottom;
-    Word16 tfa_flag;
+    int i;
+    float m_g, m_a; /* m_g: geometrical mean, m_a: arithmetical mean */
+    float flatness = 0;
+    float voicing_sum;
+    short tfa_flag;
 
-    Word32 L_tmp, L_tmp1;
-    Word16 exp;
-
-    m_a_bottom = L_shl(625, Q_enr); /*  10000.0 / N_TEC_TFA_SUBFR in Q_enr */
+    float pitch_buf_sum;
+    const float m_a_bottom = 10000.0 / N_TEC_TFA_SUBFR;
 
     tfa_flag = 0;
-    move16();
 
-    L_tmp = L_deposit_l(0);
-    m_a = L_deposit_l(0);
-    m_g = L_deposit_l(0);
-
-    FOR (i = 0; i < N_TEC_TFA_SUBFR; i++)
+    m_a = 1e-12f;
+    m_g = 0.0;
+    for (i=0; i<N_TEC_TFA_SUBFR; i++)
     {
-        IF(enr[i] != 0)
-        {
-            m_a = L_add(m_a, L_shr(enr[i], 4)); /* Q_enr */
-            exp = norm_l(enr[i]);
-            L_tmp = BASOP_Util_Log2(L_shl(enr[i], exp));
-            exp = sub(sub(31, exp), Q_enr);
-            L_tmp = L_add(L_shl(L_deposit_h(exp), 9), L_tmp);
-            m_g = L_add(m_g, L_shr(L_tmp, 4));
-        }
+        m_a += enr[i];
+        m_g += log10(enr[i]);
     }
+    m_a /= N_TEC_TFA_SUBFR;
+    m_g /= N_TEC_TFA_SUBFR;
+    m_g = pow(10.0, m_g);
 
+    flatness = m_g / m_a;
+
+    voicing_sum = voicing[0] + voicing[1];
+
+    pitch_buf_sum = pitch_buf[0] + pitch_buf[1] + pitch_buf[2] + pitch_buf[3];
+
+    if ((flatness > 0.70 && pitch_buf_sum > 4.0 * 110 && voicing_sum > 2.0 * 0.70) ||
+            (last_core == TCX_20_CORE && flatness > 0.50 && voicing_sum < 2.0 * 0.70))
+    {
+        tfa_flag = 1;
+    }
     /* energy lower limit */
-    IF(L_sub(m_a, m_a_bottom) < 0)
+    if(m_a < m_a_bottom)
     {
         tfa_flag = 0;
-        move16();
-    }
-    ELSE
-    {
-        exp = norm_l(m_a);
-        L_tmp = BASOP_Util_Log2(L_shl(m_a, exp));
-        exp = sub(sub(31, exp), Q_enr);
-        m_a = L_add(L_shl(L_deposit_h(exp), 9), L_tmp);/* Q25 */
-        L_tmp = L_add(m_a, -17266211l/*log10(0.7f)/log10(2.f) Q25*/);
-        L_tmp1 = L_add(m_a, -33554432l/*log10(0.5f)/log10(2.f) Q25*/);
-
-        voicing_sum = add(shr(voicing[0], 1), shr(voicing[1], 1));
-
-        pitch_buf_sum = shr(add(shr(pitch_buf[0], 1), shr(pitch_buf[1], 1)), 1);
-        pitch_buf_sum = add(pitch_buf_sum, shr(add(shr(pitch_buf[2], 1), shr(pitch_buf[3], 1)), 1));
-
-        test();
-        test();
-        test();
-        test();
-        test();
-        IF ((L_sub(m_g, L_tmp) > 0 && sub(pitch_buf_sum, 7040/*110 Q6*/) > 0 && sub(voicing_sum, 22938/*0.70 Q15*/) > 0) ||
-        (sub(last_core, TCX_20_CORE) == 0 && L_sub(m_g, L_tmp1) > 0 && sub(voicing_sum, 22938/*0.70 Q15*/) < 0))
-        {
-            tfa_flag = 1;
-            move16();
-        }
     }
 
     return tfa_flag;
 }
-

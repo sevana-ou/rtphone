@@ -1,60 +1,26 @@
 /*====================================================================================
-    EVS Codec 3GPP TS26.442 Apr 03, 2018. Version 12.11.0 / 13.6.0 / 14.2.0
+    EVS Codec 3GPP TS26.443 Nov 13, 2018. Version 12.11.0 / 13.7.0 / 14.3.0 / 15.1.0
   ====================================================================================*/
 
 #ifndef __BASOP_UTIL_H__
 #define __BASOP_UTIL_H__
 
-#include "stl.h"
+#include "basop_settings.h"
 #include "typedef.h"
 #include "basop32.h"
 #include "basop_mpy.h"
 
 
-#define _LONG                long
-#define _SHORT               short
-#ifdef _WIN32
-#define _INT64               __int64
-#else
-#define _INT64               long long
-#endif
-
-#define WORD32_BITS         32
-#define MAXVAL_WORD32       ((signed)0x7FFFFFFF)
-#define MINVAL_WORD32       ((signed)0x80000000)
-#define WORD32_FIX_SCALE    ((_INT64)(1)<<(WORD32_BITS-1))
-
-#define WORD16_BITS         16
-#define MAXVAL_WORD16       (((signed)0x7FFFFFFF)>>16)
-#define MINVAL_WORD16       (((signed)0x80000000)>>16)
-#define WORD16_FIX_SCALE    ((_INT64)(1)<<(WORD16_BITS-1))
-
-/*!
-  \def   Macro converts a Word32 fixed point to Word16 fixed point <1 with saturation
-*/
-#define WORD322WORD16(val)                                                                           \
- ( ( ((((val) >> (WORD32_BITS-WORD16_BITS-1)) + 1) > (((_LONG)1<<WORD16_BITS)-1)) && ((_LONG)(val) > 0) ) ? \
- (Word16)(_SHORT)(((_LONG)1<<(WORD16_BITS-1))-1):(Word16)(_SHORT)((((val) >> (WORD32_BITS-WORD16_BITS-1)) + 1) >> 1) )
-
-
-/* Word16 Packed Type */
-typedef struct
-{
-    struct
-    {
-        Word16 re;
-        Word16 im;
-    } v;
-} PWord16;
-
-#define cast16 move16
-
-
 #define LD_DATA_SCALE     (6)
+
 #define LD_DATA_SHIFT_I5  (7)
 
 #define modDiv2(x)        sub(x,shl(shr(x,1),1))
 #define modDiv8(x)        L_sub(x,L_shl(L_shr(x,3),3))
+
+#ifndef CHEAP_NORM_SIZE
+#define CHEAP_NORM_SIZE 161
+#endif
 
 static __inline Word16 limitScale16( Word16 s)
 {
@@ -76,6 +42,7 @@ static __inline Word16 limitScale32( Word16 s)
     return (s);
 }
 
+
 /*!**********************************************************************
    \brief   Add two values given by mantissa and exponent.
 
@@ -90,23 +57,7 @@ Word16 BASOP_Util_Add_MantExp                    /*!< Exponent of result        
  Word16   b_e,       /*!< Exponent of 2nd operand b */
  Word16  *ptrSum_m); /*!< Mantissa of result */
 
-/************************************************************************/
-/*!
-   \brief   Divide two values given by mantissa and exponent.
 
-   Mantissas are in 16-bit-fractional format with values between 0 and 1. <br>
-   The base for exponents is 2.  Example:  \f$  a = a\_m * 2^{a\_e}  \f$<br>
-
-   For performance reasons, the division is based on a table lookup
-   which limits accuracy.
-*/
-void BASOP_Util_Divide_MantExp (Word16   a_m,          /*!< Mantissa of dividend a */
-                                Word16   a_e,          /*!< Exponent of dividend a */
-                                Word16   b_m,          /*!< Mantissa of divisor b */
-                                Word16   b_e,          /*!< Exponent of divisor b */
-                                Word16  *ptrResult_m,  /*!< Mantissa of quotient a/b */
-                                Word16  *ptrResult_e   /*!< Exponent of quotient a/b */
-                               );
 
 /************************************************************************/
 /*!
@@ -122,60 +73,6 @@ Word16 Sqrt16(                  /*!< output mantissa */
     Word16 *exponent  /*!< pointer to exponent */
 );
 
-Word16 Sqrt16norm(              /*!< output mantissa */
-    Word16 mantissa,  /*!< normalized input mantissa */
-    Word16 *exponent  /*!< pointer to exponent */
-);
-
-Word32 Sqrt32(                  /*!< output mantissa */
-    Word32 mantissa,  /*!< input mantissa */
-    Word16 *exponent  /*!< pointer to exponent */
-);
-
-Word32 Sqrt32norm(              /*!< output mantissa */
-    Word32 mantissa,  /*!< normalized input mantissa */
-    Word16 *exponent  /*!< pointer to exponent */
-);
-
-/* deprecated, use Sqrt16! */
-void BASOP_Util_Sqrt_MantExp (Word16  *mantissa,       /*!< Pointer to mantissa */
-                              Word16  *exponent        /*!< Pointer to exponent */
-                             );
-
-/* deprecated, use Sqrt16norm! */
-void BASOP_Util_Sqrt_MantExpNorm (Word16  *mantissa,   /*!< Pointer to normalized mantissa */
-                                  Word16  *exponent    /*!< Pointer to exponent */
-                                 );
-
-/****************************************************************************/
-/*!
-  \brief   Calculate the inverse of the squareroot of a number given by mantissa and exponent
-
-  Mantissa is in 16/32-bit-fractional format with values between 0 and 1. <br>
-  For *norm versions mantissa has to be between 0.5 and 1. <br>
-  The base for the exponent is 2.  Example:  \f$  a = a\_m * 2^{a\_e}  \f$<br>
-  The exponent is addressed via pointers and will be overwritten with the result.
-*/
-Word16 ISqrt16(                  /*!< output mantissa */
-    Word16 mantissa,  /*!< input mantissa */
-    Word16 *exponent  /*!< pointer to exponent */
-);
-
-Word32 ISqrt32(                  /*!< output mantissa */
-    Word32 mantissa,  /*!< input mantissa */
-    Word16 *exponent  /*!< pointer to exponent */
-);
-
-Word32 ISqrt32norm(              /*!< output mantissa */
-    Word32 mantissa,  /*!< normalized input mantissa */
-    Word16 *exponent  /*!< pointer to exponent */
-);
-
-/* deprecated, use ISqrt16! */
-void BASOP_Util_InvSqrt_MantExp (Word16  *mantissa,    /*!< Pointer to mantissa */
-                                 Word16  *exponent     /*!< Pointer to exponent */
-                                );
-
 /*****************************************************************************/
 /*!
   \brief   Calculate the inverse of a number given by mantissa and exponent
@@ -190,6 +87,7 @@ Word16 Inv16(                  /*!< output mantissa */
     Word16 mantissa,  /*!< input mantissa */
     Word16 *exponent  /*!< pointer to exponent */
 );
+
 /******************************************************************************/
 /*!
   \brief   Calculate the squareroot and inverse of squareroot of a number given by mantissa and exponent
@@ -205,19 +103,7 @@ void BASOP_Util_Sqrt_InvSqrt_MantExp (Word16 mantissa,      /*!< mantissa */
                                       Word16 *isqrt_exp     /*!< Pointer to 1/sqrt exponent */
                                      );
 
-/********************************************************************/
-/*!
-  \brief   Calculates the scalefactor needed to normalize input array
 
-    The scalefactor needed to normalize the Word16 input array is returned <br>
-    If the input array contains only '0', a scalefactor 0 is returned <br>
-    Scaling factor is determined wrt a normalized target x: 16384 <= x <= 32767 for positive x <br>
-    and   -32768 <= x <= -16384 for negative x
-*/
-
-Word16 getScaleFactor16(                 /* o: measured headroom in range [0..15], 0 if all x[i] == 0 */
-    const Word16 *x,      /* i: array containing 16-bit data */
-    const Word16 len_x);  /* i: length of the array to scan  */
 
 /********************************************************************/
 /*!
@@ -233,106 +119,17 @@ Word16 getScaleFactor32(                 /* o: measured headroom in range [0..31
     const Word32 *x,      /* i: array containing 32-bit data */
     const Word16 len_x);  /* i: length of the array to scan  */
 
-/**
- * \brief normalize mantissa and update the exponent accordingly.
- * \param mantissa the mantissa to be normalized
- * \param pexponent pointer to the exponent.
- * \return the normalized mantissa.
+/************************************************************************/
+/*!
+  \brief 	Binary logarithm with 7 iterations
+
+  \param   x
+
+  \return log2(x)/64
  */
-Word16 normalize16(Word16 mantissa, Word16 *pexponent);
-/****************************************************************************/
-/*!
-  \brief   Does fractional integer division of Word32 arg1 by Word16 arg2
+/************************************************************************/
+Word32 BASOP_Util_Log2(Word32 x);
 
-  both input arguments may be positive or negative <br>
-  the result is truncated to Word16
-
-  \return fractional integer Word16 result of arg1/arg2
-*/
-Word16 divide3216(  Word32 x,   /*!< Numerator*/
-                    Word16 y);  /*!< Denominator*/
-
-
-/****************************************************************************/
-/*!
-  \brief   Does fractional integer division of Word16 arg1 by Word16 arg2
-
-  both input arguments may be positive or negative <br>
-  the result is truncated to Word16
-
-  \return fractional integer Word16 result of arg1/arg2
-*/
-Word16 divide1616(  Word16 x,   /*!< Numerator*/
-                    Word16 y);  /*!< Denominator*/
-
-
-/****************************************************************************/
-/*!
-  \brief   Does fractional integer division of Word32 arg1 by Word32 arg2
-
-   this function makes both the numerator and the denominator positive integers,
-   and scales up both values to avoid losing the accuracy of the outcome
-   too much
-
-   WARNING: it should be arg1 < arg2 because of the maximum degree of scaling for the mantissa!
-
-  \return fractional Word16 integer z = arg1(32bits)/arg2(32bits)
-*/
-Word16 divide3232(  Word32 x,   /*!< Numerator*/
-                    Word32 y);  /*!< Denominator*/
-
-
-/****************************************************************************/
-/*!
-  \brief   Does fractional integer division of UWord32 arg1 by UWord32 arg2
-
-   This function ensures both the numerator  and the denominator are positive integers,
-   and scales up both values to avoid losing the accuracy of the outcome
-   too much.<br>
-
-   CAUTION: Arg 3 is a Word16 pointer which will point to the scalefactor difference
-   s_diff = sub(s2,s1), where s1 and s2 are the scalefactors of the arguments, which
-   were shifted in order to e.g. preserve accuracy.
-   I.e. the result has to be scaled due to shifting it
-   s_diff to the right to obtain the real result of the division.
-
-  \return fractional Word16 integer z = arg1(32bits)/arg2(32bits)
-*/
-Word16 BASOP_Util_Divide3232_uu_1616_Scale( Word32 x,   /*!< i  : Numerator*/
-        Word32 y,   /*!< i  : Denominator*/
-        Word16 *s); /*!< o  : Additional scalefactor difference*/
-
-
-/****************************************************************************/
-/*!
-  \brief   Does fractional integer division of Word32 arg1 by Word32 arg2
-
-   This function scales up both values to avoid losing the accuracy of the outcome
-   too much.<br>
-
-   CAUTION: Arg 3 is a Word16 pointer which will point to the scalefactor difference
-   s_diff = sub(s2,s1), where s1 and s2 are the scalefactors of the arguments, which
-   were shifted in order to e.g. preserve accuracy.
-   I.e. the result has to be scaled due to shifting it
-   s_diff to the right to obtain the real result of the division.
-
-  \return fractional Word16 integer z = arg1(32bits)/arg2(32bits)
-*/
-Word16 BASOP_Util_Divide3232_Scale( Word32 x,   /*!< i  : Numerator*/
-                                    Word32 y,   /*!< i  : Denominator*/
-                                    Word16 *s); /*!< o  : Additional scalefactor difference*/
-
-
-/****************************************************************************/
-/*!
-  \brief   Does fractional integer division of Word32 arg1 by Word16 arg2
-
-
-  \return fractional Word16 integer z = arg1(32bits)/arg2(16bits) , z not normalized
-*/
-Word16 BASOP_Util_Divide3216_Scale(     Word32 x,   /*!< i  : Numerator  */
-                                        Word16 y,   /*!< i  : Denominator*/
-                                        Word16 *s); /*!< o  : Additional scalefactor difference*/
 
 
 /****************************************************************************/
@@ -346,17 +143,28 @@ Word16 BASOP_Util_Divide1616_Scale( Word16 x,   /*!< i  : Numerator*/
                                     Word16 y,   /*!< i  : Denominator*/
                                     Word16 *s); /*!< o  : Additional scalefactor difference*/
 
+/****************************************************************************/
+/*!
+  \brief   Does fractional integer division of Word32 arg1 by Word16 arg2
+
+
+  \return fractional Word16 integer z = arg1(32bits)/arg2(16bits) , z not normalized
+*/
+Word16 BASOP_Util_Divide3216_Scale(     Word32 x,   /*!< i  : Numerator  */
+                                        Word16 y,   /*!< i  : Denominator*/
+                                        Word16 *s); /*!< o  : Additional scalefactor difference*/
+
+
 /************************************************************************/
 /*!
-  \brief 	Binary logarithm with 7 iterations
-
-  \param   x
-
-  \return log2(x)/64
+ * \brief 	Binary logarithm with 5 iterations
+ *
+ * \param[i] val
+ *
+ * \return basop_log2(val)/128
  */
 /************************************************************************/
-Word32 BASOP_Util_Log2(Word32 x);
-
+Word32 BASOP_Util_log2_i5(Word32 val);
 
 /************************************************************************/
 /*!
@@ -399,111 +207,39 @@ Word32 BASOP_Util_Log2(Word32 x);
 /************************************************************************/
 Word32 BASOP_Util_InvLog2(Word32 x);
 
-Word16 BASOP_util_norm_s_bands2shift (Word16 x);
 
-/***********************************************************************/
-/*!
-  \brief 	Calculate the headroom of the complex data in a 2 dimensional array
-
-  \return number of headroom bits
- */
-Word16 BASOP_util_norm_l_dim2_cplx (const Word32 * const *re,      /*!< Real part of 32 Bit input */
-                                    const Word32 * const *im,      /*!< Imag part if 32 Bit input */
-                                    Word16 startBand, /*!< start band of cplx data   */
-                                    Word16 stopBand,  /*!< stop band of cplx data    */
-                                    Word16 startSlot, /*!< start slot of cplx data   */
-                                    Word16 stopSlot   /*!< stop slot of cplx data    */
-                                   );
 /****************************************************************************/
 /*!
-  \brief   Does a data copy of Word8 *arg1 to Word8 *arg2 with Word16 arg3 number of moves
+  \brief Sets Array Word16 arg1 to value Word16 arg2 for Word16 arg3 elements
 */
-void copyWord8(     const Word8 *src,   /*!< i  : Source address             */
-                    Word8 *dst,         /*!< i  : Destination address        */
-                    const Word32 n);    /*!< i  : Number of elements to copy */
+void set_val_Word16(    Word16 X[],         /*!< Address of array               */
+                        const Word16 val,   /*!< Value to copy into array       */
+                        Word16 n);          /*!< Number of elements to process  */
 
 
 /****************************************************************************/
 /*!
-  \brief   Sets Word8 array arg1[] to zero for a length of Word16 arg2 elements
+  \brief Sets Array Word32 arg1 to value Word32 arg2 for Word16 arg3 elements
 */
-void set_zero_Word8(    Word8 X[],      /*!< i  : Address of array                   */
-                        Word32 n);      /*!< i  : Number of elements to set to zero  */
+void set_val_Word32(    Word32 X[],         /*!< Address of array               */
+                        const Word32 val,   /*!< Value to copy into array       */
+                        Word16 n);          /*!< Number of elements to process  */
 
 /****************************************************************************/
 /*!
-  \brief    Does a multiplication of Word32 * Word16 input values
+  \brief    Does a multiplication of Word16 input values
 
-  \return   z32 = x32 * y16
+  \return   z16 = x16 * y16
 */
-Word32 L_mult0_3216(    Word32 x,   /*!<   : Multiplier     */
-                        Word16 y);  /*!<   : Multiplicand   */
+Word16 mult0 (  Word16 x,   /*!< i  : Multiplier    */
+                Word16 y);  /*!< i  : Multiplicand  */
 
-/* Calculate sin/cos. Angle in 2Q13 format, result has exponent = 1 */
-Word16 getCosWord16(Word16 theta);
-Word32 getCosWord32(Word32 theta);
 /**
  * \brief calculate cosine of angle. Tuned for ISF domain.
  * \param theta Angle normalized to radix 2, theta = (angle in radians)*2.0/pi
  * \return result with exponent 0.
  */
 Word16 getCosWord16R2(Word16 theta);
-
-/****************************************************************************/
-/*!
-  \brief    square root abacus algorithm
-
-  \return integer sqrt(x)
- */
-Word16 getSqrtWord32(Word32 x);
-
-/****************************************************************************/
-/*!
-  \brief    finds index of min Word16 in array
-
-  \return   index of min Word16
- */
-Word16 findIndexOfMinWord16(Word16 *x, const Word16 len);
-
-/****************************************************************************/
-/*!
-  \brief    finds index of min Word32 in array
-
-  \return   index of min Word32
- */
-Word16 findIndexOfMinWord32(Word32 *x, const Word16 len);
-
-/****************************************************************************/
-/*!
-  \brief    finds index of max Word16 in array
-
-  \return   index of max Word16
- */
-Word16 findIndexOfMaxWord16(Word16 *x, const Word16 len);
-
-/****************************************************************************/
-/*!
-  \brief    finds index of max Word32 in array
-
-  \return   index of max Word32
- */
-Word16 findIndexOfMaxWord32(Word32 *x, const Word16 len);
-
-/****************************************************************************/
-/*!
-  \brief    16x16->16 integer multiplication without overflow control
-
-  \return 16x16->16 integer
- */
-Word16 imult1616(Word16 x, Word16 y);
-
-/****************************************************************************/
-/*!
-  \brief    32x16->32 integer multiplication with overflow control
-
-  \return 32x16->32 integer
- */
-Word32 imult3216(Word32 x, Word16 y);
 
 /****************************************************************************/
 /*!
@@ -516,100 +252,7 @@ Word32 imult3216(Word32 x, Word16 y);
 
 Word16 idiv1616U(Word16 x, Word16 y);
 
-/****************************************************************************/
-/*!
-  \brief    16/16->16 signed integer division
 
-  x and y have to be positive, x has to be < 16384
-
-  \return 16/16->16 integer
- */
-
-Word16 idiv1616(Word16 x, Word16 y);
-
-/*------------------------------------------------------------------*
- * Dot_product16HQ:
- *
- * \brief Compute scalar product of <x[],y[]> using 64-bit accumulator.
- *
- * Performs normalization of the result, returns the exponent
- * Note: In contrast to dotWord32, no headroom is required for data
- *       in x[] and y[], means, they may have any format Qn
- *------------------------------------------------------------------*/
-Word32 Dot_product16HQ(   /*<! o : normalized result              Q31 */
-    const Word32 L_off,  /*<! i : initial sum value               Qn */
-    const Word16 x[],    /*<! i : x vector                        Qn */
-    const Word16 y[],    /*<! i : y vector                        Qn */
-    const Word16 lg,     /*<! i : vector length, range [0..7FFF]  Q0 */
-    Word16 * exp         /*<! o : exponent of result in [-32,31]  Q0 */
-);
-
-
-/*------------------------------------------------------------------*
- * norm_llQ31:
- *
- * \brief Compute normalized Q31 Values out of overflowed Q31 value
- *
- * Performs the calculation of a normalized Q31 Value with its
- * scalingfactor, taking into account the overflowed Q31 input value
- * and the number of Carrys, collected.
- *------------------------------------------------------------------*/
-Word32 norm_llQ31(        /* o : normalized result              Q31 */
-    Word32 L_c,          /* i : upper bits of accu             Q-1 */
-    Word32 L_sum,        /* i : lower bits of accu, unsigned   Q31 */
-    Word16 * exp         /* o : exponent of result in [-32,31]  Q0 */
-);
-
-/**
- * \brief Compute dot product of 1 32 bit vectors with itself
- * \param x input vector 1
- * \param headroom amount of headroom bits the input vector
- * \param length the length of the input vector
- * \param result_e pointer to where the exponent of the result will be stored into
- * \return the dot product of x and x.
- */
-Word32 Norm32Norm(const Word32 *x, const Word16 headroom, const Word16 length, Word16 *result_e);
-
-
-/*------------------------------------------------------------------*
- * Dot_productSq16HQ:
- *
- * \brief Compute scalar product of <x[],x[]> using 64-bit accumulator.
- *
- * Performs normalization of the result, returns the exponent
- * Note: In contrast to dotWord32, no headroom is required for data
- *       in x[], means, they may have any format Qn
- *------------------------------------------------------------------*/
-Word32 Dot_productSq16HQ( /*<! o : normalized result              Q31 */
-    const Word32 L_off,  /*<! i : initial sum value               Qn */
-    const Word16 x[],    /*<! i : x vector                        Qn */
-    const Word16 lg,     /*<! i : vector length, range [0..7FFF]  Q0 */
-    Word16 * exp         /*<! o : exponent of result in [-32,31]  Q0 */
-);
-
-/*------------------------------------------------------------------*
- * dotp_s_fx:
- *
- * \brief Compute scalar product of <x[],y[]> using 64-bit accumulator.
- *
- * Performs no normalization of the result
- *------------------------------------------------------------------*/
-Word32 dotp_s_fx(       /*<! o  : dot product of vector x and y 16Q15 */
-    const Word16 *x,   /*<! i  : vector x                       6Q9  */
-    const Word16 *y,   /*<! i  : vector y                       6Q9  */
-    const Word16  n,   /*<! i  : vector length                   Q0  */
-    Word16  s    /*<! i  : headroom                        Q0  */
-);
-
-/*-------------------------------------------------------------------*
- * Sum32:
- *
- * \brief Return the sum of one 32 bits vector
- *-------------------------------------------------------------------*/
-Word32 Sum32(             /*<! o  : the sum of the elements of the vector */
-    const Word32 *vec,    /*<! i  : input vector                          */
-    const Word16 lvec     /*<! i  : length of input vector                */
-);
 /**
  * \brief return 2 ^ (exp * 2^exp_e)
  * \param exp_m mantissa of the exponent to 2.0f
@@ -623,26 +266,61 @@ Word32 BASOP_util_Pow2(
 );
 
 
-/* deprecated, use ISqrt32norm! */
-Word32 Isqrt_lc(
-    Word32 frac,  /*!< (i)   Q31: normalized value (1.0 < frac <= 0.5) */
-    Word16 * exp  /*!< (i/o)    : exponent (value = frac x 2^exponent) */
+Word32 Isqrt_lc1(
+    Word32 frac,  /* (i)   Q31: normalized value (1.0 < frac <= 0.5) */
+    Word16 * exp  /* (i/o)    : exponent (value = frac x 2^exponent) */
 );
 
-/**
- * \brief return 1/x
- * \param x index of lookup table
- * \return Word16 value of 1/x
- */
-Word16 getNormReciprocalWord16(Word16 x);
+/*****************************************************************************/
+/*!
 
-/**
- * \brief return (1/x) << s
- * \param x index of lookup table
- * \param s shift factor
- * \return Word16 value of (1/x) << s
- */
-Word16 getNormReciprocalWord16Scale(Word16 x, Word16 s);
+   \brief Calculates pow(2,x)
+  ___________________________________________________________________________
+ |                                                                           |
+ |   Function Name : Pow2()                                                  |
+ |                                                                           |
+ |     L_x = pow(2.0, exponant.fraction)         (exponent = interger part)  |
+ |         = pow(2.0, 0.fraction) << exponent                                |
+ |---------------------------------------------------------------------------|
+ |  Algorithm:                                                               |
+ |                                                                           |
+ |   The function Pow2(L_x) is approximated by a table and linear            |
+ |   interpolation.                                                          |
+ |                                                                           |
+ |   1- i = bit10-b15 of fraction,   0 <= i <= 31                            |
+ |   2- a = bit0-b9   of fraction                                            |
+ |   3- L_x = table[i]<<16 - (table[i] - table[i+1]) * a * 2                 |
+ |   4- L_x = L_x >> (30-exponant)     (with rounding)                       |
+ |___________________________________________________________________________|
+*/
+Word32 Pow2(                              /*!< (o) Q0  : result       (range: 0<=val<=0x7fffffff) */
+    Word16 exponant,                      /*!< (i) Q0  : Integer part.      (range: 0<=val<=30)   */
+    Word16 fraction                       /*!< (i) Q15 : Fractionnal part.  (range: 0.0<=val<1.0) */
+);
+
+/*************************************************************************
+ *
+ *   FUNCTION:   Log2_norm()
+ *
+ *   PURPOSE:   Computes log2(L_x, exp),  where   L_x is positive and
+ *              normalized, and exp is the normalisation exponent
+ *              If L_x is negative or zero, the result is 0.
+ *
+ *   DESCRIPTION:
+ *        The function Log2(L_x) is approximated by a table and linear
+ *        interpolation. The following steps are used to compute Log2(L_x)
+ *
+ *           1- exponent = 30-norm_exponent
+ *           2- i = bit25-b31 of L_x;  32<=i<=63  (because of normalization).
+ *           3- a = bit10-b24
+ *           4- i -=32
+ *           5- fraction = table[i]<<16 - (table[i] - table[i+1]) * a * 2
+ *
+ *************************************************************************/
+
+Word16 Log2_norm_lc ( /* (o) : Fractional part of Log2. (range: 0<=val<1)  */
+    Word32 L_x        /* (i) : input value (normalized)                    */
+);
 
 /*************************************************************************
  *
@@ -674,41 +352,6 @@ Word32 BASOP_Util_fPow(               /* (o) : mantissa of result               
     Word16 *result_e              /* (o) : output pointer to exponent of result                            */
 );
 
-/*___________________________________________________________________________
- |                                                                           |
- |   Function Name : Dot_product12_offs()                                    |
- |                                                                           |
- |       Compute scalar product of <x[],y[]> using accumulator.              |
- |       The parameter 'L_off' is added to the accumulation result.          |
- |       The result is normalized (in Q31) with exponent (0..30).            |
- |   Notes:                                                                  |
- |       o  data in x[],y[] must provide enough headroom for accumulation    |
- |       o  L_off must correspond in format with product of x,y              |
- |          Example: 0.01f for Q9 x Q9: 0x0000147B in Q19                    |
- |                   means: L_off = FL2WORD32_SCALE(0.01f,31-19)             |
- |---------------------------------------------------------------------------|
- |  Algorithm:                                                               |
- |                                                                           |
- |       dot_product = L_off + sum(x[i]*y[i])     i=0..N-1                   |
- |___________________________________________________________________________|
-*/
-
-Word32 Dot_product12_offs(                 /* (o) Q31: normalized result (1 < val <= -1) */
-    const Word16 x[],                     /* (i) 12bits: x vector                       */
-    const Word16 y[],                     /* (i) 12bits: y vector                       */
-    const Word16 lg,                      /* (i)    : vector length in range [1..256]   */
-    Word16 * exp,                         /* (o)    : exponent of result (0..+30)       */
-    Word32 L_off                          /* (i) initial summation offset /2              */
-);
-
-Word32 Dot_product15_offs(                 /* (o) Q31: normalized result (1 < val <= -1) */
-    const Word16 x[],                     /* (i) 15bits: x vector                       */
-    const Word16 y[],                     /* (i) 15bits: y vector                       */
-    const Word16 lg,                      /* (i)    : vector length in range [1..256]   */
-    Word16 *exp,                          /* (o)    : exponent of result (0..+30)       */
-    Word32 L_off                          /* (i) initial summation offset               */
-);
-
 /*!**********************************************************************
    \brief   Add two values given by mantissa and exponent.
 
@@ -722,96 +365,22 @@ Word32 BASOP_Util_Add_Mant32Exp                  /*!< o: normalized result manti
  Word32   b_m,       /*!< i: Mantissa of 2nd operand b  */
  Word16   b_e,       /*!< i: Exponent of 2nd operand b  */
  Word16  *ptr_e);    /*!< o: exponent of result         */
-/*!**********************************************************************
-   \brief   Returns the comparison result of two normalized values given by mantissa and exponent.
-            return value: -1: a < b, 0: a == b, 1; a > b
-
-   Mantissas are in 32-bit-fractional format with values between 0 and 1. <br>
-   The base for exponents is 2.  Example:  \f$  a = a\_m * 2^{a\_e}  \f$<br>
-
-************************************************************************/
-Word16 BASOP_Util_Cmp_Mant32Exp                  /*!< o: flag: result of comparison */
-(Word32   a_m,       /*!< i: Mantissa of 1st operand a  */
- Word16   a_e,       /*!< i: Exponent of 1st operand a  */
- Word32   b_m,       /*!< i: Mantissa of 2nd operand b  */
- Word16   b_e);       /*!< i: Exponent of 2nd operand b  */
-
-/********************************************************************
- * bufferCopyFx
- *
- * \brief copies buffer while preserving Format of destination buffer
-*********************************************************************
-*/
-void bufferCopyFx(
-    Word16* src,       /*<! Qx  pointer to input buffer                */
-    Word16* dest,      /*<! Qx  pointer to output buffer               */
-    Word16 length,     /*<! Q0  length of buffer to copy               */
-    Word16 Qf_src,     /*<! Q0  Q format (frac-bits) of source buffer  */
-    Word16 Qf_dest,    /*<! Q0  Q format (frac-bits )of dest buffer    */
-    Word16 Q_src,      /*<! Q0  exponent of source buffer              */
-    Word16 Q_dest      /*<! Q0  exponent of destination buffer         */
-);
 
 /****************************************************************************/
 /*!
   \brief   Accumulates multiplications
 
-	Accumulates the elementwise multiplications of Word32 Array bufX32 with Word16 Array bufY16
-	pointed to by arg1 to arg4 including the corresponding exponents. Length of to be multiplied arrays is arg5,
+	Accumulates the elementwise multiplications of Word32 Array X with Word16 Array Y
+	pointed to by arg1 and arg2 with specified headroom. Length of to be multiplied arrays is arg3,
+    headroom with has to be taken into account is specified in arg4
 
-  \return Word32 result of accumulated multiplications over Word32 array arg1 and Word16 array arg3 and Word16 pointer
-          to exponent of the result
+  \return Word32 result of accumulated multiplications over Word32 array arg1 and Word16 array arg2 and Word16 pointer
+          to exponent correction factor which needs to be added to the exponent of the result vector
 */
-Word32 dotWord32_16_Mant32Exp(const Word32 *bufX32,/* i: 32-bit buffer with unknown headroom */
-                              Word16 bufX32_exp,   /* i: exponent of buffer bufX32           */
-                              const Word16 *bufY16,/* i: 16-bit buffer quite right-aligned   */
-                              Word16 bufY16_exp,   /* i: exponent of buffer bufY16           */
-                              Word16 len,          /* i: buffer len to process               */
-                              Word16 *exp);         /* o: result exponent                     */
-
-/*!**********************************************************************
-   \brief   Converts linear factor or energy to Decibel
-            return value: fEnergy=0: 20 * log10(x * 2^{x\_e}),
-                          fEnergy=1: 10 * log10(x * 2^{x\_e})
-
-   Mantissa x is in 32-bit-fractional format with values between 0 and 1. <br>
-   The base for exponent x_e is 2. <br>
-
-************************************************************************/
-Word16 BASOP_Util_lin2dB(                 /*!< o: dB value (7Q8) */
-    Word32 x,        /*!< i: mantissa */
-    Word16 x_e,      /*!< i: exponent */
-    Word16 fEnergy); /*!< i: flag indicating if x is energy */
-
-/*!**********************************************************************
-   \brief   Calculates atan(x).
-************************************************************************/
-Word16 BASOP_util_atan(                 /*!< o:  atan(x)           [-pi/2;pi/2]   1Q14  */
-    Word32 x         /*!< i:  input data        (-64;64)       6Q25  */
-);
-
-/*!**********************************************************************
-   \brief   Calculates atan2(y,x).
-************************************************************************/
-Word16 BASOP_util_atan2(              /*!< o: atan2(y,x)    [-pi,pi]        Q13   */
-    Word32 y,     /*!< i:                                     */
-    Word32 x,     /*!< i:                                     */
-    Word16 e      /*!< i: exponent difference (exp_y - exp_x) */
-);
-/*!**********************************************************************
-   \brief   norm_llQ31 returns Word32 with scalingfactor, with 2 32bit accus as input
-
-************************************************************************/
-Word32 norm_llQ31(        /* o : normalized result              Q31 */
-    Word32 L_c,          /* i : upper bits of accu             Q-1 */
-    Word32 L_sum,        /* i : lower bits of accu, unsigned   Q31 */
-    Word16 * exp         /* o : exponent of result in [-32,31]  Q0 */
-);
-
-/* compare two positive normalized 16 bit mantissa/exponent values */
-/* return value: positive if first value greater, negative if second value greater, zero if equal */
-Word16 compMantExp16Unorm(Word16 m1, Word16 e1, Word16 m2, Word16 e2);
+Word32 dotWord32_16_guards(const Word32 * X, const Word16 * Y, Word16 n, Word16 hr, Word16 * shift);
 
 
+
+Word32 Sqrt_l(Word32 L_x, Word16 *exp);
 
 #endif /* __BASOP_UTIL_H__ */

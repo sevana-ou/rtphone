@@ -1,10 +1,10 @@
 /*====================================================================================
-    EVS Codec 3GPP TS26.442 Apr 03, 2018. Version 12.11.0 / 13.6.0 / 14.2.0
+    EVS Codec 3GPP TS26.443 Nov 13, 2018. Version 12.11.0 / 13.7.0 / 14.3.0 / 15.1.0
   ====================================================================================*/
 
 
 #define AMRWB_MAGIC_NUMBER "#!AMR-WB\n"             /* defined in  RFC4867  */
-#define EVS_MAGIC_NUMBER   "#!EVS_MC1.0\n"          /* defined in 26.445 */
+#define EVS_MAGIC_NUMBER   "#!EVS_MC1.0\n"          /* defined in 26.445    */
 
 static const Word32 AMRWB_IOmode2rate[16] =
 {
@@ -22,8 +22,8 @@ static const Word32 AMRWB_IOmode2rate[16] =
     -1,    /* AMRWB_IO_FUT2 */
     -1,    /* AMRWB_IO_FUT3 */
     -1,    /* AMRWB_IO_FUT4 */
-    0,    /* SPEECH_LOST   */
-    0     /* NO_DATA_TYPE       */
+    0,    /* SPEECH_BAD    */
+    0     /* _NO_DATA       */
 };
 
 static const Word32 PRIMARYmode2rate[16] =
@@ -43,7 +43,7 @@ static const Word32 PRIMARYmode2rate[16] =
     2400,   /* PRIMARY_SID */
     -1,   /* PRIMARY_FUT1 */
     0,   /* SPEECH_LOST */
-    0    /* NO_DATA_TYPE */
+    0    /* _NO_DATA */
 };
 
 /* sorting tables for all AMR-WB IO modes */
@@ -384,9 +384,9 @@ static const Word16 sort_SID[35] =
 };
 
 /* pointer table for bit sorting tables */
-static const Word16 * const sort_ptr[16] = { sort_660, sort_885, sort_1265, sort_1425, sort_1585, sort_1825, sort_1985, sort_2305,
-                                             sort_2385, sort_SID,      NULL,      NULL,      NULL,      NULL,      NULL,      NULL
-                                           };
+static const Word16 *const sort_ptr[16] = { sort_660, sort_885, sort_1265, sort_1425, sort_1585, sort_1825, sort_1985, sort_2305,
+                                            sort_2385, sort_SID,      NULL,      NULL,      NULL,      NULL,      NULL,      NULL
+                                          };
 
 /* 4 bit to 3 bit AMR-WB CMR remapping table */
 static const Word16 amrwb_3bit_cmr[16] =

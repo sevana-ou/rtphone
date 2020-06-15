@@ -1,320 +1,169 @@
 /*====================================================================================
-    EVS Codec 3GPP TS26.442 Apr 03, 2018. Version 12.11.0 / 13.6.0 / 14.2.0
+    EVS Codec 3GPP TS26.443 Nov 13, 2018. Version 12.11.0 / 13.7.0 / 14.3.0 / 15.1.0
   ====================================================================================*/
 
-
-#include "options.h"
-#include "stl.h"
-#include "prot_fx.h"
-#include "basop_util.h"
 #include <assert.h>
-
-
-#define MODE_DECISION_BASED_ON_PEAK_DETECTION
-
-
-/*  static void setnoiseLevelMemory()
- *
- *      Helper function - updates buffer for minimumStatistics function
- */
-static void setnoiseLevelMemory(Word16 f, Word16* new_noiseEstimate_e, Word16* noiseLevelMemory_e, Word16* noiseLevelMemory, Word16* currLevelIndex)
-{
-    noiseLevelMemory[*currLevelIndex] = f;
-    move16();
-    noiseLevelMemory_e[*currLevelIndex] = *new_noiseEstimate_e;
-    move16();
-}
+#include "options.h"
+#include "prot.h"
+#include "cnst.h"
+#include "stat_com.h"
 
 
 /* PLC: [Common: Fade-out]
  * PLC: and for PLC fade out */
 
-void minimumStatistics(Word16*       noiseLevelMemory,      /* Qx, internal state */
-                       Word16*       noiseLevelIndex,       /* Q0, internal state */
-                       Word16*       currLevelIndex,        /* Q0, internal state (circular buffer) */
-                       Word16*       noiseEstimate,         /* Qx, previous estimate of background noise */
-                       Word16*       lastFrameLevel,        /* Qx, level of the last frame */
-                       Word16        currentFrameLevel,     /* Qx, level of the current frame */
-                       Word16*       noiseLevelMemory_e,    /* scaling factor for noiseLevelMemory  */
-                       Word16  const noiseEstimate_e,       /* exponent of noiseEstimate */
-                       Word16*       new_noiseEstimate_e,   /* new exponent of noise Estimate*/
-                       Word16* const lastFrameLevel_e,      /* exponent of lastFrameLevel    */
-                       Word16        currentFrameLevel_e)   /* exponent of currentFrameLevel */
+void minimumStatistics(
+    float*      noiseLevelMemory,
+    int*        noiseLevelIndex,
+    int*        currLevelIndex,
+    float*      noiseEstimate,
+    float*      lastFrameLevel,
+    float       currentFrameLevel,
+    float const minLev,
+    int   const buffSize
+)
 {
-    Word16 aOpt, aOpt_e;
-    Word16 f, p, i;
-    Word16 tmp,tmp2, tmp_e;
-    Word32 tmp32;
-    move16();
-    aOpt_e = 0;
+    float aOpt;
+    float f;
+    int p;
+    int i;
 
-
-    BASOP_SATURATE_WARNING_OFF
-    IF (sub(shl(currentFrameLevel, currentFrameLevel_e),PLC_MIN_CNG_LEV) < 0)
+    if (currentFrameLevel < minLev)
     {
-        BASOP_SATURATE_WARNING_ON
-        currentFrameLevel = PLC_MIN_CNG_LEV;
-        move16();
-        move16();
-        currentFrameLevel_e = 0;
+        currentFrameLevel = minLev;
     }
-    BASOP_SATURATE_WARNING_ON
-
     /* compute optimal factor aOpt for recursive smoothing of frame minima */
-    tmp2 = BASOP_Util_Add_MantExp(*lastFrameLevel,*lastFrameLevel_e,negate(*noiseEstimate),noiseEstimate_e,&tmp);
-    IF (tmp >= 0)
+    if (*lastFrameLevel >= *noiseEstimate)
     {
-        /* aOpt = *noiseEstimate / *lastFrameLevel; */
-        aOpt = BASOP_Util_Divide1616_Scale(*noiseEstimate, *lastFrameLevel, &aOpt_e);
-        aOpt_e = add(aOpt_e, sub(noiseEstimate_e, *lastFrameLevel_e));
+        aOpt = *noiseEstimate / *lastFrameLevel;
     }
-    ELSE
+    else
     {
-        /* aOpt = *lastFrameLevel / *noiseEstimate; */
-        aOpt = BASOP_Util_Divide1616_Scale(*lastFrameLevel, *noiseEstimate, &aOpt_e);
-        aOpt_e = add(aOpt_e, sub(*lastFrameLevel_e, noiseEstimate_e));
+        aOpt = *lastFrameLevel / *noiseEstimate;
     }
-    aOpt = mult_r(aOpt, aOpt); /* Q15 */
-    aOpt_e = shl(aOpt_e,1);
-    if (aOpt == 0)
-    {
-        move16();
-        aOpt_e = 0;
-    }
-
+    aOpt *= aOpt;
     *lastFrameLevel = currentFrameLevel;
-    move16();
-    move16();
-    *lastFrameLevel_e = currentFrameLevel_e;
-
     /* recursively compute smoothed frame minima using optimal factor aOpt */
-    tmp = *currLevelIndex;
-    move16();
-    move16();
-    if (tmp == 0)
-    {
-        tmp = PLC_MIN_STAT_BUFF_SIZE;
-        move16();
-
-    }
-    /*f = msu_r(L_mult(aOpt, noiseLevelMemory[sub(tmp, 1)]),  add(aOpt, 0x8000),  currentFrameLevel);*/
-    /*f = (aOpt * noiseLevelMemory[tmp-1]) - (currentFrameLevel * (aOpt-1))*/
-    /*tmp32*/                           /*tmp*/
-
-    tmp32 =  L_mult(aOpt,noiseLevelMemory[tmp-1]); /*Q_tmp32 = aOpt_e + noiseLevelMemory_e[tmp - 1]*/
-    move16();
-    tmp_e = tmp;
-
-
-    tmp2 = BASOP_Util_Add_MantExp(aOpt,aOpt_e,negate(32768/2),1,&tmp);
-    tmp = mult_r(tmp,currentFrameLevel);                 /*Q_tmp = tmp2 + currentFrameLevel_e*/
-    tmp2 = add(tmp2,currentFrameLevel_e);
-
-    *new_noiseEstimate_e = BASOP_Util_Add_MantExp(round_fx(tmp32),add(aOpt_e,noiseLevelMemory_e[tmp_e - 1]),negate(s_max(tmp,-32767)/*to avoid negate(-32768)*/),tmp2,&f);
-
-    assert(f >= 0);
-
+    f = currentFrameLevel * (1.0f - aOpt);
+    f += aOpt * noiseLevelMemory[(*currLevelIndex ? *currLevelIndex : buffSize)-1];
     /* if current frame min is a new local min, set index to current index */
     p = *noiseLevelIndex;
-    move16();
-    tmp2 = BASOP_Util_Add_MantExp(noiseLevelMemory[p],noiseLevelMemory_e[p],negate(f),*new_noiseEstimate_e,&tmp);
-    IF (tmp >= 0)
+    if (noiseLevelMemory[p] >= f)
     {
-
-        /*rescale noiseLevelMemory*/
-
-        setnoiseLevelMemory(f,new_noiseEstimate_e,noiseLevelMemory_e, noiseLevelMemory, currLevelIndex);
+        noiseLevelMemory[*currLevelIndex] = f;
         p = *currLevelIndex;
-        move16();
     }
-    ELSE
+    else
     {
-        move16();
-
-        setnoiseLevelMemory(f,new_noiseEstimate_e, noiseLevelMemory_e, noiseLevelMemory, currLevelIndex);
-
+        noiseLevelMemory[*currLevelIndex] = f;
         /* current min is not a new min, so check if min must be re-searched */
-        IF (sub(p, *currLevelIndex) != 0)
+        if (p != *currLevelIndex)
         {
             f = noiseLevelMemory[p];   /* min is still in memory, so return it */
-            move16();
-            *new_noiseEstimate_e = noiseLevelMemory_e[p];
         }
-        ELSE {
+        else
+        {
             /* p == currLevelIndex; min was removed from memory, re-search min */
-            FOR (i = 0; i < PLC_MIN_STAT_BUFF_SIZE; i++)
+            for (i = *currLevelIndex + 1; i < buffSize; i++)
             {
-                tmp2 = BASOP_Util_Add_MantExp(noiseLevelMemory[p],noiseLevelMemory_e[p],negate(noiseLevelMemory[i]),noiseLevelMemory_e[i],&tmp);
-                if ( tmp > 0)
+                if (f >= noiseLevelMemory[i])
                 {
+                    f = noiseLevelMemory[i];
                     p = i;
-                    move16();
                 }
             }
-            f = noiseLevelMemory[p];
-            move16();
-            *new_noiseEstimate_e = noiseLevelMemory_e[p];
+            for (i = 0; i <= *currLevelIndex; i++)
+            {
+                if (f >= noiseLevelMemory[i])
+                {
+                    f = noiseLevelMemory[i];
+                    p = i;
+                }
+            }
         }
     }
-
     /* update local-minimum-value index and current circular-buffer index */
     *noiseLevelIndex = p;
-    move16();
-    p = add(*currLevelIndex,1);
-    *currLevelIndex = add(*currLevelIndex, 1);
-    move16();
-    if (sub(*currLevelIndex, PLC_MIN_STAT_BUFF_SIZE) == 0)
-    {
-        *currLevelIndex = 0;
-        move16();
-    }
+    p = *currLevelIndex + 1;
+    *currLevelIndex = (p == buffSize) ? 0 : p;
 
     *noiseEstimate = f;
-    move16();
+
+    return;
 }
+
 
 /*----------------------------------------------------------------------*
  * PLC: [ACELP: Fade-out]
  * PLC: getLevelSynDeemph: derives on frame or subframe basis the level
  *      of LPC synthesis and deeemphasis based on the given input
  *----------------------------------------------------------------------*/
-Word16 getLevelSynDeemph( /*10Q5*/
-    Word16        h1Init[],     /* i: input value or vector to be processed */ /* Q15 */
-    Word16  const A[],          /* i: LPC coefficients                      */ /* Qx  */
-    Word16  const lpcorder,     /* i: LPC order                             */ /* Q0  */
-    Word16  const lenLpcExc,    /* i: length of the LPC excitation buffer   */ /* Q0  */
-    Word16  const preemph_fac,  /* i: preemphasis factor                    */ /* Q15 */
-    Word16  const numLoops,     /* i: number of loops                       */ /* Q0  */
-    Word16        *Exp          /* o: exponent of return value Q15          */
-)
+float getLevelSynDeemph(float const h1Init[],     /* i: input value or vector to be processed */
+                        float const A[],          /* i: LPC coefficients                      */
+                        int   const lenLpcExc,    /* i: length of the LPC excitation buffer   */
+                        float const preemph_fac,  /* i: preemphasis factor                    */
+                        int   const numLoops)     /* i: number of loops                       */
 {
-    Word32  levelSynDeemphSub;
-    Word32  levelSynDeemph ;
-    Word16  h1[L_FRAME_PLUS/4]; /*Q15*/
-    Word16  mem[M];
-    Word16  tmp;
-    Word16  loop;
-    Word16 s16, tmp16, Hr16;
-    Word16 Q_h1;
+    float levelSynDeemphSub;
+    float levelSynDeemph = 0;
+    float h1[L_FRAME_PLUS/4];
+    float mem[M];
+    float tmp = 0;
+    int   loop;
 
-
-    levelSynDeemphSub = L_deposit_l(0);
-    levelSynDeemph = L_deposit_l(0);
-    tmp = 0;
-    Q_h1 = 9; /*synthesis scaling for */                                          move16();
-
-    /*calculate headroom for dotproduct*/
-    Hr16 = sub(15,norm_s(lenLpcExc));
-
-    Q_h1 = s_max(sub(Q_h1,Hr16),0); /*compensate synthesis scaling with Headroom as much as possible to retain as much precision as possible*/
-
-    /*Factor to be multiplied in order to calculate dotproduct with headroom*/
-    tmp16 = shr(32768/2,sub(Hr16,1));
-
-    /*moved from inside loop, before synthesis*/
-    h1Init[0] = mult_r(h1Init[0],tmp16);
-    move16();
-
-    FOR (loop = 0; loop  < numLoops; loop++)
+    for (loop = 0; loop  < numLoops; loop++)
     {
-        set16_fx(h1, 0, lenLpcExc);
-        set16_fx(mem, 0, lpcorder);
+        set_zero(h1, lenLpcExc);
+        set_zero(mem, M);
 
-        Copy(h1Init, h1, 1);
-        /*h1 will be scaled down, Q_h1 */
-        E_UTIL_synthesis(Q_h1, A, h1, h1, lenLpcExc, mem, 0, lpcorder);
-        deemph_fx(h1, preemph_fac, lenLpcExc, &tmp);
+        h1[0] = *h1Init;
+
+        syn_filt(A, M, h1, h1, lenLpcExc, mem, 0);
+        deemph(h1, preemph_fac, lenLpcExc, &tmp);
         A += (M+1);
 
         /* gain introduced by synthesis+deemphasis */
-        /*levelSynDeemphSub = (float)sqrt(dot_product( h1, h1, lenLpcExc));*/
-        levelSynDeemphSub = Dot_product12_offs(h1, h1, lenLpcExc, &s16, 0);
-        s16 = sub(shl(add(Q_h1,Hr16),1), sub(30, s16));
+        levelSynDeemphSub = (float)sqrt(dotp( h1, h1, lenLpcExc));
 
-        levelSynDeemphSub = Sqrt32(levelSynDeemphSub,&s16); /*Q31*/
-
-        /* mean of the above across all subframes  -- moved outta loop*/
-        /*levelSynDeemph += (1.0/(float)numLoops) * levelSynDeemphSub;*/
-        tmp16 = 32767/*1.0f Q15*/;
-        move16();
-
-        if (sub(numLoops , 1) > 0)
-        {
-            tmp16 = div_s(1,numLoops);
-        }
-
-        levelSynDeemph = L_add(levelSynDeemph , L_shl(Mpy_32_16_1(levelSynDeemphSub,tmp16),sub(s16,10))); /*10Q21*/
-
+        /* mean of the above across all subframes */
+        levelSynDeemph += (1.0f/(float)numLoops) * levelSynDeemphSub;
     }
-    s16 = norm_l(levelSynDeemph);
-    levelSynDeemph = L_shl(levelSynDeemph, s16);
-    move16();
-    *Exp = sub(10,s16); /*Set exponent in order to transform returnvalue to Q15*/
-
-    return round_fx(levelSynDeemph); /*Q15*/
+    return levelSynDeemph;
 }
 
-/* BASOP version: up to date with rev 7422 */
-void genPlcFiltBWAdap(const Word32 sr_core, Word16 *lpFiltAdapt, const Word16 type, const Word16 alpha
+void genPlcFiltBWAdap(int   const sr_core,     /* i: core sampling rate                                         */
+                      float*      lpFiltAdapt, /* o: filter coefficients for filtering codebooks in case of flc */
+                      int   const type,        /* i: type of filter, either 0 : lowpass or 1 : highpass         */
+                      float const alpha        /* i: fade out factor [0 1) used decrease filter tilt            */
                      )
 {
-    Word16 a, b, exp;
-
-
-    assert(type == 0 || type == 1);
-
-    IF ( L_sub(sr_core, 16000) == 0 )
+    float a;
+    switch (sr_core)
     {
-        IF (type == 0)
-        {
-            move16();
-            move16();
-            move16();
-            *lpFiltAdapt++ = 7282/*  0.4000f/(2.f*0.4000f+1.f) Q15*/;
-            *lpFiltAdapt++ = 18204/*      1.f/(2.f*0.4000f+1.f) Q15*/;
-            *lpFiltAdapt   = 7282/*  0.4000f/(2.f*0.4000f+1.f) Q15*/;
-        }
-        ELSE
-        {
-            a = mult_r(13107/*0.4000f Q15*/, alpha);
-            exp = 0;
-            move16();
-            b = Inv16(add(a, 16384/*0.5f Q15*/), &exp);
-            b = shr(b, sub(1, exp));
-            a = negate(mult_r(a, b));
-            move16();
-            move16();
-            move16();
-            *lpFiltAdapt++ = a;
-            *lpFiltAdapt++ = b;
-            *lpFiltAdapt   = a;
-        }
+    case 16000 :
+        a = 0.4000f;
+        break;
+    default    :
+        a = 0.2813f; /*sr_core = 12800*/
+        break;
     }
-    ELSE
+    switch (type)
     {
-        IF (type == 0)
-        {
-            move16();
-            move16();
-            move16();
-            *lpFiltAdapt++ = 5899/*  0.2813f/(2.f*0.2813f+1.f) Q15*/;
-            *lpFiltAdapt++ = 20970/*      1.f/(2.f*0.2813f+1.f) Q15*/;
-            *lpFiltAdapt   = 5899/*  0.2813f/(2.f*0.2813f+1.f) Q15*/;
-        }
-        ELSE {
-            a = mult_r(9218/*0.2813f Q15*/, alpha);
-            exp = 0;
-            move16();
-            b = Inv16(add(a, 16384/*0.5f Q15*/), &exp);
-            b = shr(b, sub(1, exp));
-            a = negate(mult_r(a, b));
-            move16();
-            move16();
-            move16();
-            *lpFiltAdapt++ = a;
-            *lpFiltAdapt++ = b;
-            *lpFiltAdapt   = a;
-        }
+    case 0 :
+        *lpFiltAdapt++ =   a/(2.f*a+1.f);
+        *lpFiltAdapt++ = 1.f/(2.f*a+1.f);
+        *lpFiltAdapt   =   a/(2.f*a+1.f);
+        break;
+    case 1 :
+        a *= alpha;
+        *lpFiltAdapt++ =  -a/(2.f*a+1.f);
+        *lpFiltAdapt++ = 1.f/(2.f*a+1.f);
+        *lpFiltAdapt   =  -a/(2.f*a+1.f);
+        break;
+    default   :
+        fprintf(stderr,"PLC: Filter type neither lowpass nor highpass.\n");
+        assert(0);
+        break;
     }
 
 }
@@ -324,147 +173,111 @@ void genPlcFiltBWAdap(const Word32 sr_core, Word16 *lpFiltAdapt, const Word16 ty
  * PLC: [ACELP: general]
  * PLC: high pass filtering
  *-----------------------------------------------------------------*/
-/*VERSIONINFO: This port is up to date with trunk rev. 32434*/
-void highPassFiltering(
-    const   Word16 last_good,    /* i:   short  last classification type                            */
-    const   Word16 L_buffer,     /* i:   int    buffer length                                       */
-    Word16 exc2[],       /* i/o: Qx     unvoiced excitation before the high pass filtering  */
-    const   Word16 hp_filt[],    /* i:   Q15    high pass filter coefficients                       */
-    const   Word16 l_fir_fer)    /* i:        high pass filter length                               */
-
+void highPassFiltering(const short last_good,     /* i:   last classification type                           */
+                       const int   L_buffer,      /* i:   buffer length                                      */
+                       float       exc2[],        /* i/o: unvoiced excitation before the high pass filtering */
+                       const float hp_filt[],     /* i:   high pass filter coefficients                      */
+                       const int   l_fir_fer)     /* i:   high pass filter length                            */
 {
-    Word16   i; /*int*/
+    int   i;
 
-    IF( sub(last_good , UNVOICED_TRANSITION)> 0 )
+    if( last_good > UNVOICED_TRANSITION )
     {
-
-        FOR( i=0 ; i< L_buffer; i++ )
+        for( i=0 ; i< L_buffer; i++ )
         {
-            exc2[i] = round_fx(L_sub(Dot_product(&exc2[i], hp_filt, l_fir_fer), 1));
+            exc2[i] = dotp(&exc2[i], hp_filt, l_fir_fer);
         }
     }
 }
+
 
 /*----------------------------------------------------------------------------------*
  * PLC: [Common: mode decision]
  * PLC: Decide which Concealment to use. Update pitch lags if needed
  *----------------------------------------------------------------------------------*/
-Word16 GetPLCModeDecision(
-    Decoder_State_fx *st              /* i/o:    decoder memory state pointer */
-)
+int GetPLCModeDecision(Decoder_State *st   /* i/o:    decoder memory state pointer */
+                      )
 {
-    Word16 /*int*/ core;
-    Word16 numIndices = 0;
-
-
-    IF( sub(st->flagGuidedAcelp,1) == 0 )
+    int core;
+    int numIndices = 0;
+    if( st->flagGuidedAcelp == 1 )
     {
-        st->old_pitch_buf_fx[2*st->nb_subfr] = L_deposit_h(st->guidedT0);
-        st->old_pitch_buf_fx[2*st->nb_subfr+1] = L_deposit_h(st->guidedT0);
-        st->mem_pitch_gain[0] = st->mem_pitch_gain[1] = 16384/*1.f Q14*/;/*Q14*/
+        /* update mem_lag according to info available on future frame */
+        st->old_pitch_buf[2*st->nb_subfr] = (float)st->guidedT0;
+        st->old_pitch_buf[2*st->nb_subfr+1] = (float)st->guidedT0;
+        st->mem_pitch_gain[0] = st->mem_pitch_gain[1] = 1.f;
     }
-    st->plc_use_future_lag = 0;
-    move16();
-    test();
-    test();
-    if(( st->last_core_fx > ACELP_CORE && st->tcxltp_last_gain_unmodified!=0 )
-            || ( sub(st->flagGuidedAcelp,1) == 0 )
-      )
+    if(( st->last_core > ACELP_CORE && st->tcxltp_last_gain_unmodified != 0 ) || ( st->flagGuidedAcelp == 1 ))
     {
         /* no updates needed here, because already updated in last good frame */
         st->plc_use_future_lag = 1;
-        move16();
     }
-
-    IF (sub(st->last_core_fx,-1) == 0)
+    else
     {
-        core = TCX_20_CORE;
-        move16();
-        st->last_core_fx = ACELP_CORE;
-        move16();
-        if(st->Opt_AMR_WB_fx)
+        st->plc_use_future_lag = 0;
+    }
+    if (st->last_core == -1)
+    {
+        if (st->Opt_AMR_WB)
         {
-            core = ACELP_CORE;
-            move16();
+            core = 0;
         }
+        else
+        {
+            core = 1;
+        }
+        st->last_core = ACELP_CORE;
         st->tonal_mdct_plc_active = 0;
-        move16();
     }
-    ELSE
+    else
     {
-        core = ACELP_CORE;
-        move16();
-        if (sub(st->nbLostCmpt,1) > 0)
+        core = 0;
+        if (st->nbLostCmpt > 1)
         {
             core = st->last_core_bfi;
-            move16();
         }
-        IF (sub(st->nbLostCmpt,1) == 0)
+
+        /* no FD TCX PLC after a TCX transition frame: the appropriate framing is not implemented */
+        if (st->nbLostCmpt == 1)
         {
             st->tonal_mdct_plc_active = 0;
-            move16();
-            test();
-            test();
-            test();
-            IF ( !(st->rf_flag && st->use_partial_copy && (sub(st->rf_frame_type, RF_TCXTD1) == 0 || sub(st->rf_frame_type, RF_TCXTD2) == 0)))
+            if ( !(st->rf_flag && st->use_partial_copy && (st->rf_frame_type == RF_TCXTD1 || st->rf_frame_type == RF_TCXTD2)))
             {
-                test();
-                test();
-                test();
-                test();
-                test();
-                test();
-                IF ((sub(st->last_core_fx,TCX_20_CORE) == 0) && (sub(st->second_last_core,TCX_20_CORE) == 0)
-                && ((L_sub(st->old_fpitch,L_deposit_h(shr(st->L_frame_fx,1)))) <= 0
-                || (sub(st->tcxltp_last_gain_unmodified,13107/*0.4f Q15*/) <= 0))
-                /* it is fine to call the detection even if no ltp information
-                   is available, meaning that st->old_fpitch ==
-                   st->tcxltp_second_last_pitch == st->L_frame */
-                && (L_sub(st->old_fpitch, st->tcxltp_second_last_pitch) == 0)
-                && !st->last_tns_active && !st->second_last_tns_active)
+                if ((st->last_core == TCX_20_CORE)
+                        && (st->second_last_core == TCX_20_CORE)
+                        && ((st->old_fpitch <= 0.5f*st->L_frame) || (st->tcxltp_last_gain_unmodified <= 0.4f))
+                        /* it is fine to call the detection even if no ltp information
+                           is available, meaning that st->old_fpitch ==
+                           st->tcxltp_second_last_pitch == st->L_frame */
+                        && (st->old_fpitch == st->tcxltp_second_last_pitch)
+                        && !st->last_tns_active
+                        && !st->second_last_tns_active)
                 {
-                    Word32 pitch;
 
-
-                    pitch = L_deposit_h(0);
-                    if(st->tcxltp_last_gain_unmodified > 0)
-                    {
-                        pitch = L_add(st->old_fpitch, 0);
-                    }
                     TonalMDCTConceal_Detect(&st->tonalMDCTconceal,
-                                            pitch,
+                                            (st->tcxltp_last_gain_unmodified > 0) ? st->old_fpitch : 0,
                                             &numIndices);
-
-                    test();
-                    test();
-                    test();
-                    test();
-                    test();
-                    test();
-                    IF ((sub(numIndices,10) > 0)
-                        || ((sub(numIndices,5) > 0)
-                            && (L_sub(L_abs(L_sub(st->tcxltp_third_last_pitch,st->tcxltp_second_last_pitch)),32768l/*0.5f Q16*/) < 0))
-                        || ((numIndices > 0) && ((sub(st->last_good_fx,UNVOICED_TRANSITION) <= 0) || (sub(st->tcxltp_last_gain_unmodified,13107/*0.4f Q15*/) <= 0))
-                            && (L_sub(L_abs(L_sub(st->tcxltp_third_last_pitch,st->tcxltp_second_last_pitch)),32768l/*0.5f Q16*/) < 0)))
+                    if ((numIndices > 10)
+                            || ((numIndices > 5)
+                                && (fabs(st->tcxltp_third_last_pitch-st->tcxltp_second_last_pitch) < 0.5f)
+                               )
+                            || ((numIndices > 0) && ((st->last_good <= UNVOICED_TRANSITION) || (st->tcxltp_last_gain_unmodified <= 0.4f))
+                                && (fabs(st->tcxltp_third_last_pitch-st->tcxltp_second_last_pitch) < 0.5f)
+                               ))
                     {
-                        core = TCX_20_CORE;
-                        move16();
+                        core = 1;
                         st->tonal_mdct_plc_active = 1;
-                        move16();
                     }
-                    ELSE IF (sub(st->last_good_fx,UNVOICED_TRANSITION) <= 0 || sub(st->tcxltp_last_gain_unmodified,13107/*0.4f Q15*/)<=0)
+                    else if (st->last_good <= UNVOICED_TRANSITION || st->tcxltp_last_gain_unmodified <= 0.4f)
                     {
-                        core = TCX_20_CORE;
-                        move16();
+                        core = 1;
                     }
                 }
-                ELSE IF (st->last_core_fx != ACELP_CORE)
+                else if (st->last_core != ACELP_CORE)
                 {
-                    test();
-                    if (sub(st->last_good_fx,UNVOICED_TRANSITION) <= 0 || sub(st->tcxltp_last_gain_unmodified,13107/*0.4f Q15*/)<=0)
+                    if (st->last_good <= UNVOICED_TRANSITION || st->tcxltp_last_gain_unmodified <= 0.4f)
                     {
-                        core = st->last_core_fx;
-                        move16();
+                        core = st->last_core;
                     }
                 }
             }

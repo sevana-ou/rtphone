@@ -1,384 +1,308 @@
 /*====================================================================================
-    EVS Codec 3GPP TS26.442 Apr 03, 2018. Version 12.11.0 / 13.6.0 / 14.2.0
+    EVS Codec 3GPP TS26.443 Nov 13, 2018. Version 12.11.0 / 13.7.0 / 14.3.0 / 15.1.0
   ====================================================================================*/
 
 #include <stdlib.h>
+#include <math.h>
 #include <assert.h>
 #include "options.h"
-#include "prot_fx.h"
-#include "basop_util.h"
-#include "stl.h"
-#include "options.h"
-#include "rom_com_fx.h"
+#include "rom_com.h"
+#include "prot.h"
+
+/*-------------------------------------------------------------------*
+* Local function
+*--------------------------------------------------------------------*/
+
+static int BITS_ALLOC_adjust_acelp_fixed_cdk( int bits_frame, int *fixed_cdk_index, int nb_subfr );
 
 
-/*
- * function  BITS_ALLOC_init_config_acelp()
- *
- * description: initial configuration for ACELP
- *
- *  return: void
- */
+/*-------------------------------------------------------------------*
+* BITS_ALLOC_init_config_acelp()
+*
+* initial configuration for Mode 2 ACELP
+*--------------------------------------------------------------------*/
+
 void BITS_ALLOC_init_config_acelp(
-    const Word32 bit_rate,
-    const Word8 narrowBand,
-    const Word16 nb_subfr,
-    ACELP_config *pConfigAcelp        /*o:  configuration structure of ACELP*/
+    int bit_rate,
+    int narrowBand,
+    int nb_subfr,
+    ACELP_config *acelp_cfg        /*o:  configuration structure of ACELP*/
 )
 {
-    Word8 rate_mode_index;
+    short rate_mode_index;
 
+    if( bit_rate <= ACELP_9k60 )
+    {
+        rate_mode_index=0;
+    }
+    else
+    {
+        rate_mode_index=1;
+    }
 
-    move16();
-    move16();
-    move16();
-    rate_mode_index=(bit_rate > ACELP_9k60);
-
-    pConfigAcelp->mode_index=rate_mode_index;
-
+    acelp_cfg->mode_index=rate_mode_index;
 
     /*LPC: midLpc should be swithced off?*/
-    pConfigAcelp->midLpc_enable = 1;
-    move16();
+    acelp_cfg->midLpc_enable = 1;
 
     /*ACELP ICB config*/
-    test();
-    IF( (rate_mode_index==0) || narrowBand != 0 )
+    if( (rate_mode_index==0) || (narrowBand==1) )
     {
-        move16();
-        move16();
-        move16();
-        move16();
-        move16();
-        move16();
-        pConfigAcelp->pre_emphasis = 1;
-        pConfigAcelp->formant_enh = 1;
-        pConfigAcelp->formant_enh_num = FORMANT_SHARPENING_G1;
-        pConfigAcelp->formant_enh_den = FORMANT_SHARPENING_G2;
-        pConfigAcelp->formant_tilt = 0;
-        pConfigAcelp->voice_tilt = 0;
+        acelp_cfg->pre_emphasis = 1;
+        acelp_cfg->formant_enh = 1;
+        acelp_cfg->formant_enh_num = FORMANT_SHARPENING_G1;
+        acelp_cfg->formant_enh_den = FORMANT_SHARPENING_G2;
+        acelp_cfg->formant_tilt = 0;
+        acelp_cfg->voice_tilt = 0;
     }
-    ELSE
+    else
     {
-        move16();
-        move16();
-        move16();
-        move16();
-        move16();
-        move16();
-        pConfigAcelp->pre_emphasis = 0;
-        pConfigAcelp->formant_enh = 1;
-        pConfigAcelp->formant_enh_num = FORMANT_SHARPENING_G1;
-        pConfigAcelp->formant_enh_den = FORMANT_SHARPENING_G2;
-        pConfigAcelp->formant_tilt = 1;
-        pConfigAcelp->voice_tilt = 1;
+        acelp_cfg->pre_emphasis = 0;
+        acelp_cfg->formant_enh = 1;
+        acelp_cfg->formant_enh_num = FORMANT_SHARPENING_G1;
+        acelp_cfg->formant_enh_den = FORMANT_SHARPENING_G2;
+        acelp_cfg->formant_tilt = 1;
+        acelp_cfg->voice_tilt = 1;
     }
 
     /*Wide band @ 16kHz*/
-    IF ( sub(nb_subfr,NB_SUBFR16k) == 0 )
+    if ( nb_subfr == NB_SUBFR16k )
     {
-        move16();
-        move16();
-        move16();
-        move16();
-        move16();
-        move16();
-        pConfigAcelp->pre_emphasis = 1;
-        pConfigAcelp->formant_enh = 1;
-        pConfigAcelp->formant_enh_num = FORMANT_SHARPENING_G1_16k;
-        pConfigAcelp->formant_enh_den = FORMANT_SHARPENING_G2_16k;
-        pConfigAcelp->formant_tilt = 0;
-        pConfigAcelp->voice_tilt = 2;
+        acelp_cfg->pre_emphasis = 1;
+        acelp_cfg->formant_enh = 1;
+        acelp_cfg->formant_enh_num = FORMANT_SHARPENING_G1_16k;
+        acelp_cfg->formant_enh_den = FORMANT_SHARPENING_G2_16k;
+        acelp_cfg->formant_tilt = 0;
+        acelp_cfg->voice_tilt = 2;
     }
 
+    return;
 }
 
+/*-------------------------------------------------------------------*
+* BITS_ALLOC_config_acelp()
+*
+* configure all Mode 2 ACELP modes and allocate the bits
+*--------------------------------------------------------------------*/
 
-/*
- * function  BITS_ALLOC_config_acelp()
- *
- * description: configure all acelp modes and allocate the bits
- *
- *  return: bit demand
- */
-Word16 BITS_ALLOC_config_acelp(
-    const Word16 bits_frame,                   /*i: remaining bit budget for the frame*/
-    const Word16 coder_type,               /*i: acelp coder type*/
-    ACELP_config *pConfigAcelp,                /*i/o:  configuration structure of ACELP*/
-    const Word16 narrowBand,
-    const Word16 nb_subfr
+int BITS_ALLOC_config_acelp(
+    const int   bits_frame,         /* i  : remaining bit budget for the frame  */
+    const short coder_type,         /* i  : acelp extended mode index           */
+    ACELP_config *acelp_cfg,         /* i/o: configuration structure of ACELP    */
+    const short narrowBand,         /* i  : narrowband flag                     */
+    const short nb_subfr            /* i  : number of subframes                 */
 )
 {
-    Word16 mode_index;
-    Word16 band_index;
-    Word16 i;
-    Word16 remaining_bits, bits;
+    short mode_index;
+    short band_index;
+    short i;
+    short remaining_bits, bits;
 
+    /*Sanity check*/
 
-
-    move16();
-    move16();
-    move16();
-    mode_index = pConfigAcelp->mode_index;
+    mode_index = acelp_cfg->mode_index;
     band_index = (narrowBand==0);
-    bits=0;
+    bits = 0;
 
-    IF ( band_index==0 )
+    if ( band_index==0 )
     {
-        move16();
-        pConfigAcelp->formant_enh = 1;
-        if(sub(coder_type,INACTIVE) == 0)
+        if(coder_type == INACTIVE)
         {
-            move16();
-            pConfigAcelp->formant_enh = 0;
+            acelp_cfg->formant_enh = 0;
         }
-    }
-
-    IF ( s_and(sub(band_index,1)==0, sub(nb_subfr,4)==0) )
-    {
-        IF(sub(coder_type,INACTIVE) == 0)
+        else
         {
-            pConfigAcelp->pre_emphasis = 0;
-            move16();
-            pConfigAcelp->formant_enh = 0;
-            move16();
-            pConfigAcelp->formant_enh_num = FORMANT_SHARPENING_G1_16k;
-            move16();
-            pConfigAcelp->voice_tilt = 1;
-            move16();
-            pConfigAcelp->formant_tilt = 1;
-            move16();
+            acelp_cfg->formant_enh = 1;
         }
-        ELSE
-        {
-            pConfigAcelp->pre_emphasis = 1;
-            move16();
-            pConfigAcelp->formant_enh = 1;
-            move16();
-            pConfigAcelp->formant_enh_num = FORMANT_SHARPENING_G1;
-            move16();
-            pConfigAcelp->voice_tilt = 0;
-            move16();
-            pConfigAcelp->formant_tilt = 0;
-            move16();
-        }
-    }
-    IF (sub(coder_type,UNVOICED) == 0 )
-    {
-        IF(sub(ACELP_GAINS_MODE[mode_index][band_index][coder_type], 6) == 0)
-        {
-            pConfigAcelp->pitch_sharpening = 0;
-            move16();
-            pConfigAcelp->phase_scrambling = 1;
-            move16();
-        }
-        ELSE
-        {
-            pConfigAcelp->pitch_sharpening = 0;
-            move16();
-            pConfigAcelp->phase_scrambling = 0;
-            move16();
-        }
-    }
-    ELSE
-    {
-        pConfigAcelp->pitch_sharpening = 1;
-        move16();
-        pConfigAcelp->phase_scrambling = 0;
-        move16();
     }
 
-    IF(sub(coder_type,ACELP_MODE_MAX) > 0)   /* keep pitch sharpening for RF_ALLPRED mode */
+    if( band_index==1 && nb_subfr == NB_SUBFR )
     {
-        pConfigAcelp->pitch_sharpening = 0;
-        pConfigAcelp->phase_scrambling = 0;
+
+        if( coder_type == INACTIVE)
+        {
+            acelp_cfg->pre_emphasis = 0;
+            acelp_cfg->formant_enh = 0;
+            acelp_cfg->formant_enh_num = FORMANT_SHARPENING_G1_16k;
+            acelp_cfg->formant_tilt = 1;
+            acelp_cfg->voice_tilt = 1;
+        }
+        else
+        {
+            acelp_cfg->pre_emphasis = 1;
+            acelp_cfg->formant_enh = 1;
+            acelp_cfg->formant_enh_num = FORMANT_SHARPENING_G1;
+            acelp_cfg->formant_tilt = 0;
+            acelp_cfg->voice_tilt = 0;
+        }
+    }
+
+    if( coder_type == UNVOICED )
+    {
+        if( ACELP_GAINS_MODE[mode_index][band_index][coder_type]==6 )
+        {
+            acelp_cfg->pitch_sharpening = 0;
+            acelp_cfg->phase_scrambling = 1;
+        }
+        else
+        {
+            acelp_cfg->pitch_sharpening = 0;
+            acelp_cfg->phase_scrambling = 0;
+        }
+    }
+    else
+    {
+        acelp_cfg->pitch_sharpening = 1;
+        acelp_cfg->phase_scrambling = 0;
+    }
+
+    if( coder_type > ACELP_MODE_MAX )
+    {
+        /* keep pitch sharpening for RF_ALLPRED mode */
+        acelp_cfg->pitch_sharpening = 0;
+        acelp_cfg->phase_scrambling = 0;
     }
 
     /*Allocate bits and different modes*/
-    move16();
-    pConfigAcelp->bpf_mode=ACELP_BPF_MODE[mode_index][band_index][coder_type];
-    bits = add(bits, ACELP_BPF_BITS[pConfigAcelp->bpf_mode]);
+    acelp_cfg->bpf_mode=ACELP_BPF_MODE[mode_index][band_index][coder_type];
+    bits+=ACELP_BPF_BITS[acelp_cfg->bpf_mode];
 
-    move16();
-    move16();
-    pConfigAcelp->nrg_mode=ACELP_NRG_MODE[mode_index][band_index][coder_type];
-    pConfigAcelp->nrg_bits=ACELP_NRG_BITS[pConfigAcelp->nrg_mode];
-    bits = add(bits, pConfigAcelp->nrg_bits);
+    acelp_cfg->nrg_mode=ACELP_NRG_MODE[mode_index][band_index][coder_type];
+    acelp_cfg->nrg_bits=ACELP_NRG_BITS[acelp_cfg->nrg_mode];
+    bits+=acelp_cfg->nrg_bits;
 
-    move16();
-    pConfigAcelp->ltp_mode=ACELP_LTP_MODE[mode_index][band_index][coder_type];
+    acelp_cfg->ltp_mode=ACELP_LTP_MODE[mode_index][band_index][coder_type];
+    acelp_cfg->ltp_bits=0;
+    acelp_cfg->ltf_mode=ACELP_LTF_MODE[mode_index][band_index][coder_type];
+    acelp_cfg->ltf_bits=ACELP_LTF_BITS[acelp_cfg->ltf_mode];
 
-    move16();
-    pConfigAcelp->ltp_bits=0;
-
-    move16();
-    pConfigAcelp->ltf_mode=ACELP_LTF_MODE[mode_index][band_index][coder_type];
-
-    move16();
-    pConfigAcelp->ltf_bits=ACELP_LTF_BITS[pConfigAcelp->ltf_mode];
-    if ( s_and(sub(nb_subfr,5)==0, sub(pConfigAcelp->ltf_bits,4)==0) )
+    if( nb_subfr == NB_SUBFR16k && acelp_cfg->ltf_bits == 4 )
     {
-        pConfigAcelp->ltf_bits = add(pConfigAcelp->ltf_bits,1);
+        acelp_cfg->ltf_bits++;
     }
-    bits = add(bits,pConfigAcelp->ltf_bits);
+    bits+=acelp_cfg->ltf_bits;
 
 
-    FOR ( i=0; i<nb_subfr; i++ )
+    for ( i=0; i<nb_subfr; i++ )
     {
-        pConfigAcelp->gains_mode[i] = ACELP_GAINS_MODE[mode_index][band_index][coder_type];
-        move16();
+        acelp_cfg->gains_mode[i] = ACELP_GAINS_MODE[mode_index][band_index][coder_type];
 
         /* skip subframe 1, 3 gain encoding, and use from subframe 0, and 3, respectively */
-        test();
-        test();
-        IF(sub(coder_type,ACELP_MODE_MAX) >= 0 && (sub(i,1) == 0 || sub(i,3) == 0))
+        if(coder_type >= ACELP_MODE_MAX && (i == 1 || i == 3))
         {
-            pConfigAcelp->gains_mode[i] = 0;
+            acelp_cfg->gains_mode[i] = 0;
         }
 
-        bits = add(bits, ACELP_GAINS_BITS[pConfigAcelp->gains_mode[i]]);
-
-        move16();
-        bits = add(bits, ACELP_LTP_BITS_SFR[pConfigAcelp->ltp_mode][i]);
-        pConfigAcelp->ltp_bits= add( pConfigAcelp->ltp_bits,ACELP_LTP_BITS_SFR[pConfigAcelp->ltp_mode][i]);
+        bits += ACELP_GAINS_BITS[acelp_cfg->gains_mode[i]];
+        bits += ACELP_LTP_BITS_SFR[acelp_cfg->ltp_mode][i];
+        acelp_cfg->ltp_bits += ACELP_LTP_BITS_SFR[acelp_cfg->ltp_mode][i];
     }
 
     /*Innovation*/
-
-    if ( sub(bits_frame,bits) < 0)
+    if( bits_frame < bits )
     {
-        printf("Warning: bits per frame too low\n");
+        printf("\nWarning: bits per frame too low\n");
         return -1;
     }
 
-    IF( sub(coder_type,RF_ALLPRED) == 0 )
+    if( coder_type == RF_ALLPRED )
     {
-        set16_fx(pConfigAcelp->fixed_cdk_index, -1, nb_subfr);
+        set_i(acelp_cfg->fixed_cdk_index, -1, nb_subfr);
     }
-    ELSE IF ( sub(coder_type,RF_GENPRED) == 0 )
+    else if ( coder_type == RF_GENPRED )
     {
-        pConfigAcelp->fixed_cdk_index[0] = 0;  /* 7 bits */
-        pConfigAcelp->fixed_cdk_index[1] = -1;
-        pConfigAcelp->fixed_cdk_index[2] = 0;  /* 7 bits */
-        pConfigAcelp->fixed_cdk_index[3] = -1;
-        pConfigAcelp->fixed_cdk_index[4] = -1;
-        bits = add(bits,14);
+        acelp_cfg->fixed_cdk_index[0] = 0;  /* 7 bits */
+        acelp_cfg->fixed_cdk_index[1] = -1;
+        acelp_cfg->fixed_cdk_index[2] = 0;  /* 7 bits */
+        acelp_cfg->fixed_cdk_index[3] = -1;
+        acelp_cfg->fixed_cdk_index[4] = -1;
+        bits += 14;
     }
-    ELSE IF( sub(coder_type,RF_NOPRED) == 0 )
+    else if( coder_type == RF_NOPRED )
     {
-        set16_fx(pConfigAcelp->fixed_cdk_index, 0, nb_subfr);
-        bits = add(bits,28);
+        set_i(acelp_cfg->fixed_cdk_index, 0, nb_subfr);
+        bits += 28;
     }
-    ELSE
+    else
     {
-        bits = add(bits, BITS_ALLOC_adjust_acelp_fixed_cdk(sub(bits_frame,bits), pConfigAcelp->fixed_cdk_index, nb_subfr ));
+        bits += BITS_ALLOC_adjust_acelp_fixed_cdk(bits_frame - bits, acelp_cfg->fixed_cdk_index, nb_subfr );
     }
 
-    remaining_bits = sub(bits_frame, bits);
+    remaining_bits = bits_frame-bits;
 
     /*Sanity check*/
-    if (remaining_bits<0)
+    if( remaining_bits < 0 )
     {
-        move16();
         bits = -1;
     }
 
 
-    return(bits);
+    return( bits );
 }
 
+/*-------------------------------------------------------------------*
+* BITS_ALLOC_adjust_acelp_fixed_cdk()
+*
+*
+*--------------------------------------------------------------------*/
 
-static
-Word16 BITS_ALLOC_adjust_generic(
-    const Word16 bits_frame, /*i: bit budget*/
-    Word16 *fixed_cdk_index,
-    const Word16 nb_subfr,
-    const Word16 *pulseconfigbits,
-    const Word16 pulseconfig_size
+static int BITS_ALLOC_adjust_acelp_fixed_cdk(
+    int bits_frame, /*i: bit budget*/
+    int *fixed_cdk_index,
+    int nb_subfr
 )
 {
-    Word16 bits_subframe2, inb_subfr;
-    Word16 sfr, k, bitsused, bits_currsubframe;
+    int bits_subframe2;
+    int sfr, k, bitsused, bits_currsubframe;
 
     bits_subframe2 = bits_frame;
-    move16();
-    inb_subfr = 8192/*1.0f/NB_SUBFR Q15*/;
-    move16();
-    if ( sub(nb_subfr,NB_SUBFR16k) == 0 )
-    {
-        inb_subfr = 6554/*1.0f/NB_SUBFR16k Q15*/;
-        move16();
-    }
 
-    IF ( sub(bits_subframe2, i_mult2(pulseconfigbits[0], nb_subfr)) < 0 )                    /* not in final code - not instrumented */
+    if( bits_subframe2 < ACELP_FIXED_CDK_BITS(0)*nb_subfr )
     {
-        return add(bits_frame,1); /* Not enough bits for lowest mode. -> trigger alarm*/
+        return(bits_frame+1 ); /* Not enough bits for lowest mode. -> trigger alarm*/
     }
 
     /* search cdk-index for first subframe */
-    FOR (k=0; k<pulseconfig_size-1; k++)
+    for (k=0; k<ACELP_FIXED_CDK_NB-1; k++)
     {
-
-        IF (i_mult2(pulseconfigbits[k], nb_subfr) > bits_subframe2)
+        if (ACELP_FIXED_CDK_BITS(k)*nb_subfr > bits_subframe2)
         {
-            k = sub(k,1);    /* previous mode did not exceed bit-budget */
-            BREAK;
+            k--;    /* previous mode did not exceed bit-budget */
+            break;
         }
     }
 
-    if (i_mult2(pulseconfigbits[k], nb_subfr) > bits_subframe2)
+    if( ACELP_FIXED_CDK_BITS(k)*nb_subfr > bits_subframe2 )
     {
-        k = sub(k,1);    /* previous mode did not exceed bit-budget */
+        k--;    /* previous mode did not exceed bit-budget */
     }
-
-    move16();
     fixed_cdk_index[0] = k;
-    bitsused = i_mult2(pulseconfigbits[k], nb_subfr);
+    bitsused = ACELP_FIXED_CDK_BITS(k);
 
-    FOR (sfr=1; sfr < nb_subfr; sfr++)
+    for (sfr=1; sfr < nb_subfr; sfr++)
     {
-        /*bits_currsubframe = (int)(((float)sfr+1.0f)*bits_subframe) - bitsused;*/
-        bits_currsubframe = sub(add(i_mult2(sfr, bits_subframe2), bits_subframe2), bitsused);
+        bits_currsubframe = (sfr*bits_subframe2 + bits_subframe2) - bitsused*nb_subfr;
 
         /* try increasing mode while below threshold */
-        WHILE ( (sub(k, pulseconfig_size-1) < 0) && (sub(i_mult2(pulseconfigbits[add(k,1)], nb_subfr),bits_currsubframe) <= 0) )
+        while ( (k < ACELP_FIXED_CDK_NB-1) && (ACELP_FIXED_CDK_BITS(k+1)*nb_subfr <= bits_currsubframe) )
         {
-            test();
-            k = add(k,1);
+            k++;
         }
 
         /* try decreasing mode until below threshold */
-        WHILE (i_mult2(pulseconfigbits[k], nb_subfr) > bits_currsubframe)
+        while (ACELP_FIXED_CDK_BITS(k)*nb_subfr > bits_currsubframe)
         {
-            k = sub(k,1);
-
-            IF (k == 0)
+            k--;
+            if ( k == 0 )
             {
-                BREAK;
+                break;
             }
         }
 
         /* store mode */
-        move16();
         fixed_cdk_index[sfr] = k;
-        bitsused = add(bitsused, i_mult2(pulseconfigbits[k], nb_subfr));
+        bitsused += ACELP_FIXED_CDK_BITS(k);
     }
-
-    return mult_r(bitsused, inb_subfr);
-}
-
-Word16 BITS_ALLOC_adjust_acelp_fixed_cdk(
-    const Word16 bits_frame, /*i: bit budget*/
-    Word16 *fixed_cdk_index,
-    const Word16 nb_subfr
-)
-{
-    Word16 bitsused;
-
-
-    bitsused = BITS_ALLOC_adjust_generic(bits_frame, fixed_cdk_index, nb_subfr, ACELP_CDK_BITS, ACELP_FIXED_CDK_NB);
-
 
     return bitsused;
 }
-

@@ -1,1601 +1,782 @@
 /*====================================================================================
-    EVS Codec 3GPP TS26.442 Apr 03, 2018. Version 12.11.0 / 13.6.0 / 14.2.0
+    EVS Codec 3GPP TS26.443 Nov 13, 2018. Version 12.11.0 / 13.7.0 / 14.3.0 / 15.1.0
   ====================================================================================*/
 
-#include <stdlib.h>
-#include <stdio.h>
-#include <assert.h>
+#include "options.h"
+#include <math.h>
 #include <string.h>
-#include "prot_fx.h"
-#include "basop_util.h"
-#include "stat_com.h"
-#include "stl.h"    /* FOR wmc_tool */
-
-void get_maxConv_and_pitch_x(Word16 *s_LP, Word16 s, Word16 e, Word16 N,
-                             Word32 *maxConv, Word16 *maxConv_bits, Word16 *pitch);
-Word16 get_voicing_x(Word16 *s_LP, Word16 pitch, Word32 covMax,Word16 maxConv_bits, Word16 Framesize);
-Word32 con_Log10(Word32 i_s32Val, Word16 i_s16Q);
+#include <stdio.h>
+#include <stdlib.h>
+#include <limits.h>
+#include "prot.h"
 
 
-Word16 vadmin(Word16 a, Word16 b)
+
+static void LpFilter2(float *x, float *y, int N, float *mem);
+static float harmo(float *X, int n, float f);
+static int Is_Periodic(float cov_max, int zp, float ener, float ener_mean,int pitch, int Framesize, float *mdctdata);
+static float sig_tilt(float *s, int FrameSize);
+static int zero_pass(float *s, int N);
+static float dot(float *a, float *b, int N);
+static int array_max_indx(float *s, int N);
+
+/* Decoder side */
+static void LpFilter2(float *x, float *y, int N, float *mem)
 {
-    return s_min(a, b);
-}
-
-void set_state(Word16 *state, Word16 num, Word16 N)
-{
-    Word16 i, tmp;
-
-    tmp = sub(N, 1);
-    FOR (i = 0; i < tmp; i++)
+    int i;
+    y[0] = 0.18f * mem[0] + 0.64f * mem[1] + 0.18f * x[0];
+    y[1] = 0.18f * mem[1] + 0.64f * y[0] + 0.18f * x[1];
+    for (i = 2; i < N; i++)
     {
-        state[i] = state[i+1];
-        move16();
+        y[i] = 0.18f * y[i-2] + 0.64f * y[i-1] + 0.18f * x[i];
     }
-    state[tmp] = num;
-    move16();
 }
 
-void concealment_update_x(Word16 bfi, Word16 curr_mode, Word16 tonality, Word32 *invkoef, Word16 *invkoef_scale, void *_plcInfo)
+static float harmo(float *X, int n, float f)
 {
-    T_PLCInfo *plcInfo = (T_PLCInfo*)_plcInfo;
-    Word32 *data_reci2 = plcInfo->data_reci2_fx;
-    Word16 *tcx_tonality = plcInfo->TCX_Tonality;
-    Word16 FrameSize = plcInfo->FrameSize;
-    Word16 subframe = plcInfo->subframe_fx;
-    Word16 i;
-    move16();
-    move16();
-    IF (sub(curr_mode ,1)==0)
+    int h, k, m = 8;
+    float ener = 0, ener_harmo = 0;
+    for (k = 1; k < m+1; k++)
     {
-        set_state(plcInfo->Transient, curr_mode, MAX_POST_LEN);
-
-        FOR (i = 0; i < FrameSize; i++)
+        h = (int)(k*f - 0.5f);
+        if (k*f - h > 0.5f)
         {
-            data_reci2[i] = invkoef[i];
-            move32();
-
+            ener_harmo += X[h]*X[h] + X[h+1]*X[h+1];
         }
-        plcInfo->data_reci2_scale = *invkoef_scale;
-        move16();
-        IF (!bfi)
+        else
         {
-            set_state(tcx_tonality, tonality, DEC_STATE_LEN);
+            ener_harmo += X[h]*X[h];
         }
     }
-    ELSE
+    for (k = 0; k < n; k++)
     {
-
-        IF (subframe == 0)
-        {
-            set_state(plcInfo->Transient, curr_mode, MAX_POST_LEN);
-
-            IF (!bfi)
-            {
-                set_state(tcx_tonality, tonality, DEC_STATE_LEN);
-            }
-        }
-        /* don't store the second subframe during frameloss; in
-           pitch_search_fx(), low_freq_rate is derived on the last good
-           TCX-10 spectrum */
-        test();
-        IF (!bfi || subframe == 0)
-        {
-
-            Word32 *ptr = data_reci2+subframe;
-            Word16 FrameSize2 = shr(FrameSize,1);
-
-            FOR (i = 0; i < FrameSize2; i++)
-            {
-                ptr[i] = invkoef[i];
-                move32();
-            }
-
-            plcInfo->data_reci2_scale = *invkoef_scale;
-            move16();
-        }
+        ener += X[k]*X[k];
     }
-    return;
+    return ener_harmo/(ener+EPSILON);
 }
 
-static Word16 zero_pass_w32_x(Word16 *s, Word16 N)
+static int Is_Periodic(float cov_max, int zp, float ener, float ener_mean,int pitch, int Framesize, float *mdctdata)
 {
-    Word16 i;
-    Word32 temp, zp = L_deposit_l(0);
-
-    FOR (i = 1; i < N; i++)
-    {
-        temp = L_mac0(-1L, s[i],s[i-1]);
-        zp = L_sub(zp, L_shr(temp,31));
-    }
-    return extract_l(zp);
-}
-
-Word16 Sqrt_x_fast(Word32 value)
-{
-    Word16 norm;
-    Word16 result, index;
-
-    norm = sub(23, norm_l(value));
-    index = extract_l( L_shr_r(value, add(norm, s_and(norm, 1))));
-    result = shr(sqrt_table_pitch_search[index], sub(11, shr(add(norm,1),1)));
-    return result;
-}
-
-Word32 dot_w32_accuracy_x(Word16 *s1, Word16 *s2, Word16 nbits, Word16 N)
-{
-    Word16 i;
-    Word32 eng = L_deposit_l(0), temp;
-
-    FOR (i = 0; i < N; i++)
-    {
-        temp = L_mult0(s1[i], s2[i]);
-        eng = L_add(eng, L_shr(temp,nbits));
-    }
-
-    return eng;
-}
-
-
-Word16 int_div_s_x(Word16 a, Word16 b)
-{
-    Word16 result = 0;
-    Word16 norm, left=0, i;
-    move16();
-    move16();
-    test();
-    IF (sub(a,b) < 0 || b == 0)
-    {
-        return 0;
-    }
-    ELSE
-    {
-        a = add(a, shr(b,1));
-        norm = sub(norm_s(b),norm_s(a));
-
-        FOR (i = norm; i>= 0; i--)
-        {
-            left = shr(a, i);
-            result = shl(result,1);
-            IF (sub(left,b) >= 0)
-            {
-                result = add(result,1);
-                left= sub(left, b);
-                a   = add(shl(left,i), s_and(a, sub(shl(1,i),1)));
-            }
-        }
-    }
-
-    return result;
-}
-
-Word16 GetW32Norm_x(Word32 *s, Word16 N)
-{
-    Word32 smax = L_deposit_l(0);
-    Word16 smax_norm, i;
-
-    FOR (i = 0; i < N; i++)
-    {
-        smax = L_or(smax, L_abs(s[i]));
-    }
-
-    smax_norm = norm_l(smax);
-
-    return smax_norm;
-}
-
-Word16 harmo_x(Word32 *X, Word16  Framesize, Word16 pitch)
-{
-    Word16  h,  k,  result = 0;
-    Word32 ener = L_deposit_l(0), ener_harmo = L_deposit_l(0);
-    Word16 norm1, d1, d2;
-    Word16 ener_w, ener_harmo_w;
-    Word16 nbits = sub(15, norm_s(Framesize));
-    move16();
-    norm1 = GetW32Norm_x(X, Framesize);
-
-    FOR (k = 1; k < 9; k++)
-    {
-        h = sub(int_div_s_x(extract_l(L_mult(k, Framesize)), pitch),1);
-
-        d1 = extract_h(L_shl(X[h],  norm1));
-        d2 = extract_h(L_shl(X[h+1],norm1));
-
-        ener_harmo = L_add(ener_harmo,
-                           L_shr(L_mac0(L_mult0(d1, d1), d2, d2),nbits));
-    }
-
-    FOR (k = 0; k < Framesize; k++)
-    {
-        d1 = extract_h(L_shl(X[k],norm1));
-        ener = L_add(ener, L_shr(L_mult0(d1, d1),nbits));
-    }
-
-    norm1 = norm_l(ener);
-    ener_w = extract_h(L_shl(ener,norm1));
-    ener_harmo_w = extract_h(L_shl(ener_harmo,norm1));
-
-    IF (L_sub(ener_harmo ,ener)>= 0)
-    {
-        return 32767;
-    }
-    test();
-    IF ((ener_harmo_w <= 0)||(ener_w <= 0))
-    {
-        return 0;
-    }
-    result = div_s(ener_harmo_w, ener_w);
-    return result;
-}
-
-static
-Word16 get_low_freq_eng_rate_x(Word32 *mdct_data,
-                               Word16 curr_mode,
-                               Word16 N)
-{
-    Word16 N1, N2, i;
-    Word32 low_eng = L_deposit_l(0), eng = L_deposit_l(0), smax = L_deposit_l(0);
-    Word16 nbits, temp, norm = 0;
-    move16();
-    N1 = 30;
-    N2 = N;
-    move16();
-    move16();
-    IF (sub(2 ,curr_mode)==0)
-    {
-        N1 = shr(30,1);
-        N2 = shr(N,1);
-    }
-
-    nbits = sub(15, norm_s(N2));
-
-    FOR (i = 0; i < N2; i++)
-    {
-        smax = L_or(smax, L_abs(mdct_data[i]));
-    }
-
-    norm = norm_l(smax);
-
-    FOR (i = 0; i < N1; i++)
-    {
-        temp = extract_h(L_shl(mdct_data[i], norm));
-        low_eng  = L_add(low_eng, L_shr(L_mult0(temp, temp),nbits));
-    }
-
-    FOR (i = N1; i < N2; i++)
-    {
-        temp = extract_h(L_shl(mdct_data[i], norm));
-        eng  = L_add(eng, L_shr(L_mult0(temp, temp),nbits));
-    }
-    eng = L_add(low_eng, eng);
-
-    /* IF (low_eng<(eng+EPSILON)*0.02) return 1;ELSE return 0; */
-    /* smax=eng*0.02 */
-    smax = L_shr(Mpy_32_16_1(eng, 5243), 3);
-
-    return (L_sub(low_eng,smax) <= 0);
-}
-
-void LpFilter2_x(Word16 *x, Word16 *y, Word16 N)
-{
-    Word16  i;
-    Word16 smax, norm;
-    Word16 a1 = 5898;  /* W16(0.18f); */
-    Word16 a2 = 20971; /* W16(0.64f); */
-    move16();
-    move16();
-    smax=0;
-    move16();
-    FOR (i = 0; i < N; i++)
-    {
-        smax = s_or(smax, abs_s(x[i]));
-    }
-    norm = norm_s(smax);
-
-    y[0] = mult(shl(x[0],norm), a1);
-    move16();
-    y[1] = add(mult(y[0], a2),mult(shl(x[1],norm), a1));
-    move16();
-
-    FOR (i = 2; i < N; i++)
-    {
-        /* 5898*2+20971=32767 -->no overflow */
-        y[i] = add(mult(y[i-2],a1), add(mult(y[i-1],a2), mult(shl(x[i],norm),a1)));
-        move16();
-    }
-}
-
-void sig_tilt_x(Word16 *s, Word16 FrameSize, Word32 *enr1, Word32 *enr2)
-{
-    Word16 subFrameSize, shIFt;
-    Word16 *p1, *p2;
-    Word16 nbits;
-
-    subFrameSize = shr(FrameSize, 2);
-    p1 = s+subFrameSize;
-    p2 = s+sub(subFrameSize, 2);
-
-    shIFt = sub(FrameSize, subFrameSize);
-    nbits = sub(15, norm_s(shIFt));
-    *enr1 = dot_w32_accuracy_x(p1, p2, nbits, shIFt);
-    move32();
-    *enr2 = dot_w32_accuracy_x(p1, p1, nbits, shIFt);
-    move32();
-}
-
-void get_maxConv_and_pitch_x(Word16 *s_LP, Word16 s, Word16 e, Word16 N,
-                             Word32 *maxConv, Word16 *maxConv_bits, Word16 *pitch)
-{
-    Word16 t, cov_size, size = N;
-    Word32 tmp_sigma = L_deposit_l(0), cov_max_sigma = L_deposit_l(0);
-    Word16 nbits,tmp_pitch=0;
-    Word32 r1_high, r2_high;
-    UWord16 r1_low, r2_low;
-    Word32 tmp_sigma_last    = L_deposit_l(0);  /* not needed, just to avoid compiler warning */
-    Word16 cov_size_last     = N;               /* not needed, just to avoid compiler warning */
-    Word32 cov_max_sigma_tmp = L_deposit_l(0);
-    Word16 size_tmp          = N;
-    move16();
-    move16();
-    nbits = sub(15, norm_s(sub(N, s)));
-
-    FOR (t = s; t < e; t++)
-    {
-        cov_size =  sub(N,t);
-        tmp_sigma = dot_w32_accuracy_x(s_LP, s_LP+t, nbits, cov_size);
-
-        IF (sub(t,s) > 0)                               /* don't use the first value */
-        {
-            Mpy_32_16_ss(tmp_sigma     , cov_size_last, &r1_high, &r1_low);
-            Mpy_32_16_ss(tmp_sigma_last, cov_size     , &r2_high, &r2_low);
-            /* tmp_sigma > tmp_sigma_last */
-            test();
-            test();
-            move16();
-            move16(); /* moves are for the (Word32) casts */
-            IF((L_sub(r1_high, r2_high)  > 0) ||
-               (L_sub(r1_high, r2_high) == 0 && L_sub((Word32)r1_low, (Word32)r2_low) > 0))
-            {
-                /* store the current cov, if it is larger than the last one */
-                cov_max_sigma_tmp = tmp_sigma;
-                move32();
-                size_tmp          = cov_size;
-                move16();
-            }
-            ELSE
-            {
-                Mpy_32_16_ss(cov_max_sigma    , size_tmp, &r1_high, &r1_low);
-                Mpy_32_16_ss(cov_max_sigma_tmp, size    , &r2_high, &r2_low);
-                /* cov_max_sigma < cov_max_sigma_tmp */
-                test();
-                test();
-                move16();
-                move16(); /* moves are for the (Word32) casts */
-                IF((L_sub(r1_high, r2_high)  < 0) ||
-                (L_sub(r1_high, r2_high) == 0 && L_sub((Word32)r1_low, (Word32)r2_low) < 0))
-                {
-                    /* otherwise */
-                    /* use the last value of cov, being a max */
-                    cov_max_sigma = cov_max_sigma_tmp;
-                    move32();
-                    size = cov_size;
-                    move16();
-                    /* and use the last index as pitch */
-                    tmp_pitch = sub(t,1);
-                }
-            }
-        }
-        tmp_sigma_last = tmp_sigma;
-        move32();
-        cov_size_last  = cov_size;
-        move16();
-    }
-    *pitch = tmp_pitch;
-    move16();
-    *maxConv = cov_max_sigma;
-    move32();
-    *maxConv_bits = nbits;
-    move16();
-}
-
-Word16 get_voicing_x(Word16 *s_LP, Word16 pitch, Word32 covMax,Word16 maxConv_bits,  Word16 Framesize)
-{
-    Word32 eng1 = L_deposit_l(0), eng2 = L_deposit_l(0);
-    Word16 voicing, norm;
-    Word16 tmpLen, nbits;
-    Word16 eng1_w, eng2_w;
-
-    IF (covMax <= 0)
-    {
-        return 0;
-    }
-    ELSE
-    {
-        tmpLen = sub(Framesize, pitch);
-        nbits = maxConv_bits;
-        move16();
-
-        eng1 = dot_w32_accuracy_x(s_LP, s_LP, nbits, tmpLen);
-        eng2 = dot_w32_accuracy_x(s_LP+pitch, s_LP+pitch, nbits, tmpLen);
-
-        norm  = sub(norm_l(L_or(eng1, L_or(eng2, covMax))),1);
-        eng1   = L_shl(eng1,   norm);
-        eng2   = L_shl(eng2,   norm);
-        covMax = L_shl(covMax, norm);
-
-        eng1_w = Sqrt_x_fast(eng1);
-        eng2_w = Sqrt_x_fast(eng2);
-
-        eng1 = L_mult0(eng1_w, eng2_w);
-        norm = norm_l(eng1);
-        eng1_w = extract_h(L_shl(eng1, norm));
-        eng2_w = extract_h(L_shl(covMax, norm));
-
-        IF (L_sub(covMax , eng1)>=0)
-        {
-            return 32767;
-        }
-        test();
-        IF ((eng2_w <= 0)||(eng1_w <= 0))
-        {
-            return 0;
-        }
-        voicing = div_s(eng2_w, eng1_w);
-
-        return voicing;
-    }
-}
-
-void pitch_modify_x(Word16 *s_LP, Word16 *voicing, Word16 *pitch, Word16 FrameSize)
-{
-    Word32 eng1, eng2, eng3;
-    Word16 shIFt = shr(*pitch ,1);
-    Word16 tmpLen, nbits, norm, voicing2;
-    Word16 eng1_w, eng2_w;
-
-    tmpLen = sub(FrameSize, shIFt);
-    nbits = sub(15, norm_s(tmpLen));
-
-    eng1 = dot_w32_accuracy_x(s_LP+shIFt, s_LP+shIFt, nbits, tmpLen);
-    eng2 = dot_w32_accuracy_x(s_LP, s_LP, nbits, tmpLen);
-    eng3 = dot_w32_accuracy_x(s_LP+shIFt, s_LP, nbits, tmpLen);
-
-    IF (eng3 <= 0)
-    {
-        return ;
-    }
-
-    norm  = sub(norm_l(L_or(eng1, L_or(eng2, eng3))),1);
-    eng1   = L_shl(eng1,   norm);
-    eng2   = L_shl(eng2,   norm);
-    eng3   = L_shl(eng3,   norm);
-
-    eng1_w = Sqrt_x_fast(eng1);
-    eng2_w = Sqrt_x_fast(eng2);
-
-    eng1 = L_mult0(eng1_w, eng2_w);
-
-    norm = norm_l(eng1);
-    eng1_w = extract_h(L_shl(eng1, norm));
-    eng2_w = extract_h(L_shl(eng3, norm));
-
-    IF (L_sub(eng3,eng1) >= 0)
-    {
-        voicing2 = 32767;
-        move16();
-    }
-    ELSE {                                                                            test();
-            IF ((eng2_w <= 0)||(eng1_w <= 0))
-    {
-        voicing2 = 0;
-        move16();
-    }
-    ELSE {
-        voicing2 = div_s(eng2_w, eng1_w);
-    }
-         }
-
-    IF (sub(voicing2, *voicing) > 0)
-    {
-        *pitch = shIFt;
-        move16();
-        *voicing = voicing2;
-        move16();
-    }
-}
-
-Word16 Is_Periodic_x(Word32 *mdct_data, Word16 cov_max, Word16  zp, Word32 ener,
-                     Word32 ener_mean, Word16  pitch, Word16  Framesize)
-{
-    Word16 flag =0;
-    Word16 harm;
-    move16();
-    test();
-    test();
-    test();
-    IF (L_sub(ener, L_shl(50,8)) < 0 || (L_sub(ener, L_sub(ener_mean, L_shl(8,8))) < 0
-                                         && sub(cov_max, 29491) < 0 ))
+    int flag =0;
+    float f = 2.0f*Framesize/pitch;
+    float harm;
+    harm = harmo(mdctdata /*X*/, Framesize, f);
+    if (ener < 50 || (ener < ener_mean - 8.0f && cov_max < 0.9f))
     {
         flag = 0;
-        move16();
     }
-    ELSE IF (sub(cov_max, 26214) > 0)
+    else if (cov_max > 0.8f)
     {
         flag = 1;
-        move16();
     }
-    ELSE IF (sub(zp, 100) > 0)
+    else if (zp > 100)
     {
         flag = 0;
-        move16();
     }
-    ELSE IF (L_sub(ener, L_sub(ener_mean,L_shl(6,8))) < 0)
+    else if (ener < ener_mean - 6)
     {
         flag = 0;
-        move16();
     }
-    ELSE IF (L_sub(ener, L_add(ener_mean, L_shl(1,8))) > 0 && sub(cov_max, 19661) > 0)
+    else if (ener > ener_mean + 1 && cov_max > 0.6f)
     {
         flag = 1;
-        move16();
     }
-    ELSE
+    else if (harm < 0.7f)
     {
-        harm = harmo_x(mdct_data, Framesize, pitch);
-        flag = 1;
-        move16();
-        if (sub(harm, 22938) < 0)
-        {
-            flag = 0;
-            move16();
-        }
+        flag = 0;
     }
-
+    else
+    {
+        flag = 1;
+    }
     return flag;
 }
 
-Word16 get_conv_relation_x(Word16 *s_LP, Word16 shIFt, Word16 N)
+static int zero_pass(float *s, int N)
 {
-    Word32 eng1,eng2, eng3;
-    Word16 eng1_w, eng2_w;
-    Word16 tmp, norm, nbits;
-
-    nbits = sub(15, norm_s(N));
-    eng3 = dot_w32_accuracy_x(s_LP, s_LP+shIFt, nbits, N);
-
-    IF (eng3 <= 0)
+    int zp = 0, i;
+    for (i = 1; i < N; i++)
     {
-        return 0;
-    }
-
-    eng1 = dot_w32_accuracy_x(s_LP+shIFt, s_LP+shIFt, nbits, N);
-    eng2 = dot_w32_accuracy_x(s_LP, s_LP, nbits, N);
-
-    norm = sub(norm_l(L_or(eng1, L_or(eng2, eng3))),1);
-    eng1 = L_shl(eng1,   norm);
-    eng2 = L_shl(eng2,   norm);
-    eng3 = L_shl(eng3,   norm);
-
-    eng1_w = Sqrt_x_fast(eng1);
-    eng2_w = Sqrt_x_fast(eng2);
-
-    eng1 = L_mult0(eng1_w, eng2_w);
-
-    norm = norm_l(eng1);
-    eng1_w = extract_h(L_shl(eng1, norm));
-    eng2_w = extract_h(L_shl(eng3, norm));
-
-    IF (L_sub(eng3, eng1) >= 0)
-    {
-        return 32767;
-    }
-    test();
-    IF ((eng2_w <= 0)||(eng1_w <= 0))
-    {
-        return 0;
-    }
-
-    tmp = div_s(eng2_w, eng1_w);
-
-    return tmp;
-}
-
-static
-Word16  pitch_search_fx(Word16 *s,         /* lastPcmOut */
-                        Word16 *outx_new,
-                        Word16 Framesize,
-                        Word16 *voicing,
-                        Word16 zp,
-                        Word32 ener,
-                        Word32 ener_mean,
-                        Word32 *mdct_data,
-                        Word16 curr_mode
-                       )
-{
-    Word16 pitch = 0;
-    Word32 cov_max = L_deposit_l(0), tilt_enr1, tilt_enr2;
-    Word16 s_LP[L_FRAME_MAX];
-    Word16 start_pos, end_pos;
-    Word16 low_freq_rate_result;
-    Word16 flag = 0, zp_current;
-    Word32 *mdctPtr;
-    Word16 curr_frmsize;
-    Word16 cov_max_bits=0;
-    Word16 i;
-    move16();
-    move16();
-    move16();
-    *voicing = 0;
-    move16();
-    curr_frmsize = Framesize;
-    move16();
-    if (sub(2, curr_mode) == 0)
-    {
-        curr_frmsize = shr(Framesize, 1);
-    }
-
-    zp_current = zero_pass_w32_x(outx_new, curr_frmsize);
-
-    if (sub(2, curr_mode) == 0)
-    {
-        zp_current = shl(zp_current,1);
-    }
-    IF (sub(Framesize, 256) <= 0)
-    {
-        IF (sub(zp_current, 70) > 0)
+        if (s[i-1] * s[i] <= 0)
         {
-            return 0;
+            zp++;
         }
     }
-    ELSE
-    {
-        IF (sub(zp_current, 105) > 0)
-        {
-            return 0;
-        }
-    }
-
-    mdctPtr = mdct_data;
-    if (sub(2, curr_mode) == 0)
-    {
-        mdctPtr = mdct_data + shr(Framesize,1);
-    }
-
-    low_freq_rate_result = get_low_freq_eng_rate_x(mdctPtr,
-                           curr_mode,
-                           Framesize);
-
-    IF(low_freq_rate_result)
-    {
-        return 0;
-    }
-
-    LpFilter2_x(s, s_LP, Framesize);
-    sig_tilt_x(s_LP, Framesize, &tilt_enr1, &tilt_enr2);
-    IF (sub(Framesize, 320) <= 0)
-    {
-        test();
-        IF ((0==tilt_enr2) ||
-            (L_sub(tilt_enr1, L_shr(tilt_enr2, 1)) < 0))
-        {
-            return 0;
-        }
-    }
-    ELSE
-    {
-        test();
-        IF ((0==tilt_enr2) ||
-        (L_sub(tilt_enr1, Mpy_32_16_1(tilt_enr2, 22938)) < 0))
-        {
-            return 0;
-        }
-    }
-
-    IF (sub(Framesize, 320) <= 0)
-    {
-        start_pos = extract_l(L_shr(L_mac0(0x80, 34, Framesize), 8));
-        end_pos   = extract_l(L_shr(L_mac0(0x2 ,  3, Framesize), 2));
-        get_maxConv_and_pitch_x(s_LP, start_pos, end_pos, Framesize, &cov_max, &cov_max_bits, &pitch);
-        *voicing = get_voicing_x(s_LP, pitch, cov_max, cov_max_bits, Framesize);
-        move16();
-        pitch_modify_x(s_LP, voicing, &pitch, Framesize);
-    }
-    ELSE
-    {
-        Word16 s_tmp[L_FRAME_MAX];
-        Word16 Framesize_tmp;
-        Word16 pitch_tmp[3];
-        Word16 cov_size;
-
-        Framesize_tmp = shr(Framesize, 1);
-        FOR (i = 0; i < Framesize_tmp; i++)
-        {
-            s_tmp[i] = s_LP[2*i];
-            move16();
-        }
-
-        start_pos = extract_l( L_shr(L_mac0(0x80, 34, Framesize_tmp), 8));
-        end_pos = extract_l( L_shr(L_mac0(0x2, 3, Framesize_tmp), 2));
-
-        cov_max = L_deposit_l(0);
-        pitch = 0;
-        move16();
-        get_maxConv_and_pitch_x(s_tmp, start_pos, end_pos, Framesize_tmp, &cov_max, &cov_max_bits, &pitch);
-
-        IF (pitch > 0)
-        {
-            pitch_tmp[0] = 0;
-            move16();
-            if (sub(shl(pitch, 1), 1) > 0)
-            {
-                pitch_tmp[0] = sub(shl(pitch, 1), 1);
-                move16();
-            }
-            pitch_tmp[1] = shl(pitch, 1);
-            move16();
-            pitch_tmp[2] = add(shl(pitch, 1), 1);
-            move16();
-            start_pos = 0;
-            move16();
-            pitch = 0;
-            move16();
-            FOR (i = 0; i < 3; i++)
-            {
-                cov_size =  sub(Framesize, pitch_tmp[i]);
-                end_pos = get_conv_relation_x(s_LP, pitch_tmp[i], cov_size);
-                IF (sub(end_pos, start_pos) > 0)
-                {
-                    start_pos = end_pos;
-                    move16();
-                    pitch = pitch_tmp[i];
-                    move16();
-                }
-            }
-            *voicing = start_pos;
-            move16();
-        }
-    }
-
-    IF (pitch > 0)
-    {
-        flag = Is_Periodic_x(mdct_data, *voicing, zp, ener, ener_mean, pitch, Framesize);
-    }
-    if (flag == 0 )
-    {
-        pitch = 0;
-        move16();
-    }
-    return pitch;
+    return zp;
 }
 
-void concealment_init_x(Word16 N, void *_plcInfo)
+static float dot(float *a, float *b, int N)
 {
-    T_PLCInfo *plcInfo = (T_PLCInfo*)_plcInfo;
-    Word16 i;
-
-    plcInfo->FrameSize = N;
-    move16();
-    plcInfo->Pitch_fx = 0;
-    move16();
-    plcInfo->T_bfi_fx = 0;
-    move16();
-    plcInfo->outx_new_n1_fx = 0;
-    move16();
-    plcInfo->nsapp_gain_fx = 0;
-    move16();
-    plcInfo->nsapp_gain_n_fx = 0;
-    move16();
-    plcInfo->ener_mean_fx = L_deposit_l(15213);                                                  /*Q8 59.4260f*256*/
-    plcInfo->ener_fx = L_deposit_l(0);
-    plcInfo->zp_fx = N;
-    move16();
-    plcInfo->recovery_gain = 0;
-    move16();
-    plcInfo->step_concealgain_fx = 0;
-    move16();
-    plcInfo->concealment_method = TCX_NONTONAL;
-    move16();
-    plcInfo->subframe_fx = 0;
-    move16();
-    plcInfo->nbLostCmpt = L_deposit_l(0);
-    plcInfo->seed = 21845;
-    move16();
-
-    FOR (i = 0; i < TCX_TONALITY_INIT_CNT; i++)
+    float sum = 0;
+    int i;
+    for (i = 0; i < N; i++)
     {
-        plcInfo->TCX_Tonality[i] = 1;
-        move16();
+        sum += (float)(a[i] * b[i]);
     }
-    FOR (i = TCX_TONALITY_INIT_CNT; i < DEC_STATE_LEN; i++)
-    {
-        plcInfo->TCX_Tonality[i] = 0;
-        move16();
-    }
-
-    FOR (i = 0; i < MAX_POST_LEN; i++)
-    {
-        plcInfo->Transient[i] = 1;
-        move16();
-    }
-
-    FOR (i = 0; i < L_FRAME_MAX; i++)
-    {
-        plcInfo->data_reci2_fx[i] = L_deposit_l(0);
-    }
-    return;
+    return sum;
 }
 
-static Word16 own_random_fix(                         /* o  : output random value */
-    Word16 *seed            /* i/o: random seed         */
-)
+static int array_max_indx(float *s, int N)
 {
-    *seed = extract_l(L_mac0(13849L, *seed , 31821));
-    return(*seed);
-}
-
-void concealment_decode_fix(Word16 curr_mode, Word32 *invkoef, Word16 *invkoef_scale,void *_plcInfo)
-{
-    T_PLCInfo *plcInfo = (T_PLCInfo*)_plcInfo;
-    Word16 i;
-    Word16 N = plcInfo->FrameSize;
-    Word16 *seed = &(plcInfo->seed);
-    Word16 sign;
-    move16();
-    IF (plcInfo->concealment_method == TCX_NONTONAL)    /* #define TCX_NONTONAL 0 */
+    int i, indx = 0;
+    for (i = 0; i < N; i++)
     {
-        IF (sub(curr_mode, 1) == 0)
-        {
-            /* copy the data of the last frame */
-            mvr2r_Word32(plcInfo->data_reci2_fx, invkoef, N);
-            *invkoef_scale = plcInfo->data_reci2_scale;
-            move16();
-            /* sign randomization */
-            FOR (i = 0; i < N; i++)
-            {
-                sign = add(shl(shr(own_random_fix(seed),15),1),1);
-                if(sub(sign,-1)==0)
-                {
-                    invkoef[i] = L_negate(invkoef[i]);
-                    move32();
-                }
-            }
-        }
-    }
-    return;
-}
-
-
-Word16 Spl_GetScalingSquare_x(Word16 *in_vector, Word16 in_vector_length, Word16 times)
-{
-    Word16 nbits = sub(15, norm_s(times))/*Spl_GetSizeInBits_x(times)*/;
-    Word16 i;
-    Word16 smax = -1;
-    Word16 sabs;
-    Word16 *sptr = in_vector;
-    Word16 t;
-    move16();
-    FOR (i = in_vector_length; i > 0; i--)
-    {
-
-        sabs = abs_s(*sptr);
-        sptr++;
-        smax = s_max(sabs, smax);
-
-    }
-
-    t = norm_l(L_mult0(smax, smax));
-
-    IF (smax == 0)
-    {
-        return 0; /* Since norm(0) returns 0 */
-    }
-    ELSE
-    {
-        nbits = sub(nbits, t);
-        nbits = s_max(0,nbits);
-
-        return nbits;
-    }
-}
-
-
-Word32 Spl_Energy_x(Word16* vector, Word16 vector_length, Word16* scale_factor)
-{
-    Word32 en = L_deposit_l(0);
-    Word32 i;
-    Word16 scaling = Spl_GetScalingSquare_x(vector, vector_length, vector_length);
-
-    FOR (i = 0; i < vector_length; i++)
-    {
-        en = L_add(en,L_shr(L_mult0(vector[i], vector[i]), scaling));
-    }
-
-    move32();
-    *scale_factor = scaling;
-
-    return en;
-}
-
-void Log10OfEnergy_x(Word16 *s, Word32 *enerlogval, Word16 len)
-{
-    Word32 energy = L_deposit_l(0), tmp2 = L_deposit_l(0);
-    Word16 shfts = 0;
-    Word32 Log10_energy = L_deposit_l(0), Log10_len = L_deposit_l(0);
-    move16();
-    energy = Spl_Energy_x(s, len, &shfts);/* Q:-shfts */
-    IF (energy > 0)
-    {
-        Log10_energy = con_Log10(energy, negate(shfts)); /* Q25 */
-        Log10_len = con_Log10(L_deposit_l(len), 0); /* Q25 */
-        tmp2 = L_sub(Log10_energy,Log10_len); /* Q25 */
-        tmp2 = Mpy_32_16_1(tmp2,20480); /* Q11->10   Q=25+11-15=21 */
-        *enerlogval = L_shr(tmp2,13); /* Q8 */                                    move32();
-    }
-    ELSE
-    {
-        *enerlogval = -25600;
-        move32();
-    }
-
-}
-
-static Word32 fnLog2(Word32 L_Input)
-{
-
-    Word16 swC0 = -0x2b2a, swC1 = 0x7fc5, swC2 = -0x54d0;
-    Word16 siShIFtCnt, swInSqrd, swIn;
-    Word32 LwIn;
-    move16();
-    move16();
-    move16();
-    /*_________________________________________________________________________
-     |                                                                         |
-     |                              Executable Code                            |
-     |_________________________________________________________________________|
-    */
-
-    /* normalize input and store shIFts required */
-    /* ----------------------------------------- */
-
-    siShIFtCnt = norm_l(L_Input);
-    LwIn = L_shl(L_Input, siShIFtCnt);
-    siShIFtCnt = add(siShIFtCnt, 1);
-    siShIFtCnt = negate(siShIFtCnt);
-
-    /* calculate x*x*c0 */
-    /* ---------------- */
-
-    swIn = extract_h(LwIn);
-    swInSqrd = mult_r(swIn, swIn);
-    LwIn = L_mult(swInSqrd, swC0);
-
-    /* add x*c1 */
-    /* --------- */
-
-    LwIn = L_mac(LwIn, swIn, swC1);
-
-    /* add c2 */
-    /* ------ */
-
-    LwIn = L_add(LwIn, L_deposit_h(swC2));
-
-    /* apply *(4/32) */
-    /* ------------- */
-
-    LwIn = L_shr(LwIn, 3);
-    LwIn = L_and(LwIn, 0x03ffffff);
-    siShIFtCnt = shl(siShIFtCnt, 10);
-    LwIn = L_add(LwIn, L_deposit_h(siShIFtCnt));
-
-    /* return log2 */
-    /* ----------- */
-
-    return (LwIn);
-}
-
-static Word32 fnLog10(Word32 L_Input)
-{
-
-    Word16 Scale = 9864;            /* 0.30103 = log10(2) */
-    Word32 LwIn;
-    move16();
-    /*_________________________________________________________________________
-     |                                                                         |
-     |                              Executable Code                            |
-     |_________________________________________________________________________|
-    */
-
-    /* 0.30103*log2(x) */
-    /* ------------------- */
-
-    LwIn = fnLog2(L_Input);
-    LwIn = Mpy_32_16_1(LwIn, Scale);
-
-    return (LwIn);
-}
-
-Word32 con_Log10(Word32 i_s32Val, Word16 i_s16Q)
-{
-    Word32 s32Out;
-    Word32 s32Correct;                                           /* corrected (31-q)*log10(2) */
-    const Word16 s16Log10_2 = 19728;                             /* log10(2)~Q16 */   move16();
-
-    IF(0 == i_s32Val)
-    {
-        return EVS_LW_MIN;
-    }
-
-    s32Out = fnLog10(i_s32Val);                                  /* (2^26)*log10(a) */
-
-    s32Correct = L_mult(sub(31,i_s16Q), s16Log10_2);             /* q = 17 */
-    s32Correct = L_shl(s32Correct, 8);                           /* q = 25 */
-    s32Out = L_shr(s32Out, 1);                                   /* q = 25 */
-
-    s32Out = L_add(s32Out, s32Correct);
-
-    return s32Out;
-}
-
-void concealment_update2_x(Word16 *outx_new, void *_plcInfo, Word16 FrameSize)
-{
-    T_PLCInfo *plcInfo = (T_PLCInfo*)_plcInfo;
-
-    plcInfo->zp_fx = zero_pass_w32_x(outx_new, FrameSize);
-    move16();
-
-    Log10OfEnergy_x(outx_new, &plcInfo->ener_fx, FrameSize); /* Q8 */
-    test();
-    IF (sub(plcInfo->zp_fx, 100) < 0 && L_sub(plcInfo->ener_fx, L_shl(50,8)) > 0)
-    {
-        plcInfo->ener_mean_fx  = L_add(Mpy_32_16_1(plcInfo->ener_mean_fx ,32112/* 0.98 Q15 */),
-                                       Mpy_32_16_1(plcInfo->ener_fx , 655/* 0.02 Q15 */));
-        move32();
-    }
-    return;
-}
-
-static Word16 array_max_indx_fx(Word16 *s, Word16 N)
-{
-    Word16 i, indx = 0;
-    move16();
-    FOR (i = 0; i < N; i++)
-    {
-        if (sub(s[i], s[indx]) > 0)
+        if (s[i] > s[indx])
         {
             indx = i;
-            move16();
         }
     }
     return indx;
 }
 
-Word16 ffr_getSfWord16(                 /* o: measured headroom in range [0..15], 0 IF all x[i] == 0 */
-    Word16 *x,      /* i: array containing 16-bit data */
-    Word16 len_x)   /* i: length of the array to scan  */
+static float sig_tilt(float *s, int FrameSize)
 {
-    Word16 i, i_min, i_max;
-    Word16 x_min, x_max;
-
-
-    x_max = 0;
-    move16();
-    x_min = 0;
-    move16();
-    FOR (i = 0; i < len_x; i++)
-    {
-        if (x[i] >= 0)
-            x_max = s_max(x_max,x[i]);
-        if (x[i] < 0)
-            x_min = s_min(x_min,x[i]);
-    }
-
-    i_max = 0x10;
-    move16();
-    i_min = 0x10;
-    move16();
-
-    if (x_max != 0)
-        i_max = norm_s(x_max);
-
-    if (x_min != 0)
-        i_min = norm_s(x_min);
-
-    i = s_and(s_min(i_max, i_min),0xF);
-
-
-    return i;
+    float tilt, enr1, enr2;
+    int subFrameSize, shift = 2;
+    float *p1, *p2;
+    subFrameSize = FrameSize>>2;
+    p1 = s+subFrameSize;
+    p2 = s+subFrameSize-shift;
+    enr1 = dot(p1, p2, FrameSize-subFrameSize);
+    enr2 = dot(p1, p1, FrameSize-subFrameSize);
+    tilt = enr1 / (enr2+EPSILON);
+    return tilt;
 }
 
-static Word16 OverlapAdd_fx(Word16 *pitch125_data, Word16 *sbuf,
-                            Word16  n, Word16  pitch, Word16  Framesize)
+static int pitch_search(float *s, /* lastPcmOut */
+                        float *outx_new,
+                        int   Framesize,
+                        float *voicing,
+                        int *zp,
+                        float *ener,
+                        float ener_mean,
+                        float *mdct_data,
+                        int curr_mode
+                       )
 {
-    Word16 n1,n2,s,s16MaxCoefNorm,s16MaxCoefNorm2,tmp16;
-    Word16 i;
-    Word16 pitch125 =extract_l(L_shr(L_add(L_add(L_deposit_h(pitch), L_mult(pitch, 8192)), 32768) ,16));
-    Word16 Loverlap = sub(pitch125,pitch);
-    Word16 Framesize_sub_n =  sub(Framesize, n);
+    int   pitch = 0, t, i;
+    float cov_max = 0, temp = 0, tmp, tilt, mdct_ener = 0, low_freq_rate;
+    float s_LP[L_FRAME_MAX] = {0};
+    float mem[2]= {0};
+    short start_pos, end_pos;
+    int  cov_size;
+    int flag = 0, zp_current;
+    int curr_frmsize = Framesize/curr_mode;
+    float tmp_last    = 0; /* not needed, just to avoid compiler warning */
+    float cov_max_tmp = 0;
+    zp_current = zero_pass(outx_new, curr_frmsize);
 
-    n1 = Framesize_sub_n;
-    move16();
-    n2 = Framesize_sub_n;
-    move16();
-    if( sub(Loverlap, Framesize_sub_n) < 0 )
+    if (curr_mode==2)
     {
-        n1 = Loverlap;
-        move16();
+        zp_current = zp_current << 1;
     }
-    if( sub(pitch125, Framesize_sub_n) < 0 )
+    if (Framesize <= 256)
     {
-        n2 = pitch125;
-        move16();
+        if (zp_current > 70)
+        {
+            return 0;
+        }
     }
-    s16MaxCoefNorm = sub(ffr_getSfWord16(sbuf+n, n1),1);
-    s16MaxCoefNorm2 = ffr_getSfWord16(pitch125_data, n1);
-    Loverlap = s_max(1, Loverlap);
-    tmp16 =BASOP_Util_Divide1616_Scale(1, Loverlap,&s);
-    FOR (i = 0; i < n1; i++)
+    else
     {
-        Word16 tmp;
-        Word16 dat;
-        dat= shl(sbuf[n+i],s16MaxCoefNorm);
-        tmp = extract_l(L_shl(L_mult0(i, tmp16), s)); /* q15 */
-        sbuf[n+i] = round_fx(L_add(L_shr(L_mult(dat, sub(32767,tmp)),s16MaxCoefNorm),
-                                   L_shr(L_mult(shl(pitch125_data[i],s16MaxCoefNorm2),tmp),s16MaxCoefNorm2)));
+        if (zp_current > 105)
+        {
+            return 0;
+        }
     }
-
-    FOR (i = n1; i < n2; i++)
+    if (curr_mode == 2)
     {
-        sbuf[n+i] = pitch125_data[i];
-        move16();
+        mdct_data = mdct_data + (Framesize>>1);
     }
 
-    pitch = add(n, pitch);
+    for (i = 0; i < 30/curr_mode; i++)
+    {
+        mdct_ener += mdct_data[i]*mdct_data[i];
+    }
+    low_freq_rate = mdct_ener;
+    for (i = 30/curr_mode; i < Framesize/curr_mode; i++)
+    {
+        mdct_ener += mdct_data[i]*mdct_data[i];
+    }
+    low_freq_rate /= (mdct_ener+EPSILON);
+    if (curr_mode == 2)
+    {
+        mdct_data = mdct_data - (Framesize>>1);
+    }
+    if(low_freq_rate < 0.02f)
+    {
+        return 0;
+    }
 
+    LpFilter2(s, s_LP, Framesize, mem);
+    tilt = sig_tilt(s_LP, Framesize);
+    if (Framesize <= 320)
+    {
+        if (tilt < 0.5f)
+        {
+            return 0;
+        }
+    }
+    else
+    {
+        if (tilt < 0.7f)
+        {
+            return 0;
+        }
+    }
+    if (Framesize <= 320)
+    {
+        start_pos = (int)(Framesize *  34/256.0 + 0.5f);
+        end_pos   = (int)(Framesize *     3/4.0 + 0.5f);
+        for (t = start_pos; t < end_pos; t++)
+        {
+            cov_size =  Framesize-t;
+            tmp = dot(s_LP, s_LP+t, cov_size)/cov_size;
+            if (t > start_pos)                  /* don't use the first value */
+            {
+                if ( tmp > tmp_last)              /* store the current cov, if it is larger than the last one */
+                {
+                    cov_max_tmp = tmp;
+                }
+                else if (cov_max < cov_max_tmp)   /* otherwise */
+                {
+                    cov_max = cov_max_tmp;          /* use the last value cov, being a max */
+                    pitch = t-1;                    /* and the last index as pitch */
+                }
+            }
+            tmp_last = tmp;
+        }
+        temp = (float)(sqrt(dot(s_LP+pitch, s_LP+pitch, Framesize-pitch)) *
+                       sqrt(dot(s_LP,s_LP,Framesize-pitch)));
+        *voicing = cov_max * (Framesize - pitch) / (temp + EPSILON);
+        {
+            float temp2, voicing2;
+            temp2 = (float)(sqrt(dot(s_LP+(pitch>>1), s_LP+(pitch>>1), Framesize-(pitch>>1))) *
+                            sqrt(dot(s_LP,s_LP,Framesize-(pitch>>1))));
+            voicing2 = dot(s_LP+(pitch>>1),s_LP,Framesize-(pitch>>1))/temp2;
+            if (voicing2 > *voicing)
+            {
+                pitch = pitch>>1;
+                *voicing = voicing2;
+            }
+        }
+    }
+    else
+    {
+        float s_tmp[L_FRAME_MAX];
+        int Framesize_tmp = Framesize>>1;
+        int pitch_tmp[3];
+        for (i = 0; i < Framesize_tmp; i++)
+        {
+            s_tmp[i] = s_LP[2*i];
+        }
+        start_pos = (int)((34.0f*Framesize_tmp)/256 + 0.5f);
+        end_pos  = (int)((Framesize_tmp>>1)*1.5f + 0.5f);
+        cov_max = 0;
+        pitch = 0;
+        for (t = start_pos; t < end_pos; t++)
+        {
+            cov_size =  Framesize_tmp-t;
+            tmp = dot(s_tmp, s_tmp+t, cov_size)/cov_size;
+            if (t > start_pos)                  /* don't use the first value */
+            {
+                if ( tmp > tmp_last)              /* store the current cov, if it is larger than the last one */
+                {
+                    cov_max_tmp = tmp;
+                }
+                else if (cov_max < cov_max_tmp)   /* otherwise */
+                {
+                    cov_max = cov_max_tmp;          /* use the last value cov, being a max */
+                    pitch = t-1;                    /* and the last index as pitch */
+                }
+            }
+            tmp_last = tmp;
+        }
+
+        if (pitch > 0)
+        {
+            pitch_tmp[0] = max(2*pitch - 1,0);
+            pitch_tmp[1] = 2*pitch;
+            pitch_tmp[2] = 2*pitch + 1;
+            cov_max = 0;
+            pitch = 0;
+            for (i = 0; i < 3; i++)
+            {
+                cov_size =  Framesize - pitch_tmp[i];
+                temp = (float)(sqrt(dot(s_LP+pitch_tmp[i], s_LP+pitch_tmp[i], cov_size)) *
+                               sqrt(dot(s_LP,s_LP,cov_size)));
+                tmp = dot(s_LP, s_LP + pitch_tmp[i], cov_size)/(temp+EPSILON);
+                if (tmp > cov_max)
+                {
+                    cov_max = tmp;
+                    pitch = pitch_tmp[i];
+                }
+            }
+            *voicing = cov_max;
+        }
+    }
+    if (pitch > 0)
+    {
+        flag = Is_Periodic(*voicing, *zp, *ener, ener_mean, pitch, Framesize, mdct_data);
+    }
+    if (flag == 0 )
+    {
+        pitch = 0;
+    }
     return pitch;
 }
 
-static void add_noise (Word16      * const sbuf,
-                       Word16      * const outx_new_n1,
-                       Word16 const* const noise_seg,
-                       Word16        const Len,
-                       Word16      * const gain,
-                       Word16 const* const gain_n,
-                       Word8         const firstFrame)
+static  int OverlapAdd(float *pitch125_data, float *sbuf, int n, int pitch, int Bufsize)
 {
-    Word16 i;
-    Word16 temp_OUT;
-
-    IF( !firstFrame )
+    int pitch125 = (int)floor(0.5f+(1.25f*(float)pitch));
+    int Loverlap = pitch125 - pitch;
+    int n1 = min(Loverlap, Bufsize-n);
+    int n2 = min(pitch125, Bufsize-n);
+    int i;
+    float tmp, dat;
+    for (i = 0; i < n1; i++)
     {
-        temp_OUT = sub(noise_seg[0], mult((*outx_new_n1),22282/* 0.68 Q15 */));
-        sbuf[0] = add(sbuf[0], mult((temp_OUT), *gain));
-        move16();
-        *gain = mac_r(L_mult(32439/* 0.99 Q15 */,*gain),328/* 0.01 Q15 */,*gain_n);
+        tmp = (float)i/(float)Loverlap;
+        dat = sbuf[n+i];
+        sbuf[n+i] = (float)((1.0 - tmp)*dat + tmp*pitch125_data[i]);
     }
-
-    FOR( i = 1; i < Len; i++ )
+    for (i = n1; i < n2; i++)
     {
-        temp_OUT = sub(noise_seg[i], mult((noise_seg[i-1]),22282/* 0.68 Q15 */));
-        sbuf[i] = add(sbuf[i], mult((temp_OUT), *gain));
-        move16();
-        *gain = mac_r(L_mult(32439/* 0.99 Q15 */,*gain),328/* 0.01 Q15 */,*gain_n);
+        sbuf[n+i] = pitch125_data[i];
     }
+    return (n+pitch);
+}
 
-    *outx_new_n1 = noise_seg[i-1]; /*q0*/
+static void add_noise (float      * const sbuf,
+                       float      * const outx_new_n1,
+                       float const* const noise_seg,
+                       int          const Len,
+                       float      * const gain,
+                       float const* const gain_n,
+                       int          const firstFrame)
+{
+    int i;
 
-    return;
+    if (!firstFrame)
+    {
+        sbuf[0] += *gain * (noise_seg[0] - 0.68f*(*outx_new_n1));
+        *gain = 0.99f*(*gain) + 0.01f*(*gain_n);
+    }
+    for (i = 1; i < Len; i++)
+    {
+        sbuf[i] += *gain * (noise_seg[i] - 0.68f*noise_seg[i-1]);
+        *gain = 0.99f*(*gain) + 0.01f*(*gain_n);
+    }
+    *outx_new_n1 = noise_seg[i-1];
+
 }
 
 static
-Word16 waveform_adj_fix(Word16 *overlapbuf,
-                        Word16 *outdata2,
-                        Word16 *outx_new,
-                        Word16 *data_noise,
-                        Word16 *outx_new_n1,
-                        Word16 *nsapp_gain,
-                        Word16 *nsapp_gain_n,
-                        Word16 Framesize,
-                        Word8  T_bfi,
-                        Word16 voicing,
-                        Word16 curr_mode,
-                        Word16 pitch)
+int waveform_adj(
+    float *overlapbuf,
+    float *outdata2,
+    float *outx_new,
+    float *data_noise,
+    float *outx_new_n1,
+    float *nsapp_gain,
+    float *nsapp_gain_n,
+    int    Framesize,
+    int    T_bfi,
+    float  voicing,
+    int    curr_mode,
+    int    pitch)
 {
-    Word16 i, zp1, zp2,Framesizediv2,s16MaxCoefNorm;
-    Word16 sbuf[L_FRAME_MAX];
-    Word16 tmp;
+    int i, zp1, zp2;
+    float sbuf[L_FRAME_MAX] = {0};
 
-    Framesizediv2=shr(Framesize,1);
-    zp1 = zero_pass_w32_x(outdata2, Framesizediv2);
-    zp2 = zero_pass_w32_x(outdata2+Framesizediv2, Framesizediv2);
+    zp1 = zero_pass(outdata2, Framesize>>1);
+    zp2 = zero_pass(outdata2+(Framesize>>1), Framesize>>1);
 
     /* judge if the pitch is usable */
-    tmp = 1;
-    move16();
-    if (sub(zp1, 1) > 0)
+    if( 4*max(zp1,1) < zp2 )
     {
-        tmp = zp1;
-        move16();
-    }
-    IF (sub(shl(tmp,2), zp2) < 0)
-    {
-        move16();
         return 0;
     }
 
     /* adjust the pitch value */
-    test();
-    test();
-    test();
-    IF (T_bfi && (sub(pitch , Framesizediv2)<=0)
-        && (sub(Framesize ,256)>0) && (sub(curr_mode , 1)==0))
+    if (T_bfi && pitch <= Framesize>>1 && Framesize > 256 && curr_mode == 1)
     {
-        Word16 i1 = 0, i2 = 0;
-        Word16  pos1, pos2, pos3;
-        move16();
-        move16();
-        i1 = add(1 , array_max_indx_fx(outx_new, pitch));
-        i2 = add(1 , array_max_indx_fx(outx_new+pitch, pitch));
-
-        pos1 = add(i2,sub(pitch,i1));
-        pos3 = add(pos1, mult(pos1, 8192/* 0.25 Q15 */));
-        pos2 = add(pitch,mult(pitch, 8192/* 0.25 Q15 */));
-
-        test();
-        test();
-        IF ((sub(pos1,pos2)<0) && (sub(pos3,pitch)>0) && (sub(pos1,Framesizediv2)<0))
+        int i1 = 0, i2 = 0;
+        i1 = 1 + array_max_indx(outx_new, pitch);
+        i2 = 1 + array_max_indx(outx_new+pitch, pitch);
+        if ((float)(i2+pitch-i1)<(1.25f*pitch) && (1.25f*(i2+pitch-i1))>(float)pitch && (float)(i2+pitch-i1)<(float)(Framesize>>1))
         {
-            pitch = add(i2,sub(pitch,i1));
+            pitch = i2+pitch-i1;
         }
     }
 
     {
-        Word16 pitch125 = 0, Loverlap = 0, n = 0;
-        Word16 pitch125_data[L_FRAME_MAX];
-        move16();
-        move16();
-        pitch125 = extract_l((L_shr(L_add(L_add(L_deposit_h(pitch), L_mult(pitch, 8192)), 32768) ,16)));
-        Loverlap = sub(pitch125,pitch);
-        FOR (i = 0; i < pitch; i++)
-        {
-            pitch125_data[i] = outdata2[Framesize-pitch+i];
-            move16();
-        }
-        FOR (i = 0; i < Loverlap; i++)
-        {
-            pitch125_data[pitch+i] = outx_new[i];
-            move16();
-        }
-        FOR (i = 0; i < Framesize; i++)
-        {
-            sbuf[i] = outx_new[i];
-            move16();
-        }
+        int pitch125 = 0, Loverlap = 0, n = 0;
+        float pitch125_data[L_FRAME_MAX] = {0};
 
+        pitch125 = (int)floor(0.5f+(1.25f*(float)pitch));
+        Loverlap = pitch125 - pitch;
+        memcpy(pitch125_data, outdata2+Framesize-pitch, sizeof(float)*pitch);
+        memcpy(pitch125_data+pitch, outx_new, sizeof(float)*Loverlap);
+        memcpy(sbuf, outx_new, sizeof(float)*Framesize);
         {
-            Word16 pitch125a1;
-            Word16 tmp_buf[2*L_FRAME_MAX], *p_tmp = tmp_buf+1;
-
-            FOR (i = 0; i < pitch125; i++)
-            {
-                p_tmp[i] = pitch125_data[i];
-                move16();
-            }
-
+            float tmp_buf[L_FRAME_MAX]= {0}, *p_tmp = tmp_buf+1;
+            memcpy(p_tmp, pitch125_data, sizeof(float)*pitch125);
             p_tmp[-1] = outdata2[Framesize-pitch-1];
-            move16();
             p_tmp[pitch125] = outx_new[Loverlap];
-            move16();
-            pitch125a1 = add(pitch125,1);
-            s16MaxCoefNorm = sub(ffr_getSfWord16(p_tmp-1, pitch125a1),1);
-            FOR (i = 0; i < pitch125a1; i++)
+            for (i = 0; i < pitch125; i++)
             {
-                p_tmp[i-1] = shl(p_tmp[i-1],s16MaxCoefNorm);
-                move16();
-            }
-            FOR (i = 0; i < pitch125; i++)
-            {
-                pitch125_data[i] = round_fx(L_shr(L_add((L_mult(p_tmp[i], 20972)),L_mac(L_mult(p_tmp[i-1], 5898),p_tmp[i+1],5898)),s16MaxCoefNorm));
+                pitch125_data[i] = 0.18f*p_tmp[i-1]+0.64f*p_tmp[i]+0.18f*p_tmp[i+1];
             }
         }
-
-        WHILE (sub(n, Framesize) < 0)   /* periodical extension */
+        while (n < Framesize)   /* periodical extension */
         {
-            n = OverlapAdd_fx(pitch125_data,sbuf,n,pitch,Framesize);
+            n = OverlapAdd(pitch125_data,sbuf,n,pitch,Framesize);
         }
-
         /* maximum pitch lag is 3/4 Framesize; pitch125_data is reused for
            temporary storage, since outdata2 (holding the pcm data of the
            last good frame) is still needed and overlapbuf overlaps outdata2 */
-        Copy(&sbuf[Framesize/4], pitch125_data, (3*Framesize)/4);
+        mvr2r(&sbuf[Framesize/4], pitch125_data, (3*Framesize)/4);
 
-        *nsapp_gain   = 0;
-        move16();
-        *nsapp_gain_n = sub(32767 ,shr(voicing,1)); /* q15 */
-        tmp = Framesize;
-        move16();
-        /* use last good signal for noise generation */
-        add_noise(sbuf, outx_new_n1, outdata2, tmp, nsapp_gain, nsapp_gain_n, 1);
-        /* save current (noisy) output from IMDCT */
-        mvr2r_Word16(outx_new, data_noise, tmp);
+        *nsapp_gain   = 0.0;
+        *nsapp_gain_n = 1.0f - voicing/2;
+        {
+            int size = Framesize;
+            /* use last good signal for noise generation */
+            add_noise(sbuf, outx_new_n1, outdata2, size, nsapp_gain, nsapp_gain_n, 1);
+            /* save current (noisy) output from IMDCT */
+            mvr2r(outx_new, data_noise, size);
+        }
         /* overlapbuf can now be filled with sbuf, needed for subsequently lost frames */
-        Copy(pitch125_data, &overlapbuf[Framesize/4], (3*Framesize)/4);
+        mvr2r(pitch125_data, &overlapbuf[Framesize/4], (3*Framesize)/4);
     }
-    FOR (i = 0; i < Framesize; i++)
+    for (i = 0; i < Framesize; i++)
     {
         outx_new[i] = sbuf[i];
-        move16();
     }
+
     return pitch;
 }
 
-void waveform_adj2_fix(  Word16 *overlapbuf,
-                         Word16 *outx_new,
-                         Word16 *data_noise,
-                         Word16 *outx_new_n1,
-                         Word16 *nsapp_gain,
-                         Word16 *nsapp_gain_n,
-                         Word16 *recovery_gain,
-                         Word16 step_concealgain,
-                         Word16 pitch,
-                         Word16 Framesize,
-                         Word16 delay,
-                         Word16 bfi_cnt,
-                         Word16  bfi
-                      )
+void waveform_adj2(float *overlapbuf,
+                   float *outx_new,
+                   float *data_noise,
+                   float *outx_new_n1,
+                   float *nsapp_gain,
+                   float *nsapp_gain_n,
+                   float *recovery_gain,
+                   float step_concealgain,
+                   int    pitch,
+                   int    Framesize,
+                   int    delay,
+                   int    bfi_cnt,
+                   int    bfi)
 {
-    Word16 i, n,tablescale,ratio,
-           dat,Framesizesubn,Framesizesubp,tmp16,s,ptable,temp_OUT,s16MaxCoefNorm,s16MaxCoefNorm2;
-    Word16 sbuf[L_FRAME_MAX];
-
-    n=0;
-    move16();
-    Framesizesubn = sub(Framesize,n);
-    Framesizesubp = sub(Framesize,pitch);
-    IF (pitch > 0)
+    int i, n=0;
+    float ratio;
+    float sbuf[L_FRAME_MAX];
+    if (pitch > 0)
     {
-        WHILE (Framesizesubn>0)
+        while (n < Framesize)
         {
             /* periodical extension */
-            Word16 tmp = vadmin(pitch, Framesizesubn);
-            FOR (i = 0; i < tmp; i++)
+            for (i = 0; i < min(pitch, Framesize-n); i++)
             {
-                sbuf[n+i] = overlapbuf[Framesizesubp+i];
-                move16();
+                sbuf[n+i] = overlapbuf[Framesize-pitch+i];
             }
-            n = add(n, pitch);
-            Framesizesubn = sub(Framesize,n);
+            n += pitch;
         }
-
-        FOR (i = 0; i < Framesize; i++)
+        for (i = 0; i < Framesize; i++)
         {
             overlapbuf[i] = sbuf[i];
-            move16();
         }
-
         {
-            Word16  size      = Framesize;
-            Word16* noise_ptr = data_noise;
-
+            int    size      = Framesize;
+            float* noise_ptr = data_noise;
             /* use last (noisy) output from IMDCT for noise generation */
             add_noise(sbuf, outx_new_n1, noise_ptr, size, nsapp_gain, nsapp_gain_n, 0);
-
-            /* save current (noisy) output from IMDCT */
-            IF( bfi )
+            if (bfi)
             {
-                mvr2r_Word16(outx_new, noise_ptr, size);
+                /* save current (noisy) output from IMDCT */
+                mvr2r(outx_new, noise_ptr, size);
             }
         }
-        test();
-        IF (sub(bfi_cnt ,4)==0 || bfi == 0)
+        if (bfi_cnt == 4 || bfi == 0)
         {
-            SWITCH ( Framesize)
+            if (bfi == 0)
             {
-            case 160:
+                int gain_zero_start = 10000;
+                /* overlap-and-add */
+                if (step_concealgain > EPSILON)
                 {
-                    tablescale =8;
-                    move16();
-                    ptable = 26214; /* (Word16)(32767*256/160.0+0.5); q7+15 */        move16();
-                    BREAK;
+                    gain_zero_start = (int)min((float)L_FRAME48k, (*recovery_gain/step_concealgain)) + 1;
                 }
-            case 320:
+
+                if (delay > 0)
                 {
-                    tablescale =9;
-                    move16();
-                    ptable = 26214; /* (Word16)(32767*256/320.0+0.5); q8+15 */        move16();
-                    BREAK;
+                    Framesize -= delay;
                 }
-            case 512:
+                for (i = 0; i < min(gain_zero_start, Framesize); i++)
                 {
-                    tablescale =10;
-                    move16();
-                    ptable = 32767;        /* q9+15 */                                move16();
-                    BREAK;
+                    ratio = (float)i/(float)Framesize;
+                    outx_new[i] = (1-ratio)*sbuf[i]**recovery_gain+ratio*outx_new[i];
+                    *recovery_gain -= step_concealgain;
                 }
-            case 640:
+                for (i = gain_zero_start; i < Framesize; i++)
                 {
-                    tablescale =10;
-                    move16();
-                    ptable = 26214; /* (Word16)(32767*512/640.0+0.5); q9+15 */        move16();
-                    BREAK;
+                    ratio = (float)i/(float)Framesize;
+                    outx_new[i] = ratio*outx_new[i];
                 }
-            default:  /* 960  */
+                if (*recovery_gain < 0.0f)
                 {
-                    tablescale =10;
-                    move16();
-                    ptable = 17456; /* (Word16)(32767*512/960.0); q9+15    */         move16();
-                    BREAK;
+                    *recovery_gain = 0.0f;
                 }
             }
-            IF (bfi == 0)    /* overlap-and-add */
-            {
-                Word16 gain_zero_start = 10000;
-                move16();
-
-                IF (step_concealgain > 0)
-                {
-                    gain_zero_start = BASOP_Util_Divide1616_Scale(*recovery_gain, step_concealgain,&s);
-                    gain_zero_start= shl(gain_zero_start, sub(s,14)); /* q0 */
-                    gain_zero_start= add(gain_zero_start,1);
-                }
-
-                IF (delay > 0)
-                {
-                    Framesize = sub(Framesize,delay);
-                }
-
-                s16MaxCoefNorm = sub(ffr_getSfWord16(sbuf, Framesize),1);
-                s16MaxCoefNorm2 = ffr_getSfWord16(outx_new, Framesize);
-                tmp16 = vadmin(gain_zero_start, Framesize);
-                FOR (i = 0; i < tmp16; i++)
-                {
-                    ratio = extract_l(L_shr(L_mult(i, ptable), tablescale));
-                    dat= shl(sbuf[i],s16MaxCoefNorm);
-                    temp_OUT= mult(*recovery_gain, sub(32767,ratio));
-                    outx_new[i]= round_fx(L_add(L_shr(L_mult(temp_OUT,dat ),s16MaxCoefNorm-1), L_shr(L_mult(shl(outx_new[i],s16MaxCoefNorm2),ratio),s16MaxCoefNorm2)));
-                    move16();
-                    *recovery_gain =sub(*recovery_gain,shr_r(step_concealgain,1)); /* q14 */
-                }
-                FOR (i = gain_zero_start; i < Framesize; i++)
-                {
-                    ratio = extract_l(L_shr(L_mult(i, ptable), tablescale));
-                    outx_new[i] = round_fx(L_shr(L_mult(shl(outx_new[i],s16MaxCoefNorm2),ratio),s16MaxCoefNorm2));
-
-                }
-
-                if (*recovery_gain < 0)
-                {
-                    *recovery_gain = 0;
-                    move16();
-                }
-            }
-            ELSE
+            else
             {
                 /* overlap-and-add */
-                Word16 tmp;
-                s16MaxCoefNorm = sub(ffr_getSfWord16(sbuf, Framesize),1);
-                s16MaxCoefNorm2 = ffr_getSfWord16(outx_new, Framesize);
-                FOR (i = 0; i < Framesize; i++)
+                for (i = 0; i < Framesize; i++)
                 {
-                    dat = shl(sbuf[i], s16MaxCoefNorm);
-                    tmp = extract_l(L_shr(L_mult(i, ptable), tablescale));
-                    outx_new[i] = round_fx(L_add(L_shr(L_mult(dat, sub(32767,tmp)),s16MaxCoefNorm), L_shr(L_mult(shl(outx_new[i],s16MaxCoefNorm2),tmp),s16MaxCoefNorm2)));
+                    ratio = (float)i/(float)Framesize;
+                    outx_new[i] = (1-ratio)*sbuf[i]+ratio*outx_new[i];
                 }
             }
         }
-        ELSE
+        else
         {
-            FOR (i = 0; i < Framesize; i++)
+            for (i = 0; i < Framesize; i++)
             {
                 outx_new[i] = sbuf[i];
-                move16();
             }
         }
     }
     return;
 }
 
-void concealment_signal_tuning_fx(Word16 bfi, Word16 curr_mode, Word16 *outx_new_fx, void *_plcInfo, Word16 nbLostCmpt, Word16 pre_bfi, Word16 *OverlapBuf_fx, Word16 past_core_mode, Word16 *outdata2_fx, Decoder_State_fx *st)
+void set_state(int *state, int num, int N)
+{
+    int i;
+    for (i = 0; i < N-1; i++)
+    {
+        state[i] = state[i+1];
+    }
+    state[N-1] = num;
+    return;
+}
+
+void concealment_init(int N, void *_plcInfo)
 {
     T_PLCInfo *plcInfo = (T_PLCInfo*)_plcInfo;
-    Word16    FrameSize  = plcInfo->FrameSize;
-    Word16    Pitch       = plcInfo->Pitch_fx;
-    Word16    voicing_fx  = 0;
-    move16();
-    move16();
-    move16();
-    move16();
-    IF (bfi)
+    int i;
+
+    plcInfo->FrameSize      = N;
+    plcInfo->Pitch          = 0;
+    plcInfo->T_bfi          = 0;
+    plcInfo->outx_new_n1    = 0.0f;
+    plcInfo->nsapp_gain     = 0.0f;
+    plcInfo->nsapp_gain_n   = 0.0f;
+    plcInfo->ener_mean      = 59.4260f;
+    plcInfo->ener           = 0.0f;
+    plcInfo->zp             = N;
+    plcInfo->recovery_gain  = 0.0f;
+    plcInfo->step_concealgain = 0.0f;
+    plcInfo->concealment_method = TCX_NONTONAL;
+    plcInfo->subframe       = 0;
+    plcInfo->nbLostCmpt     = 0;
+    plcInfo->seed = 21845;
+
+    for (i = 0; i < TCX_TONALITY_INIT_CNT; i++)
+    {
+        plcInfo->TCX_Tonality[i] = 1;
+    }
+    for (i = TCX_TONALITY_INIT_CNT; i < DEC_STATE_LEN; i++)
+    {
+        plcInfo->TCX_Tonality[i] = 0;
+    }
+    for (i = 0; i < MAX_POST_LEN; i++)
+    {
+        plcInfo->Transient[i] = 1;
+    }
+
+    for (i = 0; i < L_FRAME_MAX; i++)
+    {
+        plcInfo->data_reci2[i] = 0;
+    }
+    return;
+}
+
+void concealment_decode(int curr_mode, float *invkoef, void *_plcInfo)
+{
+    T_PLCInfo *plcInfo = (T_PLCInfo*)_plcInfo;
+    int i;
+    int N = plcInfo->FrameSize;
+    short *seed = &(plcInfo->seed);
+    short sign;
+    if (plcInfo->concealment_method == TCX_NONTONAL)
+    {
+        if (curr_mode == 1)
+        {
+            /* copy the data of the last frame */
+            mvr2r(plcInfo->data_reci2, invkoef, N);
+            /* sign randomization */
+            for (i = 0; i < N; i++)
+            {
+                sign = ((own_random(seed)>>15)<<1)+1;
+                invkoef[i] *= sign;
+            }
+        }
+    }
+    return;
+}
+
+void concealment_update(int bfi, int curr_mode, int tonality, float *invkoef, void *_plcInfo)
+{
+    T_PLCInfo *plcInfo  = (T_PLCInfo*)_plcInfo;
+    float *data_reci2   = plcInfo->data_reci2;
+    int   *tcx_tonality = plcInfo->TCX_Tonality;
+    int    FrameSize    = plcInfo->FrameSize;
+    int    subframe     = plcInfo->subframe;
+    int    i;
+    if (curr_mode == 1)
+    {
+        set_state(plcInfo->Transient, curr_mode, MAX_POST_LEN);
+        for (i = 0; i < FrameSize; i++)
+        {
+            data_reci2[i] = invkoef[i];
+        }
+        if (!bfi)
+        {
+            set_state(tcx_tonality, tonality, DEC_STATE_LEN);
+        }
+    }
+    else
+    {
+        if (subframe == 0)
+        {
+            set_state(plcInfo->Transient, curr_mode, MAX_POST_LEN);
+            if (!bfi)
+            {
+                set_state(tcx_tonality, tonality, DEC_STATE_LEN);
+            }
+        }
+        /* don't store the second subframe during frameloss; in
+           pitch_search(), low_freq_rate is derived on the last good
+           TCX-10 spectrum */
+        if (!bfi || subframe == 0)
+        {
+            float *ptr = data_reci2+subframe;
+            for (i = 0; i < FrameSize>>1; i++)
+            {
+                ptr[i] = invkoef[i];
+            }
+        }
+    }
+    return;
+}
+
+void concealment_update2(float *outx_new, void *_plcInfo, int FrameSize)
+{
+    T_PLCInfo *plcInfo = (T_PLCInfo*)_plcInfo;
+    plcInfo->zp = zero_pass(outx_new, FrameSize);
+    plcInfo->ener = dot(outx_new, outx_new, FrameSize)/FrameSize;
+    plcInfo->ener = 10 * (float)log10(plcInfo->ener+EPSILON);
+    if (plcInfo->zp < 100 && plcInfo->ener > 50)
+    {
+        plcInfo->ener_mean = 0.98f*plcInfo->ener_mean + 0.02f*plcInfo->ener;
+    }
+    return;
+}
+
+void concealment_signal_tuning(int bfi, int curr_mode, float *outx_new, void *_plcInfo, int nbLostCmpt, int pre_bfi,
+                               float *OverlapBuf, int past_core_mode, float *outdata2, Decoder_State *st)
+{
+    T_PLCInfo *plcInfo = (T_PLCInfo*)_plcInfo;
+    int    FrameSize   = plcInfo->FrameSize;
+    float *data_reci2  = plcInfo->data_reci2;
+    int    Pitch       = plcInfo->Pitch;
+    float voicing      = 0;
+    if (bfi)
     {
 
-        test();
-        IF (st->enablePlcWaveadjust && plcInfo->concealment_method == TCX_NONTONAL)   /* #define TCX_NONTONAL 0 */
+        if (st->enablePlcWaveadjust && plcInfo->concealment_method == TCX_NONTONAL)
         {
-
-            IF (sub(nbLostCmpt, 1) == 0)
+            if (nbLostCmpt == 1)
             {
-                plcInfo->Pitch_fx = pitch_search_fx(outdata2_fx,
-                                                    outx_new_fx,
-                                                    FrameSize,
-                                                    &voicing_fx,
-                                                    plcInfo->zp_fx,
-                                                    (plcInfo->ener_fx),
-                                                    (plcInfo->ener_mean_fx),
-                                                    plcInfo->data_reci2_fx,
-                                                    curr_mode
-                                                   );
-                move16();
-
-                IF (plcInfo->Pitch_fx)    /* waveform adjustment for the first lost frame */
+                plcInfo->Pitch = pitch_search(outdata2,
+                                              outx_new,
+                                              FrameSize,
+                                              &voicing,
+                                              &plcInfo->zp,
+                                              &plcInfo->ener,
+                                              plcInfo->ener_mean,
+                                              data_reci2,
+                                              curr_mode
+                                             );
+                if (plcInfo->Pitch)    /* waveform adjustment for the first lost frame */
                 {
-                    plcInfo->Pitch_fx = waveform_adj_fix(OverlapBuf_fx,
-                                                         outdata2_fx,
-                                                         outx_new_fx,
-                                                         plcInfo->data_noise,
-                                                         &plcInfo->outx_new_n1_fx,
-                                                         &plcInfo->nsapp_gain_fx,
-                                                         &plcInfo->nsapp_gain_n_fx,
-                                                         FrameSize,
-                                                         plcInfo->T_bfi_fx,
-                                                         voicing_fx,
-                                                         curr_mode,
-                                                         plcInfo->Pitch_fx);
-                    move16();
+                    plcInfo->Pitch = waveform_adj(OverlapBuf,
+                                                  outdata2,
+                                                  outx_new,
+                                                  plcInfo->data_noise,
+                                                  &plcInfo->outx_new_n1,
+                                                  &plcInfo->nsapp_gain,
+                                                  &plcInfo->nsapp_gain_n,
+                                                  FrameSize,
+                                                  plcInfo->T_bfi,
+                                                  voicing,
+                                                  curr_mode,
+                                                  plcInfo->Pitch);
                 }
             }
-            ELSE IF (sub(nbLostCmpt, 5) < 0)    /* waveform adjustment for the 2nd~4th lost frame */
+            else if (nbLostCmpt < 5)      /* waveform adjustment for the 2nd~4th lost frame */
             {
-                waveform_adj2_fix(OverlapBuf_fx,
-                                  outx_new_fx,
+                waveform_adj2(OverlapBuf,
+                              outx_new,
+                              plcInfo->data_noise,
+                              &plcInfo->outx_new_n1,
+                              &plcInfo->nsapp_gain,
+                              &plcInfo->nsapp_gain_n,
+                              &plcInfo->recovery_gain,
+                              plcInfo->step_concealgain,
+                              Pitch,
+                              FrameSize,
+                              0,
+                              nbLostCmpt,
+                              bfi);
+            }
+        }
+        plcInfo->T_bfi = 1;
+    }
+    else
+    {
+        if (pre_bfi &&
+                past_core_mode != 0 &&
+                st->last_total_brate >= HQ_48k &&
+                st->last_codec_mode == MODE2)
+        {
+            if (plcInfo->concealment_method == TCX_NONTONAL)
+            {
+                if (plcInfo->nbLostCmpt < 4)   /* smoothing of the concealed signal with the good signal */
+                {
+                    waveform_adj2(OverlapBuf,
+                                  outx_new,
                                   plcInfo->data_noise,
-                                  &plcInfo->outx_new_n1_fx,
-                                  &plcInfo->nsapp_gain_fx,
-                                  &plcInfo->nsapp_gain_n_fx,
+                                  &plcInfo->outx_new_n1,
+                                  &plcInfo->nsapp_gain,
+                                  &plcInfo->nsapp_gain_n,
                                   &plcInfo->recovery_gain,
-                                  plcInfo->step_concealgain_fx,
+                                  plcInfo->step_concealgain,
                                   Pitch,
                                   FrameSize,
                                   0,
-                                  nbLostCmpt,
+                                  plcInfo->nbLostCmpt + 1,
                                   bfi);
-            }
-        }
-        plcInfo->T_bfi_fx = 1;
-        move16();
-    }
-    ELSE
-    {
-        test();
-        test();
-        test();
-        IF (pre_bfi &&
-        past_core_mode != 0 &&
-        L_sub(st->last_total_brate_fx, 48000) >= 0 &&
-        sub(st->last_codec_mode, MODE2) == 0)
-        {
-            IF (plcInfo->concealment_method == TCX_NONTONAL)    /* #define TCX_NONTONAL 0 */
-            {
-                IF (L_sub(plcInfo->nbLostCmpt, 4) < 0)   /* smoothing of the concealed signal with the good signal */
-                {
-                    waveform_adj2_fix(OverlapBuf_fx,
-                    outx_new_fx,
-                    plcInfo->data_noise,
-                    &plcInfo->outx_new_n1_fx,
-                    &plcInfo->nsapp_gain_fx,
-                    &plcInfo->nsapp_gain_n_fx,
-                    &plcInfo->recovery_gain,
-                    plcInfo->step_concealgain_fx,
-                    Pitch,
-                    FrameSize,
-                    0,
-                    add(extract_l(plcInfo->nbLostCmpt), 1),
-                    bfi);
                 }
             }
         }
-        ELSE
+        else
         {
-            plcInfo->T_bfi_fx = 0;
-            move16();
+            plcInfo->T_bfi = 0;
         }
     }
     return;

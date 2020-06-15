@@ -1,57 +1,39 @@
 /*====================================================================================
-    EVS Codec 3GPP TS26.442 Apr 03, 2018. Version 12.11.0 / 13.6.0 / 14.2.0
+    EVS Codec 3GPP TS26.443 Nov 13, 2018. Version 12.11.0 / 13.7.0 / 14.3.0 / 15.1.0
   ====================================================================================*/
 
+#include <math.h>
 #include <stdio.h>
+#include "cnst.h"
+#include "prot.h"
+#include "stat_com.h"
 #include "assert.h"
-#include "prot_fx.h"
-#include "basop_mpy.h"
-#include "cnst_fx.h"
-#include "stl.h"
+#include "basop_util.h"
 
-/**
- * \brief  31x16 Bit multiply (x*y)
- *
- * \param[i] xh  high part, bit [30..15]
- * \param[i] xl  low part, 15 LSBits
- * \param[i] y
- *
- * \return x*y
- */
-Word32 L_multi31x16_X2(Word16 xh, Word16 xl, Word16 y)
-{
-    Word32 z;
+#ifndef int32
+#define int32   int
+#endif
 
-    z = L_shl(L_mult0(xh,y),15);
-    z = L_mac0(z,xl,y);
 
-    return z;
-}
 
 /*---------------------------------------------------------------
   Ari 14 bits common routines
   -------------------------------------------------------------*/
 
 /**
- * \brief  Integer Multiply
+ * \brief 	Integer Multiply
  *
  * \param[i] r
  * \param[i] c
  *
  * \return r*c
  */
-Word32 mul_sbc_14bits(Word32 r, Word16 c)
+long mul_sbc_14bits(long r,long c)
 {
-    Word32 ret;
+    long temp;
+    /*function in line*/
+    temp = (((int32) r)*((int32) c))>>stat_bitsnew;
+    return temp;
 
-
-    /*
-      temp = (((int32) r)*((int32) c))>>stat_bitsnew;
-     */
-    assert(stat_bitsnew == 14);
-    ret = Mpy_32_16_1(L_shl(r,15-stat_bitsnew), c);
-
-    /*assert( (((int) r)*((int) c))>>stat_bitsnew == ret);*/
-
-    return (ret);
+    /*function in line*/
 }

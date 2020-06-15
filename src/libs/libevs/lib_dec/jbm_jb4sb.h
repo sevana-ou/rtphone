@@ -1,11 +1,13 @@
 /*====================================================================================
-    EVS Codec 3GPP TS26.442 Apr 03, 2018. Version 12.11.0 / 13.6.0 / 14.2.0
+    EVS Codec 3GPP TS26.443 Nov 13, 2018. Version 12.11.0 / 13.7.0 / 14.3.0 / 15.1.0
   ====================================================================================*/
 
-/** \file jbm_jb4sb.h Jitter Buffer Management Interface */
+/** \file jbm_jb4sb.h EVS Jitter Buffer Management Interface */
 
-#ifndef ACE_JB4SB_H
-#define ACE_JB4SB_H ACE_JB4SB_H
+#ifndef JBM_JB4SB_H
+#define JBM_JB4SB_H JBM_JB4SB_H
+
+#include "jbm_types.h"
 
 /** handle for jitter buffer */
 typedef struct JB4* JB4_HANDLE;
@@ -14,52 +16,53 @@ typedef struct JB4* JB4_HANDLE;
 struct JB4_DATAUNIT
 {
     /** the RTP sequence number (16 bits) */
-    Word16 sequenceNumber;
+    uint16_t sequenceNumber;
     /** the RTP time stamp (32 bits) of this chunk in timeScale() units */
-    Word32 timeStamp;
+    uint32_t timeStamp;
     /** the duration of this chunk in timeScale() units */
-    Word32 duration;
+    uint32_t duration;
     /** the RTP time scale, which is used for timeStamp() and duration() */
-    Word32 timeScale;
+    uint32_t timeScale;
     /** the receive time of the RTP packet in milliseconds */
-    Word32 rcvTime;
+    uint32_t rcvTime;
     /** true, if the data unit contains only silence */
-    Word16 silenceIndicator;
+    bool_t   silenceIndicator;
 
     /** the binary encoded access unit */
-    UWord8 *data;
+    uint8_t *data;
     /** the size of the binary encoded access unit [bits] */
-    Word16 dataSize;
+    uint32_t dataSize;
 
     /** identify if the data unit has a partial copy of a previous frame */
-    Word16 partial_frame;
+    bool_t partial_frame;
     /** offset of the partial copy contained in that frame or zero */
-    Word16 partialCopyOffset;
-    Word16 nextCoderType;
+    int16_t partialCopyOffset;
+    int16_t nextCoderType;
 };
 /** handle for jitter buffer data units */
 typedef struct JB4_DATAUNIT* JB4_DATAUNIT_HANDLE;
 
 
-Word16 JB4_Create( JB4_HANDLE *ph );
+int JB4_Create( JB4_HANDLE *ph );
 void JB4_Destroy( JB4_HANDLE *ph );
 
-Word16 JB4_Init( JB4_HANDLE h, Word16 safetyMargin );
+int JB4_Init( JB4_HANDLE h, Word16 safetyMargin );
 
 /** Returns a memory slot to store a new data unit */
 JB4_DATAUNIT_HANDLE JB4_AllocDataUnit( JB4_HANDLE h );
 /** Notifies the JBM that a data unit is no longer used and the memory can be reused */
 void JB4_FreeDataUnit( JB4_HANDLE h, JB4_DATAUNIT_HANDLE dataUnit );
 
-Word16 JB4_PushDataUnit( JB4_HANDLE h, JB4_DATAUNIT_HANDLE dataUnit, Word32 rcvTime );
-Word16 JB4_PopDataUnit( JB4_HANDLE h, Word32 sysTime, Word32 extBufferedTime,
-                        JB4_DATAUNIT_HANDLE *pDataUnit, Word16 *scale, Word16 *maxScaling );
+int JB4_PushDataUnit( JB4_HANDLE h, JB4_DATAUNIT_HANDLE dataUnit, uint32_t rcvTime );
+int JB4_PopDataUnit( JB4_HANDLE h, uint32_t sysTime, uint32_t extBufferedTime,
+                     JB4_DATAUNIT_HANDLE *pDataUnit, uint32_t *scale, uint32_t *maxScaling );
+
+int JB4_getFECoffset(JB4_HANDLE h);
+
+short JB4_FECoffset(JB4_HANDLE h);
+
 
 /** function to get the number of data units contained in the buffer */
-Word16 JB4_bufferedDataUnits( const JB4_HANDLE h );
+unsigned int JB4_bufferedDataUnits( const JB4_HANDLE h );
 
-Word16 JB4_getFECoffset(JB4_HANDLE h);
-
-Word16 JB4_FECoffset(JB4_HANDLE h);
-
-#endif /* ACE_JB4SB_H */
+#endif /* JBM_JB4SB_H */

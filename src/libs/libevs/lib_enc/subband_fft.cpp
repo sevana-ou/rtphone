@@ -1,346 +1,186 @@
 /*====================================================================================
-    EVS Codec 3GPP TS26.442 Apr 03, 2018. Version 12.11.0 / 13.6.0 / 14.2.0
+    EVS Codec 3GPP TS26.443 Nov 13, 2018. Version 12.11.0 / 13.7.0 / 14.3.0 / 15.1.0
   ====================================================================================*/
 
+#include <math.h>
+#include "prot.h"
+#include "rom_enc.h"
 
-#include "basop_util.h"
-#include "stl.h"
-#include "vad_basop.h"
-#include "prot_fx.h"
-#include "rom_enc_fx.h"
 
-#define RE(A) A.r
-#define IM(A) A.i
 
-typedef struct
+
+/*-------------------------------------------------------------------*
+ * fft16()
+ *
+ *
+ *-------------------------------------------------------------------*/
+
+static void fft16(float *r_samp, float *i_samp)
 {
-    complex_16 work[32];
-    complex_16 const* tab;
-} cfft_info_16;
+    int i,j,N,Nv2,nm1,k;
+    float tmpr[16],tmpi[16];
+    float r1,s1,r2,s2;
 
-static  void ComplexMult_16(Word16 *y1, Word16 *y2, Word16 x1, Word16 x2, Word16 c1, Word16 c2)
-{
-    *y1 = add(mult(x1, c1) , mult(x2, c2));
-    move16();
-    *y2 = sub(mult(x2, c1) , mult(x1, c2));
-    move16();
+
+    for (i = 0; i < 16; i++)
+    {
+        tmpr[i] = r_samp[i]*M_inr[i] - i_samp[i]*M_ini[i];
+        tmpi[i] = r_samp[i]*M_ini[i] + i_samp[i]*M_inr[i];
+    }
+
+    for (i = 0; i < 8; i++)
+    {
+        s1 = tmpr[i] - tmpr[8+i];
+        r1 = tmpi[i] - tmpi[8+i];
+
+        tmpr[i] = tmpr[i] + tmpr[8+i];
+        tmpi[i] = tmpi[i] + tmpi[8+i];
+
+        tmpr[i+8] = s1*M_r[i] - r1*M_i[i];
+        tmpi[i+8] = s1*M_i[i] + r1*M_r[i];
+    }
+
+    for (i = 0; i < 4; i++)
+    {
+        s1 = tmpr[i] - tmpr[4+i];
+        r1 = tmpi[i] - tmpi[4+i];
+
+        tmpr[i] = tmpr[i] + tmpr[4+i];
+        tmpi[i] = tmpi[i] + tmpi[4+i];
+
+        tmpr[i+4] = s1*M_r[2*i] - r1*M_i[2*i];
+        tmpi[i+4] = s1*M_i[2*i] + r1*M_r[2*i];
+
+    }
+    for (i = 0; i < 4; i++)
+    {
+        s1 = tmpr[i+8] - tmpr[12+i];
+        r1 = tmpi[i+8] - tmpi[12+i];
+
+        tmpr[i+8] = tmpr[i+8] + tmpr[12+i];
+        tmpi[i+8] = tmpi[i+8] + tmpi[12+i];
+
+        tmpr[i+12] = s1*M_r[2*i] - r1*M_i[2*i];
+        tmpi[i+12] = s1*M_i[2*i] + r1*M_r[2*i];
+
+    }
+
+
+    for (i = 0; i< 16; i=i+4)
+    {
+        s1 = tmpr[i] - tmpr[2+i];
+        r1 = tmpi[i] - tmpi[2+i];
+        s2 = tmpr[i+1] - tmpr[3+i];
+        r2 = tmpi[i+1] - tmpi[3+i];
+
+        tmpr[i] = tmpr[i] + tmpr[2+i];
+        tmpi[i] = tmpi[i] + tmpi[2+i];
+        tmpr[i+1] = tmpr[i+1] + tmpr[3+i];
+        tmpi[i+1] = tmpi[i+1] + tmpi[3+i];
+
+        tmpr[i+2] = s1*M_r[0] - r1*M_i[0];
+        tmpi[i+2] = s1*M_i[0] + r1*M_r[0];
+        tmpr[i+3] = s2*M_r[4] - r2*M_i[4];
+        tmpi[i+3] = s2*M_i[4] + r2*M_r[4];
+    }
+
+    for (i = 0; i < 16; i= i+2)
+    {
+        s1 = tmpr[i] - tmpr[1+i];
+        r1 = tmpi[i] - tmpi[1+i];
+
+        tmpr[i] = tmpr[i] + tmpr[1+i];
+        tmpi[i] = tmpi[i] + tmpi[1+i];
+
+        tmpr[i+1] = s1*M_r[0] - r1*M_i[0];
+        tmpi[i+1] = s1*M_i[0] + r1*M_r[0];
+    }
+
+
+    N = 16;
+    Nv2=N>>1;
+    nm1=N-1;
+    j=0;
+    for(i=0; i<nm1; i++)
+    {
+        if(i<j)
+        {
+            r_samp[j] = tmpr[i]*M_Wr[j] - tmpi[i]*M_Wi[j];
+            i_samp[j] = tmpr[i]*M_Wi[j] + tmpi[i]*M_Wr[j];
+            r_samp[i] = tmpr[j]*M_Wr[i] - tmpi[j]*M_Wi[i];
+            i_samp[i] = tmpr[j]*M_Wi[i] + tmpi[j]*M_Wr[i];
+        }
+        else if (i==j)
+        {
+            r_samp[i] = tmpr[i]*M_Wr[i] - tmpi[i]*M_Wi[i];
+            i_samp[i] = tmpr[i]*M_Wi[i] + tmpi[i]*M_Wr[i];
+        }
+
+        k=Nv2;
+        while(k<=j)
+        {
+            j-=k;
+            k>>=1;
+        }
+        j+=k;
+    }
+
+    r_samp[15] = tmpr[15]*M_Wr[15] - tmpi[15]*M_Wi[15];
+    i_samp[15] = tmpr[15]*M_Wi[15] + tmpi[15]*M_Wr[15];
+
+    return;
 }
 
-Word16 ffr_getSfWord32(Word32 *vector, /*!< Pointer to input vector */
-                       Word16 len)           /*!< Length of input vector */
-{
-    Word32 maxVal;
-    Word16 i;
-    Word16 resu;
-
-
-    maxVal = L_add(0,0);
-    FOR(i=0; i<len; i++)
-    {
-        maxVal = L_max(maxVal,L_abs(vector[i]));
-    }
-
-    resu = 31;
-    move16();
-    if(maxVal)
-        resu = norm_l(maxVal);
-
-
-    return resu;
-}
-
-static
-void cgetpreSfWord16( Word16 *vector, /*!< Pointer to input vector */
-                      Word16 len,Word16 preshr,Word16* num)
-{
-    Word16 i;
-
-
-    *num = sub(*num,preshr);
-    move16();
-    FOR (i=0; i<len; i++)
-    {
-        vector[i] = shr(vector[i],preshr);
-        move16();
-    }
-
-}
-
-static void passf4_1_16( const complex_16 *cc,
-                         complex_16 *ch,
-                         const complex_16 *wa1,
-                         const complex_16 *wa2,
-                         const complex_16 *wa3)
-{
-    UWord16 i;
-
-
-    FOR (i = 0; i < 4; i++)
-    {
-        complex_16 c2, c3, c4, t1, t2, t3, t4;
-        RE(t2) = add(RE(cc[i]) , RE(cc[i+8]));
-        RE(t1) = sub(RE(cc[i]) , RE(cc[i+8]));
-        IM(t2) = add(IM(cc[i]) , IM(cc[i+8]));
-        IM(t1) = sub(IM(cc[i]) , IM(cc[i+8]));
-        RE(t3) = add(RE(cc[i+4]) , RE(cc[i+12]));
-        IM(t4) = sub(RE(cc[i+4]) , RE(cc[i+12]));
-        IM(t3) = add(IM(cc[i+12]) , IM(cc[i+4]));
-        RE(t4) = sub(IM(cc[i+12]) , IM(cc[i+4]));
-
-        RE(c2) = add(RE(t1) , RE(t4));
-        RE(c4) = sub(RE(t1) , RE(t4));
-
-        IM(c2) = add(IM(t1) , IM(t4));
-        IM(c4) = sub(IM(t1) , IM(t4));
-
-        RE(ch[i]) = add(RE(t2) , RE(t3));
-        move16();
-        RE(c3)    = sub(RE(t2) , RE(t3));
-
-        IM(ch[i]) = add(IM(t2) , IM(t3));
-        move16();
-        IM(c3)    = sub(IM(t2) , IM(t3));
-
-        ComplexMult_16(&IM(ch[i+4]), &RE(ch[i+4]),
-                       IM(c2), RE(c2), RE(wa1[i]), IM(wa1[i]));
-        ComplexMult_16(&IM(ch[i+8]), &RE(ch[i+8]),
-                       IM(c3), RE(c3), RE(wa2[i]), IM(wa2[i]));
-        ComplexMult_16(&IM(ch[i+12]), &RE(ch[i+12]),
-                       IM(c4), RE(c4), RE(wa3[i]), IM(wa3[i]));
-    }
-
-}
-
-static void passf4_2_16(const complex_16 *cc,
-                        complex_16 *ch)
-{
-
-    Word16  k;
-
-
-    FOR (k = 0; k < 4; k++)
-    {
-        complex_16 t1, t2, t3, t4;
-
-        RE(t2) = add(RE(cc[4*k])   , RE(cc[4*k+2]));
-        RE(t1) = sub(RE(cc[4*k])   , RE(cc[4*k+2]));
-        IM(t2) = add(IM(cc[4*k])   , IM(cc[4*k+2]));
-        IM(t1) = sub(IM(cc[4*k])   , IM(cc[4*k+2]));
-        RE(t3) = add(RE(cc[4*k+1]) , RE(cc[4*k+3]));
-        IM(t4) = sub(RE(cc[4*k+1]) , RE(cc[4*k+3]));
-        IM(t3) = add(IM(cc[4*k+3]) , IM(cc[4*k+1]));
-        RE(t4) = sub(IM(cc[4*k+3]) , IM(cc[4*k+1]));
-
-        RE(ch[k])   = add(RE(t2) , RE(t3));
-        move16();
-        RE(ch[k+8]) = sub(RE(t2) , RE(t3));
-        move16();
-
-        IM(ch[k])   = add(IM(t2) , IM(t3));
-        move16();
-        IM(ch[k+8]) = sub(IM(t2) , IM(t3));
-        move16();
-
-        RE(ch[k+4]) = add(RE(t1) , RE(t4));
-        move16();
-        RE(ch[k+12])= sub(RE(t1) , RE(t4));
-        move16();
-
-        IM(ch[k+4]) = add(IM(t1) , IM(t4));
-        move16();
-        IM(ch[k+12])= sub(IM(t1) , IM(t4));
-        move16();
-
-    }
-
-}
-
-static
-void cfftf_16(Word16* scale, complex_16 *c, complex_16 *ch, const complex_16 *wa)
-{
-
-    cgetpreSfWord16((Word16*)c, 32,3,scale);
-    passf4_1_16((const complex_16*)c, ch, &wa[0], &wa[4], &wa[8]);
-    cgetpreSfWord16((Word16*)ch, 32,2,scale);
-    passf4_2_16((const complex_16*)ch, c);
-
-}
-
-static
-void fft16_fix_4_16(
-    Word32 **Sr,
-    Word32 **Si,
-    Word32 Offset,
-    Word16 i,
-    cfft_info_16 cfft,
-    Word16 in_specamp_Q,
-    Word16 tmpQ,
-    Word32 * spec_amp
-)
-{
-    Word32 n;
-
-    Word32  tmpr,tmpi,ptmpn,ptmp15_n,tmpspec;
-    Word16  specamp_Q,tmpr_16,tmpi_16;
-    Word16  resu,scalefactor1;
-    complex_16 f_int2[16];
-    Word16 *count2= &resu;
-    Word16 Sr16, Si16;
-    Word32 maxVal;
-
-
-    maxVal = L_deposit_l(0);
-    FOR (n=0; n<16; n++)
-    {
-        maxVal = L_max(maxVal,L_abs(Sr[Offset+n][i]));
-        maxVal = L_max(maxVal,L_abs(Si[Offset+n][i]));
-    }
-
-    resu = 30;
-    move16();
-    IF ( maxVal )
-    {
-        resu = sub(norm_l(maxVal),1);
-    }
-
-    FOR (n = 0; n < 16; n++)
-    {
-        Sr16 = round_fx(L_shl(Sr[Offset+n][i],resu));
-        Si16 = round_fx(L_shl(Si[Offset+n][i],resu));
-        ComplexMult_16(&IM(f_int2[n]), &RE(f_int2[n]), Si16, Sr16, RE(M_in_fix16[n]), IM(M_in_fix16[n]));/*q+16*/
-    }
-
-    cfftf_16(count2, f_int2,cfft.work,  (const complex_16*)cfft.tab);
-    cgetpreSfWord16((Word16*)f_int2, 32,1,count2);
-    scalefactor1 = add(*count2,DATAFFT_Q);
-
-    in_specamp_Q = add(in_specamp_Q,shl(scalefactor1,1));
-
-    FOR (n = 0; n < 8; n++)
-    {
-        tmpi = L_mac(L_mult(IM(f_int2[n]),  M_Wr_fix16[n]) , RE(f_int2[n]), M_Wi_fix16[n]);
-        tmpr = L_msu(L_mult(RE(f_int2[n]),  M_Wr_fix16[n]) , IM(f_int2[n]), M_Wi_fix16[n]);
-        tmpi_16 = extract_h(tmpi);
-        tmpr_16 = extract_h(tmpr);
-
-        ptmpn = L_mac0(L_mult0(tmpi_16,tmpi_16), tmpr_16,tmpr_16);
-
-        tmpi = L_mac(L_mult(IM(f_int2[15-n]),  M_Wr_fix16[15-n]) , RE(f_int2[15-n]), M_Wi_fix16[15-n]);
-        tmpr = L_msu(L_mult(RE(f_int2[15-n]),  M_Wr_fix16[15-n]) , IM(f_int2[15-n]), M_Wi_fix16[15-n]);
-        tmpi_16 = extract_h(tmpi);
-        tmpr_16 = extract_h(tmpr);
-
-        ptmp15_n = L_add((L_mult0(tmpi_16,tmpi_16)), (L_mult0(tmpr_16,tmpr_16)));
-        tmpspec= L_add(ptmpn, ptmp15_n) ;
-
-        tmpspec = fft_vad_Sqrt_l(tmpspec,in_specamp_Q,&specamp_Q);
-        spec_amp[i*8+n]  = L_shr(tmpspec,  limitScale32(sub(specamp_Q,tmpQ)));
-        move32();
-    }
-
-}
-
-static
-void fft16_fix_5_16(
-    Word32 **Sr,
-    Word32 **Si,
-    Word32 Offset,
-    Word16 i,
-    cfft_info_16 cfft,
-    Word16 in_specamp_Q,
-    Word16 tmpQ,
-    Word32 * spec_amp
-)
-{
-    Word32 n;
-
-    Word32  tmpr,tmpi,ptmpn,ptmp15_n,tmpspec;
-    Word16  specamp_Q,tmpr_16,tmpi_16;
-
-    Word16  resu,scalefactor1;
-    complex_16 f_int2[16];
-    Word16 *count2= &resu;
-    Word16 Sr16, Si16;
-    Word32 maxVal;
-
-
-    maxVal = L_deposit_l(0);
-    FOR (n=0; n<16; n++)
-    {
-        maxVal = L_max(maxVal,L_abs(Sr[Offset+n][i]));
-        maxVal = L_max(maxVal,L_abs(Si[Offset+n][i]));
-    }
-
-    resu = 30;
-    move16();
-    IF ( maxVal )
-    {
-        resu = sub(norm_l(maxVal),1);
-    }
-
-    FOR (n = 0; n < 16; n++)
-    {
-        Sr16 = round_fx(L_shl(Sr[Offset+n][i],resu));
-        Si16 = round_fx(L_shl(Si[Offset+n][i],resu));
-        ComplexMult_16(&IM(f_int2[n]), &RE(f_int2[n]), Si16, Sr16, RE(M_in_fix16[n]), IM(M_in_fix16[n]));/*q+16*/
-    }
-
-    cfftf_16(count2, f_int2,cfft.work,  (const complex_16*)cfft.tab);
-    cgetpreSfWord16((Word16*)f_int2, 32,1,count2);
-
-    scalefactor1 = add(*count2,DATAFFT_Q);
-
-    in_specamp_Q = add(in_specamp_Q,shl(scalefactor1,1));
-
-    FOR (n = 0; n < 8; n++)
-    {
-        tmpi = L_mac(L_mult(IM(f_int2[n]),  M_Wr_fix16[n]), RE(f_int2[n]), M_Wi_fix16[n]);
-        tmpr = L_msu(L_mult(RE(f_int2[n]),  M_Wr_fix16[n]) , IM(f_int2[n]), M_Wi_fix16[n]);
-        tmpi_16 = extract_h(tmpi);
-        tmpr_16 = extract_h(tmpr);
-
-        ptmpn = L_add((L_mult0(tmpi_16,tmpi_16)) , (L_mult0(tmpr_16,tmpr_16)));
-
-        tmpi = L_mac(L_mult(IM(f_int2[15-n]),  M_Wr_fix16[15-n]) , RE(f_int2[15-n]), M_Wi_fix16[15-n]);
-        tmpr = L_msu(L_mult(RE(f_int2[15-n]),  M_Wr_fix16[15-n]) , IM(f_int2[15-n]), M_Wi_fix16[15-n]);
-        tmpi_16 = extract_h(tmpi);
-        tmpr_16 = extract_h(tmpr);
-
-        ptmp15_n = L_mac0(L_mult0(tmpi_16,tmpi_16), tmpr_16,tmpr_16);
-        tmpspec= L_add( ptmpn, ptmp15_n) ;
-
-        tmpspec = fft_vad_Sqrt_l(tmpspec,in_specamp_Q,&specamp_Q);
-        spec_amp[i*8+7-n]  =  L_shr(tmpspec,  limitScale32(sub(specamp_Q,tmpQ)));
-        move32();
-    }
-
-}
+/*-------------------------------------------------------------------*
+ * subband_FFT()
+ *
+ *
+ *-------------------------------------------------------------------*/
 
 void subband_FFT(
-    Word32 ** Sr,     /*(i) real part of the CLDFB*/
-    Word32 ** Si,     /*(i) imag part of the CLDFB*/
-    Word32 *spec_amp, /*(o) spectral amplitude*/
-    Word32	Offset,    /*(i) offset of the CLDFB*/
-    Word16 *fftoQ     /*(o) the Scaling */
+    float Sr[16][60],            /*(i) real part of the cldfb*/
+    float Si[16][60],            /*(i) imag part of the cldfb*/
+    float *spec_amp              /*(o) spectral amplitude*/
 )
 {
-    Word16 i;
-    Word16 tmpQ,in_specamp_Q;
-    cfft_info_16 cfft;
-
-
-    cfft.tab = wnk_table_16;
-    in_specamp_Q = shl(sub(*fftoQ,DATAFFT_Q),1);
-    tmpQ = add(*fftoQ,8);
-
-    FOR(i=0; i<10; i=i+2)
+    int i,j;
+    float tmpr[16],tmpi[16];
+    float ptmp[16],tmp1;
+    for(i=0; i<10; i++)
     {
-        fft16_fix_4_16(Sr,Si,Offset,i,cfft,in_specamp_Q,tmpQ,spec_amp);
+        for(j=0; j<16; j++)
+        {
+            tmpr[j] = Sr[j][i];
+            tmpi[j] = Si[j][i];
+        }
+
+        fft16(tmpr,tmpi);
+
+        for(j=0; j<16; j++)
+        {
+            ptmp[j] = tmpr[j]*tmpr[j] + tmpi[j]*tmpi[j];
+        }
+        if(i%2==0)
+        {
+            for(j=0; j<8; j++)
+            {
+                tmp1 = ptmp[j] + ptmp[15-j] ;
+                spec_amp[i*8+j] = (float)sqrt(tmp1);
+            }
+        }
+        else
+        {
+            for(j=0; j<8; j++)
+            {
+                tmp1 = ptmp[j] + ptmp[15-j] ;
+                spec_amp[i*8+7-j] =(float)sqrt(tmp1);
+            }
+        }
     }
 
-    FOR(i=1; i<10; i=i+2)
-    {
-        fft16_fix_5_16(Sr,Si,Offset,i,cfft,in_specamp_Q,tmpQ,spec_amp);
-    }
-
+    return;
 }
+
+
+
+

@@ -1,121 +1,105 @@
 /*====================================================================================
-    EVS Codec 3GPP TS26.442 Apr 03, 2018. Version 12.11.0 / 13.6.0 / 14.2.0
+    EVS Codec 3GPP TS26.443 Nov 13, 2018. Version 12.11.0 / 13.7.0 / 14.3.0 / 15.1.0
   ====================================================================================*/
 
-
-/* Header files */
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include "stl.h"
-#include "basop_util.h"
-#include "prot_fx.h"
+#include "options.h"
+#include "prot.h"
+#include "rom_com.h"
+#include "basop_proto_func.h"
 
-/* Constants */
-#define M 16
-
-#define BFI_FAC 0.9f
-
+/*------------------------------------------------------------------*
+* lpc_unquantize()
+*
+*
+*------------------------------------------------------------------*/
 
 void lpc_unquantize(
-    Decoder_State_fx * st,
-    Word16 *lsfold,
-    Word16 *lspold,
-    Word16 *lsf,
-    Word16 *lsp,
-    const Word16 m,
-    const Word16 lpcQuantization,
-    Word16 *param_lpc,
-    const Word16 numlpc,
-    const Word16 core,
-    Word16 *mem_MA,
-    Word16 * mem_AR,
-    Word16 *lspmid,
-    Word16 *lsfmid,
-    Word16 coder_type,
-    Word16 acelp_midLpc,
-    Word8 narrow_band,
-    Word16 *seed_acelp,
-    Word32 sr_core,
-    Word16 *mid_lsf_int,
-    Word16 prev_bfi,
-    Word16 *LSF_Q_prediction,  /* o  : LSF prediction mode                     */
-    Word16 *safety_net
+    Decoder_State * st,
+    float *lsfold,
+    float *lspold,
+    float *lsf,
+    float *lsp,
+    int lpcQuantization,
+    int *param_lpc,
+    int numlpc,
+    int core,
+    float *mem_MA,
+    float *lspmid,
+    float *lsfmid,
+    short coder_type,
+    int acelp_midLpc,
+    int narrow_band,
+    short *seed_acelp,
+    int sr_core,
+    short *mid_lsf_int,
+    short prev_bfi,
+    short *LSF_Q_prediction,  /* o  : LSF prediction mode                     */
+    short *safety_net
 )
 {
-    Word16 nb_indices, k;
-    Word16 i;
+    int nb_indices=0, k;
 
-    nb_indices = 0;       /* to avoid compilation warnings */
+    mvr2r(lsfold, &lsf[0], M);
+    mvr2r(lspold, &lsp[0], M);
 
-
-    Copy(lsfold, &lsf[0], m);
-    Copy(lspold, &lsp[0], m);
-
-    IF( lpcQuantization == 0 )
+    if( lpcQuantization == 0 )
     {
-        nb_indices = dlpc_avq(param_lpc, &lsf[m], numlpc, st->sr_core);
-        FOR ( k=0; k<numlpc; k++ )
+        nb_indices = dlpc_avq(param_lpc, &lsf[M], numlpc, sr_core );
+        for ( k=0; k<numlpc; k++ )
         {
-            E_LPC_lsf_lsp_conversion(&lsf[(k+1)*m], &lsp[(k+1)*m], m);
+            lsf2lsp(&lsf[(k+1)*M], &lsp[(k+1)*M], M, sr_core);
         }
     }
-    ELSE IF ( sub(lpcQuantization, 1) == 0 )
+    else if( lpcQuantization == 1 )
     {
-        test();
-        IF ((L_sub(sr_core, INT_FS_16k) == 0) && (sub(coder_type, UNVOICED) == 0 ))
+        if( sr_core == INT_FS_16k && coder_type == UNVOICED )
         {
-            lsf_end_dec_fx( st, 1, GENERIC, sub(1,narrow_band) /* st->bwidth */ , 31, &lsf[m], mem_AR, mem_MA, sr_core, st->core_brate_fx,
-                            &st->offset_scale1_fx[0][0], &st->offset_scale2_fx[0][0], &st->offset_scale1_p_fx[0][0], &st->offset_scale2_p_fx[0][0],
-                            &st->no_scales_fx[0][0], &st->no_scales_p_fx[0][0], &st->safety_net_fx, param_lpc, LSF_Q_prediction, &nb_indices );
+            lsf_end_dec( st, GENERIC, 1-narrow_band /* st->bwidth */ , ENDLSF_NBITS, &lsf[M], st->mem_AR, mem_MA, sr_core, st->core_brate,
+                         &st->offset_scale1[0][0], &st->offset_scale2[0][0], &st->offset_scale1_p[0][0], &st->offset_scale2_p[0][0],
+                         &st->no_scales[0][0], &st->no_scales_p[0][0], &st->safety_net, param_lpc, LSF_Q_prediction, &nb_indices);
         }
-        ELSE
+        else
         {
-            IF (sub(st->core_fx, TCX_20_CORE)==0)
+            if (st->core == TCX_20_CORE)
             {
-                lsf_end_dec_fx( st, 1, AUDIO, sub(1, narrow_band) /* st->bwidth */ , 31, &lsf[m], mem_AR, mem_MA, sr_core, st->core_brate_fx,
-                &st->offset_scale1_fx[0][0], &st->offset_scale2_fx[0][0], &st->offset_scale1_p_fx[0][0], &st->offset_scale2_p_fx[0][0],
-                &st->no_scales_fx[0][0], &st->no_scales_p_fx[0][0], &st->safety_net_fx, param_lpc, LSF_Q_prediction, &nb_indices);
+                lsf_end_dec( st, AUDIO, 1-narrow_band /* st->bwidth */ , ENDLSF_NBITS, &lsf[M], st->mem_AR, mem_MA, sr_core, st->core_brate,
+                             &st->offset_scale1[0][0], &st->offset_scale2[0][0], &st->offset_scale1_p[0][0], &st->offset_scale2_p[0][0],
+                             &st->no_scales[0][0], &st->no_scales_p[0][0], &st->safety_net, param_lpc, LSF_Q_prediction, &nb_indices);
             }
-            ELSE
+            else
             {
-                lsf_end_dec_fx( st, 1, coder_type, sub(1, narrow_band) /* st->bwidth */ , 31, &lsf[m], mem_AR, mem_MA, sr_core, st->core_brate_fx,
-                &st->offset_scale1_fx[0][0], &st->offset_scale2_fx[0][0], &st->offset_scale1_p_fx[0][0], &st->offset_scale2_p_fx[0][0],
-                &st->no_scales_fx[0][0], &st->no_scales_p_fx[0][0], &st->safety_net_fx, param_lpc, LSF_Q_prediction, &nb_indices);
+                lsf_end_dec( st, coder_type, 1-narrow_band /* st->bwidth */ , 31, &lsf[M], st->mem_AR, mem_MA, sr_core, st->core_brate,
+                             &st->offset_scale1[0][0], &st->offset_scale2[0][0], &st->offset_scale1_p[0][0], &st->offset_scale2_p[0][0],
+                             &st->no_scales[0][0], &st->no_scales_p[0][0], &st->safety_net, param_lpc, LSF_Q_prediction, &nb_indices);
             }
         }
 
-        lsf2lsp_fx(&lsf[m], &lsp[m], M, sr_core);
+        lsf2lsp(&lsf[M], &lsp[M], M, sr_core);
     }
-    ELSE
+    else
     {
         assert(0);
     }
 
     *seed_acelp=0;
-    move16();
-    FOR(i=nb_indices-1; i>=0; i--)
+    for(k=nb_indices-1; k>=0; k--)
     {
-        *seed_acelp = extract_l(L_mac0(L_mac0(13849, shr(*seed_acelp, 1), 31821), param_lpc[i], 31821));
+        /* rightshift before *seed_acelp+param_lpc[i] to avoid overflows*/
+        *seed_acelp=(short)((((*seed_acelp)>>1)+param_lpc[k]) * 31821L + 13849L);
     }
 
-    /* Decoded mid-frame isf */
-    test();
-    test();
-    test();
-    IF ( lpcQuantization && acelp_midLpc && core==ACELP_CORE && st->rate_switching_reset==0)
+    /* Decoded mid-frame lsf */
+    if( lpcQuantization && acelp_midLpc && core == ACELP_CORE && st->rate_switching_reset == 0 )
     {
-        midlsf_dec ( &lsf[0], &lsf[m], param_lpc[nb_indices], lsfmid
-                     ,coder_type
-                     ,mid_lsf_int,
-                     prev_bfi,
-                     *safety_net
-                   );
-        reorder_lsf_fx( lsfmid, LSF_GAP_MID_FX, M, sr_core );
-        lsf2lsp_fx(lsfmid, lspmid, M, sr_core);
+        midlsf_dec( &lsf[0], &lsf[M], (short)param_lpc[nb_indices], lsfmid, M, coder_type, mid_lsf_int, prev_bfi, *safety_net );
+
+        reorder_lsf( lsfmid, LSF_GAP_MID, M, sr_core );
+        lsf2lsp( lsfmid, lspmid, M, sr_core );
     }
 
 
     return;
 }
-

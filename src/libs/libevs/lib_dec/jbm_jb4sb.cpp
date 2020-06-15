@@ -1,42 +1,34 @@
 /*====================================================================================
-    EVS Codec 3GPP TS26.442 Apr 03, 2018. Version 12.11.0 / 13.6.0 / 14.2.0
+    EVS Codec 3GPP TS26.443 Nov 13, 2018. Version 12.11.0 / 13.7.0 / 14.3.0 / 15.1.0
   ====================================================================================*/
 
-/*! \file jbm_jb4sb.c Jitter Buffer Management Interface */
+
+/*! \file jbm_jb4sb.c EVS Jitter Buffer Management Interface */
 
 /* system headers */
 #include <assert.h>
 #include <stdlib.h>
-/* instrumentation headers */
-#include "stl.h"
+#include <math.h>
 #include "options.h"
-#include "basop_util.h"
-#include "basop_util_jbm.h"
-#include "cnst_fx.h"
+/* instrumentation */
 /* local headers */
 #include "jbm_jb4_circularbuffer.h"
 #include "jbm_jb4_inputbuffer.h"
 #include "jbm_jb4_jmf.h"
 #include "jbm_jb4sb.h"
-#include "prot_fx.h"
+#include "prot.h"
 
 
-static Word16 idiv3216(Word32 x, Word16 y)
-{
-    Word16 z, divScaleFac;
-
-    z = BASOP_Util_Divide3216_Scale(x, y, &divScaleFac);
-    z = shl(z, add(divScaleFac,1));
-    return z;
-}
+#define JB4_MIN(a,b)  ((a)>(b) ? (b) : (a))
+#define JB4_MAX(a,b)  ((a)>(b) ? (a) : (b))
 
 #define MAXOFFSET 10
 
 /*! Calculates the difference between two RTP timestamps - the diff is positive, if B 'later', negative otherwise */
-static Word32 JB4_rtpTimeStampDiff( Word32 tsA, Word32 tsB );
+static int32_t JB4_rtpTimeStampDiff( uint32_t tsA, uint32_t tsB );
 /* function to calculate different options for the target playout delay */
-static void JB4_targetPlayoutDelay( const JB4_HANDLE h, Word32 *targetMin,
-                                    Word32 *targetMax, Word32 *targetDtx, Word32 *targetStartUp );
+static void JB4_targetPlayoutDelay( const JB4_HANDLE h, uint32_t *targetMin,
+                                    uint32_t *targetMax, uint32_t *targetDtx, uint32_t *targetStartUp );
 /*! function to do playout adaptation before playing the next data unit */
 /*! In case of time shrinking, data units will be dropped before the next data unit to play is returned and
  *  in case of time stretching a empty data unit is returned and the frame should be concealed.
@@ -44,41 +36,41 @@ static void JB4_targetPlayoutDelay( const JB4_HANDLE h, Word32 *targetMin,
  *  @param[out] dataUnit the next data unit to play
  *  @param[out] scale the scale in percent used as target for time scaling of the returned data unit
  *  @param[out] maxScaling the maximum allowed external time scaling */
-static Word16 JB4_adaptPlayout( JB4_HANDLE h, Word32 sysTime, Word32 extBufferedTime,
-                                JB4_DATAUNIT_HANDLE *pDataUnit, Word16 *scale, Word16 *maxScaling );
+static int JB4_adaptPlayout( JB4_HANDLE h, uint32_t sysTime, uint32_t extBufferedTime,
+                             JB4_DATAUNIT_HANDLE *pDataUnit, uint32_t *scale, uint32_t *maxScaling );
 /*! function to do playout adaptation before playing the first data unit */
 /*! @param[in] now current system time
  *  @param[out] prebuffer true, if the data unit should be prebuffered */
-static void JB4_adaptFirstPlayout( JB4_HANDLE h, Word32 sysTime, Word16 *prebuffer );
+static void JB4_adaptFirstPlayout( JB4_HANDLE h, uint32_t sysTime, bool_t *prebuffer );
 /*! function for playout adaptation while active (no DTX) */
-static void JB4_adaptActivePlayout( JB4_HANDLE h, Word32 sysTime,
-                                    Word32 extBufferedTime, Word16 *scale, Word16 *maxScaling );
+static void JB4_adaptActivePlayout( JB4_HANDLE h, uint32_t sysTime,
+                                    uint32_t extBufferedTime, uint32_t *scale, uint32_t *maxScaling );
 /*! function for playout adaptation while DTX */
-static void JB4_adaptDtxPlayout( JB4_HANDLE h, Word32 sysTime, Word16 *stretchTime );
+static void JB4_adaptDtxPlayout( JB4_HANDLE h, uint32_t sysTime, bool_t *stretchTime );
 /*! function to look into the buffer and check if it makes sense to drop a data unit */
 /*! @param[out] dropEarly true, if a data unit could be dropped early
  *  @param[out] buffered the buffered time span in timeScale units
  *  @return true, if a data unit could be dropped */
-static Word16 JB4_inspectBufferForDropping( const JB4_HANDLE h, Word16 *dropEarly, Word32 *buffered );
+static int JB4_inspectBufferForDropping( const JB4_HANDLE h, bool_t *dropEarly, uint32_t *buffered );
 /* function to look into the buffer and check if it makes sense to drop a data unit during DTX */
-static Word16 JB4_checkDtxDropping( const JB4_HANDLE h );
+static int JB4_checkDtxDropping( const JB4_HANDLE h );
 /*! function to estimate the short term jitter  */
-static void JB4_estimateShortTermJitter( JB4_HANDLE h, Word32 rcvTime, Word32 rtpTimeStamp );
+static void JB4_estimateShortTermJitter( JB4_HANDLE h, uint32_t rcvTime, uint32_t rtpTimeStamp );
 /*! function to pop a data unit from the buffer */
-static void JB4_popFromBuffer( JB4_HANDLE h, Word32 sysTime, JB4_DATAUNIT_HANDLE *pDataUnit );
+static void JB4_popFromBuffer( JB4_HANDLE h, uint32_t sysTime, JB4_DATAUNIT_HANDLE *pDataUnit );
 /*! function to drop a data unit from the buffer - updates nShrinked */
-static void JB4_dropFromBuffer( JB4_HANDLE h, Word32 sysTime );
+static void JB4_dropFromBuffer( JB4_HANDLE h, uint32_t sysTime );
 /*! function to calculate the playout delay based on the current jitter */
 /*! @param[in] playTime the system time when the data unit will be played
  *  @param[in] timeStamp the time stamp of the data unit to played
  *  @param[out] delay the calculated playout delay */
-static Word16 JB4_playoutDelay( const JB4_HANDLE h, Word32 playTime,
-                                Word32 rtpTimeStamp, Word32 *delay );
+static int JB4_playoutDelay( const JB4_HANDLE h, uint32_t playTime,
+                             uint32_t rtpTimeStamp, uint32_t *delay );
 /*! function to update lastPlayoutDelay and lastTargetTime after popFromBuffer() */
-static void JB4_updateLastTimingMembers( JB4_HANDLE h, Word32 playTime, Word32 rtpTimeStamp );
+static void JB4_updateLastTimingMembers( JB4_HANDLE h, uint32_t playTime, uint32_t rtpTimeStamp );
 /*! function to compare the RTP time stamps of two data units: newElement==arrayElement ? 0 : (newElement>arrayElement ? +1 : -1) */
-static Word32 JB4_inputBufferCompareFunction( const JB4_INPUTBUFFER_ELEMENT newElement,
-        const JB4_INPUTBUFFER_ELEMENT arrayElement, Word16 *replaceWithNewElementIfEqual );
+static int JB4_inputBufferCompareFunction( const JB4_INPUTBUFFER_ELEMENT newElement,
+        const JB4_INPUTBUFFER_ELEMENT arrayElement, bool_t *replaceWithNewElementIfEqual );
 
 
 /*! Jitter Buffer Management Interface */
@@ -87,158 +79,147 @@ struct JB4
     /*! @name statistics for user */
     /*@{ */
     /*! the number of late lost data units */
-    Word32                     nLateLost;
+    uint32_t                     nLateLost;
     /*! the number of data units that were available (not NULL) at playout time */
-    Word32                     nAvailablePopped;
+    uint32_t                     nAvailablePopped;
     /*! the number of data units that were not available (NULL) at playout time */
-    Word32                     nUnavailablePopped;
+    uint32_t                     nUnavailablePopped;
     /*! the number of unavailable pops since the last available one - used as temp value for nLost and nStretched */
-    Word32                     nLostOrStretched;
+    uint32_t                     nLostOrStretched;
     /*! the number of data units that were lost at playout time */
-    Word32                     nLost;
+    uint32_t                     nLost;
     /*! the number of empty data units inserted for playout adaptation */
-    Word32                     nStretched;
+    uint32_t                     nStretched;
     /*! the number of data units dropped for playout adaptation */
     /*! This function counts all time shrinking events, no matter if a dropped data unit was actually available. */
-    Word32                     nShrinked;
+    uint32_t                     nShrinked;
     /*! the number of data units that were returned to create comfort noice (including NULL) */
-    Word32                     nComfortNoice;
+    uint32_t                     nComfortNoice;
     /*! the number of jitter induced concealment operations (as defined in 3GPP TS 26.114) */
-    Word32                     jitterInducedConcealments;
+    uint32_t                     jitterInducedConcealments;
     /*! the target playout delay of the last returned data unit */
-    Word32                     targetPlayoutDelay;
+    uint32_t                     targetPlayoutDelay;
     /*! the target playout time of the last returned data unit */
-    Word32                     lastTargetTime;
+    uint32_t                     lastTargetTime;
     /*@} */
     /*! @name internal configuration values - do not change!!! */
     /*@{ */
     /*! internal time scale for all calculations */
-    Word16                     timeScale;
+    int                          timeScale;
     /*! internal frame duration in timeScale units */
-    Word32                     frameDuration;
+    uint32_t                     frameDuration;
     /*@} */
     /*! @name jitter buffer configuration values */
     /*@{ */
     /*! the allowed delay reserve in addition to network jitter to reduce late-loss [milliseconds] */
-    Word32                     safetyMargin;
+    Word32                       safetyMargin;
     /*@} */
     /*! @name data for short term jitter estimation */
     /*@{ */
     /*! short term jitter measure FIFO */
-    JB4_JMF_HANDLE             stJmf;
+    JB4_JMF_HANDLE               stJmf;
     /*! FIFO of short term jitter values */
-    JB4_CIRCULARBUFFER_HANDLE  stJitterFifo;
+    JB4_CIRCULARBUFFER_HANDLE    stJitterFifo;
     /*! FIFO of RTP time stamps for the values stored in stJitterFifo */
-    JB4_CIRCULARBUFFER_HANDLE  stTimeStampFifo;
+    JB4_CIRCULARBUFFER_HANDLE    stTimeStampFifo;
     /*! short term jitter */
-    Word32                     stJitter;
+    uint32_t                     stJitter;
     /*@} */
     /*! @name jitter buffer data */
     /*@{ */
     /*! true, if a data unit was already popped from the buffer */
-    Word16                     firstDataUnitPopped;
+    bool_t                       firstDataUnitPopped;
     /*! system time of the previous JB4_PopDataUnit() call */
-    Word32                     prevPopSysTime;
+    uint32_t                     prevPopSysTime;
     /*! RTP timestamp of the last played/dropped data unit that was actually available */
-    Word32                     lastReturnedTs;
+    uint32_t                     lastReturnedTs;
     /*! true, if the last popped data unit contained no active signal, i.e. silence -> hint for DTX */
-    Word16                     lastPoppedWasSilence;
+    bool_t                       lastPoppedWasSilence;
     /*! the playout time minus the minimum offset of the last played data unit in microseconds */
-    Word32                     lastPlayoutOffset;
+    int32_t                      lastPlayoutOffset;
     /*! RTP time stamp of the next data unit that is expected to be fetched from the buffer */
-    Word32                     nextExpectedTs;
-    Word16                     rfOffset2Active;
-    Word16                     rfOffset3Active;
-    Word16                     rfOffset5Active;
-    Word16                     rfOffset7Active;
-    Word32                     rfDelay;
+    uint32_t                     nextExpectedTs;
+    Word16                       rfOffset2Active;
+    Word16                       rfOffset3Active;
+    Word16                       rfOffset5Active;
+    Word16                       rfOffset7Active;
+    Word32                       rfDelay;
     /*! long term jitter measure FIFO */
-    JB4_JMF_HANDLE             ltJmf;
+    JB4_JMF_HANDLE               ltJmf;
 
-    Word32  FecOffWinLen;
-    Word32  FecOffWin[10];
-    Word32  optimum_offset;
-    Word32  totWin;
-    Word32  netLossRate;
-    /*! the number of partial copies decoded instead of PLC */
+    uint32_t  FecOffWinLen;
+    uint32_t  FecOffWin[10];
+    uint32_t  optimum_offset;
+
+    float  netLossRate;
     Word32  nPartialCopiesUsed;
     Word32 last_nLost;
     Word32 last_ntot;
+
+    uint32_t  totWin;
+    bool_t                     pre_partial_frame;
     /*@} */
 
     /*! @name members to store the data units */
     /*@{ */
     /*! the data unit buffer */
-    JB4_INPUTBUFFER_HANDLE     inputBuffer;
-    Word16                     pre_partial_frame;
-    struct JB4_DATAUNIT        memorySlots[MAX_JBM_SLOTS];
-    JB4_DATAUNIT_HANDLE        freeMemorySlots[MAX_JBM_SLOTS];
-    Word16                     nFreeMemorySlots;
+    JB4_INPUTBUFFER_HANDLE       inputBuffer;
+    struct JB4_DATAUNIT          memorySlots[MAX_JBM_SLOTS];
+    JB4_DATAUNIT_HANDLE          freeMemorySlots[MAX_JBM_SLOTS];
+    unsigned int                 nFreeMemorySlots;
     /*@} */
 }; /* JB4 */
 
 
-Word16 JB4_Create( JB4_HANDLE *ph )
+int JB4_Create( JB4_HANDLE *ph )
 {
-    JB4_HANDLE h = (JB4_HANDLE)calloc( 1, sizeof( struct JB4 ) );
-
-    Word16 iter;
+    JB4_HANDLE h = (JB4*)calloc( 1, sizeof( struct JB4 ) );
+    short iter;
 
     /* statistics for user */
-    h->nLateLost                 = L_deposit_l(0);
-    h->nAvailablePopped          = L_deposit_l(0);
-    h->nUnavailablePopped        = L_deposit_l(0);
-    h->nLostOrStretched          = L_deposit_l(0);
-    h->nLost                     = L_deposit_l(0);
-    h->nStretched                = L_deposit_l(0);
-    h->nShrinked                 = L_deposit_l(0);
-    h->nComfortNoice             = L_deposit_l(0);
-    h->jitterInducedConcealments = L_deposit_l(0);
-    h->targetPlayoutDelay        = L_deposit_l(0);
-    h->lastTargetTime            = L_deposit_l(0);
+    h->nLateLost                 = 0;
+    h->nAvailablePopped          = 0;
+    h->nUnavailablePopped        = 0;
+    h->nLostOrStretched          = 0;
+    h->nLost                     = 0;
+    h->nStretched                = 0;
+    h->nShrinked                 = 0;
+    h->nComfortNoice             = 0;
+    h->jitterInducedConcealments = 0;
+    h->targetPlayoutDelay        = 0;
+    h->lastTargetTime            = 0;
     /* internal configuration values - do not change!!! */
     h->timeScale                 = 0;
-    move16();
-    h->frameDuration             = L_deposit_l(0);
+    h->frameDuration             = 0;
     /* jitter buffer configuration values: done in JB4_Init() */
     /* short term jitter evaluation */
     JB4_JMF_Create( &h->stJmf );
     JB4_CIRCULARBUFFER_Create( &h->stJitterFifo );
     JB4_CIRCULARBUFFER_Create( &h->stTimeStampFifo );
-    h->stJitter                  = L_deposit_l(0);
+    h->stJitter                  = 0;
     /* jitter buffer data */
     h->firstDataUnitPopped       = false;
-    move16();
-    h->prevPopSysTime            = L_deposit_l(0);
-    h->lastReturnedTs            = L_deposit_l(0);
+    h->prevPopSysTime            = 0;
+    h->lastReturnedTs            = 0;
     h->lastPoppedWasSilence      = false;
-    move16();
-    h->lastPlayoutOffset         = L_deposit_l(0);
-    h->nextExpectedTs            = L_deposit_l(0);
+    h->lastPlayoutOffset         = 0;
+    h->nextExpectedTs            = 0;
     h->rfOffset2Active           = 0;
-    move16();
     h->rfOffset3Active           = 0;
-    move16();
     h->rfOffset5Active           = 0;
-    move16();
     h->rfOffset7Active           = 0;
-    move16();
-    h->rfDelay                   = L_deposit_l(0);
+    h->rfDelay                   = 0;
     JB4_JMF_Create( &h->ltJmf );
     h->pre_partial_frame         = 0;
 
     h->FecOffWinLen               = 0;
-    move32();
-    FOR (iter = 0; iter < 10; iter++ )
+    for (iter = 0; iter < 10; iter++ )
     {
         h->FecOffWin[iter] = 0;
-        move32();
     }
     h->optimum_offset             = 3;
-    move32();
     h->totWin                     = 0;
-    move32();
-    h->netLossRate                = 0;
+    h->netLossRate                = 0.0f;
     move32();
     h->nPartialCopiesUsed         = 0;
     move32();
@@ -250,31 +231,27 @@ Word16 JB4_Create( JB4_HANDLE *ph )
     /* members to store the data units */
     JB4_INPUTBUFFER_Create( &h->inputBuffer );
     /* allocate memory for data units */
-    FOR(iter = 0; iter < MAX_JBM_SLOTS; ++iter)
+    for(iter = 0; iter < MAX_JBM_SLOTS; ++iter)
     {
-        h->memorySlots[iter].data = (UWord8*)malloc(MAX_AU_SIZE);
+        h->memorySlots[iter].data = (uint8_t*)malloc(MAX_AU_SIZE);
         h->freeMemorySlots[iter] = &h->memorySlots[iter];
-        move16();
     }
     h->nFreeMemorySlots = MAX_JBM_SLOTS;
     *ph = h;
-    move16();
     return 0;
 }
 
 void JB4_Destroy( JB4_HANDLE *ph )
 {
     JB4_HANDLE h;
-    Word16 i;
+    unsigned int i;
 
-    IF( !ph )
+    if( !ph )
     {
         return;
     }
     h = *ph;
-    move16();
-
-    IF( !h )
+    if( !h )
     {
         return;
     }
@@ -292,37 +269,34 @@ void JB4_Destroy( JB4_HANDLE *ph )
 
     free( h );
     *ph = NULL;
-    move16();
+
 }
 
-Word16 JB4_Init( JB4_HANDLE h, Word16 safetyMargin )
+int JB4_Init( JB4_HANDLE h, Word16 safetyMargin )
 {
-    Word16 ltJmfSize, stFifoSize, stJmfSize, stJmfAllowedLateLoss;
-    Word16 inputBufferCapacity;
+    unsigned int ltJmfSize, stFifoSize, stJmfSize, stJmfAllowedLateLoss;
+    unsigned int inputBufferCapacity;
 
     /* internal timescale is 1000, frame duration is 20ms */
-    h->timeScale            = 1000; /* ms */                                                          move16();
-    h->frameDuration        = L_deposit_l(20);   /* ms */
+    h->timeScale            = 1000; /* ms */
+    h->frameDuration        = 20;   /* ms */
 
     /* jitter buffer configuration values */
-    h->safetyMargin         = L_deposit_l(safetyMargin);
+    h->safetyMargin         = safetyMargin;
 
     /* long term jitter measure FIFO: 500 frames and 10s */
     ltJmfSize = 10000;
-    move16();
     JB4_JMF_Init( h->ltJmf, h->timeScale, ltJmfSize / 20, ltJmfSize, 1000 );
     /* short term jitter evaluation */
     stFifoSize           = 200;
-    move16();
     stJmfSize            = 50;
-    move16();
-    stJmfAllowedLateLoss = 940; /* (1000 - 60) = 6%, e.g. ignore three packets out of 50 */           move16();
+    stJmfAllowedLateLoss = 60; /* 6%, e.g. ignore three packets out of 50 */
     JB4_CIRCULARBUFFER_Init( h->stJitterFifo, stFifoSize );
     JB4_CIRCULARBUFFER_Init( h->stTimeStampFifo, stFifoSize );
-    JB4_JMF_Init( h->stJmf, h->timeScale, stJmfSize, h->timeScale /* 1s */, stJmfAllowedLateLoss );
+    JB4_JMF_Init( h->stJmf, h->timeScale,
+                  stJmfSize, h->timeScale /* 1s */, 1000 - stJmfAllowedLateLoss );
 
     inputBufferCapacity = MAX_JBM_SLOTS - 2;
-    move16();
     JB4_INPUTBUFFER_Init( h->inputBuffer, inputBufferCapacity, JB4_inputBufferCompareFunction );
     return 0;
 }
@@ -331,18 +305,15 @@ Word16 JB4_Init( JB4_HANDLE h, Word16 safetyMargin )
 JB4_DATAUNIT_HANDLE JB4_AllocDataUnit( JB4_HANDLE h )
 {
     JB4_DATAUNIT_HANDLE dataUnit;
-
-    WHILE(h->nFreeMemorySlots == 0)
+    while(h->nFreeMemorySlots == 0)
     {
         assert(JB4_INPUTBUFFER_IsEmpty(h->inputBuffer) == 0);
         JB4_dropFromBuffer(h, 0);
     }
 
-    h->nFreeMemorySlots = sub(h->nFreeMemorySlots, 1);
+    --h->nFreeMemorySlots;
     dataUnit = h->freeMemorySlots[h->nFreeMemorySlots];
-    move16();
     h->freeMemorySlots[h->nFreeMemorySlots] = NULL;
-    move16();
     assert(dataUnit != NULL);
     return dataUnit;
 }
@@ -353,114 +324,99 @@ void JB4_FreeDataUnit( JB4_HANDLE h, JB4_DATAUNIT_HANDLE dataUnit )
     assert(dataUnit != NULL);
     assert(h->nFreeMemorySlots < MAX_JBM_SLOTS);
     h->freeMemorySlots[h->nFreeMemorySlots] = dataUnit;
-    move16();
-    h->nFreeMemorySlots = add(h->nFreeMemorySlots, 1);
+    h->nFreeMemorySlots++;
 }
 
-Word16 JB4_PushDataUnit( JB4_HANDLE h, JB4_DATAUNIT_HANDLE dataUnit, Word32 rcvTime )
+int JB4_PushDataUnit( JB4_HANDLE h, JB4_DATAUNIT_HANDLE dataUnit, uint32_t rcvTime )
 {
     JB4_DATAUNIT_HANDLE droppedDataUnit = NULL;
-    move16();
 
-    assert( dataUnit->duration  == h->frameDuration );
-    assert( dataUnit->timeScale == h->timeScale );
+    assert( dataUnit->duration == h->frameDuration );
+    assert( dataUnit->timeScale == (unsigned int)h->timeScale );
 
-    /* ignore frames from too far in future (3 seconds) */                                            test();
-    IF( h->firstDataUnitPopped &&
-        L_sub(JB4_rtpTimeStampDiff(h->lastReturnedTs, dataUnit->timeStamp),
-              L_mult0(50 * 3, extract_l(dataUnit->duration))) >= 0)
+    /* ignore frames from too far in future (3 seconds) */
+    if( h->firstDataUnitPopped && JB4_rtpTimeStampDiff( h->lastReturnedTs, dataUnit->timeStamp ) >=
+            (int32_t) (50 * 3 * dataUnit->duration) )
     {
         JB4_FreeDataUnit(h, dataUnit);
         return 0;
     }
 
     /* reserve space for one element to add: drop oldest if buffer is full */
-    WHILE(JB4_INPUTBUFFER_IsFull(h->inputBuffer))
+    while(JB4_INPUTBUFFER_IsFull(h->inputBuffer))
     {
         JB4_dropFromBuffer(h, rcvTime);
     }
     assert(JB4_INPUTBUFFER_IsFull(h->inputBuffer) == 0);
 
     /* do statistics on partial copy offset using active primary copies to
-     * avoid unexpected resets because RF_NO_DATA partial copies are dropped before JBM */
-    IF(dataUnit->silenceIndicator == 0 && dataUnit->partial_frame == 0)
+     * avoid unexpected resets because RF__NO_DATA partial copies are dropped before JBM */
+    if(dataUnit->silenceIndicator == 0 && dataUnit->partial_frame == 0)
     {
-        IF(sub(dataUnit->partialCopyOffset, 0) == 0)
+        if(dataUnit->partialCopyOffset == 0)
         {
-            h->rfOffset2Active = s_max(sub(h->rfOffset2Active, 1), 0);
-            h->rfOffset3Active = s_max(sub(h->rfOffset3Active, 1), 0);
-            h->rfOffset5Active = s_max(sub(h->rfOffset5Active, 1), 0);
-            h->rfOffset7Active = s_max(sub(h->rfOffset7Active, 1), 0);
+            if(h->rfOffset2Active > 0)
+                --h->rfOffset2Active;
+            if(h->rfOffset3Active > 0)
+                --h->rfOffset3Active;
+            if(h->rfOffset5Active > 0)
+                --h->rfOffset5Active;
+            if(h->rfOffset7Active > 0)
+                --h->rfOffset7Active;
         }
-        ELSE IF(sub(dataUnit->partialCopyOffset, 2) == 0)
+        else if(dataUnit->partialCopyOffset == 2)
         {
             h->rfOffset2Active = 100;
-            move16();
             h->rfOffset3Active = 0;
-            move16();
             h->rfOffset5Active = 0;
-            move16();
             h->rfOffset7Active = 0;
-            move16();
         }
-        ELSE IF(sub(dataUnit->partialCopyOffset, 3) == 0)
+        else if(dataUnit->partialCopyOffset == 3)
         {
             h->rfOffset2Active = 0;
-            move16();
             h->rfOffset3Active = 100;
-            move16();
             h->rfOffset5Active = 0;
-            move16();
             h->rfOffset7Active = 0;
-            move16();
         }
-        ELSE IF(sub(dataUnit->partialCopyOffset, 5) == 0)
+        else if(dataUnit->partialCopyOffset == 5)
         {
             h->rfOffset2Active = 0;
-            move16();
             h->rfOffset3Active = 0;
-            move16();
             h->rfOffset5Active = 100;
-            move16();
             h->rfOffset7Active = 0;
-            move16();
         }
-        ELSE IF(sub(dataUnit->partialCopyOffset, 7) == 0)
+        else if(dataUnit->partialCopyOffset == 7)
         {
             h->rfOffset2Active = 0;
-            move16();
             h->rfOffset3Active = 0;
-            move16();
             h->rfOffset5Active = 0;
-            move16();
             h->rfOffset7Active = 100;
-            move16();
         }
     }
 
-    IF(dataUnit->partial_frame != 0)
+    if(dataUnit->partial_frame != 0)
     {
-        /* check for "real" late loss: a frame with higher/same timestamp was already returned to be fed into decoder */    test();
-        IF( h->firstDataUnitPopped && JB4_rtpTimeStampDiff( h->lastReturnedTs, dataUnit->timeStamp ) <= 0 )
+        /* check for "real" late loss: a frame with higher/same timestamp was already returned to be fed into decoder */
+        if( h->firstDataUnitPopped && JB4_rtpTimeStampDiff( h->lastReturnedTs, dataUnit->timeStamp ) <= 0 )
         {
             JB4_FreeDataUnit(h, dataUnit);
             return 0;
         }
 
         /* drop partial copy if the missing frame was already concealed */
-        IF( h->firstDataUnitPopped )
+        if( h->firstDataUnitPopped )
         {
-            IF( sub(dataUnit->partialCopyOffset, 3) <= 0 && JB4_rtpTimeStampDiff( h->nextExpectedTs, dataUnit->timeStamp ) < 0)
+            if( dataUnit->partialCopyOffset <= 3 && JB4_rtpTimeStampDiff( h->nextExpectedTs, dataUnit->timeStamp ) < 0)
             {
                 JB4_FreeDataUnit(h, dataUnit);
                 return 0;
             }
-            ELSE IF( sub(dataUnit->partialCopyOffset, 5) == 0 && L_add(JB4_rtpTimeStampDiff( h->nextExpectedTs, dataUnit->timeStamp ), 40) < 0)
+            else if( dataUnit->partialCopyOffset == 5 && JB4_rtpTimeStampDiff( h->nextExpectedTs, dataUnit->timeStamp ) < -40)
             {
                 JB4_FreeDataUnit(h, dataUnit);
                 return 0;
             }
-            ELSE IF( sub(dataUnit->partialCopyOffset, 7) == 0 && L_add(JB4_rtpTimeStampDiff( h->nextExpectedTs, dataUnit->timeStamp ), 80) < 0)
+            else if( dataUnit->partialCopyOffset == 7 && JB4_rtpTimeStampDiff( h->nextExpectedTs, dataUnit->timeStamp ) < -80)
             {
                 JB4_FreeDataUnit(h, dataUnit);
                 return 0;
@@ -468,46 +424,46 @@ Word16 JB4_PushDataUnit( JB4_HANDLE h, JB4_DATAUNIT_HANDLE dataUnit, Word32 rcvT
         }
 
         /* try to store partial copy - will be dropped if primary copy already available */
-        IF(JB4_INPUTBUFFER_Enque( h->inputBuffer, dataUnit, (void**)&droppedDataUnit ) == 0)
+        if(JB4_INPUTBUFFER_Enque( h->inputBuffer, dataUnit, (void**)&droppedDataUnit ) == 0)
         {
             /* partial copy is useful, consider it in long-term jitter estimation */
-            IF( sub(dataUnit->partialCopyOffset, 3) <= 0 )
+            if(dataUnit->partialCopyOffset <= 3)
             {
                 JB4_JMF_PushPacket( h->ltJmf, rcvTime, dataUnit->timeStamp );
             }
         }
-        ELSE
+        else
         {
             JB4_FreeDataUnit(h, dataUnit);
         }
-        IF(droppedDataUnit != NULL)
+        if(droppedDataUnit != NULL)
         {
             JB4_FreeDataUnit(h, droppedDataUnit);
         }
     }
-    ELSE
+    else
     {
         /* calculate jitter */
         JB4_JMF_PushPacket( h->ltJmf, rcvTime, dataUnit->timeStamp );
         JB4_estimateShortTermJitter( h, rcvTime, dataUnit->timeStamp );
-        /* check for "real" late loss: a frame with higher/same timestamp was already returned to be fed into decoder */    test();
-        IF( h->firstDataUnitPopped && JB4_rtpTimeStampDiff( h->lastReturnedTs, dataUnit->timeStamp ) <= 0 )
+        /* check for "real" late loss: a frame with higher/same timestamp was already returned to be fed into decoder */
+        if( h->firstDataUnitPopped && JB4_rtpTimeStampDiff( h->lastReturnedTs, dataUnit->timeStamp ) <= 0 )
         {
-            IF( !dataUnit->silenceIndicator )
+            if( !dataUnit->silenceIndicator )
             {
-                h->nLateLost = L_add(h->nLateLost, 1);
+                ++h->nLateLost;
                 /* deletion of a speech frame because it arrived at the JBM too late */
-                h->jitterInducedConcealments = L_add(h->jitterInducedConcealments, 1);
+                ++h->jitterInducedConcealments;
             }
             JB4_FreeDataUnit(h, dataUnit);
             return 0;
         }
         /* store data unit */
-        IF(JB4_INPUTBUFFER_Enque( h->inputBuffer, dataUnit, (void**)&droppedDataUnit ) != 0)
+        if(JB4_INPUTBUFFER_Enque( h->inputBuffer, dataUnit, (void**)&droppedDataUnit) != 0)
         {
             JB4_FreeDataUnit(h, dataUnit);
         }
-        IF(droppedDataUnit != NULL)
+        if(droppedDataUnit != NULL)
         {
             JB4_FreeDataUnit(h, droppedDataUnit);
         }
@@ -515,55 +471,58 @@ Word16 JB4_PushDataUnit( JB4_HANDLE h, JB4_DATAUNIT_HANDLE dataUnit, Word32 rcvT
     return 0;
 }
 
-Word16 JB4_PopDataUnit( JB4_HANDLE h, Word32 sysTime, Word32 extBufferedTime,
-                        JB4_DATAUNIT_HANDLE *pDataUnit, Word16 *scale, Word16 *maxScaling )
+
+
+int JB4_getFECoffset(JB4_HANDLE h)
 {
-    Word16 ret;
+    return (int)h->optimum_offset;
+}
+short JB4_FECoffset(JB4_HANDLE h)
+{
+    if ( h->netLossRate <  0.05 )
+    {
+        return (short)0;
+    }
+    else
+    {
+        return (short)1;
+    }
+}
+
+
+
+int JB4_PopDataUnit( JB4_HANDLE h, uint32_t sysTime, uint32_t extBufferedTime,
+                     JB4_DATAUNIT_HANDLE *pDataUnit, uint32_t *scale, uint32_t *maxScaling )
+{
+    int ret;
 
     assert( sysTime >= h->prevPopSysTime );
-    if( L_sub(sysTime, L_add(h->prevPopSysTime, h->frameDuration)) > 0 )
+    if( sysTime > h->prevPopSysTime + 20 )
     {
-        h->lastPlayoutOffset = rtpTs_add(h->lastPlayoutOffset, h->frameDuration);
+        h->lastPlayoutOffset += 20;
     }
     h->prevPopSysTime = sysTime;
-    move32();
+
 
     ret = JB4_adaptPlayout( h, sysTime, extBufferedTime, pDataUnit, scale, maxScaling );
+
+
     return ret;
 }
 
 /* Calculates the difference between two RTP timestamps - the diff is positive, if B 'later', negative otherwise */
-static Word32 JB4_rtpTimeStampDiff( Word32 tsA, Word32 tsB )
+static int32_t JB4_rtpTimeStampDiff( uint32_t tsA, uint32_t tsB )
 {
-    Word32 ret;
-    /* no saturation wanted! */
-    ret = rtpTs_sub(tsB, tsA);
-    assert( ret == (Word32)(tsB - tsA) );
+    int32_t ret;
+    /* do not dare to inline this function, casting to int32_t is important here! */
+    ret = (int32_t)(tsB - tsA);
     return ret;
 }
 
 /* function to get the number of data units contained in the buffer */
-Word16 JB4_bufferedDataUnits( const JB4_HANDLE h )
+unsigned int JB4_bufferedDataUnits( const JB4_HANDLE h )
 {
     return JB4_INPUTBUFFER_Size( h->inputBuffer );
-}
-
-
-Word16 JB4_getFECoffset(JB4_HANDLE h)
-{
-    return (Word16)h->optimum_offset;
-}
-
-Word16 JB4_FECoffset(JB4_HANDLE h)
-{
-    IF ( L_sub( h->netLossRate,  1634) < 0 )
-    {
-        return (Word16)0;
-    }
-    ELSE
-    {
-        return (Word16)1;
-    }
 }
 
 
@@ -573,272 +532,246 @@ Word16 JB4_FECoffset(JB4_HANDLE h)
 
 
 /* function to calculate different options for the target playout delay */
-static void JB4_targetPlayoutDelay( const JB4_HANDLE h, Word32 *targetMin,
-                                    Word32 *targetMax, Word32 *targetDtx, Word32 *targetStartUp )
+static void JB4_targetPlayoutDelay( const JB4_HANDLE h, uint32_t *targetMin,
+                                    uint32_t *targetMax, uint32_t *targetDtx, uint32_t *targetStartUp )
 {
-    Word32 ltJitter, extraDelayReserve;
+    uint32_t ltJitter, extraDelayReserve;
     /* adapt target delay to partial copy offset */
-    extraDelayReserve = L_deposit_l(0);
-    h->rfDelay = L_deposit_l(0);
-    IF(h->rfOffset7Active != 0)
+    extraDelayReserve = 0;
+    h->rfDelay = 0;
+    if(h->rfOffset7Active != 0)
     {
-        h->rfDelay = L_deposit_l(140);
+        h->rfDelay = 140;
     }
-    ELSE IF(h->rfOffset5Active != 0)
+    else if(h->rfOffset5Active != 0)
     {
-        h->rfDelay = L_deposit_l(100);
+        h->rfDelay = 100;
     }
-    ELSE IF(h->rfOffset2Active == 0 && h->rfOffset3Active == 0)
+    else if(h->rfOffset2Active == 0 && h->rfOffset3Active == 0)
     {
         /* keep some delay reserve for RF-off */
-        extraDelayReserve = L_deposit_l(15);
+        extraDelayReserve = 15;
     }
 
     /* get estimated long term jitter */
-    IF( JB4_JMF_Jitter( h->ltJmf, &ltJitter ) == 0 )
+    if( JB4_JMF_Jitter( h->ltJmf, &ltJitter ) == 0 )
     {
         /* combine long term and short term jitter to calculate target delay values */
-        *targetMax     = L_add(h->stJitter, L_add(h->safetyMargin, h->rfDelay));
-        *targetMin     = L_min(L_add(L_add(L_add(ltJitter, 20), h->rfDelay), extraDelayReserve), *targetMax );
-        *targetDtx     = L_min(L_add(ltJitter, extraDelayReserve), h->stJitter );
-        *targetStartUp = L_shr(L_add(L_add(*targetMin, *targetMax), L_shr(extraDelayReserve, 2)), 1);
+        *targetMax     = h->stJitter + h->safetyMargin + h->rfDelay;
+        *targetMin     = JB4_MIN( ltJitter + 20 + h->rfDelay + extraDelayReserve, *targetMax );
+        *targetDtx     = JB4_MIN( ltJitter + extraDelayReserve, h->stJitter );
+        *targetStartUp = ( *targetMin + *targetMax + extraDelayReserve / 4) / 2;
     }
-    ELSE
+    else
     {
         /* combine long term and short term jitter to calculate target delay values */
         *targetMax     = h->safetyMargin;
-        move32();
-        *targetMin     = L_min( 20, *targetMax );
+        *targetMin     = JB4_MIN( 20, *targetMax );
         *targetDtx     = 0;
-        move16();
-        *targetStartUp = L_shr(L_add(*targetMin, *targetMax), 1);
+        *targetStartUp = ( *targetMin + *targetMax ) / 2;
     }
-    if(L_sub(*targetStartUp, 60) < 0)
+    if(*targetStartUp < 60)
     {
         *targetStartUp = 60;
-        move32();
     }
 }
 
 /* function to do playout adaptation before playing the next data unit */
-static Word16 JB4_adaptPlayout( JB4_HANDLE h, Word32 sysTime, Word32 extBufferedTime,
-                                JB4_DATAUNIT_HANDLE *pDataUnit, Word16 *scale, Word16 *maxScaling )
+static int JB4_adaptPlayout( JB4_HANDLE h, uint32_t sysTime, uint32_t extBufferedTime,
+                             JB4_DATAUNIT_HANDLE *pDataUnit, uint32_t *scale, uint32_t *maxScaling )
 {
-    Word16 stretchTime;
-
-    /* reset scale */                                                                                 test();
-    IF( scale == NULL || maxScaling == NULL )
+    bool_t stretchTime;
+    /* reset scale */
+    if( scale == NULL || maxScaling == NULL )
     {
         return -1;
     }
     *scale = 100;
-    move16();
     *maxScaling = 0;
-    move16();
     stretchTime = false;
-    move16();
 
     /* switch type of current playout (first one, active, DTX) */
-    IF( !h->firstDataUnitPopped )
+    if( !h->firstDataUnitPopped )
     {
         JB4_adaptFirstPlayout( h, sysTime, &stretchTime );
     }
-    ELSE IF( h->lastPoppedWasSilence )
+    else if( h->lastPoppedWasSilence )
     {
         JB4_adaptDtxPlayout( h, sysTime, &stretchTime );
     }
-    ELSE
+    else
     {
         JB4_adaptActivePlayout( h, sysTime, extBufferedTime, scale, maxScaling );
     }
 
     /* time shrinking done if needed, now do time stretching or pop data unit to play */
-    IF( stretchTime )
+    if( stretchTime )
     {
         /* return empty data unit */
         *pDataUnit = NULL;
-        move16();
-
-        IF( h->firstDataUnitPopped )
+        if( h->firstDataUnitPopped )
         {
-            h->nUnavailablePopped = L_add(h->nUnavailablePopped, 1);
-            IF( !h->lastPoppedWasSilence )
+            ++h->nUnavailablePopped;
+            if( !h->lastPoppedWasSilence )
             {
-                h->nStretched = L_add(h->nStretched, 1);
+                ++h->nStretched;
                 /* jitter-induced insertion (e.g. buffer underflow) */
-                h->jitterInducedConcealments = L_add(h->jitterInducedConcealments, 1);
+                ++h->jitterInducedConcealments;
             }
         }
         /* add one frame to last playout delay */
-        h->lastPlayoutOffset = rtpTs_add(h->lastPlayoutOffset, h->frameDuration);
+        h->lastPlayoutOffset += h->frameDuration;
     }
-    ELSE
+    else
     {
         /* return next data unit from buffer */
         JB4_popFromBuffer( h, sysTime, pDataUnit );
     }
+
     return 0;
 }
 
 /* function for playout adaptation while active (no DTX) */
-static void JB4_adaptActivePlayout( JB4_HANDLE h, Word32 sysTime,
-                                    Word32 extBufferedTime, Word16 *scale, Word16 *maxScaling )
+static void JB4_adaptActivePlayout( JB4_HANDLE h, uint32_t sysTime,
+                                    uint32_t extBufferedTime, uint32_t *scale, uint32_t *maxScaling )
 {
     JB4_DATAUNIT_HANDLE nextDataUnit;
-    Word16 convertToLateLoss, dropEarly = 0;
-    Word32 targetMin, targetMax, targetDtx, targetStartUp, targetMaxStretch;
-    Word32 currPlayoutDelay, buffered;
-    Word16 gap, rate, dropGapMax, dropRateMin, dropRateMax;
-    Word32 minOffTicks, tsDiffToNextDataUnit;
-    Word32 delayWithClearedExternalBuffer;
-    Word32 tmp32;
+    bool_t convertToLateLoss, dropEarly;
+    uint32_t targetMin, targetMax, targetDtx, targetStartUp, targetMaxStretch;
+    uint32_t currPlayoutDelay, gap, buffered;
+    uint32_t dropGapMax, dropRateMin, dropRateMax, rate;
+    int32_t minOffTicks, tsDiffToNextDataUnit;
 
     JB4_targetPlayoutDelay( h, &targetMin, &targetMax, &targetDtx, &targetStartUp );
-    IF( JB4_JMF_MinOffset( h->ltJmf, &minOffTicks ) != 0 )
+    if( JB4_JMF_MinOffset( h->ltJmf, &minOffTicks ) != 0 )
     {
         return;
     }
-    h->targetPlayoutDelay = L_shr(L_add(targetMin, targetMax ), 1);
+    h->targetPlayoutDelay = ( targetMin + targetMax ) / 2;
 
     convertToLateLoss = false;
-    move16();
     dropEarly         = false;
-    move16();
     dropGapMax        = 200;
-    move16();
     dropRateMin       = 5;
-    move16();
-    dropRateMax       = 200; /* 20% */                                                                move16();
+    dropRateMax       = 200; /* 20% */
+
     /* calculate current playout delay */
-    currPlayoutDelay = rtpTs_add(rtpTs_sub(h->lastPlayoutOffset, minOffTicks), extBufferedTime);
-    /* adapt it to time stretching due to empty buffer */
-    IF( !JB4_INPUTBUFFER_IsEmpty( h->inputBuffer ) )
+    currPlayoutDelay = h->lastPlayoutOffset - minOffTicks + extBufferedTime;
+    if( !JB4_INPUTBUFFER_IsEmpty( h->inputBuffer ) )
     {
         nextDataUnit = (JB4_DATAUNIT_HANDLE)JB4_INPUTBUFFER_Front( h->inputBuffer );
         tsDiffToNextDataUnit = JB4_rtpTimeStampDiff( h->nextExpectedTs, nextDataUnit->timeStamp );
-        IF( tsDiffToNextDataUnit < 0 )
+        if( tsDiffToNextDataUnit < 0 )
         {
             convertToLateLoss = true;
-            move16();
-            {
-                /* time stretching is expected -> increase playout delay to allow dropping the late frame */
-                currPlayoutDelay = L_sub(currPlayoutDelay, tsDiffToNextDataUnit);
-                currPlayoutDelay = L_add(currPlayoutDelay, 1);
-            }
+            /* time stretching is expected -> increase playout delay to allow dropping the late frame */
+            currPlayoutDelay -= tsDiffToNextDataUnit;
+            currPlayoutDelay += 1;
         }
     }
 
     /*  decided between shrinking/stretching */
-    IF( L_sub(currPlayoutDelay, targetMax) > 0 )   /* time shrinking */
+    if( currPlayoutDelay > targetMax )   /* time shrinking */
     {
-        gap = extract_l(L_sub(currPlayoutDelay, h->targetPlayoutDelay));
+        gap = currPlayoutDelay - h->targetPlayoutDelay;
         /* check if gap is positive and dropping is allowed
-         * and buffer contains enough time (ignoring one frame) */                                      test();
-        test();
-        test();
-        IF( gap > 0 &&
-            JB4_inspectBufferForDropping( h, &dropEarly, &buffered ) == 0 &&
-            ( convertToLateLoss ||
-              L_sub(L_add(L_add(buffered, h->frameDuration), extBufferedTime), targetMax) > 0 ) )
+         * and buffer contains enough time (ignoring one frame) */
+        if( gap > 0 &&
+                JB4_inspectBufferForDropping( h, &dropEarly, &buffered ) == 0 &&
+                ( convertToLateLoss ||
+                  ( buffered + h->frameDuration + extBufferedTime ) > targetMax ) )
         {
-            IF( convertToLateLoss )
-            {
-                JB4_dropFromBuffer( h, sysTime );
-                h->nLostOrStretched = L_add(h->nLostOrStretched, 1);
-            }
-            ELSE IF( dropEarly )
+            if( convertToLateLoss )
             {
                 JB4_dropFromBuffer( h, sysTime );
             }
-            ELSE
+            else if( dropEarly )
+            {
+                JB4_dropFromBuffer( h, sysTime );
+                ++h->nLostOrStretched;
+            }
+            else
             {
                 /* limit gap to [gapMin,gapMax] and calculate current drop rate from gap */
-                tmp32 = L_mult0(s_min(gap, dropGapMax), sub(dropRateMax, dropRateMin));
-                assert( tmp32 == s_min(gap, dropGapMax) * ( dropRateMax - dropRateMin ));
-                rate = idiv3216(tmp32, dropGapMax);
-                assert( rate == tmp32 / dropGapMax );
-                rate = add(rate, dropRateMin);
-                *scale = idiv1616U(sub(1000, rate), 10);
-                assert( *scale == (1000 - rate) / 10 );
-                *maxScaling = extract_l(L_sub(currPlayoutDelay, targetMax));
+                rate = JB4_MIN( (uint32_t)(gap), dropGapMax ) *
+                       ( dropRateMax - dropRateMin ) / dropGapMax + dropRateMin;
+                *scale = ( 1000 - rate ) / 10;
+                *maxScaling = currPlayoutDelay - targetMax;
             }
         }
     }
-    ELSE   /* time stretching */
+    else   /* time stretching */
     {
+        uint32_t delayWithClearedExternalBuffer;
         /* Stretching only makes sense if we win one additional frame in the input buffer.
          * If too much additional delay would be required to do so, then do not scale.
          * Also make sure that the delay doesn't increase too much. */
-        delayWithClearedExternalBuffer = L_add(L_sub(currPlayoutDelay, extBufferedTime), h->frameDuration);
-        targetMaxStretch = L_sub(targetMax, h->frameDuration);
-        IF( L_sub(L_add(delayWithClearedExternalBuffer, h->frameDuration), targetMaxStretch) <= 0 &&
-        L_sub(currPlayoutDelay, targetMaxStretch) < 0 && L_sub(currPlayoutDelay, L_add(110, L_shr(h->rfDelay, 2))) < 0)
+        delayWithClearedExternalBuffer = currPlayoutDelay - extBufferedTime + h->frameDuration;
+        targetMaxStretch = targetMax - h->frameDuration;
+        if( delayWithClearedExternalBuffer + h->frameDuration <= targetMaxStretch &&
+                currPlayoutDelay < targetMaxStretch && currPlayoutDelay < (uint32_t)(110 + h->rfDelay / 4))
         {
             *scale = 120;
-            move16();
-            *maxScaling = extract_l(L_sub(targetMaxStretch, currPlayoutDelay));
+            *maxScaling = targetMaxStretch - currPlayoutDelay;
         }
     }
 
 }
 
 /* function for playout adaptation while DTX */
-static void JB4_adaptDtxPlayout( JB4_HANDLE h, Word32 sysTime, Word16 *stretchTime )
+static void JB4_adaptDtxPlayout( JB4_HANDLE h, uint32_t sysTime, bool_t *stretchTime )
 {
     JB4_DATAUNIT_HANDLE firstDu;
-    Word32 targetMin, targetMax, targetDtx, targetStartUp;
-    Word32 currPlayoutDelay, headRoom;
-    Word32 minOffTicks, tsDiffToNextDataUnit;
-
+    uint32_t firstTs;
+    uint32_t targetMin, targetMax, targetDtx, targetStartUp;
+    uint32_t currPlayoutDelay, headRoom;
+    int32_t minOffTicks, tsDiffToNextDataUnit;
 
     JB4_targetPlayoutDelay( h, &targetMin, &targetMax, &targetDtx, &targetStartUp );
-    IF( JB4_JMF_MinOffset( h->ltJmf, &minOffTicks ) != 0 )
+    if( JB4_JMF_MinOffset( h->ltJmf, &minOffTicks ) != 0 )
     {
         return;
     }
 
     /* calculate current playout delay */
-    assert( rtpTs_sub(h->lastPlayoutOffset, minOffTicks) == h->lastPlayoutOffset - minOffTicks );
-    currPlayoutDelay = rtpTs_sub(h->lastPlayoutOffset, minOffTicks);
+    currPlayoutDelay = h->lastPlayoutOffset - minOffTicks;
 
     /* check for startup after DTX */
-    IF( !JB4_INPUTBUFFER_IsEmpty( h->inputBuffer ) )
+    if( !JB4_INPUTBUFFER_IsEmpty( h->inputBuffer ) )
     {
         firstDu = (JB4_DATAUNIT_HANDLE)JB4_INPUTBUFFER_Front( h->inputBuffer );
+        firstTs = firstDu->timeStamp;
 
-        tsDiffToNextDataUnit = JB4_rtpTimeStampDiff( h->nextExpectedTs, firstDu->timeStamp );
+        tsDiffToNextDataUnit = JB4_rtpTimeStampDiff( h->nextExpectedTs, firstTs );
         /* check if the next available data unit should already be used (time stamp order) */
         if( tsDiffToNextDataUnit > 0 )
         {
             /* time stretching is expected -> increase playout delay */
-            currPlayoutDelay = L_add(currPlayoutDelay, tsDiffToNextDataUnit);
+            currPlayoutDelay += tsDiffToNextDataUnit;
         }
-
-        IF( !firstDu->silenceIndicator )
+        if( !firstDu->silenceIndicator )
         {
             /* recalculate playout delay based on first buffered data unit */
-            JB4_playoutDelay( h, sysTime, firstDu->timeStamp, &currPlayoutDelay );
+            JB4_playoutDelay( h, sysTime, firstTs, &currPlayoutDelay );
             /* check if the next available data unit should already be used (time stamp order) */
             if( tsDiffToNextDataUnit > 0 )
             {
                 /* time stretching is expected -> increase playout delay */
-                currPlayoutDelay = L_add(currPlayoutDelay, tsDiffToNextDataUnit);
+                currPlayoutDelay += tsDiffToNextDataUnit;
             }
             h->targetPlayoutDelay = targetStartUp;
-            move32();
-            headRoom = L_deposit_l(12); /* 600 * 20 (h->frameDuration) / 1000 */
+            headRoom = 600 * h->frameDuration / 1000;
             /*  decided between shrinking/stretching */
-            IF( L_sub(currPlayoutDelay, L_add(targetStartUp, headRoom)) > 0)   /* time shrinking */
+            if( currPlayoutDelay > targetStartUp + headRoom )   /* time shrinking */
             {
-                IF( JB4_checkDtxDropping( h ) )
+                if( JB4_checkDtxDropping( h ) )
                 {
                     JB4_dropFromBuffer( h, sysTime );
                 }
             }
-            ELSE IF( L_sub(L_add(currPlayoutDelay, headRoom), targetStartUp) < 0 )   /* time stretching */
+            else if( currPlayoutDelay + headRoom < targetStartUp )   /* time stretching */
             {
                 *stretchTime = true;
-                move16();
             }
             return;
         }
@@ -846,201 +779,196 @@ static void JB4_adaptDtxPlayout( JB4_HANDLE h, Word32 sysTime, Word16 *stretchTi
 
     /* adapt while DTX */
     h->targetPlayoutDelay = targetDtx;
-    move32();
 
     /*  decided between shrinking/stretching */
-    IF( L_sub(currPlayoutDelay, L_add(targetDtx, h->frameDuration)) >= 0 )   /* time shrinking */
+    if( currPlayoutDelay >= targetDtx + h->frameDuration )   /* time shrinking */
     {
-        IF( JB4_checkDtxDropping( h ) )
+        if( JB4_checkDtxDropping( h ) )
         {
             JB4_dropFromBuffer( h, sysTime );
         }
     }
-    ELSE IF( L_sub(L_add(currPlayoutDelay, L_shr(h->frameDuration, 1)), targetDtx) < 0 )   /* time stretching */
+    else if( currPlayoutDelay + 500 * h->frameDuration / 1000 < targetDtx )   /* time stretching */
     {
         *stretchTime = true;
-        move16();
     }
+
 }
 
 /* function to do playout adaptation before playing the first data unit */
-static void JB4_adaptFirstPlayout( JB4_HANDLE h, Word32 sysTime, Word16 *prebuffer )
+static void JB4_adaptFirstPlayout( JB4_HANDLE h, uint32_t sysTime, bool_t *prebuffer )
 {
-    Word32 currPlayoutDelay;
+    uint32_t currPlayoutDelay;
     JB4_DATAUNIT_HANDLE firstDu;
-    Word32 targetMin, targetMax, targetDtx, targetStartUp;
-
-    /* get target delay */
-    IF( JB4_INPUTBUFFER_IsEmpty( h->inputBuffer ) )
+    uint32_t targetMin, targetMax, targetDtx, targetStartUp;
+    if( JB4_INPUTBUFFER_IsEmpty( h->inputBuffer ) )
     {
         *prebuffer = true;
-        move16();
         return;
     }
     JB4_targetPlayoutDelay( h, &targetMin, &targetMax, &targetDtx, &targetStartUp );
-
-    IF(L_sub(targetStartUp, h->frameDuration) < 0)
+    if(targetStartUp < h->frameDuration)
     {
         return;
     }
     /* calculate delay if first data unit would be played now */
     firstDu = (JB4_DATAUNIT_HANDLE)JB4_INPUTBUFFER_Front( h->inputBuffer );
-
-    IF( JB4_playoutDelay( h, sysTime, firstDu->timeStamp, &currPlayoutDelay ) != 0 )
+    if( JB4_playoutDelay( h, sysTime, firstDu->timeStamp, &currPlayoutDelay ) != 0 )
     {
         *prebuffer = true;
-        move16();
         return;
     }
-
-    IF( L_sub(L_add(currPlayoutDelay, L_shr(h->frameDuration, 1)), targetStartUp) < 0 )   /* time stretching */
+    if( currPlayoutDelay + h->frameDuration / 2 < targetStartUp )   /* time stretching */
     {
         *prebuffer = true;
-        move16();
     }
-    ELSE    /* no adaptation, start playout */
+    else   /* no adaptation, start playout */
     {
         *prebuffer = false;
-        move16();
     }
 }
 
 /* function to look into the buffer and check if it makes sense to drop a data unit */
-static Word16 JB4_inspectBufferForDropping( const JB4_HANDLE h, Word16 *dropEarly, Word32 *buffered )
+static int JB4_inspectBufferForDropping( const JB4_HANDLE h, bool_t *dropEarly, uint32_t *buffered )
 {
-    Word16 inputBufferSize;
-    Word32 tsDiff, bufferedTs, endTs;
+    unsigned int inputBufferSize;
+    int16_t seqNrDiff;
+    int32_t bufferedTs;
+    uint32_t firstTs;
+    uint64_t beginTs, endTs;
     JB4_DATAUNIT_HANDLE firstDu, secondDu, lastDu;
 
     assert( !h->lastPoppedWasSilence );
     *dropEarly   = false;
-    move16();
-    *buffered    = L_deposit_l(0);
+    *buffered    = 0;
     inputBufferSize = JB4_INPUTBUFFER_Size( h->inputBuffer );
-
-    IF( inputBufferSize == 0 )
+    if( inputBufferSize == 0U )
     {
         return -1;
     }
 
     firstDu = (JB4_DATAUNIT_HANDLE)JB4_INPUTBUFFER_Front( h->inputBuffer );
-    tsDiff = L_deposit_l(0);
-    /* check for loss: timestamp diff is exactly 0 in the valid case */
-    IF( h->firstDataUnitPopped )
+    firstTs = firstDu->timeStamp;
+    /* check for loss: sequence number diff is exactly 0 in the valid case */
+    if( h->firstDataUnitPopped )
     {
-        tsDiff = JB4_rtpTimeStampDiff( h->nextExpectedTs, firstDu->timeStamp );
+        seqNrDiff = JB4_rtpTimeStampDiff( h->nextExpectedTs, firstTs ) /
+                    (int32_t)(h->frameDuration);
     }
-
-    IF( tsDiff <= 0 )
+    else
+    {
+        seqNrDiff = 0;
+    }
+    if( seqNrDiff <= 0 )
     {
         /* preview data unit to play after dropping */
-        IF( sub(inputBufferSize, 1) <= 0 )
+        if( inputBufferSize <= 1U )
         {
             /* data unit to play missing, avoid drop followed by concealment */
             return -1;
         }
         secondDu = (JB4_DATAUNIT_HANDLE)JB4_INPUTBUFFER_Element( h->inputBuffer, 1 );
-
-        IF( rtpTs_sub(rtpTs_add(firstDu->timeStamp, h->frameDuration), secondDu->timeStamp) != 0 )
+        if( firstTs + h->frameDuration != secondDu->timeStamp )
         {
             /* data unit to play is not available, avoid drop followed by concealment */
             return -1;
         }
         /* calculate buffered time span */
-        bufferedTs = L_deposit_l(0);
+        bufferedTs = 0;
     }
-    ELSE IF( rtpTs_sub(tsDiff, L_mult0(2, extract_l(h->frameDuration))) == 0 )
+    else if( seqNrDiff == 2 )
     {
         /* data unit to play is not available, avoid dropping followed by concealment */
         return -1;
     }
-    ELSE   /* seqNoDiff == 1 || seqNoDiff > 2 */
+    else   /* seqNoDiff == 1 || seqNoDiff > 2 */
     {
         /* first data unit is not available -> drop it early to avoid concealment
          * This is very aggressive: ignores the maximum drop rate (50% drop and 50% concealment for adjacent lost),
          * but on the other hand, dropping sounds better than concealment. */
         *dropEarly = true;
-        move16();
         /* data unit to drop (first one) is lost */
-        bufferedTs = L_deposit_l(0);
+        bufferedTs = 0;
     }
 
     /* add time stamp difference of last and first actually buffered data unit */
-    IF( sub(inputBufferSize, 1) == 0 )
+    if( inputBufferSize == 1U )
     {
-        bufferedTs = rtpTs_add(bufferedTs, h->frameDuration);
+        bufferedTs += h->frameDuration;
     }
-    ELSE
+    else
     {
         lastDu = (JB4_DATAUNIT_HANDLE)JB4_INPUTBUFFER_Back( h->inputBuffer );
-        endTs  = rtpTs_add(lastDu->timeStamp, h->frameDuration);
+        beginTs = firstTs;
+        endTs   = lastDu->timeStamp + h->frameDuration;
         /* check for RTP time stamp wrap around */
-        /* check if sign changes from negative to positive */                                           test();
-        IF( L_and(firstDu->timeStamp, 0x80000000) != 0 &&
-        L_and(endTs, 0x80000000) == 0 )
+        if( endTs < beginTs )
         {
-            endTs = rtpTs_add(endTs, 0xFFFFFFFF);
+            endTs = endTs + 0xFFFFFFFF;
         }
-        bufferedTs = rtpTs_add(bufferedTs, rtpTs_sub(endTs, firstDu->timeStamp));
+        bufferedTs += (int32_t)(endTs - beginTs);
     }
 
     /* the result should not be negative */
-    IF( bufferedTs < 0 )
+    if( bufferedTs < 0 )
     {
         return -1;
     }
     *buffered = bufferedTs;
-    move32();
+
     return 0;
 }
 
 /* function to look into the buffer and check if it makes sense to drop a data unit */
-static Word16 JB4_checkDtxDropping( const JB4_HANDLE h )
+static int JB4_checkDtxDropping( const JB4_HANDLE h )
 {
-    Word16 inputBufferSize;
+    unsigned int inputBufferSize;
+    int16_t seqNrDiff;
     JB4_DATAUNIT_HANDLE firstDu;
-    Word16 droppingAllowed;
+    int droppingAllowed;
+
 
     assert( h->firstDataUnitPopped );
     assert( h->lastPoppedWasSilence );
     droppingAllowed = 1;
-    move16();
     inputBufferSize = JB4_INPUTBUFFER_Size( h->inputBuffer );
-
-    IF( inputBufferSize > 0 )
+    if( inputBufferSize > 0U )
     {
         firstDu = (JB4_DATAUNIT_HANDLE)JB4_INPUTBUFFER_Front( h->inputBuffer );
-        /* check for loss */
-        if( JB4_rtpTimeStampDiff( h->nextExpectedTs, firstDu->timeStamp ) <= 0 )
+        /* check for loss: sequence number diff is exactly 0 in the valid case */
+        seqNrDiff = JB4_rtpTimeStampDiff( h->nextExpectedTs, firstDu->timeStamp ) /
+                    (int32_t)(h->frameDuration);
+        if( seqNrDiff <= 0 )
         {
             /* no not drop first active frame */
             droppingAllowed = 0;
-            move16();
         }
     }
-    /* else: buffer empty, allow dropping FRAME_NO_DATA */
+    /* else: buffer empty, allow dropping FRAME__NO_DATA */
+
     return droppingAllowed;
 }
 
 /* function to estimate the short term jitter */
-static void JB4_estimateShortTermJitter( JB4_HANDLE h, Word32 rcvTime, Word32 rtpTimeStamp )
+static void JB4_estimateShortTermJitter( JB4_HANDLE h, uint32_t rcvTime, uint32_t rtpTimeStamp )
 {
-    Word32 stOffset, ltOffset, duration, maxDuration;
-    Word32 jitter, minTime, maxTime;
+    uint32_t jitter, duration, maxDuration;
+    int32_t minTime, maxTime;
     JB4_CIRCULARBUFFER_ELEMENT maxElement, dequedElement;
 
-    jitter = L_deposit_l(0);
+
+    jitter = 0;
     JB4_JMF_PushPacket( h->stJmf, rcvTime, rtpTimeStamp );
     /* save delta delay */
-    IF( JB4_JMF_Jitter( h->stJmf, &jitter ) == 0 )
+    if( JB4_JMF_Jitter( h->stJmf, &jitter ) == 0 )
     {
         /* compensate difference between both offsets */
+        int32_t stOffset, ltOffset;
         JB4_JMF_MinOffset( h->stJmf, &stOffset );
         JB4_JMF_MinOffset( h->ltJmf, &ltOffset );
-        jitter = L_add(jitter, L_sub(stOffset, ltOffset));
-        assert( jitter >= 0 );
-
-        IF( JB4_CIRCULARBUFFER_IsFull( h->stJitterFifo ) )
+        jitter += stOffset - ltOffset;
+        assert( (int)jitter >= 0 );
+        if( JB4_CIRCULARBUFFER_IsFull( h->stJitterFifo ) )
         {
             JB4_CIRCULARBUFFER_Deque( h->stJitterFifo, &dequedElement );
             JB4_CIRCULARBUFFER_Deque( h->stTimeStampFifo, &dequedElement );
@@ -1051,69 +979,72 @@ static void JB4_estimateShortTermJitter( JB4_HANDLE h, Word32 rcvTime, Word32 rt
         /* check for duration and discard first entries if too long */
         minTime = JB4_CIRCULARBUFFER_Front( h->stTimeStampFifo );
         maxTime = JB4_CIRCULARBUFFER_Back( h->stTimeStampFifo );
-
-        duration = rtpTs_sub(maxTime, minTime);
-        IF( duration > 0 )
+        if( maxTime > minTime )
         {
-            maxDuration = L_mult0(4, h->timeScale);
-            WHILE( rtpTs_sub(duration, maxDuration) > 0 )
+            duration = maxTime - minTime;
+            maxDuration = 4 * h->timeScale;
+            while( duration > maxDuration )
             {
                 JB4_CIRCULARBUFFER_Deque( h->stJitterFifo, &dequedElement );
                 JB4_CIRCULARBUFFER_Deque( h->stTimeStampFifo, &dequedElement );
                 minTime = JB4_CIRCULARBUFFER_Front( h->stTimeStampFifo );
-                duration = rtpTs_sub(maxTime, minTime);
-                IF( duration <= 0)
+                if( maxTime <= minTime )
                 {
-                    BREAK;
+                    break;
                 }
+                duration = maxTime - minTime;
             }
         }
     }
 
     /* update h->stJitter */
-    IF( !JB4_CIRCULARBUFFER_IsEmpty( h->stJitterFifo ) )
+    if( !JB4_CIRCULARBUFFER_IsEmpty( h->stJitterFifo ) )
     {
         JB4_CIRCULARBUFFER_Max( h->stJitterFifo, &maxElement );
         /* round up to full frame duration */
-        h->stJitter = L_add(maxElement, L_sub(h->frameDuration, 1));
-        h->stJitter = L_mult0(idiv1616(extract_l(h->stJitter), extract_l(h->frameDuration)), extract_l(h->frameDuration));
+        h->stJitter = (uint32_t)ceil( (double)( maxElement ) / h->frameDuration ) *
+                      h->frameDuration;
     }
+
 }
 
 /* function to pop a data unit from the buffer */
-static void JB4_popFromBuffer( JB4_HANDLE h, Word32 sysTime, JB4_DATAUNIT_HANDLE *pDataUnit )
+static void JB4_popFromBuffer( JB4_HANDLE h, uint32_t sysTime, JB4_DATAUNIT_HANDLE *pDataUnit )
 {
     JB4_DATAUNIT_HANDLE nextDataUnit;
-    Word32 nStretched, tsDiff;
+    uint32_t nStretched;
+    int32_t  tsDiff;
 
     JB4_DATAUNIT_HANDLE tempDataUnit;
-    Word32 readlen ;
-    Word16 i;
-    Word32 frameoffset;
-    Word32 maxval, lost, total_rec ;
+    unsigned int readlen ;
+    unsigned short i;
+    int frameoffset;
+    unsigned int maxval;
+
+    Word32 lost, total_rec ;
 
 
 
     JB4_DATAUNIT_HANDLE partialCopyDu;
-    Word16 searchpos, endpos;
+    unsigned int searchpos, endpos;
+
 
     /* check if a data unit is available */
-    IF( JB4_INPUTBUFFER_IsEmpty( h->inputBuffer ) )
+    if( JB4_INPUTBUFFER_IsEmpty( h->inputBuffer ) )
     {
         /* no data unit available */
         *pDataUnit = NULL;
-        move16();
-        h->nextExpectedTs = rtpTs_add(h->nextExpectedTs, h->frameDuration);
+        h->nextExpectedTs += h->frameDuration;
+        if( h->lastPoppedWasSilence )
+        {
+            ++h->nComfortNoice;
+        }
+        else
+        {
+            ++h->nUnavailablePopped;
+            ++h->nLostOrStretched;
+        }
 
-        IF( h->lastPoppedWasSilence )
-        {
-            h->nComfortNoice = L_add(h->nComfortNoice, 1);
-        }
-        ELSE
-        {
-            h->nUnavailablePopped = L_add(h->nUnavailablePopped, 1);
-            h->nLostOrStretched   = L_add(h->nLostOrStretched, 1);
-        }
         return;
     }
 
@@ -1121,201 +1052,174 @@ static void JB4_popFromBuffer( JB4_HANDLE h, Word32 sysTime, JB4_DATAUNIT_HANDLE
     nextDataUnit = (JB4_DATAUNIT_HANDLE)JB4_INPUTBUFFER_Front( h->inputBuffer );
 
     /* check if this is the first data unit */
-    IF( !h->firstDataUnitPopped )
+    if( !h->firstDataUnitPopped )
     {
         h->firstDataUnitPopped = true;
-        move16();
         /* adjust sequence numbers to avoid handling first packet as loss */
         h->nextExpectedTs = nextDataUnit->timeStamp;
-        move32();
     }
 
     /* check if the next available data unit should already be used (time stamp order) */
     tsDiff = JB4_rtpTimeStampDiff( nextDataUnit->timeStamp, h->nextExpectedTs );
 
     h->totWin += 1;
-    move16();
-    test();
-    IF ( ( L_sub(h->totWin , 3000) > 0) || ( L_sub( h->FecOffWinLen , 100) >0 ) )
+    if ( ( h->totWin > 3000) || ( h->FecOffWinLen > 100 ) )
     {
         maxval = h->FecOffWin[1];
-        move16();
         h->optimum_offset = 1;
-        move16();
-        FOR( i = 2; i < MAXOFFSET ; i++ )
+        for( i = 2; i < MAXOFFSET ; i++ )
         {
-            IF ( L_sub( h->FecOffWin[i], maxval ) > 0 )
+            if ( h->FecOffWin[i] > maxval )
             {
                 maxval = h->FecOffWin[i] ;
-                move16();
                 h->optimum_offset = i ;
-                move16();
             }
             h->FecOffWin[i] = 0;
-            move16();
         }
         h->FecOffWin[0] = 0;
-        move16();
         h->FecOffWin[1] = 0;
-        move16();
         h->totWin = 0;
-        move16();
         h->FecOffWinLen = 0;
-        move16();
 
-        lost = L_sub( L_add(h->nLost, h->nPartialCopiesUsed), h->last_nLost );
-        total_rec = L_sub( L_add(h->nAvailablePopped , h->nUnavailablePopped), h->last_ntot );
 
-        IF ( lost != 0 && total_rec != 0 )
+        lost =h->nLost+ h->nPartialCopiesUsed - h->last_nLost ;
+        total_rec =  h->nAvailablePopped + h->nUnavailablePopped - h->last_ntot ;
+
+        if ( lost != 0 && total_rec != 0 )
         {
-            h->netLossRate =  divide3232( lost , total_rec );
+            h->netLossRate = (float)lost/(float)total_rec;
         }
-        ELSE
+        else
         {
-            h->netLossRate = 0;
+            h->netLossRate = 0.0f;
         }
         h->last_nLost = L_add(h->nLost, h->nPartialCopiesUsed);
         h->last_ntot = L_add(h->nAvailablePopped , h->nUnavailablePopped);
+
     }
 
-
-
-    IF( tsDiff < 0 )
+    if( tsDiff < 0 )
     {
-
-
         readlen = JB4_INPUTBUFFER_Size( h->inputBuffer );
-        move16();
-        FOR ( i=0; i < readlen; i++)
+        for ( i=0; i < readlen; i++)
         {
             tempDataUnit = (JB4_DATAUNIT_HANDLE)JB4_INPUTBUFFER_Element( h->inputBuffer, i );
-
-            test();
-            IF ( tempDataUnit->partial_frame == 0 && h->lastPoppedWasSilence == 0 )
+            if ( ! tempDataUnit->partial_frame && !h->lastPoppedWasSilence )
             {
-                frameoffset = Mult_32_16(JB4_rtpTimeStampDiff(  h->nextExpectedTs, tempDataUnit->timeStamp ), 1639 ) ; /* divide by 20 */
-                test();
-                IF ( frameoffset > 0  && (L_sub( frameoffset, MAXOFFSET) < 0) )
+                frameoffset = JB4_rtpTimeStampDiff(  h->nextExpectedTs, tempDataUnit->timeStamp )/20 ;
+
+                if ( frameoffset > 0  && frameoffset < MAXOFFSET )
                 {
-                    h->FecOffWin[frameoffset] = L_add(h->FecOffWin[frameoffset], 1);
+                    h->FecOffWin[frameoffset] += 1;
                 }
             }
         }
-
-        h->FecOffWinLen = L_add (h->FecOffWinLen, 1);
-
+        h->FecOffWinLen += 1;
 
         /* next expected data unit is missing
-         * -> conceal network loss, do time stretching or create comfort noice */
+         * -> conceal network loss, do time stretching or create comfort noise */
         *pDataUnit = NULL;
 
         /* update statistics */
-        h->nextExpectedTs = rtpTs_add(h->nextExpectedTs, h->frameDuration);
-
-        IF( h->lastPoppedWasSilence )
+        h->nextExpectedTs += h->frameDuration;
+        if( h->lastPoppedWasSilence )
         {
-            h->nComfortNoice = L_add(h->nComfortNoice, 1);
+            ++h->nComfortNoice;
         }
-        ELSE
+        else
         {
-            h->nUnavailablePopped = L_add(h->nUnavailablePopped, 1);
-            h->nLostOrStretched   = L_add(h->nLostOrStretched, 1);
+            ++h->nUnavailablePopped;
+            ++h->nLostOrStretched;
         }
         return;
     }
 
     /* fetch the next data unit from buffer */
     *pDataUnit = nextDataUnit;
-    move16();
     nextDataUnit->nextCoderType = INACTIVE;
-    IF( sub(h->pre_partial_frame,1) == 0 || sub(nextDataUnit->partial_frame,1) == 0 )
+    if ( h->pre_partial_frame || nextDataUnit->partial_frame )
     {
-        IF( nextDataUnit->partial_frame )
+        if ( nextDataUnit->partial_frame )
         {
             h->pre_partial_frame = 1;
         }
-        ELSE IF( h->pre_partial_frame )
+        else if ( h->pre_partial_frame )
         {
             h->pre_partial_frame = 0;
         }
 
         endpos = JB4_INPUTBUFFER_Size(h->inputBuffer);
-        FOR(searchpos = 0; searchpos < endpos; searchpos++)
+        for(searchpos = 0; searchpos < endpos; searchpos++)
         {
             partialCopyDu = (JB4_DATAUNIT_HANDLE)JB4_INPUTBUFFER_Element(h->inputBuffer, searchpos);
-            IF ( L_sub(partialCopyDu->timeStamp,L_add(nextDataUnit->timeStamp,partialCopyDu->duration)) == 0)
+            if ( partialCopyDu->timeStamp == nextDataUnit->timeStamp + partialCopyDu->duration )
             {
-                get_NextCoderType_fx( partialCopyDu->data, &nextDataUnit->nextCoderType);
+                get_NextCoderType( partialCopyDu->data, &nextDataUnit->nextCoderType);
                 break;
             }
         }
     }
     JB4_INPUTBUFFER_Deque( h->inputBuffer, (void**)pDataUnit );
 
-
-    IF ( sub(nextDataUnit->partial_frame,1) == 0 )
+    if ( nextDataUnit->partial_frame )
     {
+        h->nPartialCopiesUsed += 1;
 
-        h->nPartialCopiesUsed = L_add(h->nPartialCopiesUsed, 1);
         readlen = JB4_INPUTBUFFER_Size( h->inputBuffer );
-        move16();
-        FOR ( i=0; i < readlen; i++)
+        for ( i=0; i < readlen; i++)
         {
             tempDataUnit = (JB4_DATAUNIT_HANDLE)JB4_INPUTBUFFER_Element( h->inputBuffer, i );
-            test();
-            IF ( tempDataUnit->partial_frame == 0 && h->lastPoppedWasSilence == 0 )
+            if ( ! tempDataUnit->partial_frame && !h->lastPoppedWasSilence )
             {
-                frameoffset = Mult_32_16(JB4_rtpTimeStampDiff(  h->nextExpectedTs, tempDataUnit->timeStamp ), 1639 ) ;
-                test();
-                IF ( frameoffset > 0  && (L_sub( frameoffset, MAXOFFSET) < 0) )
+                frameoffset = JB4_rtpTimeStampDiff(  h->nextExpectedTs, tempDataUnit->timeStamp )/20 ;
+
+                if ( frameoffset > 0  && frameoffset < MAXOFFSET )
                 {
-                    h->FecOffWin[frameoffset] = L_add(h->FecOffWin[frameoffset], 1);
+                    h->FecOffWin[frameoffset] += 1;
                 }
             }
         }
-
-        h->FecOffWinLen = L_add (h->FecOffWinLen, 1);
+        h->FecOffWinLen += 1;
     }
 
-
-
-
     /* update statistics */
-    IF( h->nLostOrStretched != 0U )
+    if( h->nLostOrStretched != 0U )
     {
         assert( h->lastPoppedWasSilence == false );
         /* separate concealments since last available pop in lost and stretched */
-        nStretched = idiv3216(tsDiff, extract_l(h->frameDuration));
-        assert( nStretched == tsDiff / h->frameDuration );
+        nStretched = tsDiff / h->frameDuration;
         assert( h->nLostOrStretched >= nStretched );
-        h->nLost = L_add(h->nLost, L_sub(h->nLostOrStretched, nStretched));
+        h->nLost                     += h->nLostOrStretched - nStretched;
         /* jitter-induced insertion (e.g. buffer underflow) */
-        h->jitterInducedConcealments = L_add(h->jitterInducedConcealments, nStretched);
-        h->nStretched = L_add(h->nStretched, nStretched);
-        h->nLostOrStretched = L_deposit_l(0);
+        h->jitterInducedConcealments += nStretched;
+        h->nStretched += nStretched;
+        h->nLostOrStretched = 0;
     }
     h->lastReturnedTs        = nextDataUnit->timeStamp;
-    move32();
     JB4_updateLastTimingMembers( h, sysTime, nextDataUnit->timeStamp );
-    h->nextExpectedTs        = rtpTs_add(nextDataUnit->timeStamp, h->frameDuration);
-
+    h->nextExpectedTs        = nextDataUnit->timeStamp + h->frameDuration;
     if( nextDataUnit->silenceIndicator )
-        h->nComfortNoice = L_add(h->nComfortNoice, 1);
-    if( !nextDataUnit->silenceIndicator )
-        h->nAvailablePopped = L_add(h->nAvailablePopped, 1);
-    h->lastPoppedWasSilence = nextDataUnit->silenceIndicator;
-    move16();
+    {
+        h->lastPoppedWasSilence = true;
+        ++h->nComfortNoice;
+    }
+    else
+    {
+        h->lastPoppedWasSilence = false;
+        ++h->nAvailablePopped;
+    }
 }
 
 /* function to drop a data unit from the buffer - updates nShrinked */
-static void JB4_dropFromBuffer( JB4_HANDLE h, Word32 sysTime )
+static void JB4_dropFromBuffer( JB4_HANDLE h, uint32_t sysTime )
 {
     JB4_DATAUNIT_HANDLE nextDataUnit, dataUnit;
-    Word32 tsDiff, nStretched;
+    int32_t  tsDiff;
+    uint32_t nStretched;
     (void)sysTime;
 
     /* check if a data unit is available */
-    IF( JB4_INPUTBUFFER_IsEmpty( h->inputBuffer ) )
+    if( JB4_INPUTBUFFER_IsEmpty( h->inputBuffer ) )
     {
         return;
     }
@@ -1323,37 +1227,32 @@ static void JB4_dropFromBuffer( JB4_HANDLE h, Word32 sysTime )
     nextDataUnit = (JB4_DATAUNIT_HANDLE)JB4_INPUTBUFFER_Front( h->inputBuffer );
 
     /* check if this is the first data unit */
-    IF( !h->firstDataUnitPopped )
+    if( !h->firstDataUnitPopped )
     {
         h->firstDataUnitPopped = true;
-        move16();
         /* adjust sequence numbers to avoid handling first packet as loss */
         h->nextExpectedTs = nextDataUnit->timeStamp;
-        move32();
     }
 
     /* check if the next available data unit should already be used (time stamp order) */
     tsDiff = JB4_rtpTimeStampDiff( nextDataUnit->timeStamp, h->nextExpectedTs );
-
-    IF( tsDiff < 0 )
+    if( tsDiff < 0 )
     {
         /* next expected data unit is missing, remember this data unit as popped,
          * but do not count it as lost, because it will not be concealed */
-        h->nextExpectedTs = rtpTs_add(h->nextExpectedTs, h->frameDuration);
+        h->nextExpectedTs += h->frameDuration;
         /* substract one frame from last playout delay */
-        h->lastPlayoutOffset = rtpTs_sub(h->lastPlayoutOffset, h->frameDuration);
-
-        IF( !h->lastPoppedWasSilence )
+        h->lastPlayoutOffset -= h->frameDuration;
+        if( !h->lastPoppedWasSilence )
         {
-            h->nShrinked = L_add(h->nShrinked, 1);
+            ++h->nShrinked;
             /* modification of the output timeline due to link loss */
-            h->nUnavailablePopped = L_add(h->nUnavailablePopped, 1);
-            h->nLostOrStretched = L_add(h->nLostOrStretched, 1);
+            ++h->nUnavailablePopped;
+            ++h->nLostOrStretched;
         }
-
-        if( h->lastTargetTime != 0 )
+        if( h->lastTargetTime != 0U )
         {
-            h->lastTargetTime = L_add(h->lastTargetTime, h->frameDuration);
+            h->lastTargetTime += h->frameDuration;
         }
         return;
     }
@@ -1361,135 +1260,128 @@ static void JB4_dropFromBuffer( JB4_HANDLE h, Word32 sysTime )
     /* fetch the next data unit from buffer */
     JB4_INPUTBUFFER_Deque( h->inputBuffer, (void **)&dataUnit );
     /* update statistics */
-    IF( h->nLostOrStretched != 0U )
+    if( h->nLostOrStretched != 0U )
     {
         assert( h->lastPoppedWasSilence == false );
         /* separate concealments since last available pop in lost and stretched */
-        nStretched = idiv3216(tsDiff, extract_l(h->frameDuration));
-        assert( nStretched == tsDiff / h->frameDuration );
+        nStretched = tsDiff / h->frameDuration;
         assert( h->nLostOrStretched >= nStretched );
 
         /* convert stretching followed by shrinking to late-loss */
-        IF( nStretched > 0 )
+        if( nStretched > 0U )
         {
-            nStretched = L_sub(nStretched, 1);
-            h->nLateLost = L_add(h->nLateLost, 1);
-            h->nLost = L_add(h->nLost , L_sub(h->nLostOrStretched, nStretched));
+            --nStretched;
+            ++h->nLateLost;
+            h->nLost += h->nLostOrStretched - nStretched;
             /* jitter-induced insertion (e.g. buffer underflow) */
-            h->jitterInducedConcealments = L_add(h->jitterInducedConcealments, nStretched);
-
+            h->jitterInducedConcealments += nStretched;
             if( !dataUnit->silenceIndicator )
             {
                 /* JBM induced removal of a speech frame (intentional frame dropping) */
-                h->jitterInducedConcealments = L_add(h->jitterInducedConcealments, 1);
+                ++h->jitterInducedConcealments;
             }
-            h->nStretched = L_add(h->nStretched, nStretched);
+            h->nStretched += nStretched;
         }
-        ELSE
+        else
         {
-            h->nLost = L_add(h->nLost, h->nLostOrStretched);
-            h->nShrinked = L_add(h->nShrinked, 1);
+            h->nLost += h->nLostOrStretched;
+            ++h->nShrinked;
             if( !dataUnit->silenceIndicator )
             {
                 /* JBM induced removal of a speech frame (intentional frame dropping) */
-                h->jitterInducedConcealments = L_add(h->jitterInducedConcealments, 1);
+                ++h->jitterInducedConcealments;
             }
         }
-        h->nLostOrStretched = L_deposit_l(0);
+        h->nLostOrStretched = 0;
     }
-    ELSE IF( !dataUnit->silenceIndicator )
+    else
     {
-        h->nShrinked = L_add(h->nShrinked, 1);
-        /* JBM induced removal of a speech frame (intentional frame dropping) */
-        h->jitterInducedConcealments = L_add(h->jitterInducedConcealments, 1);
+        if( !dataUnit->silenceIndicator )
+        {
+            ++h->nShrinked;
+            /* JBM induced removal of a speech frame (intentional frame dropping) */
+            ++h->jitterInducedConcealments;
+        }
     }
 
     h->lastReturnedTs        = dataUnit->timeStamp;
-    move32();
     h->lastPoppedWasSilence  = dataUnit->silenceIndicator;
-    move16();
-    h->nextExpectedTs        = rtpTs_add(dataUnit->timeStamp, h->frameDuration);
+    h->nextExpectedTs        = dataUnit->timeStamp + h->frameDuration;
 
     /* substract one frame from last playout delay */
-    h->lastPlayoutOffset = rtpTs_sub(h->lastPlayoutOffset, h->frameDuration);
-
-    if( h->lastTargetTime != 0 )
-        h->lastTargetTime = L_add(h->lastTargetTime, h->frameDuration);
+    h->lastPlayoutOffset -= h->frameDuration;
+    if( h->lastTargetTime != 0U )
+        h->lastTargetTime += h->frameDuration;
     JB4_FreeDataUnit(h, dataUnit);
 }
 
 /* function to calculate the playout delay based on the current jitter */
-static Word16 JB4_playoutDelay( const JB4_HANDLE h, Word32 playTime, Word32 rtpTimeStamp, Word32 *delay )
+static int JB4_playoutDelay( const JB4_HANDLE h, uint32_t playTime, uint32_t rtpTimeStamp, uint32_t *delay )
 {
-    Word32 minOffTicks;
+    int32_t minOffTicks;
 
-    IF( JB4_JMF_MinOffset( h->ltJmf, &minOffTicks ) != 0 )
+    if( JB4_JMF_MinOffset( h->ltJmf, &minOffTicks ) != 0 )
     {
         return -1;
     }
 
-    *delay = rtpTs_sub(rtpTs_sub(playTime, minOffTicks), rtpTimeStamp);
+    *delay = playTime - minOffTicks - rtpTimeStamp;
+
     return 0;
 }
 
 /* function to update lastPlayoutDelay and lastTargetTime after popFromBuffer() */
-static void JB4_updateLastTimingMembers( JB4_HANDLE h, Word32 playTime, Word32 rtpTimeStamp )
+static void JB4_updateLastTimingMembers( JB4_HANDLE h, uint32_t playTime,
+        uint32_t rtpTimeStamp )
 {
-    Word32 minOffTicks;
+    int32_t minOffTicks;
 
-    IF( JB4_JMF_MinOffset( h->ltJmf, &minOffTicks ) != 0 )
+    if( JB4_JMF_MinOffset( h->ltJmf, &minOffTicks ) != 0 )
     {
         return;
     }
 
     /* playoutDelay = playTime - minOffset - timeStamp */
-    h->lastPlayoutOffset = rtpTs_sub(playTime, rtpTimeStamp);
+    h->lastPlayoutOffset = playTime - rtpTimeStamp;
     /* targetTime = minOffset + timeStamp + targetDelay */
-    h->lastTargetTime = rtpTs_add(rtpTs_add(minOffTicks, rtpTimeStamp), h->targetPlayoutDelay);
+    h->lastTargetTime = (uint32_t)( minOffTicks + rtpTimeStamp + h->targetPlayoutDelay );
+
 }
 
 /* function to compare the RTP time stamps of two data units: newElement==arrayElement ? 0 : (newElement>arrayElement ? +1 : -1) */
-static Word32 JB4_inputBufferCompareFunction( const JB4_INPUTBUFFER_ELEMENT newElement,
-        const JB4_INPUTBUFFER_ELEMENT arrayElement, Word16 *replaceWithNewElementIfEqual )
+static int JB4_inputBufferCompareFunction( const JB4_INPUTBUFFER_ELEMENT newElement,
+        const JB4_INPUTBUFFER_ELEMENT arrayElement, bool_t *replaceWithNewElementIfEqual )
 {
     JB4_DATAUNIT_HANDLE newDataUnit, arrayDataUnit;
-    Word32 diff, result;
+    int32_t diff;
+    int result;
 
     *replaceWithNewElementIfEqual = 0;
-    move16();
     newDataUnit   = (JB4_DATAUNIT_HANDLE)newElement;
-    move16();
     arrayDataUnit = (JB4_DATAUNIT_HANDLE)arrayElement;
-    move16();
     diff = JB4_rtpTimeStampDiff( arrayDataUnit->timeStamp, newDataUnit->timeStamp );
-
-    IF( diff > 0 )
+    if( diff > 0 )
     {
-        result = L_deposit_l(1);
+        result = 1;
     }
-    ELSE IF( diff < 0 )
+    else if( diff < 0 )
     {
-        result = L_negate(1);
+        result = -1;
     }
-    ELSE   /* equal timestamps */
+    else   /* equal timestamps */
     {
         result = 0;
-        move32();
-        test();
-        IF(newDataUnit->partial_frame == 0 && arrayDataUnit->partial_frame != 0)
+        if(newDataUnit->partial_frame == 0 && arrayDataUnit->partial_frame == 1)
         {
             /* replace partial copy with primary copy */
             *replaceWithNewElementIfEqual = 1;
-            move16();
         }
-        ELSE IF(sub(newDataUnit->partial_frame, arrayDataUnit->partial_frame) == 0 &&
-        L_sub(newDataUnit->dataSize, arrayDataUnit->dataSize) > 0)
+        else if(newDataUnit->partial_frame == arrayDataUnit->partial_frame &&
+                newDataUnit->dataSize > arrayDataUnit->dataSize)
         {
             /* if both are primary or partial: take the one with higher size (e.g. higher bitrate) */
             *replaceWithNewElementIfEqual = 1;
-            move16();
         }
     }
     return result;
 }
-

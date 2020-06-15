@@ -1,17 +1,16 @@
 /*====================================================================================
-    EVS Codec 3GPP TS26.442 Apr 03, 2018. Version 12.11.0 / 13.6.0 / 14.2.0
+    EVS Codec 3GPP TS26.443 Nov 13, 2018. Version 12.11.0 / 13.7.0 / 14.3.0 / 15.1.0
   ====================================================================================*/
 
 #define _USE_MATH_DEFINES
 
 #include <assert.h>
-#include "stl.h"
-#include "basop_util.h"
+#include <math.h>
+#include <stdlib.h>
 #include "options.h"
-#include "typedef.h"
-#include "cnst_fx.h"
-#include "prot_fx.h"
-#include "stat_com.h"
+#include "prot.h"
+
+
 
 
 /************************************************************************************/
@@ -19,50 +18,40 @@
 /************************************************************************************/
 
 static void CalcMDXT(TonalMDCTConcealPtr         const self,
-                     Word16                      const type,
-                     Word16              const * const timeSignal,
-                     Word32                    * const mdxtOutput,
-                     Word16                    * const mdxtOutput_e);
+                     char                        const type,
+                     float               const * const timeSignal,
+                     float                     * const mdxtOutput);
 
-static void CalcPowerSpec(Word32 * mdctSpec,                /* i: MDCT spectrum                        */
-                          Word16 mdctSpec_exp,              /* i: exponent of MDCT spectrum            */
-                          Word32 * mdstSpec,                /* i: MDST spectrum                        */
-                          Word16 mdstSpec_exp,              /* i: exponent of MDST spectrum               */
-                          Word16 nSamples,                  /* i: frame size                           */
-                          Word16 floorPowerSpectrum,        /* i: lower limit for power spectrum bins  */
-                          Word32 * powerSpec,               /* o: power spectrum                       */
-                          Word16 * powerSpec_exp);
+static void CalcPowerSpec(float const * mdctSpec,
+                          float const * mdstSpec,
+                          unsigned int nSamples,
+                          float floorPowerSpectrum,
+                          float * powerSpec);
 
 static void CalcPowerSpecAndDetectTonalComponents(TonalMDCTConcealPtr const self,
-        Word32 secondLastMDST[],
-        Word16 secondLastMDST_exp,
-        Word32 secondLastMDCT[],
-        Word16 secondLastMDCT_exp,
-        Word32 const pitchLag);
-static void FindPhases(                                /* o: current phase   [-pi;pi]        2Q13 */
-    TonalMDCTConcealPtr const self, /* i: pointer to internal structure        */
-    Word32 secondLastMDCT[],        /* i: MDST spectrum data                   */
-    Word32 secondLastMDST[],        /* i: MDCT spectrum data                   */
-    Word16 diff_exp);               /* i: exp_MDST - exp_MDCT                  */
+        float secondLastMDST[],
+        float secondLastMDCT[],
+        float const pitchLag);
 
-static void FindPhaseDifferences(                                   /* o: Phase difference [-pi;pi]        2Q13*/
-    TonalMDCTConcealPtr const self,    /* i: Pointer to internal structure        */
-    Word32 powerSpectrum[]);           /* i: Power spectrum data                  */
+static void FindPhases(TonalMDCTConcealPtr const self,
+                       float const secondLastMDCT[],
+                       float const secondLastMDST[]);
 
+static void FindPhaseDifferences(TonalMDCTConcealPtr const self,
+                                 float powerSpectrum[]);
 
 /*******************************************************/
 /*-------------- public functions -------------------- */
 /*******************************************************/
 
 TONALMDCTCONCEAL_ERROR TonalMDCTConceal_Init( TonalMDCTConcealPtr self,
-        Word16 nSamples,
-        Word16 nSamplesCore,
-        Word16 nScaleFactors,
+        unsigned int nSamples,
+        unsigned int nSamplesCore,
+        unsigned int nScaleFactors,
         TCX_config * tcx_cfg
                                             )
 {
-    test();
-    IF (sub(nSamples,L_FRAME_MAX) > 0 || sub(nScaleFactors,FDNS_NPTS) > 0)
+    if (nSamples > L_FRAME_MAX || nScaleFactors > FDNS_NPTS)
     {
         assert(nSamples <= L_FRAME_MAX);
         assert(nScaleFactors <= FDNS_NPTS);
@@ -71,423 +60,228 @@ TONALMDCTCONCEAL_ERROR TonalMDCTConceal_Init( TonalMDCTConcealPtr self,
     assert((self->nScaleFactors == nScaleFactors) || (self->nSamples != nSamples)); /* If nSamples doesn't change then also nScaleFactors must stay the same */
 
     self->tcx_cfg = tcx_cfg;
-
     self->lastBlockData.spectralData       = self->spectralDataBuffers[0];
-    move16();
     self->secondLastBlockData.spectralData = self->spectralDataBuffers[1];
-    move16();
     self->secondLastPowerSpectrum = self->secondLastBlockData.spectralData;
-    move16();
-
     self->lastBlockData.scaleFactors       = self->scaleFactorsBuffers[0];
-    move16();
     self->secondLastBlockData.scaleFactors = self->scaleFactorsBuffers[1];
-    move16();
-    self->lastBlockData.scaleFactors_exp       = self->scaleFactorsBuffers_exp[0];
-    move16();
-    self->secondLastBlockData.scaleFactors_exp = self->scaleFactorsBuffers_exp[1];
-    move16();
-
     self->lastBlockData.blockIsValid       = 0;
-    move16();
     self->secondLastBlockData.blockIsValid = 0;
-    move16();
     self->nSamples = 0;
-    move16();
     self->nScaleFactors = 0;
-    move16();
 
     self->lastBlockData.blockIsConcealed       = 0;
-    move16();
     self->secondLastBlockData.blockIsConcealed = 0;
-    move16();
-
     self->pTCI = (TonalComponentsInfo *)self->timeDataBuffer;
-    move16();
 
+    self->lastPitchLag = 0;
 
-    self->lastPitchLag = L_deposit_l(0);
-
-    IF (sub(self->nSamples,nSamples) != 0)
+    if (self->nSamples != nSamples)
     {
         self->secondLastBlockData.blockIsValid = 0;
-        move16();
         self->lastBlockData.blockIsValid = 0;
-        move16();
     }
-
     self->nSamples = nSamples;
-    move16();
     self->nSamplesCore = nSamplesCore;
-    move16();
-
     self->nScaleFactors = nScaleFactors;
-    move16();
 
     /* Offset the pointer to the end of buffer, so that pTCI is not destroyed when
-       new time samples are stored in lastPcmOut */  move16();
-    move16();
+       new time samples are stored in lastPcmOut */
     /* just the second half of the second last pcm output is needed */
-    self->secondLastPcmOut        = &self->timeDataBuffer[sub((3*L_FRAME_MAX)/2,3*(s_min(L_FRAME_MAX, nSamples))/2)];
-    self->lastPcmOut              = &self->timeDataBuffer[sub((3*L_FRAME_MAX)/2,   s_min(L_FRAME_MAX, nSamples))   ];
+    self->secondLastPcmOut        = &self->timeDataBuffer[(3*L_FRAME_MAX)/2-(3*min(L_FRAME_MAX, nSamples))/2];
+    self->lastPcmOut              = &self->timeDataBuffer[(3*L_FRAME_MAX)/2-min(L_FRAME_MAX, nSamples)];
 
-    /* If the second last frame was lost, we reuse saved TonalComponentsInfo and don't update pcm buffers */
+    /* If the second last frame was lost and concealed with tonal PLC, we
+       reuse saved TonalComponentsInfo and don't update pcm buffers */
     assert(sizeof(*self->pTCI) <= (self->lastPcmOut-self->timeDataBuffer)*sizeof(self->timeDataBuffer[0]));
 
     return TONALMDCTCONCEAL_OK;
 }
 
+
 TONALMDCTCONCEAL_ERROR TonalMDCTConceal_SaveFreqSignal( TonalMDCTConcealPtr self,
-        Word32 const *mdctSpectrum,
-        Word16 const mdctSpectrum_exp,
-        Word16 nNewSamples,
-        Word16 nNewSamplesCore,
-        Word16 const *scaleFactors,
-        Word16 const *scaleFactors_exp,
-        Word16 const gain_tcx_exp
+        float const *mdctSpectrum,
+        unsigned int nNewSamples,
+        unsigned int nNewSamplesCore,
+        float const *scaleFactors
                                                       )
 {
-    Word16 * temp;
-    Word16 nOldSamples, tmp_exp, s, i, max_exp;
-
+    float * temp;
+    int nOldSamples;
 
     assert(nNewSamples > 0 && nNewSamples <= 2*L_FRAME_MAX);
 
     /* Avoid overwriting self->secondLastPowerSpectrum stored in spectralData,
        because it is needed if the second last and the current frame are lost
-       and concealed using the Tonal MDCT PLC */ test();
-    IF (!self->lastBlockData.tonalConcealmentActive || sub(self->lastBlockData.nSamples,nNewSamples) != 0)
+       and concealed using the Tonal MDCT PLC */
+    if (!self->lastBlockData.tonalConcealmentActive || (self->lastBlockData.nSamples != nNewSamples))
     {
-        IF (sub(nNewSamples,L_FRAME_MAX) <= 0)
+        if (nNewSamples <= L_FRAME_MAX)
         {
             /* Shift the buffers */
-            temp = self->secondLastBlockData.spectralData; /* Save the pointer */        move16();
+            temp = self->secondLastBlockData.spectralData; /* Save the pointer */
             self->secondLastBlockData.spectralData = self->lastBlockData.spectralData;
-            move16();
             self->lastBlockData.spectralData = temp;
-            move16();
-
-            tmp_exp = self->secondLastBlockData.spectralData_exp; /* Save the pointer */        move16();
-            self->secondLastBlockData.spectralData_exp = self->lastBlockData.spectralData_exp;
-            move16();
-            self->lastBlockData.spectralData_exp = tmp_exp;
-            move16();
-
-            tmp_exp = self->secondLastBlockData.gain_tcx_exp; /* Save the pointer */            move16();
-            self->secondLastBlockData.gain_tcx_exp = self->lastBlockData.gain_tcx_exp;
-            move16();
-            self->lastBlockData.gain_tcx_exp = tmp_exp;
-            move16();
-
-            tmp_exp = self->secondLastBlockData.scaleFactors_max_e; /* Save the pointer */           move16();
-            self->secondLastBlockData.scaleFactors_max_e = self->lastBlockData.scaleFactors_max_e;
-            move16();
-            self->lastBlockData.scaleFactors_max_e = tmp_exp;
-            move16();
-
             temp = self->secondLastBlockData.scaleFactors;
-            move16();
             self->secondLastBlockData.scaleFactors = self->lastBlockData.scaleFactors;
-            move16();
             self->lastBlockData.scaleFactors = temp;
-            move16();
-
-            temp = self->secondLastBlockData.scaleFactors_exp;
-            move16();
-            self->secondLastBlockData.scaleFactors_exp = self->lastBlockData.scaleFactors_exp;
-            move16();
-            self->lastBlockData.scaleFactors_exp = temp;
-            move16();
         }
-        ELSE
+        else
         {
-            self->lastBlockData.spectralData           = self->spectralDataBuffers[0];
-            move16();
-            self->secondLastBlockData.spectralData     = self->spectralDataBuffers[1];
-            move16();
-            self->lastBlockData.scaleFactors           = self->scaleFactorsBuffers[0];
-            move16();
-            self->secondLastBlockData.scaleFactors     = self->scaleFactorsBuffers[1];
-            move16();
-            self->lastBlockData.scaleFactors_exp       = self->scaleFactorsBuffers_exp[0];
-            move16();
-            self->secondLastBlockData.scaleFactors_exp = self->scaleFactorsBuffers_exp[1];
-            move16();
+            /* Order the buffers so that even transition frame can fit in if written into the first buffer */
+            self->lastBlockData.spectralData       = self->spectralDataBuffers[0];
+            self->secondLastBlockData.spectralData = self->spectralDataBuffers[1];
+            self->lastBlockData.scaleFactors       = self->scaleFactorsBuffers[0];
+            self->secondLastBlockData.scaleFactors = self->scaleFactorsBuffers[1];
         }
-
         nOldSamples = self->lastBlockData.nSamples;
-        move16();
         self->lastBlockData.nSamples = nNewSamples;
-        move16();
         self->secondLastBlockData.nSamples = nOldSamples;
-        move16();
-
         nOldSamples = self->lastBlockData.nSamplesCore;
-        move16();
         self->lastBlockData.nSamplesCore = nNewSamplesCore;
-        move16();
         self->secondLastBlockData.nSamplesCore = nOldSamples;
-        move16();
     }
-
-    test();
-    IF ((nNewSamples > 0) && (sub(nNewSamples,2*L_FRAME_MAX) <= 0))
+    if ((nNewSamples > 0) && (nNewSamples <= 2*L_FRAME_MAX))
     {
         /* Store new data */
-        s = getScaleFactor32(mdctSpectrum, nNewSamples);
-
-        /*Copy(scaleFactors_exp, self->lastBlockData.scaleFactors_exp, self->nScaleFactors);*/
-        max_exp = 0;
-        FOR (i = 0; i < self->nScaleFactors; i++)
-        {
-            self->lastBlockData.scaleFactors_exp[i] = scaleFactors_exp[i];
-            move16();
-            max_exp = s_max(max_exp, scaleFactors_exp[i]);
-        }
-
-        /*s = sub(s, max_exp);*/
-        self->lastBlockData.scaleFactors_max_e = max_exp;
-
-        FOR (i = 0; i < nNewSamples; i++)
-        {
-            self->lastBlockData.spectralData[i] = extract_h(L_shl(mdctSpectrum[i], s));
-            move16();
-        }
-        self->lastBlockData.spectralData_exp = sub(mdctSpectrum_exp,s);
-        move16();
-        self->lastBlockData.gain_tcx_exp = gain_tcx_exp;
-
-        Copy(scaleFactors, self->lastBlockData.scaleFactors, self->nScaleFactors);
+        mvr2r(mdctSpectrum, self->lastBlockData.spectralData, nNewSamples);
+        mvr2r(scaleFactors, self->lastBlockData.scaleFactors, self->nScaleFactors);
     }
     return TONALMDCTCONCEAL_OK;
 }
 
+
 TONALMDCTCONCEAL_ERROR TonalMDCTConceal_UpdateState(TonalMDCTConcealPtr self,
-        Word16 nNewSamples,
-        Word32 pitchLag,
-        Word16 badBlock,
-        Word8 tonalConcealmentActive
+        int nNewSamples,
+        float pitchLag,
+        int badBlock,
+        int tonalConcealmentActive
                                                    )
 {
-    Word8 newBlockIsValid;
+    int newBlockIsValid;
+
 
     assert(!(!badBlock && tonalConcealmentActive));
 
-    IF (badBlock)
+    if (badBlock)
     {
         newBlockIsValid = self->lastBlockData.blockIsValid;
-        move16();
     }
-    ELSE
+    else
     {
-        newBlockIsValid = 0;
-        move16();
-        test();
-        if((sub(nNewSamples,2*L_FRAME_MAX) <= 0) && (nNewSamples > 0))
-        {
-            newBlockIsValid = 1;
-            move16();
-        }
+        newBlockIsValid = (nNewSamples <= 2*L_FRAME_MAX) && (nNewSamples > 0);
     }
 
-    /* Shift old state */ move16();
-    move16();
-    move16();
+    /* Shift old state */
     self->secondLastBlockData.blockIsConcealed = self->lastBlockData.blockIsConcealed;
     self->secondLastBlockData.blockIsValid = self->lastBlockData.blockIsValid;
     self->secondLastBlockData.tonalConcealmentActive = self->lastBlockData.tonalConcealmentActive;
 
-    /* Store new state */ move16();
-    move16();
-    move16();
+    /* Store new state */
     self->lastBlockData.blockIsConcealed = badBlock;
     self->lastBlockData.blockIsValid = newBlockIsValid;
     self->lastBlockData.tonalConcealmentActive = tonalConcealmentActive;
-
     self->lastPitchLag = pitchLag;
-    move32();
 
     return TONALMDCTCONCEAL_OK;
 }
-static void FindPhases(                                /* o: currenc phase   [-pi;pi]        2Q13 */
-    TonalMDCTConcealPtr const self, /* i: pointer to internal structure        */
-    Word32 secondLastMDCT[],        /* i: MDST spectrum data                   */
-    Word32 secondLastMDST[],        /* i: MDCT spectrum data                   */
-    Word16 diff_exp)                /* i: exp_MDST - exp_MDCT                  */
-{
-    Word16 i;
-    Word16 l;
-    Word16 *pCurrentPhase;
 
+
+static void FindPhases(TonalMDCTConcealPtr const self, float const secondLastMDCT[], float const secondLastMDST[])
+{
+    unsigned int i;
+    int l;
+    float * pCurrentPhase;
 
 
     pCurrentPhase = self->pTCI->phase_currentFramePredicted;
     /* for each index/index group */
-    FOR( i = 0; i < self->pTCI->numIndexes; i++)
+    for( i = 0; i < self->pTCI->numIndexes; i++)
     {
-        FOR (l = self->pTCI->lowerIndex[i]; l <= self->pTCI->upperIndex[i]; l++)
+        for (l = self->pTCI->lowerIndex[i]; l <= self->pTCI->upperIndex[i]; l++)
         {
-            /* in contrast to the float code, the parameter secondLastMDST[l]
-               needs not to be negated - due to a different implementation of
-               the MDST */
-            *pCurrentPhase++ = BASOP_util_atan2(secondLastMDST[l], secondLastMDCT[l], diff_exp);
-            move16();
+            *pCurrentPhase++ = (float)atan2(secondLastMDST[l], secondLastMDCT[l]);
         }
     }
 
+    return;
 }
 
-#define BANDWIDTH 7.0f
-#define G         789516047l/*1.0/(2*1.36) Q31*/
-#define MAXRATIO  22938/*44.8f Q9*/ /* Maximum ratio |ODFT[k-1]|/|ODFT[k+1]| is 16.5 dB, that is maximum ratio (for fractional = 0) is (cos(PI/bandwidth)/cos(3PI/bandwidth))^1.36 */
-#define MM        1934815907               /* FL2WORD32(cos(EVS_PI/BANDWIDTH));  */
-#define SS        29166                    /* FL2WORD16(cos((3*EVS_PI)/BANDWIDTH)*4);  Q17*/
-#define N         931758243                /* FL2WORD32(sin(EVS_PI/BANDWIDTH)); */
-#define J         31946                    /* FL2WORD16(sin((3*EVS_PI)/BANDWIDTH)); */
 
-static void FindPhaseDifferences(                                   /* o: Phase difference [-pi;pi]         2Q13*/
-    TonalMDCTConcealPtr const self,    /* i: Pointer to internal structure        */
-    Word32 powerSpectrum[])            /* i: Power spectrum data                  */
+static void FindPhaseDifferences(TonalMDCTConcealPtr const self, float powerSpectrum[])
 {
-    Word16 i, k;
-    Word16 * phaseDiff;
-    Word16 fractional, sf, sfn, sfd;
-    Word16 divi, s, j;
-    Word32 a, Q, L_tmp, m, n;
+    static float const bandwidth = 7.0f;
+    float const m = (float)cos(EVS_PI/bandwidth);
+    float const s = (float)cos((3*EVS_PI)/bandwidth);
+    float const n = (float)sin(EVS_PI/bandwidth);
+    float const j = (float)sin((3*EVS_PI)/bandwidth);
+    static float const G = (float)(1.0/(2*1.36));
+    static float const maxRatio = 44.8f; /* Maximum ratio |ODFT[k-1]|/|ODFT[k+1]| is 16.5 dB, that is maximum ratio (for fractional = 0) is (cos(EVS_PI/bandwidth)/cos(3PI/bandwidth))^1.36 */
 
-    s = SS;
-    move16();
-    j = J;
-    move16();
+    unsigned int i, k;
+    float odft_left, odft_right;
+    float * phaseDiff;
+    float fractional;
+    float Q, a;
 
     phaseDiff = self->pTCI->phaseDiff;
-
-    FOR (i = 0; i < self->pTCI->numIndexes; i++)
+    for (i = 0; i < self->pTCI->numIndexes; i++)
     {
-        m = MM;
-        move16();
-        n = N;
-        move16();
-
         k = self->pTCI->indexOfTonalPeak[i];
-        move16();
-
-        IF (L_sub(Mpy_32_16_1(powerSpectrum[k-1],512/*1.0f Q9*/),Mpy_32_16_1(powerSpectrum[k+1], MAXRATIO))  >= 0)
+        odft_left  = powerSpectrum[k-1];
+        odft_right = powerSpectrum[k+1];
+        if (odft_left >= maxRatio*odft_right)
         {
-            phaseDiff[i] = 0; /*(float)tan(0.0f*EVS_PI/bandwidth);*/                      move16();
-            if(s_and(k,1) != 0)
-                phaseDiff[i] = -12868/*-EVS_PI 3Q12*/;
+            a = (float)tan(0.0f*EVS_PI/bandwidth);
         }
-        ELSE
+        else
         {
-            IF (L_sub(Mpy_32_16_1(powerSpectrum[k+1],512/*1.0f Q9*/),Mpy_32_16_1(powerSpectrum[k-1], MAXRATIO))  >= 0)
+            if (odft_right >= maxRatio*odft_left)
             {
-                phaseDiff[i] = 12868/*EVS_PI 3Q12*/; /*(float)tan(2.0f*PI/bandwidth);*/ move16();
-                if(s_and(k,1) != 0)
-                    phaseDiff[i] = 0/*0 Q13*/;  /*2Q13*/
+                a = (float)tan(2.0f*EVS_PI/bandwidth);
             }
-            ELSE {
-                /*Q = (float)pow(odft_left/odft_right, G);
-                  a = (m - Q * s) / (n + Q * j);
-                  phaseDiff[i] = (float)atan(a) * (bandwidth/2.0f);*/
-                /*max divi=44.8 & sf=6*/
-                divi = BASOP_Util_Divide3232_uu_1616_Scale(powerSpectrum[k-1],powerSpectrum[k+1], &sf);
-                Q = BASOP_Util_fPow(L_deposit_h(divi), sf, G, 0, &sf);
-                L_tmp = Mpy_32_16_1(Q,s);
-                sfn = sub(sf, 2);
-
-                if(sfn > 0)
-                    m = L_shr(m, sfn);
-
-                IF(sfn < 0)
-                {
-                    L_tmp = L_shl(L_tmp, sfn);
-                    sfn = 0;
-                }
-
-                a = L_sub(m, L_tmp);  /*sf*/
-
-                L_tmp = Mpy_32_16_1(Q,j);
-                IF(sf >= 0)
-                {
-                    L_tmp = L_shr(L_tmp, 1);
-                    sfd = add(sf,1);
-                    n = L_shr(n,sfd);
-                }
-                ELSE{
-                    sfd = 0;
-                    L_tmp = L_shl(L_tmp, sf);
-                }
-
-                L_tmp = L_add(n,L_tmp);
-                fractional = BASOP_util_atan2(a, L_tmp, sub(sfn,sfd));  /*2Q13*/
-                L_tmp = L_mult(fractional, 28672/*BANDWIDTH/2.0f Q13*/);    /*2Q13*2Q13=4Q27*/     move16();
-
-                /* fractional is in the range 0..+pi */
-                /* we need to stay in the range -2pi..+2pi */
-                if(sub(s_and(k,3),1) == 0)
-                {
-                    L_tmp = L_add(L_tmp,  421657440l/*+1*EVS_PI           Q27*/);
-                }
-                if(sub(s_and(k,3),2) == 0)
-                {
-                    L_tmp = L_sub(L_tmp,  843314880l/*+2*EVS_PI=-2*EVS_PI Q27*/);
-                }
-                if(sub(s_and(k,3),3) == 0)
-                {
-                    L_tmp = L_sub(L_tmp,  421657440l/*+3*EVS_PI=-1*EVS_PI Q27*/);
-                }
-                phaseDiff[i] = round_fx(L_shl(L_tmp,1));      /*3Q12*/
+            else
+            {
+                Q = (float)pow(odft_left/odft_right, G);
+                a = (m - Q * s) / (n + Q * j);
             }
         }
+        fractional = (float)atan(a) * (bandwidth/2.0f);
+        assert((fractional >= 0) && (fractional <= EVS_PI + 1.192092896e-07F));
+        phaseDiff[i] = fractional + EVS_PI*(k%4);
     }
+
+    return;
 }
 
+
 static void CalcPowerSpecAndDetectTonalComponents(TonalMDCTConcealPtr const self,
-        Word32 secondLastMDST[],
-        Word16 secondLastMDST_exp,
-        Word32 secondLastMDCT[],
-        Word16 secondLastMDCT_exp,
-        Word32 const pitchLag)
+        float secondLastMDST[],
+        float secondLastMDCT[],
+        float const pitchLag)
 {
-    Word16 nSamples;
-    Word16 i;
-    Word16 floorPowerSpectrum; /* Minimum significant value of a spectral line in the power spectrum */
-    Word32 powerSpectrum[L_FRAME_MAX];
-    Word16 invScaleFactors[FDNS_NPTS];
-    Word16 invScaleFactors_exp[FDNS_NPTS];
-    Word16 powerSpectrum_exp, tmp_exp, old_exp;
-
-
+    unsigned int nSamples;
+    unsigned int i;
+    float floorPowerSpectrum; /* Minimum significant value of a spectral line in the power spectrum */
+    float powerSpectrum[L_FRAME_MAX]; /* 32 bits are required */
+    float invScaleFactors[FDNS_NPTS];
 
     nSamples = self->nNonZeroSamples;
-    move16();
 
     /* It is taken into account that the MDCT is not normalized. */
-    floorPowerSpectrum/*Q0*/ = extract_l(Mpy_32_16_1(L_mult0(self->nSamples,self->nSamples),82));      /*1/400 = 82 Q15*/
-    powerSpectrum_exp = 0;
-    move16();
-
-    CalcPowerSpec(secondLastMDCT,
-                  secondLastMDCT_exp,
-                  secondLastMDST,
-                  secondLastMDST_exp,
-                  nSamples,
-                  floorPowerSpectrum,
-                  powerSpectrum,
-                  &powerSpectrum_exp);
+    floorPowerSpectrum = self->nSamples*self->nSamples/400.0f;
+    CalcPowerSpec(secondLastMDCT, secondLastMDST, nSamples, floorPowerSpectrum, powerSpectrum );
 
     /* This setting to minimal level is required because the power spectrum is used in the threshold adaptation using the pitch up to self->nSamples. */
-    set32_fx(powerSpectrum+nSamples, floorPowerSpectrum, sub(self->nSamples, nSamples));
+    set_f(powerSpectrum+nSamples, floorPowerSpectrum, self->nSamples-nSamples);
     /* this setting to zero is needed since the FDNS needs to be called
        with self->nSamplesCore; it relevant only for nb; it has no effect
        to the output, but memory checker may complain otherwise due to the
        usage of uninitialized values */
-    IF ( sub(self->nSamplesCore, self->nSamples) > 0 )
+    if (self->nSamplesCore > self->nSamples)
     {
-        set32_fx(powerSpectrum+self->nSamples, 0, sub(self->nSamplesCore, self->nSamples));
+        set_zero(powerSpectrum+self->nSamples, self->nSamplesCore-self->nSamples);
     }
-
     DetectTonalComponents(self->pTCI->indexOfTonalPeak,
                           self->pTCI->lowerIndex,
                           self->pTCI->upperIndex,
@@ -495,752 +289,417 @@ static void CalcPowerSpecAndDetectTonalComponents(TonalMDCTConcealPtr const self
                           self->lastPitchLag,
                           pitchLag,
                           self->lastBlockData.spectralData,
-                          add(self->lastBlockData.spectralData_exp,self->lastBlockData.gain_tcx_exp),
                           self->lastBlockData.scaleFactors,
-                          self->lastBlockData.scaleFactors_exp,
-                          self->lastBlockData.scaleFactors_max_e,
                           powerSpectrum,
                           nSamples,
                           self->nSamplesCore,
-                          floorPowerSpectrum);
-
-    FindPhases(self, secondLastMDCT, secondLastMDST, sub(secondLastMDST_exp,secondLastMDCT_exp));
-
+                          floorPowerSpectrum );
+    FindPhases(self, secondLastMDCT, secondLastMDST);
     FindPhaseDifferences(self, powerSpectrum);
-
-    IF (self->pTCI->numIndexes > 0)
+    if (self->pTCI->numIndexes > 0)
     {
-
         self->secondLastPowerSpectrum = self->secondLastBlockData.spectralData;
-
-        /*sqrtFLOAT(powerSpectrum, powerSpectrum, nSamples);*/
-        old_exp = powerSpectrum_exp;
-        powerSpectrum_exp = mult_r(sub(powerSpectrum_exp,2), 1 << 14);  /*remove 2 bits of headroom from CalcPowerSpec*/
-        FOR (i = 0; i < nSamples; i++)
+        for ( i=0; i<nSamples; i++)
         {
-            tmp_exp = old_exp;
-            powerSpectrum[i] = Sqrt32(powerSpectrum[i], &tmp_exp);
-            powerSpectrum[i] = L_shr(powerSpectrum[i], sub(powerSpectrum_exp, tmp_exp));
-            move32();
+            powerSpectrum[i] = (float) sqrt(powerSpectrum[i]);
         }
-
-        FOR (i = 0; i < self->nScaleFactors; i++)
+        for (i = 0; i < self->nScaleFactors; i++)
         {
-            move16();
-            move16();
-            invScaleFactors_exp[i] = self->secondLastBlockData.scaleFactors_exp[i];
-            invScaleFactors[i] = Inv16(self->secondLastBlockData.scaleFactors[i], &invScaleFactors_exp[i]);
+            invScaleFactors[i] = 1.0f/self->secondLastBlockData.scaleFactors[i];
         }
-
-
-        /* here mdct_shaping() is intentionally used rather then mdct_shaping_16() */
-        mdct_shaping(powerSpectrum, self->nSamplesCore, invScaleFactors, invScaleFactors_exp);
-        FOR (i = self->nSamplesCore; i < nSamples; i++)
-        {
-            powerSpectrum[i] = L_shl(Mpy_32_16_1(powerSpectrum[i], invScaleFactors[FDNS_NPTS-1]), invScaleFactors_exp[FDNS_NPTS-1]);
-            move32();
-        }
-
-        /* 16 bits are now enough for storing the power spectrum */
-        FOR (i = 0; i < nSamples; i++)
-        {
-            self->secondLastPowerSpectrum[i] = round_fx(powerSpectrum[i]);
-        }
-
-        powerSpectrum_exp = sub(powerSpectrum_exp, self->secondLastBlockData.gain_tcx_exp);
-        self->secondLastPowerSpectrum_exp = powerSpectrum_exp;
-        move16();
+        mdct_noiseShaping(powerSpectrum, self->nSamplesCore, invScaleFactors);
+        v_multc( powerSpectrum + self->nSamplesCore, invScaleFactors[FDNS_NPTS-1], powerSpectrum + self->nSamplesCore, self->nSamples - self->nSamplesCore);
+        mvr2r( powerSpectrum, self->secondLastPowerSpectrum, self->nSamples); /* 16 bits are now enough for storing the power spectrum */
     }
+
+    return;
 }
 
 
 static void CalcMDXT(TonalMDCTConcealPtr         const self,
-                     Word16                      const type,
-                     Word16              const * const timeSignal,
-                     Word32                    * const mdxtOutput,
-                     Word16                    * const mdxtOutput_e)
+                     char                        const type,
+                     float               const * const timeSignal,
+                     float                     * const mdxtOutput)
 {
-    Word16 windowedTimeSignal[L_FRAME_PLUS+2*L_MDCT_OVLP_MAX];
-    Word16 left_overlap, right_overlap, L_frame;
+    float windowedTimeSignal[L_FRAME_PLUS+2*L_MDCT_OVLP_MAX];
+    int left_overlap, right_overlap, L_frame;
 
     L_frame = self->nSamples;
-    move16();
-
-    WindowSignal(self->tcx_cfg,
-                 self->tcx_cfg->tcx_offsetFB,
-                 FULL_OVERLAP,
-                 FULL_OVERLAP,
-                 &left_overlap,
-                 &right_overlap,
-                 timeSignal,
-                 &L_frame,
-                 windowedTimeSignal,
-                 1);
-
-    IF (type == 0)
+    WindowSignal( self->tcx_cfg, self->tcx_cfg->tcx_offsetFB, FULL_OVERLAP, FULL_OVERLAP,
+                  &left_overlap, &right_overlap, timeSignal, &L_frame, windowedTimeSignal, 1 );
+    if (type == 'S')
     {
-        TCX_MDST(windowedTimeSignal,
-                 mdxtOutput,
-                 mdxtOutput_e,
-                 left_overlap,
-                 sub(L_frame, shr(add(left_overlap, right_overlap), 1)),
-                 right_overlap);
+        TCX_MDST( windowedTimeSignal, mdxtOutput, left_overlap, L_frame - (left_overlap+right_overlap)/2, right_overlap );
     }
-    ELSE
+    else
     {
-        TCX_MDCT(windowedTimeSignal,
-        mdxtOutput,
-        mdxtOutput_e,
-        left_overlap,
-        sub(L_frame, shr(add(left_overlap, right_overlap), 1)),
-        right_overlap);
+        TCX_MDCT( windowedTimeSignal, mdxtOutput, left_overlap, L_frame - (left_overlap+right_overlap)/2, right_overlap );
     }
+
+    return;
 }
 
-TONALMDCTCONCEAL_ERROR TonalMDCTConceal_Detect( TonalMDCTConcealPtr const self,
-        Word32 const pitchLag,
-        Word16 * const numIndices)
-{
-    Word32 secondLastMDST[L_FRAME_MAX];
-    Word32 secondLastMDCT[L_FRAME_MAX];
-    Word16 secondLastMDCT_exp;
-    Word32 * powerSpectrum = secondLastMDST;
-    Word16 i, powerSpectrum_exp, secondLastMDST_exp, s;
-    Word16 nSamples;
 
+TONALMDCTCONCEAL_ERROR TonalMDCTConceal_Detect( TonalMDCTConcealPtr const self,
+        float const pitchLag,
+        int * const numIndices)
+{
+    float secondLastMDST[L_FRAME_MAX]; /* 32 bits are required */
+    float secondLastMDCT[L_FRAME_MAX]; /* 32 bits are required */
+    float * powerSpectrum = secondLastMDST;
+    unsigned int nSamples;
+    unsigned int i;
 
     nSamples = self->nSamples;
-    move16();
-    secondLastMDST_exp = 16;  /*time signal Q-1*/
-    secondLastMDCT_exp = 16;  /*time signal Q-1*/
-    test();
-    test();
-    test();
-    test();
-    test();
-    IF (self->lastBlockData.blockIsValid && self->secondLastBlockData.blockIsValid
-        && (sub(self->lastBlockData.nSamples,nSamples) == 0) && (sub(self->secondLastBlockData.nSamples,nSamples) == 0)
-        && (!self->secondLastBlockData.blockIsConcealed || self->secondLastBlockData.tonalConcealmentActive || (pitchLag != 0)) /* Safety if the second last frame was concealed and tonal concealment was inactive */
+    if (self->lastBlockData.blockIsValid
+            && self->secondLastBlockData.blockIsValid
+            && (self->lastBlockData.nSamples == nSamples)
+            && (self->secondLastBlockData.nSamples == nSamples)
+            && (!self->secondLastBlockData.blockIsConcealed
+                || self->secondLastBlockData.tonalConcealmentActive
+                || (pitchLag != 0))
+            /* Safety if the second last frame was concealed and tonal concealment was inactive */
        )
     {
-
-        IF (self->lastBlockData.blockIsConcealed == 0)
+        if (!self->lastBlockData.blockIsConcealed)
         {
-            IF (self->secondLastBlockData.tonalConcealmentActive == 0)
+            if (!self->secondLastBlockData.tonalConcealmentActive)
             {
-                CalcMDXT(self, 0, self->secondLastPcmOut, secondLastMDST, &secondLastMDST_exp);
-                CalcMDXT(self, 1, self->secondLastPcmOut, secondLastMDCT, &secondLastMDCT_exp);
+                CalcMDXT(self, 'S', self->secondLastPcmOut, secondLastMDST);
+                CalcMDXT(self, 'C', self->secondLastPcmOut, secondLastMDCT);
                 self->nNonZeroSamples = 0;
-                FOR (i = 0; i < self->nSamples; i++)
+                for (i = 0; i < self->nSamples; i++)
                 {
                     if (self->secondLastBlockData.spectralData[i] != 0)
                     {
                         self->nNonZeroSamples = i;
-                        move16();
                     }
                 }
-
                 /* 23 is the maximum length of the MA filter in getEnvelope */
-                self->nNonZeroSamples = s_min(self->nSamples, add(self->nNonZeroSamples, 23));
-                move16();
-                nSamples = self->nNonZeroSamples;
-                move16();
-
-                s = getScaleFactor32(secondLastMDST, nSamples);
-
-                FOR (i = 0; i < nSamples; i++)
-                {
-                    secondLastMDST[i] = L_shl(secondLastMDST[i], s);
-                    move32();
-                }
-                secondLastMDST_exp = sub(secondLastMDST_exp, s);
-                move16();
-                s = getScaleFactor32(secondLastMDCT, nSamples);
-
-                FOR (i = 0; i < nSamples; i++)
-                {
-                    secondLastMDCT[i] = L_shl(secondLastMDCT[i], s);
-                    move32();
-                }
-                secondLastMDCT_exp = sub(secondLastMDCT_exp, s);
-                move16();
-                CalcPowerSpecAndDetectTonalComponents(self, secondLastMDST, secondLastMDST_exp, secondLastMDCT, secondLastMDCT_exp, pitchLag);
+                self->nNonZeroSamples = min(self->nSamples, self->nNonZeroSamples+23);   ;
+                CalcPowerSpecAndDetectTonalComponents(self, secondLastMDST, secondLastMDCT, pitchLag);
             }
-            ELSE
+            else
             {
                 /* If the second last frame was also lost, it is expected that pastTimeSignal could hold a bit different signal (e.g. including fade-out) from the one stored in TonalMDCTConceal_SaveTimeSignal. */
                 /* That is why we reuse the already stored information about the concealed spectrum in the second last frame */
                 nSamples = self->nNonZeroSamples;
-                move16();
-                mdct_shaping_16(self->secondLastPowerSpectrum, self->nSamplesCore, nSamples,
-                self->secondLastBlockData.scaleFactors, self->secondLastBlockData.scaleFactors_exp,
-                self->secondLastBlockData.scaleFactors_max_e, powerSpectrum);
-
-                powerSpectrum_exp = getScaleFactor32(powerSpectrum, nSamples);
-                powerSpectrum_exp = sub(powerSpectrum_exp, 3); /*extra 3 bits of headroom for MA filter in getEnvelope*/
-
-                /* multFLOAT(powerSpectrum, powerSpectrum, powerSpectrum, nSamples); */
-                FOR(i = 0; i < nSamples; i++)
-                {
-                    Word32 const t = L_shl(powerSpectrum[i], powerSpectrum_exp);
-                    powerSpectrum[i] = Mpy_32_32(t, t);
-                    move32();
-                }
-
+                mvr2r(self->secondLastPowerSpectrum, powerSpectrum, nSamples); /* Convert from 16 bits to 32 bits */
+                mdct_noiseShaping(powerSpectrum, self->nSamplesCore, self->secondLastBlockData.scaleFactors);
+                v_multc(powerSpectrum + self->nSamplesCore,
+                        self->secondLastBlockData.scaleFactors[FDNS_NPTS-1],
+                        powerSpectrum + self->nSamplesCore,
+                        nSamples - self->nSamplesCore);
+                v_mult(powerSpectrum, powerSpectrum, powerSpectrum, nSamples);
                 RefineTonalComponents(self->pTCI->indexOfTonalPeak,
-                self->pTCI->lowerIndex,
-                self->pTCI->upperIndex,
-                self->pTCI->phaseDiff,
-                self->pTCI->phase_currentFramePredicted,
-                &self->pTCI->numIndexes,
-                self->lastPitchLag,
-                pitchLag,
-                self->lastBlockData.spectralData,
-                add(self->lastBlockData.spectralData_exp,self->lastBlockData.gain_tcx_exp),
-                self->lastBlockData.scaleFactors,
-                self->lastBlockData.scaleFactors_exp,
-                self->lastBlockData.scaleFactors_max_e,
-                powerSpectrum,
-                nSamples,
-                self->nSamplesCore,
-                extract_l(Mpy_32_16_1(L_mult0(self->nSamples,self->nSamples),82))); /* floorPowerSpectrum */
-
+                                      self->pTCI->lowerIndex,
+                                      self->pTCI->upperIndex,
+                                      self->pTCI->phaseDiff,
+                                      self->pTCI->phase_currentFramePredicted,
+                                      &self->pTCI->numIndexes,
+                                      self->lastPitchLag,
+                                      pitchLag,
+                                      self->lastBlockData.spectralData,
+                                      self->lastBlockData.scaleFactors,
+                                      powerSpectrum,
+                                      nSamples,
+                                      self->nSamplesCore,
+                                      self->nSamples*self->nSamples/400.0f /* floorPowerSpectrum */ );
             }
         }
     }
-    ELSE
+    else
     {
         self->pTCI->numIndexes = 0;
-        move16();
     }
-
     *numIndices = self->pTCI->numIndexes;
-    move16();
 
 
     return TONALMDCTCONCEAL_OK;
 }
 
+
 TONALMDCTCONCEAL_ERROR TonalMDCTConceal_InsertNoise( TonalMDCTConcealPtr self,      /*IN */
-        Word32* mdctSpectrum,          /*OUT*/
-        Word16* mdctSpectrum_exp,      /*OUT*/
-        Word8   tonalConcealmentActive,
-        Word16* pSeed,                 /*IN/OUT*/
-        Word16  tiltCompFactor,
-        Word16  crossfadeGain,
-        Word16  crossOverFreq)
+        float* mdctSpectrum,           /*OUT*/
+        int    tonalConcealmentActive,
+        short* pSeed,
+        float  tiltCompFactor,
+        float  crossfadeGain,
+        int    crossOverFreq)
 {
-    Word16 i, ld, fac;
-    Word16 rnd, exp, exp_last, exp_noise, inv_samples, inv_exp;
-    Word16 g, tiltFactor, tilt, tmp;
-    Word32 nrgNoiseInLastFrame, nrgWhiteNoise, L_tmp, L_tmp2;
+    unsigned int i;
+    Word16 rnd;
+    float g, nrgNoiseInLastFrame, nrgWhiteNoise, tiltFactor, tilt;
 
 
-
-    g = sub(32767/*1.0f Q15*/,crossfadeGain);
-
-    rnd = 1977;
-    move16();
-    if (self->lastBlockData.blockIsConcealed)
+    g = 1.0f-crossfadeGain;
+    if (!self->lastBlockData.blockIsConcealed)
+    {
+        rnd = 1977;
+    }
+    else
     {
         rnd = *pSeed;
-        move16();
     }
-
-    IF (self->lastBlockData.blockIsValid == 0)
+    if (!self->lastBlockData.blockIsValid)
     {
         /* may just become active if the very first frame is lost */
-        set32_fx(mdctSpectrum, 0, self->nSamples);
-        *mdctSpectrum_exp = SPEC_EXP_DEC;
+        set_f( mdctSpectrum, 0.0f, self->nSamples);
     }
-    ELSE
+    else
     {
-        L_tmp = 805306368l/*0.375f Q31*/;
-        inv_exp = 15;
-        move16();
-        inv_samples = Inv16(self->lastBlockData.nSamples, &inv_exp);
-        tiltFactor = round_fx(BASOP_Util_fPow(L_max(L_tmp, L_deposit_h(tiltCompFactor)), 0, L_deposit_h(inv_samples),inv_exp, &exp));
-        BASOP_SATURATE_WARNING_OFF /*next op may result in 32768*/
-        tiltFactor = shl(tiltFactor, exp);
-        BASOP_SATURATE_WARNING_ON
-
-        tilt = 32767/*1.0f Q15*/;
-        move16();
-
-        nrgNoiseInLastFrame = L_deposit_h(0);
-        nrgWhiteNoise = L_deposit_h(0);
-        exp_last = exp_noise = 0;
-        move16();
-        move16();
-        IF (!tonalConcealmentActive)
+        /* based on what is done in tcx_noise_filling() */
+        tiltFactor = (float)pow(max(0.375f, tiltCompFactor), 1.0f/self->lastBlockData.nSamples);
+        tilt = 1.0f;
+        nrgNoiseInLastFrame = nrgWhiteNoise = 0.0f;
+        if (!tonalConcealmentActive)
         {
-            ld = sub(14,norm_s(self->lastBlockData.nSamples));
-            fac = shr(-32768,ld);
-
-            FOR (i = 0; i < crossOverFreq; i++)
+            for (i = 0; i < (unsigned int)crossOverFreq; i++)
             {
-                Word16 x = self->lastBlockData.spectralData[i];
-                Word32 y;
-                rnd = extract_l(L_mac0(13849, rnd, 31821));
-                y = L_mult(tilt,rnd);
-
-                nrgNoiseInLastFrame = L_add(nrgNoiseInLastFrame, Mpy_32_16_1(L_msu(0, x,fac),x));
-                x = round_fx(y);
-                nrgWhiteNoise = L_add(nrgWhiteNoise, Mpy_32_16_1(L_msu(0, x,fac),x));
-
-                mdctSpectrum[i] = y; /*  15Q16 */               move32();
-
-                tilt = mult_r(tilt,tiltFactor);
+                float const x = self->lastBlockData.spectralData[i];
+                float y;
+                rnd = (Word16) (rnd * 31821L + 13849L);
+                y = tilt*rnd;
+                nrgNoiseInLastFrame += x*x;
+                nrgWhiteNoise += y*y;
+                mdctSpectrum[i] = y;
+                tilt *= tiltFactor;
             }
-
-            IF (nrgNoiseInLastFrame == 0)
+            if (nrgWhiteNoise > 0)
             {
-                set32_fx(mdctSpectrum, 0, crossOverFreq);
-                *mdctSpectrum_exp = SPEC_EXP_DEC;
+                g *= (float)sqrt(nrgNoiseInLastFrame/nrgWhiteNoise);
             }
-            ELSE
+            for (i = 0; i < (unsigned int)crossOverFreq; i++)
             {
-                exp_last = add(ld,shl(self->lastBlockData.spectralData_exp,1));
-                exp_noise = add(ld,30);
+                float const x = self->lastBlockData.spectralData[i];
+                float const y = mdctSpectrum[i];
 
-                IF (nrgWhiteNoise > 0)
+                if (y > 0)
                 {
-                    ld = norm_l(nrgNoiseInLastFrame);
-                    nrgNoiseInLastFrame = L_shl(nrgNoiseInLastFrame,ld);
-                    exp_last = sub(exp_last,ld);
-                    ld = norm_l(nrgWhiteNoise);
-                    nrgWhiteNoise = L_shl(nrgWhiteNoise,ld);
-                    exp_noise = sub(exp_noise,ld);
-
-                    exp = sub(exp_last, exp_noise);
-
-                    IF(nrgNoiseInLastFrame > nrgWhiteNoise)
-                    {
-                        nrgNoiseInLastFrame = L_shr(nrgNoiseInLastFrame,1);
-                        exp = add(exp,1);
-                    }
-                    tmp = div_l(nrgNoiseInLastFrame,round_fx(nrgWhiteNoise));
-                    tmp = Sqrt16(tmp, &exp);
-                    g = mult_r(g,tmp);
-
-                    L_tmp = L_deposit_h(0);
-                    ld = sub(self->lastBlockData.spectralData_exp, 15);
-                    exp = sub(ld, exp);
-
-                    IF(exp > 0)
-                    {
-                        g = shr(g,exp);
-                        *mdctSpectrum_exp = self->lastBlockData.spectralData_exp;
-                    }
-                    ELSE
-                    {
-                        crossfadeGain = shl(crossfadeGain,exp);
-                        *mdctSpectrum_exp = sub(self->lastBlockData.spectralData_exp,exp);
-                    }
-                    /*make a headroom for mdct_shaping*/
-                    exp = sub(*mdctSpectrum_exp, SPEC_EXP_DEC);
-                    /* assert(exp < 0);*/
-                    IF(exp < 0)
-                    {
-                        *mdctSpectrum_exp = SPEC_EXP_DEC;
-                    }
-                    ELSE
-                    {
-                        exp = 0;
-                    }
+                    mdctSpectrum[i] = g*y + crossfadeGain*x;
                 }
-
-                FOR (i = 0; i < crossOverFreq; i++)
+                else
                 {
-                    Word16 const x = self->lastBlockData.spectralData[i];
-                    Word32 const y = mdctSpectrum[i];
-
-                    if(g > 0)
-                    {
-                        L_tmp = Mpy_32_16_1(y,g);
-                    }
-
-                    L_tmp2 = L_msu(L_tmp,crossfadeGain,x);
-                    if(y > 0)
-                    {
-                        L_tmp2 = L_mac(L_tmp,crossfadeGain,x);
-                    }
-                    mdctSpectrum[i] = L_shl(L_tmp2, exp);
-                    move32();
+                    mdctSpectrum[i] = g*y - crossfadeGain*x;
                 }
             }
-            exp = sub(self->lastBlockData.spectralData_exp, sub(*mdctSpectrum_exp,16));
-            FOR (i = crossOverFreq; i < self->lastBlockData.nSamples; i++)
+
+            for (i = (unsigned int)crossOverFreq; i < self->lastBlockData.nSamples; i++)
             {
-                mdctSpectrum[i] = L_shl(L_deposit_l(self->lastBlockData.spectralData[i]), exp);
-                move32();
+                mdctSpectrum[i] = self->lastBlockData.spectralData[i];
             }
         }
-        ELSE
+        else
         {
-            Word16 l;
+            unsigned int l;
             assert(self->pTCI->numIndexes > 0);
-
-            FOR (l = self->pTCI->lowerIndex[0]; l <= self->pTCI->upperIndex[0]; l++)
+            for (l = 0; l < self->pTCI->lowerIndex[0]; l++)
             {
-                mdctSpectrum[l] = L_deposit_l(0);
+                float const x = self->lastBlockData.spectralData[l];
+                float y;
+                rnd = (Word16) (rnd * 31821L + 13849L);
+                y = tilt*rnd;
+                nrgNoiseInLastFrame += x*x;
+                nrgWhiteNoise += y*y;
+                mdctSpectrum[l] = y;
+                tilt *= tiltFactor;
             }
-
-            ld = sub(14,norm_s(self->lastBlockData.nSamples));
-            fac = shr(-32768,ld);
-            FOR (l = 0; l < self->pTCI->lowerIndex[0]; l++)
+            for (i = 1; i < self->pTCI->numIndexes; i++)
             {
-                Word16 x = self->lastBlockData.spectralData[l];
-                Word32 y;
-                rnd = extract_l(L_mac0(13849, rnd, 31821));
-                y = L_mult(tilt,rnd);
-
-                nrgNoiseInLastFrame = L_add(nrgNoiseInLastFrame, Mpy_32_16_1(L_msu(0, x,fac),x));
-                x = round_fx(y);
-                nrgWhiteNoise = L_add(nrgWhiteNoise, Mpy_32_16_1(L_msu(0, x,fac),x));
-
-                mdctSpectrum[l] = y; /*  15Q16 L_deposit_l(y);*/        move32();
-
-                tilt = mult_r(tilt,tiltFactor);
-            }
-
-            FOR (i = 1; i < self->pTCI->numIndexes; i++)
-            {
-                /*tilt *= (float)pow(tiltFactor, self->pTCI->upperIndex[i-1]-self->pTCI->lowerIndex[i-1]+1);*/
-                tmp= round_fx(BASOP_Util_fPow(L_deposit_h(tiltFactor), 0, L_deposit_h(self->pTCI->upperIndex[i-1]-self->pTCI->lowerIndex[i-1]+1),15, &exp));
-                tmp = shl(tmp, exp);
-                tilt = mult_r(tilt,tmp);
-
-                FOR (l = self->pTCI->lowerIndex[i]; l <= self->pTCI->upperIndex[i]; l++)
+                tilt *= (float)pow(tiltFactor, self->pTCI->upperIndex[i-1]-self->pTCI->lowerIndex[i-1]+1);
+                for (l = self->pTCI->upperIndex[i-1]+1; l < self->pTCI->lowerIndex[i]; l++)
                 {
-                    mdctSpectrum[l] = L_deposit_l(0);
-                }
-
-                FOR (l = self->pTCI->upperIndex[i-1]+1; l < self->pTCI->lowerIndex[i]; l++)
-                {
-                    Word16 x = self->lastBlockData.spectralData[l];
-                    Word32 y;
-                    rnd = extract_l(L_mac0(13849, rnd, 31821));
-                    y = L_mult(tilt,rnd);
-
-                    nrgNoiseInLastFrame = L_add(nrgNoiseInLastFrame, Mpy_32_16_1(L_msu(0, x,fac),x));
-                    x = round_fx(y);
-                    nrgWhiteNoise = L_add(nrgWhiteNoise, Mpy_32_16_1(L_msu(0, x,fac),x));
-
-                    mdctSpectrum[l] = y; /*  15Q16 L_deposit_l(y);*/    move32();
-
-                    tilt = mult_r(tilt,tiltFactor);
+                    float const x = self->lastBlockData.spectralData[l];
+                    float y;
+                    rnd = (Word16) (rnd * 31821L + 13849L);
+                    y = tilt*rnd;
+                    nrgNoiseInLastFrame += x*x;
+                    nrgWhiteNoise += y*y;
+                    mdctSpectrum[l] = y;
+                    tilt *= tiltFactor;
                 }
             }
+            tilt *= (float)pow(tiltFactor, self->pTCI->upperIndex[self->pTCI->numIndexes-1]-self->pTCI->lowerIndex[self->pTCI->numIndexes-1]+1);
 
-            tmp = round_fx(BASOP_Util_fPow(L_deposit_h(tiltFactor), 0, L_deposit_h(self->pTCI->upperIndex[self->pTCI->numIndexes-1]-self->pTCI->lowerIndex[self->pTCI->numIndexes-1]+1),15, &exp));
-            BASOP_SATURATE_WARNING_OFF /*next op may result in 32768*/
-            tmp = shl(tmp, exp);
-            BASOP_SATURATE_WARNING_ON
-            tilt = mult_r(tilt,tmp);
-
-            FOR (l = add(self->pTCI->upperIndex[self->pTCI->numIndexes-1], 1); l < crossOverFreq; l++)
+            for (l = self->pTCI->upperIndex[self->pTCI->numIndexes-1]+1; l < (unsigned int)crossOverFreq; l++)
             {
-                Word16 x = self->lastBlockData.spectralData[l];
-                Word32 y;
-                rnd = extract_l(L_mac0(13849, rnd, 31821));
-                y = L_mult(tilt,rnd);
-
-                nrgNoiseInLastFrame = L_add(nrgNoiseInLastFrame, Mpy_32_16_1(L_msu(0, x,fac),x));
-                x = round_fx(y);
-                nrgWhiteNoise = L_add(nrgWhiteNoise, Mpy_32_16_1(L_msu(0, x,fac),x));
-
-                mdctSpectrum[l] = y; /*  15Q16 L_deposit_l(y);*/   move32();
-
-                tilt = mult_r(tilt,tiltFactor);
+                float const x = self->lastBlockData.spectralData[l];
+                float y;
+                rnd = (Word16) (rnd * 31821L + 13849L);
+                y = tilt*rnd;
+                nrgNoiseInLastFrame += x*x;
+                nrgWhiteNoise += y*y;
+                mdctSpectrum[l] = y;
+                tilt *= tiltFactor;
             }
-
-            IF (nrgNoiseInLastFrame == 0)
+            if (nrgWhiteNoise > 0)
             {
-                set32_fx(mdctSpectrum, 0, crossOverFreq);
-                *mdctSpectrum_exp = SPEC_EXP_DEC;
+                g *= (float)sqrt(nrgNoiseInLastFrame/nrgWhiteNoise);
             }
-            ELSE
+            for (l = 0; l < self->pTCI->lowerIndex[0]; l++)
             {
-                exp_last = add(ld,shl(self->lastBlockData.spectralData_exp,1));
-                exp_noise = add(ld,shl(15,1));
+                float const x = self->lastBlockData.spectralData[l];
+                float const y = mdctSpectrum[l];
 
-                ld = norm_l(nrgNoiseInLastFrame);
-                nrgNoiseInLastFrame = L_shl(nrgNoiseInLastFrame,ld);
-                exp_last = sub(exp_last,ld);
-                ld = norm_l(nrgWhiteNoise);
-                nrgWhiteNoise = L_shl(nrgWhiteNoise,ld);
-                exp_noise = sub(exp_noise,ld);
-
-                exp = sub(exp_last, exp_noise);
-
-                IF(nrgNoiseInLastFrame > nrgWhiteNoise)
+                if (y > 0)
                 {
-                    nrgNoiseInLastFrame = L_shr(nrgNoiseInLastFrame,1);
-                    exp = add(exp,1);
+                    mdctSpectrum[l] = g*y + crossfadeGain*x;
                 }
-                tmp = div_l(nrgNoiseInLastFrame,round_fx(nrgWhiteNoise));
-                tmp = Sqrt16(tmp, &exp);
-                g = mult_r(g,tmp);
-
-                L_tmp = L_deposit_h(0);
-                ld = sub(self->lastBlockData.spectralData_exp, 15);
-                exp = sub(ld, exp);
-                IF(exp > 0)
+                else
                 {
-                    g = shr(g,exp);
-                    *mdctSpectrum_exp = self->lastBlockData.spectralData_exp;
-                }
-                ELSE {
-                    crossfadeGain = shl(crossfadeGain,exp);
-                    *mdctSpectrum_exp = sub(self->lastBlockData.spectralData_exp,exp);
-                }
-                /*make a headroom for mdct_shaping*/
-                exp = sub(*mdctSpectrum_exp, SPEC_EXP_DEC);
-
-
-                IF(exp < 0)
-                {
-                    *mdctSpectrum_exp = SPEC_EXP_DEC;
-                }
-                ELSE
-                {
-                    exp = 0;
-                }
-
-                FOR (l = 0; l < self->pTCI->lowerIndex[0]; l++)
-                {
-                    Word16 const x = self->lastBlockData.spectralData[l];
-                    Word32 const y = mdctSpectrum[l];
-
-                    if(g > 0)
-                    {
-                        L_tmp = Mpy_32_16_1(y,g);
-                    }
-
-                    L_tmp2 = L_msu(L_tmp,crossfadeGain,x);
-                    if(y > 0)
-                    {
-                        L_tmp2 = L_mac(L_tmp,crossfadeGain,x);
-                    }
-                    mdctSpectrum[l] = L_shl(L_tmp2, exp);
-                    move32();
-                }
-
-                FOR (i = 1; i < self->pTCI->numIndexes; i++)
-                {
-                    FOR (l = self->pTCI->upperIndex[i-1]+1; l < self->pTCI->lowerIndex[i]; l++)
-                    {
-                        Word16 const x = self->lastBlockData.spectralData[l];
-                        Word32 const y = mdctSpectrum[l];
-
-                        if(g > 0)
-                        {
-                            L_tmp = Mpy_32_16_1(y,g);
-                        }
-
-                        L_tmp2 = L_msu(L_tmp,crossfadeGain,x);
-                        if(y > 0)
-                        {
-                            L_tmp2 = L_mac(L_tmp,crossfadeGain,x);
-                        }
-                        mdctSpectrum[l] = L_shl(L_tmp2, exp);
-                        move32();
-                    }
-                }
-
-                /* initialize bins of tonal components with zero: basically not
-                   necessary, but currently the whole spectrum is rescaled in
-                   mdct_noiseShaping() and then there would be a processing of
-                   uninitialized values */
-                FOR (i = 0; i < self->pTCI->numIndexes; i++)
-                {
-                    FOR (l = self->pTCI->lowerIndex[i]; l <= self->pTCI->upperIndex[i]; l++)
-                    {
-                        mdctSpectrum[l] = L_deposit_l(0);
-                    }
-                }
-
-                FOR (l = add(self->pTCI->upperIndex[self->pTCI->numIndexes-1], 1); l < crossOverFreq; l++)
-                {
-                    Word16 const x = self->lastBlockData.spectralData[l];
-                    Word32 const y = mdctSpectrum[l];
-
-                    if(g > 0)
-                    {
-                        L_tmp = Mpy_32_16_1(y,g);
-                    }
-
-                    L_tmp2 = L_msu(L_tmp,crossfadeGain,x);
-                    if(y > 0)
-                    {
-                        L_tmp2 = L_mac(L_tmp,crossfadeGain,x);
-                    }
-                    mdctSpectrum[l] = L_shl(L_tmp2, exp);
-                    move32();
+                    mdctSpectrum[l] = g*y - crossfadeGain*x;
                 }
             }
-            exp = sub(self->lastBlockData.spectralData_exp, sub(*mdctSpectrum_exp,16));
-            FOR (l = crossOverFreq; l < self->lastBlockData.nSamples; l++)
+            for (i = 1; i < self->pTCI->numIndexes; i++)
             {
-                mdctSpectrum[l] = L_shl(L_deposit_l(self->lastBlockData.spectralData[l]), exp);
-                move32();
+                for (l = self->pTCI->upperIndex[i-1]+1; l < self->pTCI->lowerIndex[i]; l++)
+                {
+                    float const x = self->lastBlockData.spectralData[l];
+                    float const y = mdctSpectrum[l];
+
+                    if (y > 0)
+                    {
+                        mdctSpectrum[l] = g*y + crossfadeGain*x;
+                    }
+                    else
+                    {
+                        mdctSpectrum[l] = g*y - crossfadeGain*x;
+                    }
+                }
+            }
+            /* initialize bins of tonal components with zero: basically not
+               necessary, but currently the whole spectrum is rescaled in
+               mdct_noiseShaping() and then there would be a processing of
+               uninitialized values */
+            for (i = 0; i < self->pTCI->numIndexes; i++)
+            {
+                for (l = self->pTCI->lowerIndex[i]; l <= self->pTCI->upperIndex[i]; l++)
+                {
+                    mdctSpectrum[l] = 0;
+
+                }
+            }
+            for (l = self->pTCI->upperIndex[self->pTCI->numIndexes-1]+1; l < (unsigned int)crossOverFreq; l++)
+            {
+                float const x = self->lastBlockData.spectralData[l];
+                float const y = mdctSpectrum[l];
+
+                if (y > 0)
+                {
+                    mdctSpectrum[l] = g*y + crossfadeGain*x;
+                }
+                else
+                {
+                    mdctSpectrum[l] = g*y - crossfadeGain*x;
+                }
+            }
+            for (l = (unsigned int)crossOverFreq; l < self->lastBlockData.nSamples; l++)
+            {
+                mdctSpectrum[l] = self->lastBlockData.spectralData[l];
             }
         }
     }
 
     *pSeed = rnd;
-    move16();
 
     return TONALMDCTCONCEAL_OK;
 }
 
+
 TONALMDCTCONCEAL_ERROR TonalMDCTConceal_Apply(TonalMDCTConcealPtr self,     /*IN */
-        Word32 *mdctSpectrum,         /*IN/OUT*/
-        Word16 *mdctSpectrum_exp      /*IN */
+        float *mdctSpectrum           /*OUT */
                                              )
 {
-    Word16 i, l, exp;
-    Word16 * phaseDiff, * pCurrentPhase;
-    Word32 phaseToAdd, currentPhase;
-    Word32 powerSpectrum[L_FRAME_MAX];
-    Word16 nSamples;
+    unsigned int i, l;
+    float * phaseDiff, * pCurrentPhase;
+    float phaseToAdd;
+    float powerSpectrum[L_FRAME_MAX];
+    unsigned int nSamples;
 
 
-
-    IF (self->lastBlockData.blockIsValid & self->secondLastBlockData.blockIsValid)
+    if (self->lastBlockData.blockIsValid & self->secondLastBlockData.blockIsValid)
     {
         assert(self->pTCI->numIndexes > 0);
 
         nSamples = self->nNonZeroSamples;
-        move16();
         assert(self->pTCI->upperIndex[self->pTCI->numIndexes-1] < nSamples);
-
-
-        mdct_shaping_16(self->secondLastPowerSpectrum, self->nSamplesCore, nSamples,
-                        self->secondLastBlockData.scaleFactors, self->secondLastBlockData.scaleFactors_exp,
-                        self->secondLastBlockData.scaleFactors_max_e, powerSpectrum);
-
+        mvr2r(self->secondLastPowerSpectrum, powerSpectrum, nSamples); /* Convert from 16 bits to 32 bits */
+        mdct_noiseShaping(powerSpectrum, self->nSamplesCore, self->secondLastBlockData.scaleFactors);
+        v_multc( powerSpectrum + self->nSamplesCore, self->secondLastBlockData.scaleFactors[FDNS_NPTS-1], powerSpectrum + self->nSamplesCore, nSamples - self->nSamplesCore );
         phaseDiff = self->pTCI->phaseDiff; /* if multiple frame loss occurs use the phase from the last frame and continue rotating */
         pCurrentPhase = self->pTCI->phase_currentFramePredicted;
-
-        exp = sub(*mdctSpectrum_exp, add(add(self->secondLastPowerSpectrum_exp, add(self->secondLastBlockData.gain_tcx_exp,1)),self->secondLastBlockData.scaleFactors_max_e));
-
-        IF (!self->lastBlockData.blockIsConcealed)
+        if (!self->lastBlockData.blockIsConcealed)
         {
-            if (self->secondLastBlockData.tonalConcealmentActive != 0)
+            if (self->secondLastBlockData.tonalConcealmentActive)
             {
-                self->nFramesLost = add(self->nFramesLost,2); /*Q1*/                           move16();
+                self->nFramesLost += 1;
             }
-            if (self->secondLastBlockData.tonalConcealmentActive == 0)
+            else
             {
-                self->nFramesLost = 3; /*Q1*/                                           move16();
+                self->nFramesLost = 1.5;
             }
         }
         /* for each index group */
-        FOR (i = 0; i < self->pTCI->numIndexes; i++)
+        for (i = 0; i < self->pTCI->numIndexes; i++)
         {
-            /*phaseToAdd = self->nFramesLost*phaseDiff[i];     */
-            phaseToAdd = L_mult0(self->nFramesLost,phaseDiff[i]);      /*Q1*3Q12=2Q13*/
-            /* Move phaseToAdd to range -PI..PI */
-
-            WHILE (L_sub(phaseToAdd, 25736l/*EVS_PI Q13*/) > 0)
+            phaseToAdd = self->nFramesLost*phaseDiff[i];
+            /* Move phaseToAdd to range -EVS_PI..EVS_PI */
+            while (phaseToAdd > EVS_PI)
             {
-                phaseToAdd = L_sub(phaseToAdd, 51472l/*2*EVS_PI Q13*/);
+                phaseToAdd -= 2*EVS_PI;
             }
-            WHILE (L_sub(phaseToAdd, -25736l/*-EVS_PI Q13*/)  < 0)
+            while (phaseToAdd < -EVS_PI)
             {
-                phaseToAdd = L_add(phaseToAdd, 51472l/*2*EVS_PI Q13*/);
+                /* should never occur in flt - kept for safety reasons */
+                phaseToAdd += 2*EVS_PI;
             }
-
-            FOR (l = self->pTCI->lowerIndex[i]; l <= self->pTCI->upperIndex[i]; l++)
+            for (l = self->pTCI->lowerIndex[i]; l <= self->pTCI->upperIndex[i]; l++)
             {
-                /* *pCurrentPhase and phaseToAdd are in range -PI..PI */
-                currentPhase = L_mac0(phaseToAdd, (*pCurrentPhase++), 1);                 /*2Q13+2Q13=3Q13*/
-
-                if (L_sub(currentPhase, 25736l/*EVS_PI Q13*/) > 0)
-                {
-                    currentPhase = L_sub(currentPhase, 51472l/*2*EVS_PI Q13*/);
-                }
-                if (L_sub(currentPhase, -25736l/*-EVS_PI Q13*/)  < 0)
-                {
-                    currentPhase = L_add(currentPhase, 51472l/*2*EVS_PI Q13*/);
-                }
-                /* getCosWord16 returns 1Q14*/
-                mdctSpectrum[l] = Mpy_32_16_1(powerSpectrum[l],getCosWord16(extract_l(currentPhase)));
-                move32();
-                mdctSpectrum[l] = L_shr(mdctSpectrum[l], exp);
+                float const currentPhase = (*pCurrentPhase++) + phaseToAdd;              /* *pCurrentPhase and phaseToAdd are in range -EVS_PI..EVS_PI */
+                mdctSpectrum[l] = (float)cos(currentPhase) * powerSpectrum[l];
             }
         }
     }
-
-    self->nFramesLost = add(self->nFramesLost,2); /*Q1*/                           move16();
+    self->nFramesLost++;
 
     return TONALMDCTCONCEAL_OK;
 }
+
 
 TONALMDCTCONCEAL_ERROR TonalMDCTConceal_SaveTimeSignal( TonalMDCTConcealPtr self,
-        Word16*             timeSignal,
-        Word16              nNewSamples
+        float*              timeSignal,
+        unsigned int        nNewSamples
                                                       )
 {
-    IF (sub(nNewSamples,self->nSamples) == 0)
+    if (nNewSamples == self->nSamples)
     {
         assert(nNewSamples <= L_FRAME_MAX);
-        IF (!self->secondLastBlockData.tonalConcealmentActive)
+        if (!self->secondLastBlockData.tonalConcealmentActive)
         {
-            Copy(self->lastPcmOut + self->nSamples/2, self->secondLastPcmOut, self->nSamples/2);
+            mvr2r(self->lastPcmOut + self->nSamples/2, self->secondLastPcmOut, self->nSamples/2);
         }
-        Copy(timeSignal, self->lastPcmOut, self->nSamples);
+        mvr2r(timeSignal, self->lastPcmOut, self->nSamples);
     }
-
     return TONALMDCTCONCEAL_OK;
 }
-static void CalcPowerSpec(Word32 * mdctSpec,                /* i: MDCT spectrum Q31,mdctSpec_exp          */
-                          Word16 mdctSpec_exp,              /* i: exponent of MDCT spectrum               */
-                          Word32 * mdstSpec,                /* i: MDST spectrum Q31,mdstSpec_exp          */
-                          Word16 mdstSpec_exp,              /* i: exponent of MDST spectrum               */
-                          Word16 nSamples,                  /* i: frame size                              */
-                          Word16 floorPowerSpectrum,        /* i: lower limit for power spectrum bins Q0  */
-                          Word32 * powerSpec,               /* o: power spectrum                          */
-                          Word16 * powerSpec_exp)           /* o: exponent of power spectrum              */
+
+
+static void CalcPowerSpec(float const * mdctSpec, float const * mdstSpec,
+                          unsigned int nSamples, float floorPowerSpectrum,
+                          float * powerSpec)
 {
-    Word16 k, s1, s2, tmp;
-    Word32 x, L_tmp, L_tmp_floor;
+    unsigned int k;
+    float x;
 
-
-    k = s_max(mdctSpec_exp, mdstSpec_exp);
-    *powerSpec_exp = add(add(k, k), 3); /*extra 3 bits of headroom for MA filter in getEnvelope*/ move16();
-    s1 = sub(*powerSpec_exp, add(mdctSpec_exp, mdctSpec_exp));
-    s2 = sub(*powerSpec_exp, add(mdstSpec_exp, mdstSpec_exp));
-
-    k = sub(31, *powerSpec_exp);
-    /* If the signal is bellow floor, special care is needed for *powerSpec_exp */
-    IF (sub(add(16-3, norm_s(floorPowerSpectrum)), k) < 0) /*extra 3 bits of headroom for MA filter in getEnvelope*/
+    for (k = 1; k <= nSamples-2; k++)
     {
-        k = sub(k, add(16-3, norm_s(floorPowerSpectrum))); /*extra 3 bits of headroom for MA filter in getEnvelope*/
-        *powerSpec_exp = add(*powerSpec_exp, k);
-        s1 = add(s1, k);
-        s2 = add(s2, k);
-        k = add(16-3, norm_s(floorPowerSpectrum));
+        x = mdctSpec[k] * mdctSpec[k] + mdstSpec[k] * mdstSpec[k];
+        powerSpec[k] = max(floorPowerSpectrum, x);
     }
-    L_tmp_floor = L_shl(L_deposit_l(floorPowerSpectrum), k);
+    powerSpec[0] = 0.5f*powerSpec[1];
+    powerSpec[nSamples-1] = 0.5f*powerSpec[nSamples-2];
 
-    tmp = sub(nSamples, 2);
-    FOR (k = 1; k <= tmp; k++)
-    {
-        x = Mpy_32_32(mdctSpec[k], mdctSpec[k]); /*Q31,2*mdctSpec_exp*/
 
-        L_tmp = Mpy_32_32(mdstSpec[k], mdstSpec[k]); /*Q31,2*mdstSpec_exp*/
-        x = L_add(L_shr(x,s1), L_shr(L_tmp,s2)); /*Q31,*powerSpec_exp*/
-
-        powerSpec[k] = L_max(L_tmp_floor, x);
-        move32();
-    }
-
-    powerSpec[0] = L_shr(powerSpec[1], 1);
-    move32();
-    powerSpec[nSamples-1] = L_shr(powerSpec[nSamples-2], 1);
-    move32();
-
+    return;
 }
+

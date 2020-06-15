@@ -1,27 +1,20 @@
 /*====================================================================================
-    EVS Codec 3GPP TS26.442 Apr 03, 2018. Version 12.11.0 / 13.6.0 / 14.2.0
+    EVS Codec 3GPP TS26.443 Nov 13, 2018. Version 12.11.0 / 13.7.0 / 14.3.0 / 15.1.0
   ====================================================================================*/
 
-
 #include "options.h"
-#include "stl.h"
-#include "basop_util.h"
-#include "prot_fx.h"
+#include "stat_enc.h"
+#include "cnst.h"
+#include "prot.h"
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdarg.h>
+#include <math.h>
 
-/* Exponent of attack threshold. Picked according to current threshold values. */
-#define ATTACKTHRESHOLD_E      4
-/* Exponent of subblock energies and accumulated subblock energies.
-   The current value of 2 does not prevent saturations to happen in all cases. */
-#define SUBBLOCK_NRG_E         4
-/* Exponent of the subblock energy change.
-   This value is coupled to the transient detector API. */
-#define SUBBLOCK_NRG_CHANGE_E  NRG_CHANGE_E
 
-#define MIN_BLOCK_ENERGY ((Word32)1)
+
+#define MIN_BLOCK_ENERGY 107.37f
 
 
 /************************************************/
@@ -30,15 +23,15 @@
 /*                                              */
 /************************************************/
 
-static void InitDelayBuffer(Word16 nFrameLength, Word16 nDelay, DelayBuffer * pDelayBuffer);
-static void InitSubblockEnergies(Word16 nFrameLength, Word16 nDelay, DelayBuffer * pDelayBuffer, SubblockEnergies * pSubblockEnergies);
-static void InitTransientDetector(SubblockEnergies * pSubblockEnergies, Word16 nDelay, Word16 nSubblocksToCheck,
+static void InitDelayBuffer(int nFrameLength, int nDelay, DelayBuffer * pDelayBuffer);
+static void InitSubblockEnergies(int nFrameLength, int nDelay, DelayBuffer * pDelayBuffer, SubblockEnergies * pSubblockEnergies);
+static void InitTransientDetector(SubblockEnergies * pSubblockEnergies, int nDelay, int nSubblocksToCheck,
                                   TCheckSubblocksForAttack pCheckSubblocksForAttack,
-                                  Word16 attackRatioThreshold, TransientDetector * pTransientDetector);
-static void UpdateDelayBuffer(Word16 const * input, Word16 nSamplesAvailable, DelayBuffer * pDelayBuffer);
-static void HighPassFilter(Word16 const * input, Word16 length, Word16 * pFirState1, Word16 * pFirState2, Word16 * output);
-static void UpdateSubblockEnergies(Word16 const * input, Word16 nSamplesAvailable, SubblockEnergies * pSubblockEnergies);
-static void CalculateSubblockEnergies(Word16 const * input, Word16 nSamplesAvailable, SubblockEnergies * pSubblockEnergies);
+                                  float attackRatioThreshold, TransientDetector * pTransientDetector);
+static void UpdateDelayBuffer(float const * input, int nSamplesAvailable, DelayBuffer * pDelayBuffer);
+static void HighPassFilter(float const * input, int length, float * pFirState1, float * pFirState2, float * output);
+static void UpdateSubblockEnergies(float const * input, int nSamplesAvailable, SubblockEnergies * pSubblockEnergies);
+static void CalculateSubblockEnergies(float const * input, int nSamplesAvailable, SubblockEnergies * pSubblockEnergies);
 static void RunTransientDetector(TransientDetector * pTransientDetector);
 
 /************************************************/
@@ -48,94 +41,86 @@ static void RunTransientDetector(TransientDetector * pTransientDetector);
 /************************************************/
 
 /** TCX decision.
-  * Check IF there is an attack in a subblock. Version FOR TCX Long/Short decision.
-  * See TCheckSubblocksForAttack FOR definition of parameters.
+  * Check if there is an attack in a subblock. Version for TCX Long/Short decision.
+  * See TCheckSubblocksForAttack for definition of parameters.
   * It is assumed that the delay of MDCT overlap was not taken into account, so that the last subblock corresponds to the newest input subblock.
   */
-static void GetAttackForTCXDecision(Word32 const * pSubblockNrg, Word32 const * pAccSubblockNrg, Word16 nSubblocks, Word16 nPastSubblocks, Word16 attackRatioThreshold, Word16 * pbIsAttackPresent, Word16 * pAttackIndex)
+static void GetAttackForTCXDecision(float const * pSubblockNrg, float const * pAccSubblockNrg, int nSubblocks, int nPastSubblocks, float attackRatioThreshold, int * pbIsAttackPresent, int * pAttackIndex)
 {
-    Word16 i;
-    Word16 bIsAttackPresent, attackIndex;
-    Word16 attackRatioThreshold_1_5;
+    int i;
+    int bIsAttackPresent, attackIndex;
 
     (void)nPastSubblocks;
     (void)nSubblocks;
     assert(nSubblocks >= NSUBBLOCKS);
     assert(nPastSubblocks >= 2);
 
-    /* attackRatioThreshold_1_5 = attackRatioThreshold * 1.5, exponent is ATTACKTHRESHOLD_E+1 */
-    attackRatioThreshold_1_5 = add(shr(attackRatioThreshold,2),shr(attackRatioThreshold,1));
-
-    move16();
-    move16();
     bIsAttackPresent = FALSE;
-    attackIndex = 0;
+    attackIndex = -1;
     /* Search for the last attack in the subblocks */
-    if ( s_or(L_sub(L_shr(pSubblockNrg[-1],ATTACKTHRESHOLD_E), Mpy_32_16_1(pAccSubblockNrg[-1], attackRatioThreshold)) > 0,
-              L_sub(L_shr(pSubblockNrg[-2],ATTACKTHRESHOLD_E), Mpy_32_16_1(pAccSubblockNrg[-2], attackRatioThreshold)) > 0) )
+    if ((pSubblockNrg[-1] > pAccSubblockNrg[-1] * attackRatioThreshold)
+            || (pSubblockNrg[-2] > pAccSubblockNrg[-2] * attackRatioThreshold)
+       )
     {
-        move16();
         bIsAttackPresent = TRUE;
+        attackIndex = 0;
     }
-
-    FOR (i = 0; i < NSUBBLOCKS; i++)
+    /* PTR_INIT for pSubblockNrg[i-1] */
+    for (i = 0; i < NSUBBLOCKS; i++)
     {
-        IF ( L_sub(L_shr(pSubblockNrg[i],ATTACKTHRESHOLD_E), Mpy_32_16_1(pAccSubblockNrg[i], attackRatioThreshold)) > 0 )
+        if (pSubblockNrg[i] > pAccSubblockNrg[i] * attackRatioThreshold)
         {
             if (i < 6)
             {
-                move16();
                 bIsAttackPresent = TRUE;
             }
-
-            if ( s_and(sub(attackIndex,2) != 0, sub(attackIndex,6) != 0) )
+            if ((attackIndex != 2) && (attackIndex != 6))
             {
-                move16();
                 attackIndex = i;
+                if ((pSubblockNrg[i] < pAccSubblockNrg[i] * 1.125f * attackRatioThreshold) && (i == 2 || i == 6))
+                {
+                    attackIndex++;  /* avoid minimum overlap to prevent clicks */
+                }
             }
         }
-        ELSE     /* no attack, but set index anyway in case of strong energy increase */
+        else     /* no attack, but set index anyway in case of strong energy increase */
         {
-            IF ( s_and(( L_sub(L_shr(pSubblockNrg[i],1+ATTACKTHRESHOLD_E), Mpy_32_16_1(pSubblockNrg[sub(i,1)], attackRatioThreshold_1_5)) > 0 ),
-            ( L_sub(L_shr(pSubblockNrg[i],1+ATTACKTHRESHOLD_E), Mpy_32_16_1(pSubblockNrg[sub(i,2)], attackRatioThreshold_1_5)) > 0 )) )
+            if ((pSubblockNrg[i] > pSubblockNrg[i-1] * 1.5f * attackRatioThreshold) &&
+                    (pSubblockNrg[i] > pSubblockNrg[i-2] * 1.5f * attackRatioThreshold))
             {
-
-                if ( s_and(sub(attackIndex,2) != 0, sub(attackIndex,6) != 0) )
+                if ((attackIndex != 2) && (attackIndex != 6))
                 {
-                    move16();
                     attackIndex = i;
+
+                    if (((pSubblockNrg[i] < pSubblockNrg[i-1] * 2.0f * attackRatioThreshold) ||
+                            (pSubblockNrg[i] < pSubblockNrg[i-2] * 2.0f * attackRatioThreshold)) && (i == 2 || i == 6))
+                    {
+                        attackIndex++;  /* avoid minimum overlap to prevent clicks */
+                    }
                 }
             }
         }
     }
     /* avoid post-echos on click sounds (very short transients) due to TNS aliasing */
-    if ( sub(attackIndex,4) == 0 )
+    if (attackIndex == 4)
     {
-        move16();
         attackIndex = 7;
     }
-    if ( sub(attackIndex,5) == 0 )
+    else if (attackIndex == 5)
     {
-        move16();
         attackIndex = 6;
     }
-
-    move16();
-    move16();
     *pAttackIndex = attackIndex;
     *pbIsAttackPresent = bIsAttackPresent;
-
 }
-
 
 /** Initialize TCX transient detector.
   * See InitTransientDetector for definition of parameters.
   */
-static void InitTCXTransientDetector(Word16 nDelay, SubblockEnergies * pSubblockEnergies, TransientDetector * pTransientDetector)
+static void InitTCXTransientDetector(int nDelay, SubblockEnergies * pSubblockEnergies, TransientDetector * pTransientDetector)
 {
-    InitTransientDetector(pSubblockEnergies, nDelay, NSUBBLOCKS, GetAttackForTCXDecision, 17408/*8.5f/(1<<ATTACKTHRESHOLD_E) Q15*/, pTransientDetector);
+    InitTransientDetector(pSubblockEnergies, nDelay, NSUBBLOCKS, GetAttackForTCXDecision, 8.5f, pTransientDetector);
 }
-
 
 /************************************************/
 /*                                              */
@@ -143,8 +128,8 @@ static void InitTCXTransientDetector(Word16 nDelay, SubblockEnergies * pSubblock
 /*                                              */
 /************************************************/
 
-void InitTransientDetection(Word16 nFrameLength,
-                            Word16 nTCXDelay,
+void InitTransientDetection(int nFrameLength,
+                            int nTCXDelay,
                             TransientDetection * pTransientDetection)
 {
     /* Init the delay buffer. */
@@ -153,139 +138,106 @@ void InitTransientDetection(Word16 nFrameLength,
     InitSubblockEnergies(nFrameLength, nTCXDelay, &pTransientDetection->delayBuffer, &pTransientDetection->subblockEnergies);
     /* Init the TCX Short/Long transient detector. */
     InitTCXTransientDetector(nTCXDelay, &pTransientDetection->subblockEnergies, &pTransientDetection->transientDetector);
-    /* We need two past subblocks for the TCX TD and NSUBBLOCKS+1 for the temporal flatness measure FOR the TCX LTP. */
-    pTransientDetection->transientDetector.pSubblockEnergies->nDelay =
-        add(pTransientDetection->transientDetector.pSubblockEnergies->nDelay, NSUBBLOCKS+1);
+    /* We need two past subblocks for the TCX TD and NSUBBLOCKS+1 for the temporal flatness measure for the TCX LTP. */
+    pTransientDetection->transientDetector.pSubblockEnergies->nDelay += NSUBBLOCKS+1;
 }
 
-/**
- * \brief Calculate average of temporal energy change.
- * \return average temporal energy change with exponent = 8
- */
-Word16 GetTCXAvgTemporalFlatnessMeasure(struct TransientDetection const * pTransientDetection, Word16 nCurrentSubblocks, Word16 nPrevSubblocks)
+float GetTCXAvgTemporalFlatnessMeasure(struct TransientDetection const * pTransientDetection, int nCurrentSubblocks, int nPrevSubblocks)
 {
-    Word16 i;
-    TransientDetector const * pTransientDetector;
-    SubblockEnergies const * pSubblockEnergies;
-    Word16 nDelay;
-    Word16 nRelativeDelay;
-    Word16 const * pSubblockNrgChange;
-    Word32 sumTempFlatness;
-    Word16 nTotBlocks;
-
-
+    int i;
+    TransientDetector const * pTransientDetector = &pTransientDetection->transientDetector;
+    SubblockEnergies const * pSubblockEnergies = pTransientDetector->pSubblockEnergies;
+    int const nDelay = pTransientDetector->nDelay;                                                              /*  */
+    int const nRelativeDelay = pSubblockEnergies->nDelay - nDelay;                                              /*   */
+    float const * pSubblockNrgChange = NULL;
+    float sumTempFlatness;
+    int const nTotBlocks = nCurrentSubblocks+nPrevSubblocks;                                                    /*  */
     /* Initialization */
-    pTransientDetector = &pTransientDetection->transientDetector;
-    pSubblockEnergies = pTransientDetector->pSubblockEnergies;
-    move16();
-    nDelay = pTransientDetector->nDelay;
-    nRelativeDelay = sub(pSubblockEnergies->nDelay, nDelay);
-    pSubblockNrgChange = NULL;
-    nTotBlocks = add(nCurrentSubblocks,nPrevSubblocks);
-
     assert(nTotBlocks > 0);
-
-    sumTempFlatness = L_deposit_l(0);
-
-    assert((nPrevSubblocks <= nRelativeDelay) && (nCurrentSubblocks <= NSUBBLOCKS+nDelay));
-
-    move16();
-    pSubblockNrgChange = &pSubblockEnergies->subblockNrgChange[sub(nRelativeDelay,nPrevSubblocks)];
-
-    FOR (i = 0; i < nTotBlocks; i++)
-    {
-        sumTempFlatness = L_add(sumTempFlatness, L_deposit_l(pSubblockNrgChange[i]));
-    }
-
-    /* exponent = AVG_FLAT_E */
-    i = div_l(L_shl(sumTempFlatness,16-15+SUBBLOCK_NRG_CHANGE_E-AVG_FLAT_E), nTotBlocks);
-
-    return i;
-}
-
-Word16 GetTCXMaxenergyChange(struct TransientDetection const * pTransientDetection,
-                             const Word8 isTCX10,
-                             const Word16 nCurrentSubblocks, const Word16 nPrevSubblocks)
-{
-    Word16 i;
-    TransientDetector const * pTransientDetector;
-    SubblockEnergies const * pSubblockEnergies;
-    Word16 nDelay;
-    Word16 nRelativeDelay;
-    Word16 const * pSubblockNrgChange;
-    Word16 maxEnergyChange;
-    Word16 nTotBlocks;
-
-
-    pTransientDetector = &pTransientDetection->transientDetector;
-    pSubblockEnergies = pTransientDetector->pSubblockEnergies;
-    move16();
-    nDelay = pTransientDetector->nDelay;
-    nRelativeDelay = sub(pSubblockEnergies->nDelay, nDelay);
-    pSubblockNrgChange = NULL;
-    nTotBlocks = nCurrentSubblocks+nPrevSubblocks;
-
-    assert(nTotBlocks > 0);
-    maxEnergyChange = 0/*0.0f Q7*/;
+    sumTempFlatness = 0.0f;
 
     assert((nPrevSubblocks <= nRelativeDelay) && (nCurrentSubblocks <= NSUBBLOCKS+nDelay));
     pSubblockNrgChange = &pSubblockEnergies->subblockNrgChange[nRelativeDelay-nPrevSubblocks];
-
-    IF ( s_or(pTransientDetector->bIsAttackPresent, isTCX10) )    /* frame is TCX-10 */
+    for (i = 0; i < nTotBlocks; i++)
     {
-        Word32 const * pSubblockNrg = &pSubblockEnergies->subblockNrg[sub(nRelativeDelay,nPrevSubblocks)];
-        Word32 nrgMin, nrgMax;
-        Word16 idxMax = 0;
-
-        move16();
-
-        nrgMax = L_add(pSubblockNrg[0], 0);
-
-        /* find subblock with maximum energy */
-        FOR (i = 1; i < nTotBlocks; i++)
-        {
-            if ( L_sub(nrgMax, pSubblockNrg[i]) < 0 )
-            {
-                idxMax = i;
-                move16();
-            }
-            nrgMax = L_max(nrgMax, pSubblockNrg[i]);
-        }
-
-        nrgMin = L_add(nrgMax, 0);
-
-        /* find minimum energy after maximum */
-        FOR (i = idxMax + 1; i < nTotBlocks; i++)
-        {
-            nrgMin = L_min(nrgMin, pSubblockNrg[i]);
-        }
-        /* lower maxEnergyChange if energy doesn't decrease much after energy peak */
-        /* if (nrgMin > 0.375f * nrgMax) */
-        if ( 0 > L_sub(Mpy_32_16_1(nrgMax, 12288/*0.375f Q15*/), nrgMin) )
-        {
-            nTotBlocks = sub(idxMax, 3);
-        }
+        sumTempFlatness += pSubblockNrgChange[i];
     }
-
-    FOR (i = 0; i < nTotBlocks; i++)
-    {
-        maxEnergyChange = s_max(maxEnergyChange, pSubblockNrgChange[i]);
-    }
-
-    move16();
-    i = maxEnergyChange;
-
-    return i;
+    return sumTempFlatness / (float)nTotBlocks;
 }
 
-void RunTransientDetection(Word16 const * input, Word16 nSamplesAvailable, TransientDetection * pTransientDetection)
+float GetTCXMaxenergyChange(struct TransientDetection const * pTransientDetection,
+                            const int isTCX10,
+                            const int nCurrentSubblocks, const int nPrevSubblocks)
 {
-    Word16 filteredInput[L_FRAME48k];
-    SubblockEnergies * pSubblockEnergies = &pTransientDetection->subblockEnergies;
-    TransientDetector * pTransientDetector = &pTransientDetection->transientDetector;
+    int i;
+    TransientDetector const * pTransientDetector = &pTransientDetection->transientDetector;
+    SubblockEnergies const * pSubblockEnergies = pTransientDetector->pSubblockEnergies;
+    int const nDelay = pTransientDetector->nDelay;                                                              /*  */
+    int const nRelativeDelay = pSubblockEnergies->nDelay - nDelay;                                              /*   */
+    float const * pSubblockNrgChange = NULL;
+    float maxEnergyChange;
+    int nTotBlocks = nCurrentSubblocks+nPrevSubblocks;                                                          /*  */
+    /* Initialization */
+    assert(nTotBlocks > 0);
+    maxEnergyChange = 0.0f;
+
+    assert((nPrevSubblocks <= nRelativeDelay) && (nCurrentSubblocks <= NSUBBLOCKS+nDelay));
+    pSubblockNrgChange = &pSubblockEnergies->subblockNrgChange[nRelativeDelay-nPrevSubblocks];
+    if (pTransientDetector->bIsAttackPresent || isTCX10)    /* frame is TCX-10 */
+    {
+        float const * pSubblockNrg = &pSubblockEnergies->subblockNrg[nRelativeDelay-nPrevSubblocks];
+        float nrgMin, nrgMax = pSubblockNrg[0];
+        int idxMax = 0;
+        /* find subblock with maximum energy */
+        for (i = 1; i < nTotBlocks; i++)
+        {
+            if (nrgMax < pSubblockNrg[i])
+            {
+                nrgMax = pSubblockNrg[i];
+                idxMax = i;
+            }
+        }
+        nrgMin = nrgMax;
+        /* find minimum energy after maximum */
+        for (i = idxMax + 1; i < nTotBlocks; i++)
+        {
+            if (nrgMin > pSubblockNrg[i])
+            {
+                nrgMin = pSubblockNrg[i];
+            }
+        }
+        /* lower maxEnergyChange if energy doesn't decrease much after energy peak */
+        if (nrgMin > 0.375f * nrgMax)
+        {
+            nTotBlocks = idxMax - 3;
+        }
+    }
+    for (i = 0; i < nTotBlocks; i++)
+    {
+        maxEnergyChange = max(maxEnergyChange, pSubblockNrgChange[i]);
+    }
+
+    return maxEnergyChange;
+}
+
+/*---------------------------------------------------------------*
+ * RunTransientDetection()
+ *
+ * Time Domain Transient Detector for TCX
+ *---------------------------------------------------------------*/
+
+void RunTransientDetection(
+    float const * input,
+    int nSamplesAvailable,
+    TransientDetection * pTransientDetection
+)
+{
+    float filteredInput[L_FRAME_MAX];
+    SubblockEnergies * pSubblockEnergies = &pTransientDetection->subblockEnergies;                              /*  */
+    TransientDetector * pTransientDetector = &pTransientDetection->transientDetector;                           /*  */
 
     assert((input != NULL) && (pTransientDetection != NULL) && (pSubblockEnergies != NULL) && (pTransientDetector != NULL));
-
+    /* Variable initializations */
     HighPassFilter(input, nSamplesAvailable, &pSubblockEnergies->firState1, &pSubblockEnergies->firState2, filteredInput);
 
     /* Update subblock energies. */
@@ -296,130 +248,114 @@ void RunTransientDetection(Word16 const * input, Word16 nSamplesAvailable, Trans
 
     /* Update the delay buffer. */
     UpdateDelayBuffer(filteredInput, nSamplesAvailable, &pTransientDetection->delayBuffer);
+
+    return;
 }
 
-void SetTCXModeInfo(Encoder_State_fx *st,
-                    TransientDetection const * pTransientDetection,
-                    Word16 * tcxModeOverlap)
-{
-    assert(pTransientDetection != NULL);
 
-    IF( sub(st->codec_mode,MODE2) == 0 )
+void SetTCXModeInfo(Encoder_State *st,                  /* i/o: encoder state structure                  */
+                    TransientDetection const * pTransientDetection,
+                    short * tcxModeOverlap
+                   )
+{
+    if( st->codec_mode == MODE2 )
     {
+        assert(pTransientDetection != NULL);
 
         /* determine window sequence (1 long or 2 short windows) */
-
-        test();
-        IF ( st->tcx10Enabled != 0 && st->tcx20Enabled != 0 )
+        if (st->tcx10Enabled && st->tcx20Enabled)
         {
             /* window switching based on transient detector output */
-            test();
-            test();
-            test();
-            IF ( ((pTransientDetection->transientDetector.bIsAttackPresent != 0)
-                  ||  (L_sub(Mpy_32_16_1(st->currEnergyHF_fx, 840/*1.0f/39.0f Q15*/), st->prevEnergyHF_fx) > 0))
-                 && ((sub(st->last_core_fx, ACELP_CORE) != 0) && (sub(st->last_core_fx, AMR_WB_CORE) != 0)) )
+            if (
+                ((pTransientDetection->transientDetector.bIsAttackPresent)
+                 || (st->currEnergyHF > st->prevEnergyHF * 39.0f)) &&
+                ((st->last_core != ACELP_CORE) && (st->last_core != AMR_WB_CORE)))
             {
-                move16();
                 st->tcxMode = TCX_10;
             }
-            ELSE
+            else
             {
-                move16();
                 st->tcxMode = TCX_20;
             }
         }
-        ELSE
+        else
         {
             /* window selection (non-adaptive) based on flags only */
-            IF (st->tcx10Enabled)
+            if (st->tcx10Enabled)
             {
-                move16();
                 st->tcxMode = TCX_10;
             }
-            ELSE IF (st->tcx20Enabled)
+            else if (st->tcx20Enabled)
             {
-                move16();
                 st->tcxMode = TCX_20;
             }
-            ELSE {
-                move16();
+            else
+            {
                 st->tcxMode = NO_TCX;
             }
         }
-        test();
-        test();
-        IF (st->last_core_fx == ACELP_CORE || st->last_core_fx == AMR_WB_CORE)
+
+        /* set the left window overlap */
+
+        if (st->last_core == ACELP_CORE || st->last_core == AMR_WB_CORE)
         {
-            move16();
             st->tcx_cfg.tcx_last_overlap_mode = TRANSITION_OVERLAP;
         }
-        ELSE IF ( (sub(st->tcxMode, TCX_10) == 0) && (sub(st->tcx_cfg.tcx_curr_overlap_mode, ALDO_WINDOW) == 0))
+        else if ((st->tcxMode == TCX_10) && (st->tcx_cfg.tcx_curr_overlap_mode == ALDO_WINDOW))
         {
-            move16();
             st->tcx_cfg.tcx_last_overlap_mode = FULL_OVERLAP;
         }
-        ELSE
+        else
         {
-            move16();
             st->tcx_cfg.tcx_last_overlap_mode = st->tcx_cfg.tcx_curr_overlap_mode;
         }
 
-        /* determine window overlaps (0 full, 2 none, or 3 half) */
-
-        IF ( sub(st->tcxMode, TCX_10) == 0 )
+        /* determine the right window overlap */
+        if( st->tcxMode == TCX_10 )
         {
-            IF( pTransientDetection->transientDetector.attackIndex < 0)
+            if (pTransientDetection->transientDetector.attackIndex < 0)
             {
-                move16();
                 *tcxModeOverlap = HALF_OVERLAP;
             }
-            ELSE
+            else
             {
-                move16();
-                *tcxModeOverlap = s_and(pTransientDetection->transientDetector.attackIndex, 3);
-                if ( sub(*tcxModeOverlap,1) == 0 )
+                *tcxModeOverlap = pTransientDetection->transientDetector.attackIndex % 4;
+                if (*tcxModeOverlap == 1)
                 {
-                    move16();
                     *tcxModeOverlap = FULL_OVERLAP;
                 }
             }
         }
-        ELSE IF ( sub(st->tcxMode, TCX_20) == 0 )
+        else if (st->tcxMode == TCX_20)
         {
-            IF (sub(pTransientDetection->transientDetector.attackIndex, 7) == 0)
+            if (pTransientDetection->transientDetector.attackIndex == 7)
             {
-                move16();
                 *tcxModeOverlap = HALF_OVERLAP;
             }
-            ELSE IF (sub(pTransientDetection->transientDetector.attackIndex, 6) == 0)
+            else if (pTransientDetection->transientDetector.attackIndex == 6)
             {
-                move16();
                 *tcxModeOverlap = MIN_OVERLAP;
             }
-            ELSE
+            else
             {
-                move16();
                 *tcxModeOverlap = ALDO_WINDOW;
             }
         }
-        ELSE                      /* NO_TCX */
+        else
         {
-            move16();
+            /* NO_TCX */
             *tcxModeOverlap = TRANSITION_OVERLAP;
         }
-        test();
-        if ((sub(st->tcx_cfg.tcx_last_overlap_mode, TRANSITION_OVERLAP) == 0) && (sub(*tcxModeOverlap, ALDO_WINDOW) == 0))
+
+        /* for the ACELP -> TCX transition frames use full right window overlap */
+
+        if ((st->tcx_cfg.tcx_last_overlap_mode == TRANSITION_OVERLAP) && (*tcxModeOverlap == ALDO_WINDOW))
         {
-            move16();
             *tcxModeOverlap = FULL_OVERLAP;
         }
-
-        /* Sanity check */
-        assert(*tcxModeOverlap !=1);
-
     }
 
+    return;
 }
 
 /************************************************/
@@ -428,164 +364,150 @@ void SetTCXModeInfo(Encoder_State_fx *st,
 /*                                              */
 /************************************************/
 
-static void InitDelayBuffer(Word16 nFrameLength, Word16 nDelay, DelayBuffer * pDelayBuffer)
+static void InitDelayBuffer(int nFrameLength, int nDelay, DelayBuffer * pDelayBuffer)
 {
-    Word16 const nMaxBuffSize = sizeof(pDelayBuffer->buffer)/sizeof(pDelayBuffer->buffer[0]);
+    int const nMaxBuffSize = sizeof(pDelayBuffer->buffer)/sizeof(pDelayBuffer->buffer[0]);
 
-
-    move16();
-    move16();
     assert((nFrameLength > NSUBBLOCKS) && (nFrameLength % NSUBBLOCKS == 0) && (nDelay >= 0) && (pDelayBuffer != NULL));
     pDelayBuffer->nSubblockSize = nFrameLength/NSUBBLOCKS;
     assert(pDelayBuffer->nSubblockSize <= nMaxBuffSize);
-    set16_fx(pDelayBuffer->buffer, 0, nMaxBuffSize);
+    set_f(pDelayBuffer->buffer, 0.0f, nMaxBuffSize);
     pDelayBuffer->nDelay = nDelay % pDelayBuffer->nSubblockSize;
     assert(pDelayBuffer->nDelay <= nMaxBuffSize);
 
+    return;
 }
 
-static void InitSubblockEnergies(Word16 nFrameLength, Word16 nDelay, DelayBuffer * pDelayBuffer, SubblockEnergies * pSubblockEnergies)
-{
-    Word16 const nMaxBuffSize = sizeof(pSubblockEnergies->subblockNrg)/sizeof(pSubblockEnergies->subblockNrg[0]);
-    (void)nFrameLength;
 
+static void InitSubblockEnergies(int nFrameLength, int nDelay, DelayBuffer * pDelayBuffer, SubblockEnergies * pSubblockEnergies)
+{
+    int const nMaxBuffSize = sizeof(pSubblockEnergies->subblockNrg)/sizeof(pSubblockEnergies->subblockNrg[0]);
+    (void)nFrameLength;
 
     assert((pDelayBuffer != NULL) && (pSubblockEnergies != NULL) && (pDelayBuffer->nSubblockSize * NSUBBLOCKS == nFrameLength) && (pDelayBuffer->nSubblockSize > 0));
 
-    set32_fx(pSubblockEnergies->subblockNrg,    MIN_BLOCK_ENERGY, nMaxBuffSize);
-    set32_fx(pSubblockEnergies->accSubblockNrg, MIN_BLOCK_ENERGY, nMaxBuffSize+1);
-    set16_fx(pSubblockEnergies->subblockNrgChange, 0x7fff, nMaxBuffSize);
+    set_f(pSubblockEnergies->subblockNrg,    MIN_BLOCK_ENERGY, nMaxBuffSize);
+    set_f(pSubblockEnergies->accSubblockNrg, MIN_BLOCK_ENERGY, nMaxBuffSize+1);
+    set_f(pSubblockEnergies->subblockNrgChange, 1.0f, nMaxBuffSize);
     pSubblockEnergies->nDelay = nDelay / pDelayBuffer->nSubblockSize;
     assert(pSubblockEnergies->nDelay < nMaxBuffSize);
     pSubblockEnergies->nPartialDelay = nDelay % pDelayBuffer->nSubblockSize;
-    pSubblockEnergies->facAccSubblockNrg = 26624/*0.8125f Q15*/; /* Energy accumulation factor */
-    pSubblockEnergies->firState1 = 0;
-    pSubblockEnergies->firState2 = 0;
+    pSubblockEnergies->facAccSubblockNrg = 0.8125f; /* Energy accumulation factor */
+    pSubblockEnergies->firState1 = 0.0f;
+    pSubblockEnergies->firState2 = 0.0f;
 
     pSubblockEnergies->pDelayBuffer = pDelayBuffer;
-    pDelayBuffer->nDelay = s_max(pDelayBuffer->nDelay, pSubblockEnergies->nPartialDelay);
+    pDelayBuffer->nDelay = max(pDelayBuffer->nDelay, pSubblockEnergies->nPartialDelay);
 
+    return;
 }
 
 /** Init transient detector.
   * Fills TransientDetector structure with sensible content and enable it.
   * @param pSubblockEnergies Subblock energies used in this transient detector.
-  * @param nDelay Delay FOR this transient detector.
+  * @param nDelay Delay for this transient detector.
   * @param nSubblocksToCheck Number of subblocks to check in this transient detector.
-  * @param pCheckSubblockForAttack Attack detection function FOR this transient detector.
-  * @param pSetAttackPosition Function FOR finalizing this transient detector.
-  * @param attackRatioThreshold Attack ratio threshold with exponent ATTACKTHRESHOLD_E.
+  * @param pCheckSubblockForAttack Attack detection function for this transient detector.
+  * @param pSetAttackPosition Function for finalizing this transient detector.
+  * @param attackRatioThreshold Attack ratio threshold.
   * @param pTransientDetector Structure to be initialized.
   */
-static void InitTransientDetector(SubblockEnergies * pSubblockEnergies, Word16 nDelay, Word16 nSubblocksToCheck,
+static void InitTransientDetector(SubblockEnergies * pSubblockEnergies, int nDelay, int nSubblocksToCheck,
                                   TCheckSubblocksForAttack pCheckSubblocksForAttack,
-                                  Word16 attackRatioThreshold, TransientDetector * pTransientDetector)
+                                  float attackRatioThreshold, TransientDetector * pTransientDetector)
 {
-    Word16 nMaxBuffSize;
-
-    move16();
-    nMaxBuffSize = sizeof(pSubblockEnergies->subblockNrg)/sizeof(pSubblockEnergies->subblockNrg[0]);
-
+    int const nMaxBuffSize = sizeof(pSubblockEnergies->subblockNrg)/sizeof(pSubblockEnergies->subblockNrg[0]);
+    (void)nMaxBuffSize;
     assert((pSubblockEnergies != NULL) && (pSubblockEnergies->pDelayBuffer != NULL) && (pTransientDetector != NULL) && (pSubblockEnergies->pDelayBuffer->nSubblockSize != 0));
     pTransientDetector->pSubblockEnergies = pSubblockEnergies;
     pTransientDetector->nDelay = (nDelay - pSubblockEnergies->nPartialDelay) / pSubblockEnergies->pDelayBuffer->nSubblockSize;
     assert(nDelay == pTransientDetector->nDelay * pSubblockEnergies->pDelayBuffer->nSubblockSize + pSubblockEnergies->nPartialDelay);
     assert(pTransientDetector->nDelay < nMaxBuffSize);
-    pSubblockEnergies->nDelay = s_max(pSubblockEnergies->nDelay, pTransientDetector->nDelay);
+    pSubblockEnergies->nDelay = max(pSubblockEnergies->nDelay, pTransientDetector->nDelay);
     assert(nSubblocksToCheck <= NSUBBLOCKS + pTransientDetector->nDelay);
     pTransientDetector->nSubblocksToCheck = nSubblocksToCheck;
     pTransientDetector->CheckSubblocksForAttack = pCheckSubblocksForAttack;
     pTransientDetector->attackRatioThreshold = attackRatioThreshold;
     pTransientDetector->bIsAttackPresent = FALSE;
     pTransientDetector->attackIndex = -1;
+
+    return;
 }
 
 /* This function should be inlined and WMOPS instrumentation takes that into account, meaning that all references are considered as local variables */
-static Word32 InlineFilter(Word16 inValue, Word16 firState1, Word16 firState2)
+static float InlineFilter(float inValue, float firState1, float firState2)
 {
-    /*  0.375f * inValue - 0.5f * firState1 + 0.125f * firState2 */
-
-    return L_msu(L_mac(L_mult(firState2, 4096/*0.125f Q15*/), inValue, 12288/*0.375f Q15*/), firState1, 16384/*0.5f Q15*/);
+    return 0.375f * inValue - 0.5f * firState1 + 0.125f * firState2;
 }
 
-static void HighPassFilter(Word16 const * input, Word16 length, Word16 * pFirState1, Word16 * pFirState2, Word16 * output)
+
+static void HighPassFilter(float const * input, int length, float * pFirState1, float * pFirState2, float * output)
 {
-    Word16 i;
-
-    output[0] = round_fx(InlineFilter(input[0], *pFirState1, *pFirState2));
-    output[1] = round_fx(InlineFilter(input[1], input[0], *pFirState1));
-
-    FOR (i = 2; i < length; i++)
+    int i;
+    output[0] = InlineFilter(input[0], *pFirState1, *pFirState2);
+    output[1] = InlineFilter(input[1], input[0], *pFirState1);
+    for (i = 2; i < length; i++)
     {
-        output[i] = round_fx(InlineFilter(input[i], input[i-1], input[i-2]));
+        output[i] = InlineFilter(input[i], input[i-1], input[i-2]);
     }
-
     /* update filter states: shift time samples through delay line */
-    move16();
-    move16();
     *pFirState2 = input[length-2];
     *pFirState1 = input[length-1];
 
+    return;
 }
+
 
 static void RunTransientDetector(TransientDetector * pTransientDetector)
 {
-    Word16 const attackRatioThreshold = pTransientDetector->attackRatioThreshold;
-    SubblockEnergies const * pSubblockEnergies = pTransientDetector->pSubblockEnergies;
-    Word16 const nDelay = pTransientDetector->nDelay;
-    Word16 const nRelativeDelay = pSubblockEnergies->nDelay - nDelay;
-    Word32 const * pSubblockNrg = &pSubblockEnergies->subblockNrg[nRelativeDelay];
-    Word32 const * pAccSubblockNrg = &pSubblockEnergies->accSubblockNrg[nRelativeDelay];
+    float const attackRatioThreshold = pTransientDetector->attackRatioThreshold;                                /*  */
+    SubblockEnergies const * pSubblockEnergies = pTransientDetector->pSubblockEnergies;                         /*  */
+    int const nDelay = pTransientDetector->nDelay;                                                              /*  */
+    int const nRelativeDelay = pSubblockEnergies->nDelay - nDelay;                                              /*   */
+    float const * pSubblockNrg = &pSubblockEnergies->subblockNrg[nRelativeDelay];                               /*  */
+    float const * pAccSubblockNrg = &pSubblockEnergies->accSubblockNrg[nRelativeDelay];                         /*  */
 
     assert((pTransientDetector->CheckSubblocksForAttack != NULL));
-
+    /* Variable initialization */
     pTransientDetector->CheckSubblocksForAttack(pSubblockNrg, pAccSubblockNrg,
             NSUBBLOCKS+nDelay, nRelativeDelay,
             attackRatioThreshold,
             &pTransientDetector->bIsAttackPresent, &pTransientDetector->attackIndex);
 
+    return;
 }
 
-static void UpdateDelayBuffer(Word16 const * input, Word16 nSamplesAvailable, DelayBuffer * pDelayBuffer)
+static void UpdateDelayBuffer(float const * input, int nSamplesAvailable, DelayBuffer * pDelayBuffer)
 {
-    Word16 i;
-    Word16 nDelay;
-
-
-    move16();
-    nDelay = pDelayBuffer->nDelay;
-
+    int i;
+    int const nDelay = pDelayBuffer->nDelay;
     assert((nDelay >= 0) && (nDelay <= (int)sizeof(pDelayBuffer->buffer)/(int)sizeof(pDelayBuffer->buffer[0])));
     assert(nSamplesAvailable <= NSUBBLOCKS*pDelayBuffer->nSubblockSize);
     /* If this is not the last frame */
-    IF (nSamplesAvailable == NSUBBLOCKS*pDelayBuffer->nSubblockSize)
+    if (nSamplesAvailable == NSUBBLOCKS*pDelayBuffer->nSubblockSize)
     {
         /* Store the newest samples into the delay buffer */
-        FOR (i = 0; i < nDelay; i++)
+        for (i = 0; i < nDelay; i++)
         {
-            move16();
             pDelayBuffer->buffer[i] = input[i+nSamplesAvailable-nDelay];
         }
     }
 
+    return;
 }
 
-static void UpdateSubblockEnergies(Word16 const * input, Word16 nSamplesAvailable, SubblockEnergies * pSubblockEnergies)
+
+static void UpdateSubblockEnergies(float const * input, int nSamplesAvailable, SubblockEnergies * pSubblockEnergies)
 {
-    Word16 i;
-
-
+    int i;
     assert((pSubblockEnergies->nDelay >= 0) && (pSubblockEnergies->nDelay+NSUBBLOCKS <= (int)sizeof(pSubblockEnergies->subblockNrg)/(int)sizeof(pSubblockEnergies->subblockNrg[0])));
     assert(pSubblockEnergies->nPartialDelay <= pSubblockEnergies->pDelayBuffer->nDelay);
     /* At least one block delay is required when subblock energy change is required */
     assert(pSubblockEnergies->nDelay >= 1);
 
     /* Shift old subblock energies */
-    FOR (i = 0; i < pSubblockEnergies->nDelay; i++)
+    for (i = 0; i < pSubblockEnergies->nDelay; i++)
     {
-        move32();
-        move32();
-        move16();
         pSubblockEnergies->subblockNrg[i] = pSubblockEnergies->subblockNrg[i+NSUBBLOCKS];
         pSubblockEnergies->accSubblockNrg[i] = pSubblockEnergies->accSubblockNrg[i+NSUBBLOCKS];
         pSubblockEnergies->subblockNrgChange[i] = pSubblockEnergies->subblockNrgChange[i+NSUBBLOCKS];
@@ -594,136 +516,83 @@ static void UpdateSubblockEnergies(Word16 const * input, Word16 nSamplesAvailabl
     /* Compute filtered subblock energies for the new samples */
     CalculateSubblockEnergies(input, nSamplesAvailable, pSubblockEnergies);
 
+    return;
 }
+
 
 /* This function should be inlined and WMOPS instrumentation takes that into account, meaning that all references are considered as local variables */
-static void UpdatedAndStoreAccWindowNrg(Word32 newWindowNrgF, Word32 * pAccSubblockNrg, Word16 facAccSubblockNrg, Word32 * pOutAccWindowNrgF)
+static void UpdatedAndStoreAccWindowNrg(float newWindowNrgF, float * pAccSubblockNrg, float facAccSubblockNrg, float * pOutAccWindowNrgF)
 {
     /* Store the accumulated energy */
-    move32();
     *pOutAccWindowNrgF = *pAccSubblockNrg;
     /* Update the accumulated energy: maximum of the current and the accumulated energy */
-    *pAccSubblockNrg = Mpy_32_16_1(*pAccSubblockNrg, facAccSubblockNrg);
-
-    if ( L_sub(newWindowNrgF, *pAccSubblockNrg) > 0 )
+    *pAccSubblockNrg *= facAccSubblockNrg;
+    if (newWindowNrgF > *pAccSubblockNrg)
     {
-        move32();
         *pAccSubblockNrg = newWindowNrgF;
     }
+
+    return;
 }
 
-static void CalculateSubblockEnergies(Word16 const * input, Word16 nSamplesAvailable, SubblockEnergies * pSubblockEnergies)
+
+static void CalculateSubblockEnergies(float const * input, int nSamplesAvailable, SubblockEnergies * pSubblockEnergies)
 {
-    DelayBuffer * pDelayBuffer;
-    Word16 nSubblockSize;
-    Word16 nDelay;
-    Word16 nPartialDelay;
-    Word16 * delayBuffer;
-    Word16 facAccSubblockNrg;
-    Word32 * pSubblockNrg;
-    Word32 * pAccSubblockNrg;
-    Word16 * pSubblockNrgChange;
-    Word32 * pAccSubblockTmp;
-    Word16 nWindows;
-    Word16 w, k, k2, tmp;
-    Word16 firState1, firState2;
-    Word32 w0, w1;
-    Word32 accu;
-
-    move16();
-    pDelayBuffer = pSubblockEnergies->pDelayBuffer;
-    facAccSubblockNrg = pSubblockEnergies->facAccSubblockNrg;
-
-    move16();
-    move16();
-    move16();
-    nSubblockSize = pDelayBuffer->nSubblockSize;
-    nDelay = pSubblockEnergies->nDelay;
-    nPartialDelay = pSubblockEnergies->nPartialDelay;
-
-    delayBuffer = &pDelayBuffer->buffer[sub(pDelayBuffer->nDelay, nPartialDelay)];
-    pSubblockNrg = &pSubblockEnergies->subblockNrg[nDelay];
-    pAccSubblockNrg = &pSubblockEnergies->accSubblockNrg[nDelay];
-    pSubblockNrgChange = &pSubblockEnergies->subblockNrgChange[nDelay];
-
-    move16();
-    move16();
-    /* nWindows = (nSamplesAvailable + nPartialDelay) / nSubblockSize */
-    nWindows = shr(div_s( add(nSamplesAvailable,nPartialDelay), shl(nSubblockSize, 7)),8);
-    firState1 = pSubblockEnergies->firState1;
-    firState2 = pSubblockEnergies->firState2;
+    DelayBuffer * pDelayBuffer = pSubblockEnergies->pDelayBuffer;                                               /*  */
+    int const nSubblockSize = pDelayBuffer->nSubblockSize;                                                      /*  */
+    int const nDelay = pSubblockEnergies->nDelay;                                                               /*  */
+    int const nPartialDelay = pSubblockEnergies->nPartialDelay;                                                 /*  */
+    float const * delayBuffer = &pDelayBuffer->buffer[pDelayBuffer->nDelay - nPartialDelay];                    /*   */
+    float const facAccSubblockNrg = pSubblockEnergies->facAccSubblockNrg;                                       /*  */
+    float * pSubblockNrg = &pSubblockEnergies->subblockNrg[nDelay];                                             /*  */
+    float * pAccSubblockNrg = &pSubblockEnergies->accSubblockNrg[nDelay];                                       /*  */
+    float * pSubblockNrgChange = &pSubblockEnergies->subblockNrgChange[nDelay];                                 /*  */
+    float * pAccSubblockTmp;
+    int nWindows;
+    int i, w, k;
+    /* Variable initializations */
+    nWindows = (nSamplesAvailable+nPartialDelay)/nSubblockSize;
     pAccSubblockTmp = &pAccSubblockNrg[nWindows];
 
-    IF (nWindows > 0)
+    set_f(pSubblockNrg, MIN_BLOCK_ENERGY, NSUBBLOCKS);
+    if (nWindows > 0)
     {
         /* Process left over samples from the previous frame. */
-        accu = L_add(MIN_BLOCK_ENERGY, 0);
-        assert((SUBBLOCK_NRG_E & 1) == 0);
-        FOR (k = 0; k < nPartialDelay; k++)
+        for (k = 0; k < nPartialDelay; k++)
         {
-            tmp = shr(delayBuffer[k], SUBBLOCK_NRG_E/2);
-            accu = L_mac0(accu, tmp, tmp);
+            pSubblockNrg[0] += delayBuffer[k] * delayBuffer[k];
         }
-
+        k = 0;
         /* Process new samples in the 0. subblock. */
-        w = sub(nSubblockSize,nPartialDelay);
-        assert((SUBBLOCK_NRG_E & 1) == 0);
-        FOR (k = 0; k < w; k++)
+        for (i = nPartialDelay; i < nSubblockSize; i++, k++)
         {
-            tmp = shr(input[k], SUBBLOCK_NRG_E/2);
-            accu = L_mac0(accu, tmp, tmp);
+            pSubblockNrg[0] += input[k] * input[k];
         }
-
-        move32();
-        pSubblockNrg[0] = accu;
         /* Set accumulated subblock energy at this point. */
         UpdatedAndStoreAccWindowNrg(pSubblockNrg[0], pAccSubblockTmp, facAccSubblockNrg, &pAccSubblockNrg[0]);
-
-        FOR (w = 1; w < nWindows; w++)
+        for (w = 1; w < nWindows; w++)
         {
-            accu = L_add(MIN_BLOCK_ENERGY, 0);
             /* Process new samples in the w. subblock. */
-            k2 = add(k, nSubblockSize);
-            assert((SUBBLOCK_NRG_E & 1) == 0);
-            FOR (; k < k2; k++)
+            for (i = 0; i < nSubblockSize; i++, k++)
             {
-                tmp = shr(input[k], SUBBLOCK_NRG_E/2);
-                accu = L_mac0(accu, tmp, tmp);
+                pSubblockNrg[w] += input[k] * input[k];
             }
-            move32();
-            pSubblockNrg[w] = accu;
             /* Set accumulated subblock energy at this point. */
             UpdatedAndStoreAccWindowNrg(pSubblockNrg[w], pAccSubblockTmp, facAccSubblockNrg, &pAccSubblockNrg[w]);
         }
-
         /* Calculate energy change for each block. */
-        FOR (w = 0; w < nWindows; w++)
+        for (w = 0; w < nWindows; w++)
         {
-            w0 = L_add(pSubblockNrg[w], 0);
-            w1 = L_add(pSubblockNrg[sub(w,1)], 0);
-
-            IF ( L_sub(w0, w1) >  0 )
+            if (pSubblockNrg[w] > pSubblockNrg[w-1])
             {
-                k2 = BASOP_Util_Divide3232_uu_1616_Scale(w0, w1, &k);
+                pSubblockNrgChange[w] = pSubblockNrg[w]/pSubblockNrg[w-1];
             }
-            ELSE
+            else
             {
-                k2 = BASOP_Util_Divide3232_uu_1616_Scale(w1, w0, &k);
-            }
-            move16();
-            pSubblockNrgChange[w] = MAX_16;
-            IF ( sub(k,SUBBLOCK_NRG_CHANGE_E) < 0 )
-            {
-                move16();
-                pSubblockNrgChange[w] = shr(k2, sub(SUBBLOCK_NRG_CHANGE_E,k));
+                pSubblockNrgChange[w] = pSubblockNrg[w-1]/pSubblockNrg[w];
             }
         }
     }
 
-    move16();
-    move16();
-    pSubblockEnergies->firState1 = firState1;
-    pSubblockEnergies->firState2 = firState2;
+    return;
 }
-
-

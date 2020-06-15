@@ -1,24 +1,17 @@
 /*====================================================================================
-    EVS Codec 3GPP TS26.442 Apr 03, 2018. Version 12.11.0 / 13.6.0 / 14.2.0
+    EVS Codec 3GPP TS26.443 Nov 13, 2018. Version 12.11.0 / 13.7.0 / 14.3.0 / 15.1.0
   ====================================================================================*/
 
-#include "basop_util.h"
-#include "rom_basop_util.h"
-#include "basop_mpy.h"
-#include "cnst_fx.h"
-#include "control.h"
-#include "options.h"
 
 #include <stdio.h>
 #include <assert.h>
-
-#include "stl.h"
-
-#define DOT12_SUBDIV_LD 2  /* log2(number of dot product sub divisions) */
-
-#define HP20_COEF_SCALE  2
-#define INV_BANDS10 3277 /* 1/10 in Q15 */
-#define INV_BANDS9  3641 /* 1/9  in Q15 */
+#include "options.h"
+#include "basop_util.h"
+#include "rom_com.h"
+#include "basop_settings.h"
+#include "basop_mpy.h"
+#include "control.h"
+#include "cnst.h"
 
 extern const Word32 SqrtTable[32];
 extern const Word16 SqrtDiffTable[32];
@@ -38,13 +31,10 @@ Word32 BASOP_Util_Log2(Word32 x)
     Word16  accuSqr;
     Word32  accuRes;
 
-
-
     assert(x >= 0);
 
     if (x == 0)
     {
-
         return ((Word32)MIN_32);
     }
 
@@ -92,9 +82,9 @@ Word32 BASOP_Util_Log2(Word32 x)
     exp = L_shl(exp,(31-LD_DATA_SCALE));          /* integer part/LD_DATA_SCALE */
     accuRes = L_sub(accuRes,exp);                 /* result = integer part + fractional part */
 
-
     return (accuRes);
 }
+
 
 Word32 BASOP_Util_InvLog2(Word32 x)
 {
@@ -108,17 +98,13 @@ Word32 BASOP_Util_InvLog2(Word32 x)
     UWord32 lookup12;
     UWord32 lookup;
 
-
-
-    if ( x < -1040187392l/*-31.0/64.0 Q31*/ )
+    if ( x < FL2WORD32(-31.0/64.0) )
     {
-
         return 0;
     }
     test();
-    if ( (L_sub(x,1040187392l/*31.0/64.0 Q31*/) >= 0) || (x == 0) )
+    if ( (L_sub(x,FL2WORD32(31.0/64.0)) >= 0) || (x == 0) )
     {
-
         return 0x7FFFFFFF;
     }
 
@@ -138,12 +124,11 @@ Word32 BASOP_Util_InvLog2(Word32 x)
         exp = negate(exp);
     }
 
-    lookup3f = L_add(exp2x_tab_long[index3],L_shr(Mpy_32_16_1(0x0016302F,frac),1));
+    lookup3f = L_add(exp2x_tab_long[index3],L_shr(Mpy_32_16(0x0016302F,frac),1));
     lookup12 = Mpy_32_32(exp2_tab_long[index1],exp2w_tab_long[index2]);
     lookup   = Mpy_32_32(lookup12, lookup3f);
 
     retVal = L_shr(lookup,sub(exp,3));
-
 
     return retVal;
 }
@@ -159,8 +144,6 @@ Word16 BASOP_Util_Add_MantExp                    /*!< Exponent of result        
     Word32 L_lm, L_hm;
     Word16 shift;
 
-
-
     /* Compare exponents: the difference is limited to +/- 15
        The Word16 mantissa of the operand with higher exponent is moved into the low
      part of a Word32 and shifted left by the exponent difference. Then, the
@@ -170,14 +153,14 @@ Word16 BASOP_Util_Add_MantExp                    /*!< Exponent of result        
      including the final 16-bit extraction.
      Note: The resulting mantissa may be inaccurate in the case, where the mantissa of the operand
            with higher exponent is not really left-aligned, while the mantissa of the operand with
-         lower exponent is so. If in such a case, the difference in exponents is more than 15,
-         an inaccuracy is introduced.
-         Example:
-         A: a_e = 20, a_m = 0x0001
-         B: b_e =  0, b_m = 0x4000
+    	   lower exponent is so. If in such a case, the difference in exponents is more than 15,
+    	   an inaccuracy is introduced.
+    	   Example:
+    	   A: a_e = 20, a_m = 0x0001
+    	   B: b_e =  0, b_m = 0x4000
              correct:      A+B=1*2^20+1*2^14=0x0010.0000+0x0000.4000=0x0010.4000=0x4100*2^6
-         previously:   A+B=1*2^20+1*2^14=0x0001+0x0000=0x0001*2^20
-         this version: A+B=1*2^20+1*2^14=0x0000.8000+0x0000.4000=0x6000*2^6
+    	   previously:   A+B=1*2^20+1*2^14=0x0001+0x0000=0x0001*2^20
+    	   this version: A+B=1*2^20+1*2^14=0x0000.8000+0x0000.4000=0x6000*2^6
     */
 
     shift = sub(a_e, b_e);
@@ -208,67 +191,12 @@ Word16 BASOP_Util_Add_MantExp                    /*!< Exponent of result        
     a_e = sub(a_e,shift);
     if (L_hm)
         a_e = add(a_e,16);
+
     return (a_e);
 }
 
 
-void BASOP_Util_Divide_MantExp (Word16   a_m,          /*!< Mantissa of dividend a */
-                                Word16   a_e,          /*!< Exponent of dividend a */
-                                Word16   b_m,          /*!< Mantissa of divisor b */
-                                Word16   b_e,          /*!< Exponent of divisor b */
-                                Word16  *ptrResult_m,  /*!< Mantissa of quotient a/b */
-                                Word16  *ptrResult_e   /*!< Exponent of quotient a/b */
-                               )
-{
-    Word16 index, frac;
-    Word16 preShift, postShift;
-    Word16 m;
-    Word32 m32;
-
-
-
-    assert(b_m != 0);
-
-    /* normalize b */
-    preShift = norm_s(b_m);
-    m = shl(b_m, preShift);
-
-    /* make b positive */
-    BASOP_SATURATE_WARNING_OFF;
-    if (m < 0) m = negate(m);
-    BASOP_SATURATE_WARNING_ON;
-
-    /* get table index (upper 6 bits minus 16) */
-    /* index = (m >> 9) - 32; */
-    index = mac_r(-32768 - (32 << 16), m, 1 << 6);
-
-    /* get fractional part for interpolation (lower 9 bits) */
-    frac = shl(s_and(m, 0x1FF), 1); /* Q10 */
-
-    /* interpolate 1/b */
-    m = msu_r(InvTable[index], InvDiffTable[index], frac);
-
-    /* restore sign */
-    if (b_m < 0) m = negate(m);
-
-    /* multiply with a */
-    m32 = L_mult(a_m, m);
-
-    /* normalize result */
-    postShift = norm_l(m32);
-    m = round_fx(L_shl(m32, postShift));
-
-    /* exponent */
-    *ptrResult_e = sub(add(add(a_e, sub(1, b_e)), preShift), postShift);
-    move16();
-
-    *ptrResult_m = m;
-    move16();
-
-}
-
-
-/* local function for Sqrt16 and Sqrt16norm */
+/* local function for Sqrt16 */
 static Word16 Sqrt16_common(Word16 m,
                             Word16 e)
 {
@@ -293,87 +221,6 @@ static Word16 Sqrt16_common(Word16 m,
 
     /* handle odd exponents */
     if (s_and(e, 1) != 0) m = mult_r(m, 0x5a82);
-
-    return m;
-}
-
-/* local function for Sqrt32 and Sqrt32norm */
-static Word32 Sqrt32_common(Word32 m,
-                            Word16 e)
-{
-    Word16 m16, index, frac;
-
-    assert((m >= 0x40000000) || (m == 0));
-
-    m16 = round_fx(m);
-
-    /* get table index (upper 6 bits minus 32) */
-    /* index = (m16 >> 9) - 32; */
-    index = mac_r(-32768 - (32 << 16), m16, 1 << 6);
-
-    /* get fractional part for interpolation (lower 9 bits) */
-    frac = s_and(m16, 0x1FF); /* Q9 */
-
-    /* interpolate */
-    if (m != 0)
-    {
-        BASOP_SATURATE_WARNING_OFF;
-        m = L_mac(SqrtTable[index], SqrtDiffTable[index], frac);
-        BASOP_SATURATE_WARNING_ON;
-    }
-
-    /* handle odd exponents */
-    if (s_and(e, 1) != 0) m = Mpy_32_16_1(m, 0x5a82);
-
-    return m;
-}
-
-/* local function for ISqrt16 and ISqrt16norm */
-static Word16 ISqrt16_common(Word16 m,
-                             Word16 e)
-{
-    Word16 index, frac;
-
-    assert(m >= 0x4000);
-
-    /* get table index (upper 6 bits minus 32) */
-    /* index = (m >> 9) - 32; */
-    index = mac_r(-32768 - (32 << 16), m, 1 << 6);
-
-    /* get fractional part for interpolation (lower 9 bits) */
-    frac = s_and(m, 0x1FF); /* Q9 */
-
-    /* interpolate */
-    m = msu_r(ISqrtTable[index], ISqrtDiffTable[index], frac);
-
-    /* handle even exponents */
-    if (s_and(e, 1) == 0) m = mult_r(m, 0x5a82);
-
-    return m;
-}
-
-/* local function for ISqrt32 and ISqrt32norm */
-static Word32 ISqrt32_common(Word32 m,
-                             Word16 e)
-{
-    Word16 m16, index, frac;
-
-    assert(m >= 0x40000000);
-
-    m16 = round_fx(m);
-
-    /* get table index (upper 6 bits minus 32) */
-    /* index = (m16 >> 25) - 32; */
-    index = mac_r(-32768 - (32 << 16), m16, 1 << 6);
-
-    /* get fractional part for interpolation (lower 9 bits) */
-    frac = s_and(m16, 0x1FF); /* Q9 */
-
-    /* interpolate */
-    m = L_msu(ISqrtTable[index], ISqrtDiffTable[index], frac);
-
-    /* handle even exponents */
-    if (s_and(e, 1) == 0) m = Mpy_32_16_1(m, 0x5a82);
 
     return m;
 }
@@ -404,139 +251,6 @@ Word16 Sqrt16(                  /*!< output mantissa */
     return mantissa;
 }
 
-Word16 Sqrt16norm(              /*!< output mantissa */
-    Word16 mantissa,  /*!< normalized input mantissa */
-    Word16 *exponent  /*!< pointer to exponent */
-)
-{
-
-    assert((mantissa >= 0x4000) || (mantissa == 0));
-
-    /* calc mantissa */
-    mantissa = Sqrt16_common(mantissa, *exponent);
-
-    /* e = (e + 1) >> 1 */
-    *exponent = mult_r(*exponent, 1 << 14);
-    move16();
-
-    return mantissa;
-}
-
-
-Word16 ISqrt16(                  /*!< output mantissa */
-    Word16 mantissa,  /*!< input mantissa */
-    Word16 *exponent  /*!< pointer to exponent */
-)
-{
-    Word16 preShift, e;
-
-    assert(mantissa > 0);
-
-    /* normalize */
-    preShift = norm_s(mantissa);
-
-    e = sub(*exponent, preShift);
-    mantissa = shl(mantissa, preShift);
-
-    /* calc mantissa */
-    mantissa = ISqrt16_common(mantissa, e);
-
-    /* e = (2 - e) >> 1 */
-    *exponent = msu_r(1L << 15, e, 1 << 14);
-    move16();
-
-    return mantissa;
-}
-
-
-Word32 Sqrt32(                  /*!< output mantissa */
-    Word32 mantissa,  /*!< input mantissa */
-    Word16 *exponent  /*!< pointer to exponent */
-)
-{
-    Word16 preShift, e;
-
-    assert(mantissa >= 0);
-
-    /* normalize */
-    preShift = norm_l(mantissa);
-
-    e = sub(*exponent, preShift);
-    mantissa = L_shl(mantissa, preShift);
-
-    /* calc mantissa */
-    mantissa = Sqrt32_common(mantissa, e);
-
-    /* e = (e + 1) >> 1 */
-    *exponent = mult_r(e, 1 << 14);
-    move16();
-
-    return mantissa;
-}
-
-Word32 Sqrt32norm(              /*!< output mantissa */
-    Word32 mantissa,  /*!< normalized input mantissa */
-    Word16 *exponent  /*!< pointer to exponent */
-)
-{
-
-    assert((mantissa >= 0x40000000) || (mantissa == 0));
-
-    /* calc mantissa */
-    mantissa = Sqrt32_common(mantissa, *exponent);
-
-    /* e = (e + 1) >> 1 */
-    *exponent = mult_r(*exponent, 1 << 14);
-    move16();
-
-    return mantissa;
-}
-
-
-Word32 ISqrt32(                  /*!< output mantissa */
-    Word32 mantissa,  /*!< input mantissa */
-    Word16 *exponent  /*!< pointer to exponent */
-)
-{
-    Word16 preShift, e;
-
-    assert(mantissa > 0);
-
-    /* normalize */
-    preShift = norm_l(mantissa);
-
-    e = sub(*exponent, preShift);
-    mantissa = L_shl(mantissa, preShift);
-
-    /* calc mantissa */
-    mantissa = ISqrt32_common(mantissa, e);
-
-    /* e = (2 - e) >> 1 */
-    *exponent = msu_r(1L << 15, e, 1 << 14);
-    move16();
-
-    return mantissa;
-}
-
-Word32 ISqrt32norm(              /*!< output mantissa */
-    Word32 mantissa,  /*!< normalized input mantissa */
-    Word16 *exponent  /*!< pointer to exponent */
-)
-{
-
-    assert(mantissa >= 0x40000000);
-
-    /* calc mantissa */
-    mantissa = ISqrt32_common(mantissa, *exponent);
-
-    /* e = (2 - e) >> 1 */
-    *exponent = msu_r(1L << 15, *exponent, 1 << 14);
-    move16();
-
-    return mantissa;
-}
-
-
 Word16 Inv16(                  /*!< output mantissa */
     Word16 mantissa,  /*!< input mantissa */
     Word16 *exponent  /*!< pointer to exponent */
@@ -545,8 +259,6 @@ Word16 Inv16(                  /*!< output mantissa */
     Word16 index, frac;
     Word16 preShift;
     Word16 m, e;
-
-
 
     assert(mantissa != 0);
 
@@ -594,8 +306,6 @@ void BASOP_Util_Sqrt_InvSqrt_MantExp (Word16 mantissa,      /*!< mantissa */
     Word16 preShift;
     Word16 m, mi, e_odd;
 
-
-
     assert(mantissa > 0);
 
     /* normalize */
@@ -642,69 +352,18 @@ void BASOP_Util_Sqrt_InvSqrt_MantExp (Word16 mantissa,      /*!< mantissa */
 /*!
   \brief   Calculates the scalefactor needed to normalize input array
 
-    The scalefactor needed to normalize the Word16 input array is returned <br>
-    If the input array contains only '0', a scalefactor 0 is returned <br>
-    Scaling factor is determined wrt a normalized target x: 16384 <= x <= 32767 for positive x <br>
-    and   -32768 <= x <= -16384 for negative x
-*/
-
-Word16 getScaleFactor16(                 /* o: measured headroom in range [0..15], 0 if all x[i] == 0 */
-    const Word16 *x,      /* i: array containing 16-bit data */
-    const Word16 len_x)   /* i: length of the array to scan  */
-{
-    Word16 i, i_min, i_max;
-    Word16 x_min, x_max;
-
-
-
-    x_max = 0;
-    move16();
-    x_min = 0;
-    move16();
-    FOR (i = 0; i < len_x; i++)
-    {
-        if (x[i] >= 0)
-            x_max = s_max(x_max,x[i]);
-        if (x[i] < 0)
-            x_min = s_min(x_min,x[i]);
-    }
-
-    i_max = 0x10;
-    move16();
-    i_min = 0x10;
-    move16();
-
-    if (x_max != 0)
-        i_max = norm_s(x_max);
-
-    if (x_min != 0)
-        i_min = norm_s(x_min);
-
-    i = s_and(s_min(i_max, i_min),0xF);
-
-
-    return i;
-}
-
-
-/********************************************************************/
-/*!
-  \brief   Calculates the scalefactor needed to normalize input array
-
     The scalefactor needed to normalize the Word32 input array is returned <br>
     If the input array contains only '0', a scalefactor 0 is returned <br>
     Scaling factor is determined wrt a normalized target x: 1073741824 <= x <= 2147483647 for positive x <br>
     and   -2147483648 <= x <= -1073741824 for negative x
 */
 
-Word16 getScaleFactor32(               /* o: measured headroom in range [0..31], 0 if all x[i] == 0 */
+Word16 getScaleFactor32(                 /* o: measured headroom in range [0..31], 0 if all x[i] == 0 */
     const Word32 *x,      /* i: array containing 32-bit data */
     const Word16 len_x)   /* i: length of the array to scan  */
 {
     Word16 i, i_min, i_max;
     Word32 x_min, x_max;
-
-
 
     x_max = L_add(0, 0);
     x_min = L_add(0, 0);
@@ -729,221 +388,9 @@ Word16 getScaleFactor32(               /* o: measured headroom in range [0..31],
 
     i = s_and(s_min(i_max, i_min),0x1F);
 
-
     return i;
 }
 
-Word16 normalize16(Word16 mantissa, Word16 *pexponent)
-{
-    Word16 tmp;
-
-    tmp = norm_s(mantissa);
-    mantissa = shl(mantissa, tmp);
-    move16();
-    *pexponent = sub(*pexponent, tmp);
-
-
-    return mantissa;
-}
-Word16 divide3216(Word32 x, Word16 y)
-{
-    Word16 z;
-
-
-    z = 0;
-    move16();
-    if (0 == y)
-    {
-        return 0x7fff;
-    }
-
-    IF (x != 0)
-    {
-        Word16 den, sign;
-        Word32 num;
-        num = L_abs(x);
-        den = abs_s(y);
-
-        sign = s_and(s_xor(extract_h(x),y),-32768 /* 0x8000 */);
-
-        z = div_l(num,den);
-        if (0 != sign)
-        {
-            z = negate(z);
-        }
-    }
-
-
-    return z;
-}
-
-Word16 divide1616(Word16 x, Word16 y)
-{
-    Word16 z, num, den, sign;
-
-
-    num = abs_s(x);
-    den = abs_s(y);
-
-    sign = s_and(s_xor(x,y),-32768 /* 0x8000 */);
-
-    move16();
-    z = 0x7fff;
-    if ( sub(num, den) < 0)
-        z = div_s(num,den);
-
-    if (0 != sign)
-    {
-        z = negate(z);
-    }
-
-
-    return z;
-}
-
-Word16 divide3232(Word32 L_num, Word32 L_denom)
-{
-    Word16 z;
-    Word32 sign;
-
-
-    sign = L_and(L_xor(L_num,L_denom),0x80000000);
-
-    L_num   = L_abs(L_num);
-    L_denom = L_abs(L_denom);
-
-    /* limit the range of denominator to Word16 */
-    z = s_min(norm_l(L_num),norm_l(L_denom));
-    L_num   = L_shl(L_num,z);
-    L_denom = L_shl(L_denom,z);
-
-    /* round_fx instead of extract_h improves spectral distortion in E_UTIL_lev_dur (schur version). */
-    z = div_l(L_num,round_fx(L_denom));
-    if (0 != sign)
-    {
-        z = negate(z);
-    }
-
-
-    return z;
-}
-
-Word16 BASOP_Util_Divide3232_uu_1616_Scale(Word32 x, Word32 y, Word16 *s)
-{
-    Word16 z;
-    Word16 sx;
-    Word16 sy;
-    Word16 x16;
-    Word16 y16;
-
-
-
-    assert(x >= 0);
-    assert(y >  0);
-
-    if ( x == 0 )
-    {
-        *s = 0;
-        move16();
-
-
-        return (0);
-    }
-
-    sx = norm_l(x);
-    sy = norm_l(y);
-
-    x16 = extract_h(L_shl(x,sx));
-    y16 = extract_h(L_shl(y,sy));
-
-    if(sub(x16,y16) > 0)
-    {
-        sx = sub(sx,1);
-    }
-
-    if(sub(y16,x16) < 0)
-    {
-        x16 = mult_r(x16,0x4000);
-    }
-
-
-    z = div_s(x16,y16);
-    move16();
-    *s = sub(sy,sx);
-
-
-    return (z);
-}
-
-Word16 BASOP_Util_Divide3232_Scale(Word32 x, Word32 y, Word16 *s)
-{
-    Word16 z;
-    Word16 sy;
-
-
-
-    sy = norm_l(y);
-    if (sy > 0)
-    {
-        sy = sub(sy,1);
-    }
-    y  = L_shl(y,sy);
-
-    z = BASOP_Util_Divide3216_Scale(x, extract_h(y), s);
-    move16();
-    *s = add(*s,sy);
-
-
-    return (z);
-}
-
-Word16 BASOP_Util_Divide3216_Scale(   /* o: result of division x/y, not normalized  */
-    Word32 x,                         /* i: numerator, signed                       */
-    Word16 y,                         /* i: denominator, signed                     */
-    Word16 *s)                        /* o: scaling, 0, if x==0                     */
-{
-    Word16 z;
-    Word16 sx;
-    Word16 sy;
-    Word16 sign;
-
-
-
-    /*assert (x > (Word32)0);
-    assert (y >= (Word16)0);*/
-
-    /* check, if numerator equals zero, return zero then */
-    IF ( x == (Word32)0 )
-    {
-        move16();
-        *s = 0;
-
-
-        return ((Word16)0);
-    }
-
-    sign = s_xor(extract_h(x),y);  /* just to exor the sign bits */
-    BASOP_SATURATE_WARNING_OFF
-    x = L_abs(x);
-    y = abs_s(y);
-    BASOP_SATURATE_WARNING_ON
-    sx = sub(norm_l(x),1);
-    x  = L_shl(x,sx);
-    sy = norm_s(y);
-    y  = shl(y,sy);
-    *s = sub(sy,sx);
-    move16();
-
-    z = div_s(round_fx(x),y);
-
-    if ( sign < 0 )                /* if sign bits differ, negate the result */
-    {
-        z = negate(z);
-    }
-
-
-    return z;
-}
 
 Word16 BASOP_Util_Divide1616_Scale(Word16 x, Word16 y, Word16 *s)
 {
@@ -951,8 +398,6 @@ Word16 BASOP_Util_Divide1616_Scale(Word16 x, Word16 y, Word16 *s)
     Word16 sx;
     Word16 sy;
     Word16 sign;
-
-
 
     /* assert (x >= (Word16)0); */
     assert (y != (Word16)0);
@@ -977,7 +422,6 @@ Word16 BASOP_Util_Divide1616_Scale(Word16 x, Word16 y, Word16 *s)
         move16();
         *s = 0;
 
-
         return ((Word16)0);
     }
 
@@ -999,95 +443,47 @@ Word16 BASOP_Util_Divide1616_Scale(Word16 x, Word16 y, Word16 *s)
         z = negate(z);
     }
 
-
     return z;
 }
 
-void copyWord8(const Word8 *src, Word8 *dst, const Word32 n)
+
+void set_val_Word16(Word16 X[], const Word16 val, Word16 n)
 {
-    Word32 i;
+    Word16 i;
 
 
-    FOR (i=0; i<n; i++)
+    FOR (i = 0; i < n; i++)
     {
-        dst[i] = src[i];
+        X[i] = val;
         move16();
     }
 
+
+    return;
 }
 
-
-
-void set_zero_Word8(Word8 X[], Word32 n)
+void set_val_Word32(Word32 X[], const Word32 val, Word16 n)
 {
-    Word32 i;
+    Word16 i;
 
 
-    FOR (i=0; i<n; i++)
+    FOR (i = 0; i < n; i++)
     {
-        X[i] = 0;
-        move16();
+        X[i] = val;
+        move32();
     }
 
+
+    return;
 }
 
-
-Word32 L_mult0_3216(Word32 x, Word16 y)
+Word16 mult0 (  Word16 x, Word16 y)
 {
-    UWord16 mpy_low16;
-    Word32  mpy_high32;
-
-
-    Mpy_32_16_ss(x, y, &mpy_high32, &mpy_low16);
-
-    mpy_high32 = L_add(L_shl(mpy_high32,15),L_lshr(L_deposit_h(mpy_low16),17) );
-
-
-    return mpy_high32;
-}
-
-Word16 BASOP_util_norm_l_dim2_cplx (const Word32 * const *re, /*!< Real part of 32 Bit input */
-                                    const Word32 * const *im, /*!< Imag part if 32 Bit input */
-                                    Word16 startBand, /*!< start band of cplx data   */
-                                    Word16 stopBand,  /*!< stop band of cplx data    */
-                                    Word16 startSlot, /*!< start slot of cplx data   */
-                                    Word16 stopSlot   /*!< stop slot of cplx data    */
-                                   )
-{
-    Word16  col;
-    Word16  band;
-    Word16  maxShift;
-    Word32  maxVal;
-
-
-
-    maxVal = L_deposit_l(1);
-
-    FOR (col=startSlot; col < stopSlot; col++)
-    {
-        FOR (band=startBand; band < stopBand; band++)
-        {
-            maxVal = L_max(maxVal,L_abs(re[col][band]));
-            maxVal = L_max(maxVal,L_abs(im[col][band]));
-        }
-    }
-    maxShift = norm_l(maxVal);
-
-
-    return (maxShift);
-}
-
-Word16 BASOP_util_norm_s_bands2shift (Word16 x)
-{
-    Word16 shift;
-
-    shift = sub(WORD16_BITS-1,norm_s(negate(x)));
-
-    return (shift);
+    return extract_l(L_mult0(x,y));
 }
 
 
-#define SINETAB SineTable512
+#define SINETAB SineTable512_fx
 #define LD 9
 
 /*
@@ -1104,23 +500,19 @@ static Word16 fixp_sin_cos_residual_16(Word16 x, const Word16 scale, Word16 *sin
     Word16 s;
     Word16 ssign;
     Word16 csign;
-    Word16 tmp, cl, sl;
+    Word16 tmp, cl = 0, sl = 0;
     const Word16 shift = 15-LD-1-scale;
-
-    sl = 0;         /* to avoid compilation warnings */
-    cl = 0;         /* to avoid compilation warnings */
-
 
     if (flag_radix2 == 0)
     {
-        x = mult_r(x, 10430/*1.0/EVS_PI Q15*/);
+        x = mult_r(x, FL2WORD16(1.0/EVS_PI));
     }
     s = shr(x, shift);
 
     residual = s_and(x, (1<<shift)-1);
     /* We assume "2+scale" is a constant */
     residual = shl(residual,2+scale);
-    residual = mult_r(residual,25736/*EVS_PI/4.0 Q15*/);
+    residual = mult_r(residual,FL2WORD16(EVS_PI/4.0));
 
     /* Sine sign symmetry */
     ssign = s_and(s, (1<<LD)<<1);
@@ -1128,10 +520,10 @@ static Word16 fixp_sin_cos_residual_16(Word16 x, const Word16 scale, Word16 *sin
     /* Cosine sign symmetry */
     csign = s_and(add(s, (1<<LD)), (1<<LD)<<1);
 
-    /* Modulo PI */
+    /* Modulo EVS_PI */
     s = s_and(s, (2<<LD)-1);
 
-    /* PI/2 symmetry */
+    /* EVS_PI/2 symmetry */
     s = s_min(s, sub(2<<LD, s));
 
     {
@@ -1177,19 +569,6 @@ static Word16 fixp_sin_cos_residual_16(Word16 x, const Word16 scale, Word16 *sin
     return residual;
 }
 
-Word16 getCosWord16(Word16 theta)
-{
-    Word16 result, residual, sine, cosine;
-
-    residual = fixp_sin_cos_residual_16(theta, 2, &sine, &cosine, 0);
-    /* This negation prevents the subsequent addition from overflow */
-    /* The negation cannot overflow, sine is in range [0x0..0x7FFF] */
-    sine = negate(sine);
-    result = mac_r(L_mult0(sine, residual), cosine, 16384);
-
-
-    return result;
-}
 
 Word16 getCosWord16R2(Word16 theta)
 {
@@ -1203,332 +582,28 @@ Word16 getCosWord16R2(Word16 theta)
     result = msu_r(L_mult(sine, residual), cosine, -32768);
     BASOP_SATURATE_WARNING_ON
 
-
     return result;
-}
-
-/*
- * Calculate Integer Square Root of 'val'. This is the equivalent of (int)sqrt(val);
- * The return value will be truncated to the lowest integer (throwing away the fractionnal part.
- *
- * There are many ways to do this. The approach here is to use a simple function to get a
- * 1st estimate of (int)sqrt(val) and then correct this estimate if it is too low or too high.
- *
- * Using Word16, the range of 'val' is limited to roughly 2^30.
- *
- * Complexity: Worst=31Clks, Best=27Clks
- */
-Word16 getSqrtWord32(Word32 val)
-{
-    Word32 L_temp, L_temp2;
-    Word16 temp, temp2;
-    Word16 exp, exp2;
-
-    /* Calc Approximation */
-    exp2 = norm_l(val);
-    L_temp2 = L_shl(val, exp2);
-    exp = sub(31-32, exp2);
-    L_temp = Isqrt_lc(L_temp2, &exp); /* 12 clks */
-
-    temp = round_fx(L_temp);
-    L_temp = Mult_32_16(L_temp2, temp); /* 2 clks */
-
-    L_temp = L_shl(L_temp, sub(exp, exp2));
-
-    /* The Approximation Error Range is -1..+7, so Too Low by 1 or Up to Too High by 7 */
-    temp = round_fx(L_temp);
-
-    /* Too High? */
-    if (L_msu0(val, temp, temp) < 0)
-    {
-        /* Reduce by 2 */
-        temp = sub(temp, 2);
-    }
-    /* Too High? */
-    if (L_msu0(val, temp, temp) < 0)
-    {
-        /* Reduce by 2 */
-        temp = sub(temp, 2);
-    }
-    /* Too High? */
-    if (L_msu0(val, temp, temp) < 0)
-    {
-        /* Reduce by 2 */
-        temp = sub(temp, 2);
-    }
-    /* Too High? */
-    if (L_msu0(val, temp, temp) < 0)
-    {
-        /* Reduce by 1 */
-        temp = sub(temp, 1);
-    }
-
-    /* Try +1 */
-    temp2 = add(temp, 1);
-    /* It fits? */
-    if (L_msu0(val, temp2, temp2) >= 0)
-    {
-        /* Yes */
-        temp = temp2;
-        move16();
-    }
-    return temp;
-}
-Word16 findIndexOfMinWord32(Word32 *x, const Word16 len)
-{
-    Word16 i, indx;
-
-
-    indx = 0;
-    move16();
-    FOR (i = 1; i < len; i++)
-    {
-        if (L_sub(x[i],x[indx]) < 0)
-        {
-            indx = i;
-            move16();
-        }
-    }
-
-
-    return indx;
-}
-
-
-Word16 imult1616(Word16 x, Word16 y)
-{
-    assert((int)x * (int)y < 32768 && (int)x * (int)y >= -32768);
-    return extract_l(L_mult0(x, y));
-}
-
-Word32 imult3216(Word32 x, Word16 y)
-{
-    Word32 mh;
-    UWord16 ml;
-
-    Mpy_32_16_ss(x, y, &mh, &ml);
-
-    mh = L_shl(mh, 15);
-    ml = lshr(ml, 1);
-
-    return L_or(mh, L_deposit_l(ml));
 }
 
 
 Word16 idiv1616U(Word16 x, Word16 y)
 {
-    Word16 sx, sy;
-
-    /* make y > x  to meet the requirements for div_s parameters */
-    sx = norm_s(x);
-    sy = norm_s(y);
-    x = shl(x, sx);
-    y = shl(y, sy);
-
-    if (x >= y)
-    {
-        x = shr(x,1);
-        sx = sub(sx,1);
-    }
-
-    /* divide and shift */
-    y = shr(div_s(x, y), sub(15, sub(sy,sx)));
-
-    return y;
-}
+    Word16 s;
 
 
-Word16 idiv1616(Word16 x, Word16 y)
-{
-    Word16 s, num, den, sign;
-
-
-    num = abs_s(x);
-    den = abs_s(y);
-
-    sign = s_and(s_xor(x,y),-32768 /* 0x8000 */);
-
-    /* make num > den */
-    s = add(sub(norm_s(den), norm_s(num)), 1);
+    /* make y > x */
+    s = add(sub(norm_s(y), norm_s(x)), 1);
     s = s_max(s, 0);
 
-    den = shl(den, s);
+    BASOP_SATURATE_WARNING_OFF
+    y = shl(y, s);
+    BASOP_SATURATE_WARNING_ON
 
     /* divide and shift */
-    y = shr(div_s(num, den), sub(15, s));
-
-    if (0 != sign)
-    {
-        y = negate(y);
-    }
+    y = shr(div_s(x, y), sub(15, s));
 
 
     return y;
-}
-
-Word32 norm_llQ31(        /* o : normalized result              Q31 */
-    Word32 L_c,          /* i : upper bits of accu             Q-1 */
-    Word32 L_sum,        /* i : lower bits of accu, unsigned   Q31 */
-    Word16 * exp         /* o : exponent of result in [-32,31]  Q0 */
-)
-{
-    Word16 i;
-    Word32 L_tmp;
-
-    /* Move MSBit of L_sum into L_c */
-    Carry = 0;
-    L_tmp = L_add_c(L_sum, L_sum);    /* L_tmp = L_sum << 1         */
-    L_c = L_add_c(L_c,L_c);
-    L_add(0,0);
-    test();
-    IF ((L_c != (Word32) 0L) && (L_c != (Word32) 0xFFFFFFFFL))
-    {
-        i = norm_l(L_c);
-        L_c = L_shl(L_c,i);
-        i = sub(31,i);                  /* positive exponent  */
-        L_sum = L_lshr(L_tmp, 1);       /* L_sum with MSBit=0 */
-        L_sum = L_lshr(L_sum, i);
-        L_sum = L_add(L_c,L_sum);
-    }
-    ELSE
-    {
-        i = -32;
-        move16();      /* default exponent, if total sum=0 */
-        IF (L_sum)
-        {
-            i = norm_l(L_sum);
-            L_sum = L_shl(L_sum,i);
-            i = negate(i);                  /* negative or zero exponent */
-        }
-    }
-    *exp = i;
-    move16();
-    return L_sum;
-}
-
-
-Word32 Dot_product16HQ(   /* o : normalized result              Q31 */
-    const Word32 L_off,  /* i : initial sum value               Qn */
-    const Word16 x[],    /* i : x vector                        Qn */
-    const Word16 y[],    /* i : y vector                        Qn */
-    const Word16 lg,     /* i : vector length, range [0..7FFF]  Q0 */
-    Word16 * exp         /* o : exponent of result in [-32,31]  Q0 */
-)
-{
-    Word16 i;
-    Word32 L_sum, L_c, L_test;
-    /* Clear carry flag and init sum */
-    Carry = 0;
-    L_c = L_add(0,0);
-    L_sum = L_macNs(L_off,0,0);
-    if (L_sum > 0)
-        L_c = L_macNs(L_c,0,0);
-    if (L_sum < 0)
-        L_c = L_msuNs(L_c,0,0);
-
-    FOR (i=0; i < lg; i++)
-    {
-        BASOP_SATURATE_WARNING_OFF /*in case of both multiplicands being -32768, overflow occurs - not severe*/
-        L_test = L_mult(x[i], y[i]);
-        BASOP_SATURATE_WARNING_ON
-        Carry = 0;
-        L_sum = L_macNs(L_sum, x[i], y[i]);
-        Overflow = 0;  /* to avoid useless warning in L_macNs/L_msuNs calling L_mult */
-        if (L_test >= 0)
-            L_c = L_macNs(L_c,0,0);
-        if (L_test < 0)
-            L_c = L_msuNs(L_c,0,0);
-    }
-    L_sum = norm_llQ31(L_c,L_sum,exp);
-    return L_sum;
-}
-
-Word32 Norm32Norm(const Word32 *x, const Word16 headroom, const Word16 length, Word16 *result_e)
-{
-    Word32 L_tmp, L_tmp2;
-    Word16 i, shift, tmp;
-
-    move16();
-    shift = headroom;
-
-    L_tmp = L_deposit_l(0);
-
-    FOR (i=0; i<length; i++)
-    {
-        L_tmp2 = L_sub(L_tmp, 0x40000000);
-        if (L_tmp2 >= 0) shift = sub(shift,1);
-        if (L_tmp2 >= 0) L_tmp = L_shr(L_tmp, 2);
-
-        tmp = round_fx(L_shl(x[i], shift));
-        L_tmp = L_mac0(L_tmp, tmp, tmp); /* exponent = (1-shift*2) , Q(30+shift*2) */
-    }
-
-    move16();
-    *result_e = sub(1, shl(shift,1));
-
-    return L_tmp;
-}
-
-Word32 Dot_productSq16HQ( /* o : normalized result              Q31 */
-    const Word32 L_off,  /* i : initial sum value               Qn */
-    const Word16 x[],    /* i : x vector                        Qn */
-    const Word16 lg,     /* i : vector length, range [0..7FFF]  Q0 */
-    Word16 * exp         /* o : exponent of result in [-32,31]  Q0 */
-)
-{
-    Word16 i;
-    Word32 L_sum, L_c;
-    /* Clear carry flag and init sum */
-    Carry = 0;
-    L_c = L_add(0,0);
-    L_sum = L_macNs(L_off,0,0);
-    if (L_sum > 0)
-        L_c = L_macNs(L_c,0,0);
-    if (L_sum < 0)
-        L_c = L_msuNs(L_c,0,0);
-
-    FOR (i=0; i < lg; i++)
-    {
-        Carry = 0;
-        BASOP_SATURATE_WARNING_OFF /*multiplication of -32768 * -32768 throws an overflow, but is not critical*/
-        L_sum = L_macNs(L_sum, x[i], x[i]);
-        BASOP_SATURATE_WARNING_ON
-        Overflow = 0;  /* to avoid useless warning in L_macNs calling L_mult */
-        L_c = L_macNs(L_c,0,0);
-    }
-    L_sum = norm_llQ31(L_c,L_sum,exp);
-    return L_sum;
-}
-
-Word32 dotp_s_fx(const Word16 *x, const Word16 *y, const Word16 n, Word16 s)
-{
-    Word16 i;
-    Word16 n2;
-    Word32 L_tmp;
-    Word32 L_sum;
-
-
-    L_sum = L_add(0,0);
-
-    n2 = shr(n,1);
-
-    s = sub(s,1);
-
-    FOR (i=0; i < n2; i++)
-    {
-        L_tmp = L_mult0(x[2*i], y[2*i]);
-        L_tmp = L_mac0(L_tmp, x[2*i+1], y[2*i+1]);
-        L_sum = L_add(L_sum, L_shr(L_tmp, s));
-    }
-
-    IF ( s_and(n,1) )
-    {
-        L_tmp = L_mult0(x[n-1], y[n-1]);
-        L_sum = L_add(L_sum, L_shr(L_tmp, s));
-    }
-
-
-    return L_sum;
 }
 
 Word32 BASOP_util_Pow2(
@@ -1538,21 +613,18 @@ Word32 BASOP_util_Pow2(
 {
     static const Word16 pow2Coeff[8] =
     {
-        22713/*0.693147180559945309417232121458177 Q15*/,    /* ln(2)^1 /1! */
-        7872/*0.240226506959100712333551263163332 Q15*/,    /* ln(2)^2 /2! */
-        1819/*0.0555041086648215799531422637686218 Q15*/,   /* ln(2)^3 /3! */
-        315/*0.00961812910762847716197907157365887 Q15*/,  /* ln(2)^4 /4! */
-        44/*0.00133335581464284434234122219879962 Q15*/,  /* ln(2)^5 /5! */
-        5/*1.54035303933816099544370973327423e-4 Q15*/,  /* ln(2)^6 /6! */
-        0/*1.52527338040598402800254390120096e-5 Q15*/,  /* ln(2)^7 /7! */
-        0/*1.32154867901443094884037582282884e-6 Q15*/   /* ln(2)^8 /8! */
+        FL2WORD16(0.693147180559945309417232121458177),    /* ln(2)^1 /1! */
+        FL2WORD16(0.240226506959100712333551263163332),    /* ln(2)^2 /2! */
+        FL2WORD16(0.0555041086648215799531422637686218),   /* ln(2)^3 /3! */
+        FL2WORD16(0.00961812910762847716197907157365887),  /* ln(2)^4 /4! */
+        FL2WORD16(0.00133335581464284434234122219879962),  /* ln(2)^5 /5! */
+        FL2WORD16(1.54035303933816099544370973327423e-4),  /* ln(2)^6 /6! */
+        FL2WORD16(1.52527338040598402800254390120096e-5),  /* ln(2)^7 /7! */
+        FL2WORD16(1.32154867901443094884037582282884e-6)   /* ln(2)^8 /8! */
     };
 
-    Word32 frac_part, tmp_frac, result_m;
-    Word16 int_part;
-
-    int_part = 0;         /* to avoid compilation warnings */
-    frac_part = 0;        /* to avoid compilation warnings */
+    Word32 frac_part = 0, tmp_frac, result_m;
+    Word16 int_part = 0;
 
     IF (exp_e > 0)
     {
@@ -1571,15 +643,15 @@ Word32 BASOP_util_Pow2(
     }
 
     /* Best accuracy is around 0, so try to get there with the fractional part. */
-    IF( (tmp_frac = L_sub(frac_part,1073741824l/*0.5 Q31*/)) >= 0)
+    IF( (tmp_frac = L_sub(frac_part,FL2WORD32(0.5))) >= 0)
     {
         int_part = add(int_part, 1);
-        frac_part = L_sub(tmp_frac,1073741824l/*0.5 Q31*/);
+        frac_part = L_sub(tmp_frac,FL2WORD32(0.5));
     }
-    ELSE IF( (tmp_frac = L_add(frac_part,1073741824l/*0.5 Q31*/)) < 0)
+    ELSE IF( (tmp_frac = L_add(frac_part,FL2WORD32(0.5))) < 0)
     {
         int_part = sub(int_part, 1);
-        frac_part = L_add(tmp_frac,1073741824l/*0.5 Q31*/);
+        frac_part = L_add(tmp_frac,FL2WORD32(0.5));
     }
 
     /* Evaluate taylor polynomial which approximates 2^x */
@@ -1589,55 +661,164 @@ Word32 BASOP_util_Pow2(
 
 
         /* First taylor series coefficient a_0 = 1.0, scaled by 0.5 due to L_shr(,1). */
-        result_m = L_add(1073741824l/*1.0/2.0 Q31*/,L_shr(Mpy_32_16_1(frac_part, pow2Coeff[0]), 1));
+        result_m = L_add(FL2WORD32(1.0/2.0),L_shr(Mpy_32_16(frac_part, pow2Coeff[0]), 1));
         p = Mpy_32_32(frac_part, frac_part);
         FOR (i = 1; i < 7; i++)
         {
             /* next taylor series term: a_i * x^i, x=0 */
-            result_m = L_add(result_m, L_shr(Mpy_32_16_1(p, pow2Coeff[i]), 1));
+            result_m = L_add(result_m, L_shr(Mpy_32_16(p, pow2Coeff[i]), 1));
             p = Mpy_32_32(p, frac_part);
         }
-        result_m = L_add(result_m, L_shr(Mpy_32_16_1(p, pow2Coeff[i]), 1));
+        result_m = L_add(result_m, L_shr(Mpy_32_16(p, pow2Coeff[i]), 1));
     }
     *result_e = int_part;
     move16();
+
     return result_m;
 }
-Word16 findIndexOfMaxWord32(Word32 *x, const Word16 len)
+
+Word16 BASOP_Util_Divide3216_Scale(     /* o: result of division x/y, not normalized  */
+    Word32 x,                             /* i: numerator, signed                       */
+    Word16 y,                             /* i: denominator, signed                     */
+    Word16 *s)                            /* o: scaling, 0, if x==0                     */
 {
-    Word16 i, indx;
+    Word16 z;
+    Word16 sx;
+    Word16 sy;
+    Word16 sign;
 
+    /*assert (x > (Word32)0);
+    assert (y >= (Word16)0);*/
 
-    indx = 0;
-    move16();
-    FOR (i = 1; i < len; i++)
+    /* check, if numerator equals zero, return zero then */
+    IF ( x == (Word32)0 )
     {
-        if (L_sub(x[i],x[indx]) > 0)
-        {
-            indx = i;
-            move16();
-        }
+        *s = 0;
+        move16();
+
+        return ((Word16)0);
     }
 
+    sign = s_xor(extract_h(x),y);  /* just to exor the sign bits */
+    BASOP_SATURATE_WARNING_OFF
+    x = L_abs(x);
+    y = abs_s(y);
+    BASOP_SATURATE_WARNING_ON
+    sx = sub(norm_l(x),1);
+    x  = L_shl(x,sx);
+    sy = norm_s(y);
+    y  = shl(y,sy);
+    *s = sub(sy,sx);
+    move16();
 
-    return indx;
+    z = div_s(round_fx(x),y);
+
+    if ( sign < 0 )                /* if sign bits differ, negate the result */
+    {
+        z = negate(z);
+    }
+
+    return z;
 }
 
 
-Word16 getNormReciprocalWord16(Word16 x)
+static const Word16 table_pow2[32] =
 {
-
-    assert(x < (Word16)(sizeof(BASOP_util_normReciprocal)/sizeof(BASOP_util_normReciprocal[0])));
-
-    return extract_h(BASOP_util_normReciprocal[x]);
-}
-Word16 getNormReciprocalWord16Scale(Word16 x, Word16 s)
+    16384, 16743, 17109, 17484, 17867, 18258, 18658, 19066, 19484, 19911,
+    20347, 20792, 21247, 21713, 22188, 22674, 23170, 23678, 24196, 24726,
+    25268, 25821, 26386, 26964, 27554, 28158, 28774, 29405, 30048, 30706,
+    31379, 32066
+};
+/* table of table_pow2[i+1] - table_pow2[i] */
+static const Word16 table_pow2_diff_x32[32] =
 {
+    11488, 11712, 12000, 12256, 12512, 12800, 13056, 13376, 13664, 13952,
+    14240, 14560, 14912, 15200, 15552, 15872, 16256, 16576, 16960, 17344,
+    17696, 18080, 18496, 18880, 19328, 19712, 20192, 20576, 21056, 21536,
+    21984, 22432
+};
 
-    assert(x < (Word16)(sizeof(BASOP_util_normReciprocal)/sizeof(BASOP_util_normReciprocal[0])));
+Word32 Pow2(                              /* (o) Q0  : result       (range: 0<=val<=0x7fffffff) */
+    Word16 exponant,                      /* (i) Q0  : Integer part.      (range: 0<=val<=30)   */
+    Word16 fraction                       /* (i) Q15 : Fractional part.   (range: 0.0<=val<1.0) */
+)
+{
+    Word16 exp, i, a;
+    Word32 L_x;
 
-    return round_fx(L_shl(BASOP_util_normReciprocal[x],s));
+    i = mac_r(-32768, fraction, 32);         /* Extract b10-b16 of fraction */
+    a = s_and(fraction, 0x3ff);              /* Extract  b0-b9  of fraction */
+
+    L_x = L_deposit_h(table_pow2[i]);           /* table[i] << 16   */
+    L_x = L_mac(L_x, table_pow2_diff_x32[i], a);/* L_x -= diff*a*2  */
+
+    exp = sub(30, exponant);
+
+    L_x = L_shr_r(L_x, exp);
+
+    return L_x;
 }
+
+/*************************************************************************
+ *
+ *   FUNCTION:   Log2_norm()
+ *
+ *   PURPOSE:   Computes log2(L_x, exp),  where   L_x is positive and
+ *              normalized, and exp is the normalisation exponent
+ *              If L_x is negative or zero, the result is 0.
+ *
+ *   DESCRIPTION:
+ *        The function Log2(L_x) is approximated by a table and linear
+ *        interpolation. The following steps are used to compute Log2(L_x)
+ *
+ *           1- exponent = 30-norm_exponent
+ *           2- i = bit25-b31 of L_x;  32<=i<=63  (because of normalization).
+ *           3- a = bit10-b24
+ *           4- i -=32
+ *           5- fraction = table[i]<<16 - (table[i] - table[i+1]) * a * 2
+ *
+ *************************************************************************/
+
+static const Word32 L_table[32] =
+{
+    -32768L,   95322112L,  187793408L,  277577728L,
+    364871680L,  449740800L,  532381696L,  612859904L,
+    691306496L,  767787008L,  842432512L,  915308544L,
+    986546176L, 1056210944L, 1124302848L, 1190887424L,
+    1256095744L, 1319993344L, 1382580224L, 1443921920L,
+    1504083968L, 1563131904L, 1621000192L, 1677885440L,
+    1733722112L, 1788510208L, 1842380800L, 1895399424L,
+    1947435008L, 1998618624L, 2049015808L, 2098626560L
+};
+
+static const Word16 table_diff[32] =
+{
+    1455, 1411,  1370, 1332,  1295, 1261,  1228, 1197,
+    1167, 1139,  1112, 1087,  1063, 1039,  1016,  995,
+    975,  955,   936,  918,   901,  883,   868,  852,
+    836,  822,   809,  794,   781,  769,   757,  744
+};
+
+Word16 Log2_norm_lc (   /* (o) : Fractional part of Log2. (range: 0<=val<1)  */
+    Word32 L_x          /* (i) : input value (normalized)                    */
+)
+{
+    Word16 i, a;
+    Word16 y;
+
+
+    L_x = L_shr (L_x, 9);
+    a = extract_l (L_x);                      /* Extract b10-b24 of fraction */
+    a = lshr(a, 1);
+
+    i = mac_r(L_x, -32*2-1, 16384);           /* Extract b25-b31 minus 32 */
+
+    y = mac_r(L_table[i], table_diff[i], a);/* table[i] << 16 - diff*a*2 */
+
+
+    return y;
+}
+
 
 Word32 BASOP_Util_fPow(
     Word32 base_m, Word16 base_e,
@@ -1649,7 +830,6 @@ Word32 BASOP_Util_fPow(
     Word16 ans_lg2_e, base_lg2_e;
     Word32 base_lg2_m, ans_lg2_m, result_m;
     Word16 shift;
-
 
     test();
     IF ((base_m == 0) && (exp_m != 0))
@@ -1685,112 +865,6 @@ Word32 BASOP_Util_fPow(
     return result_m;
 }
 
-
-/*___________________________________________________________________________
- |                                                                           |
- |   Function Name : Dot_product12_offs()                                    |
- |                                                                           |
- |       Compute scalar product of <x[],y[]> using accumulator.              |
- |       The parameter 'L_off' is added to the accumulation result.          |
- |       The result is normalized (in Q31) with exponent (0..30).            |
- |   Notes:                                                                  |
- |       o  data in x[],y[] must provide enough headroom for accumulation    |
- |       o  L_off must correspond in format with product of x,y              |
- |          Example: 0.01f for Q9 x Q9: 0x0000147B in Q19                    |
- |                   means: L_off = FL2WORD32_SCALE(0.01,31-19)             |
- |---------------------------------------------------------------------------|
- |  Algorithm:                                                               |
- |                                                                           |
- |       dot_product = L_off + sum(x[i]*y[i])     i=0..N-1                   |
- |___________________________________________________________________________|
-*/
-Word32 Dot_product12_offs(                 /* (o) Q31: normalized result (1 < val <= -1) */
-    const Word16 x[],                     /* (i) 12bits: x vector                       */
-    const Word16 y[],                     /* (i) 12bits: y vector                       */
-    const Word16 lg,                      /* (i)    : vector length in range [1..256]   */
-    Word16 * exp,                         /* (o)    : exponent of result (0..+30)       */
-    Word32 L_off                            /* (i) initial summation offset / 2           */
-)
-{
-    Word16 i, sft;
-    Word32 L_sum;
-
-
-    L_sum = L_mac0(L_off, x[0], y[0]);
-    FOR (i = 1; i < lg; i++)
-    {
-        L_sum = L_mac0(L_sum, x[i], y[i]);
-    }
-    /* Normalize acc in Q31 */
-
-    sft = norm_l(L_sum);
-    if (exp != NULL)
-    {
-        L_sum = L_shl(L_sum, sft);
-    }
-
-    /* exponent = 0..30, when L_sum != 0 */
-    if (L_sum != 0)
-    {
-        sft = sub(31,sft);
-    }
-
-    if (exp != NULL)
-    {
-        *exp = sft;
-        move16();
-    }
-
-    return L_sum;
-}
-
-Word32 Dot_product15_offs(                 /* (o) Q31: normalized result (1 < val <= -1) */
-    const Word16 x[],                     /* (i) 15bits: x vector                       */
-    const Word16 y[],                     /* (i) 15bits: y vector                       */
-    const Word16 lg,                      /* (i)    : vector length in range [1..256]   */
-    Word16 *exp,                          /* (o)    : exponent of result (0..+30)       */
-    Word32 L_off                          /* (i) initial summation offset               */
-)
-{
-    Word16 i, sft, fac, ld;
-    Word32 L_sum;
-
-    ld = sub(14,norm_s(lg));
-    fac = shr(-32768,ld);
-    L_sum = L_shr(L_off,ld);
-
-    FOR (i = 0; i < lg; i++)
-    {
-        L_sum = L_add(L_sum, Mpy_32_16_1(L_msu(0, y[i],fac),x[i]));
-    }
-
-    /* Avoid returning 0 */
-    if (L_sum == 0)
-    {
-        L_sum = L_add(L_sum, 1);
-    }
-
-    /* Normalize acc in Q31 */
-    sft = norm_l(L_sum);
-    L_sum = L_shl(L_sum, sft);
-
-    /* exponent = 0..30, when L_sum != 0 */
-    if (L_sum != 0)
-    {
-        sft = add(ld, sub(30,sft));
-    }
-
-    *exp = sft;
-    move16();
-
-    return L_sum;
-}
-
-
-/*
-
-     precondition:  headroom in Y is sufficient for n accumulations
-*/
 Word32 BASOP_Util_Add_Mant32Exp                  /*!< o: normalized result mantissa */
 (Word32   a_m,       /*!< i: Mantissa of 1st operand a  */
  Word16   a_e,       /*!< i: Exponent of 1st operand a  */
@@ -1800,8 +874,6 @@ Word32 BASOP_Util_Add_Mant32Exp                  /*!< o: normalized result manti
 {
     Word32 L_tmp;
     Word16 shift;
-
-
 
     /* Compare exponents: the difference is limited to +/- 30
        The Word32 mantissa of the operand with lower exponent is shifted right by the exponent difference.
@@ -1843,394 +915,128 @@ Word32 BASOP_Util_Add_Mant32Exp                  /*!< o: normalized result manti
     return (L_tmp);
 }
 
-
-Word16 BASOP_Util_Cmp_Mant32Exp                  /*!< o: flag: result of comparison */
-/*      0, if a == b               */
-/*      1, if a > b                */
-/*     -1, if a < b                */
-(Word32   a_m,       /*!< i: Mantissa of 1st operand a  */
- Word16   a_e,       /*!< i: Exponent of 1st operand a  */
- Word32   b_m,       /*!< i: Mantissa of 2nd operand b  */
- Word16   b_e)       /*!< i: Exponent of 2nd operand b  */
-
+static const Word32 L_table_isqrt[48] =
 {
-    Word32 diff_m;
-    Word16 diff_e, shift, result;
+    2147418112L,  2083389440L,  2024669184L,  1970667520L,
+    1920794624L,  1874460672L,  1831403520L,  1791098880L,
+    1753415680L,  1717960704L,  1684602880L,  1653145600L,
+    1623326720L,  1595080704L,  1568276480L,  1542782976L,
+    1518469120L,  1495334912L,  1473183744L,  1451950080L,
+    1431633920L,  1412169728L,  1393491968L,  1375469568L,
+    1358168064L,  1341521920L,  1325465600L,  1309933568L,
+    1294991360L,  1280507904L,  1266548736L,  1252982784L,
+    1239875584L,  1227161600L,  1214775296L,  1202847744L,
+    1191182336L,  1179910144L,  1168965632L,  1158283264L,
+    1147863040L,  1137770496L,  1127940096L,  1118306304L,
+    1108934656L,  1099825152L,  1090912256L,  1082261504L
+};
+/* table of table_isqrt[i] - table_isqrt[i+1] */
+static const Word16 table_isqrt_diff[48] =
+{
+    977,   896,   824,   761,   707,   657,   615,   575,
+    541,   509,   480,   455,   431,   409,   389,   371,
+    353,   338,   324,   310,   297,   285,   275,   264,
+    254,   245,   237,   228,   221,   213,   207,   200,
+    194,   189,   182,   178,   172,   167,   163,   159,
+    154,   150,   147,   143,   139,   136,   132,   130
+};
+static const Word16 shift[] = {9,10};
+Word32 Isqrt_lc1(
+    Word32 frac,  /* (i)   Q31: normalized value (1.0 < frac <= 0.5) */
+    Word16 * exp  /* (i/o)    : exponent (value = frac x 2^exponent) */
+)
+{
+    Word16 i, a;
+    Word32 L_tmp;
+
+    IF (frac <= (Word32) 0)
+    {
+        *exp = 0;
+        move16();
+        return 0x7fffffff; /*0x7fffffff*/
+    }
+
+    /* If exponant odd -> shift right by 10 (otherwise 9) */
+    L_tmp = L_shr(frac, shift[s_and(*exp, 1)]);
+
+    /* 1) -16384 to shift left and change sign                 */
+    /* 2) 32768 to Add 1 to Exponent like it was divided by 2  */
+    /* 3) We let the mac_r add another 0.5 because it imitates */
+    /*    the behavior of shr on negative number that should   */
+    /*    not be rounded towards negative infinity.            */
+    /* It replaces:                                            */
+    /*    *exp = negate(shr(sub(*exp, 1), 1));   move16();     */
+    *exp = mac_r(32768, *exp, -16384);
+    move16();
+
+    a = extract_l(L_tmp);                           /* Extract b10-b24 */
+    a = lshr(a, 1);
+
+    i = mac_r(L_tmp, -16*2-1, 16384);               /* Extract b25-b31 minus 16 */
+
+    L_tmp = L_msu(L_table_isqrt[i], table_isqrt_diff[i], a);/* table[i] << 16 - diff*a*2 */
+
+    return L_tmp;
+}
 
 
+static const Word16 sqrt_table[49] =
+{
+    16384, 16888, 17378, 17854, 18318, 18770, 19212,
+    19644, 20066, 20480, 20886, 21283, 21674, 22058,
+    22435, 22806, 23170, 23530, 23884, 24232, 24576,
+    24915, 25249, 25580, 25905, 26227, 26545, 26859,
+    27170, 27477, 27780, 28081, 28378, 28672, 28963,
+    29251, 29537, 29819, 30099, 30377, 30652, 30924,
+    31194, 31462, 31727, 31991, 32252, 32511, 32767
+};
 
+Word32 Sqrt_l(     /* o : output value,                          Q31 */
+    Word32 L_x,    /* i : input value,                           Q31 */
+    Word16 *exp    /* o : right shift to be applied to result,   Q1  */
+)
+{
     /*
-       This function compares two input parameters, both represented by a 32-bit mantissa and a 16-bit exponent.
-       If both values are identical, 0 is returned.
-       If a is greater b, 1 is returned.
-       If a is less than b, -1 is returned.
-    */
+        y = sqrt(x)
 
-    /* Check, if both mantissa and exponents are identical, when normalized: return 0 */
-    shift = norm_l(a_m);
-    if (shift)
-        a_m = L_shl(a_m, shift);
-    if (shift)
-        a_e = sub(a_e, shift);
+        x = f * 2^-e,   0.5 <= f < 1   (normalization)
 
-    shift = norm_l(b_m);
-    if (shift)
-        b_m = L_shl(b_m, shift);
-    if (shift)
-        b_e = sub(b_e, shift);
+        y = sqrt(f) * 2^(-e/2)
 
-    /* align exponent, if any mantissa is zero */
-    if (!a_m)
-        a_e = add(b_e,0);
-    if (!b_m)
-        b_e = add(a_e,0);
+        a) e = 2k   --> y = sqrt(f)   * 2^-k  (k = e div 2,
+                                               0.707 <= sqrt(f) < 1)
+        b) e = 2k+1 --> y = sqrt(f/2) * 2^-k  (k = e div 2,
+                                               0.5 <= sqrt(f/2) < 0.707)
+     */
 
-    BASOP_SATURATE_WARNING_OFF
-    diff_m = L_sub(a_m,b_m);
-    BASOP_SATURATE_WARNING_ON
-    diff_e = sub(a_e,b_e);
+    Word16 e, i, a, tmp;
+    Word32 L_y;
 
-    test();
-    IF(diff_m == 0 && diff_e == 0)
+    if (L_x <= 0)
     {
-        return 0;
+        *exp = 0;
+        move16 ();
+        return L_deposit_l(0);
     }
 
-    /* Check sign, exponent and mantissa to identify, whether a is greater b or not */
-    result = sub(0,1);
+    e = s_and(norm_l(L_x), 0x7FFE);  /* get next lower EVEN norm. exp  */
+    L_x = L_shl(L_x, e);             /* L_x is normalized to [0.25..1) */
+    *exp = e;
+    move16 ();  /* return 2*exponent (or Q1)      */
 
-    IF (a_m  >= 0)
-    {
-        /* a is positive */
-        if (b_m < 0)
-        {
-            result = add(1,0);
-        }
+    L_x = L_shr(L_x, 9);
+    a = extract_l(L_x);              /* Extract b10-b24                */
+    a = lshr(a, 1);
 
-        test();
-        test();
-        test();
-        if ((b_m >= 0) && ((diff_e > 0) || (diff_e == 0 && diff_m > 0)))
-        {
-            result = add(1,0);
-        }
-    }
-    ELSE
-    {
-        /* a is negative */
-        test();
-        test();
-        test();
-        if ((b_m < 0) && ((diff_e < 0) || (diff_e == 0 && diff_m > 0)))
-        {
-            result = add(1,0);
-        }
-    }
-    return result;
-}
+    i = mac_r(L_x, -16*2-1, 16384);                  /* Extract b25-b31 minus 16 */
 
-/*
+    L_y = L_deposit_h(sqrt_table[i]);                /* table[i] << 16                 */
+    tmp = sub(sqrt_table[i], sqrt_table[i + 1]);     /* table[i] - table[i+1])         */
+    L_y = L_msu(L_y, tmp, a);                        /* L_y -= tmp*a*2                 */
 
-     headroom is introduced into acc
-*/
+    /* L_y = L_shr (L_y, *exp); */                   /* denormalization done by caller */
 
+    return (L_y);
 
-
-void bufferCopyFx(
-    Word16* src,       /*<! Qx  pointer to input buffer                */
-    Word16* dest,      /*<! Qx  pointer to output buffer               */
-    Word16 length,     /*<! Q0  length of buffer to copy               */
-    Word16 Qf_src,     /*<! Q0  Q format (frac-bits) of source buffer  */
-    Word16 Qf_dest,    /*<! Q0  Q format (frac-bits) of dest buffer    */
-    Word16 Q_src,      /*<! Q0  exponent of source buffer              */
-    Word16 Q_dest      /*<! Q0  exponent of destination buffer         */
-)
-{
-    Word16 tmp_16,i;
-
-    /*Copy( st->old_exc, exc_buf, st->old_exc_len);*/
-    tmp_16 = sub(sub(Qf_src,Qf_dest),sub(Q_src,Q_dest));
-    IF (tmp_16>0) /*if value will be shifted right, do a multiplication with rounding ->preserves more accuracy*/
-    {
-        tmp_16 = shl(1,sub(15,tmp_16));
-        FOR (i = 0 ; i < length ; i++)
-        {
-            *(dest+i) = mult_r(*(src+i),tmp_16);
-            move16();
-        }
-    }
-    ELSE IF (tmp_16 <0)/*leftshift - no accuracy preservation needed*/
-    {
-        FOR (i = 0 ; i < length ; i++)
-        {
-            *(dest+i) = shr(*(src+i),tmp_16);
-            move16();
-        }
-    }
-    ELSE /*no shift, simply copy*/
-    {
-        FOR (i = 0 ; i < length ; i++)
-        {
-            *(dest+i) = *(src+i);
-            move16();
-        }
-    }
-}
-
-Word32 dotWord32_16_Mant32Exp(const Word32 *bufX32,/* i: 32-bit buffer with unknown headroom */
-                              Word16 bufX32_exp,   /* i: exponent of buffer bufX32           */
-                              const Word16 *bufY16,/* i: 16-bit buffer quite right-aligned   */
-                              Word16 bufY16_exp,   /* i: exponent of buffer bufY16           */
-                              Word16 len,          /* i: buffer len to process               */
-                              Word16 *exp)         /* o: result exponent                     */
-{
-    Word32 L_sum;
-    Word16 shift, shift1, i;
-
-
-
-    shift = getScaleFactor32(bufX32, len);         /* current available headroom */
-    shift = sub(shift, sub(14,norm_s(len)));        /* reduced required headroom  */
-    L_sum = L_add(0,0);                            /* Clear accu                 */
-    FOR(i=0; i < len; i++)
-    {
-        L_sum = L_mac0(L_sum, round_fx(L_shl(bufX32[i], shift)), bufY16[i]);
-    }
-    shift1 = norm_l(L_sum);
-    L_sum = L_shl(L_sum, shift1);                  /* return value */
-
-    shift = sub(add(bufX32_exp, bufY16_exp), add(shift, shift1));
-    shift = add(shift, 1); /* compensate for factor of 2 introduced by L_mac0 */
-    /* In case of NULL result, we want to have a 0 exponent too */
-    if (L_sum == 0)
-        shift = 0;
-    *exp = shift;
-    move16();
-
-
-    return L_sum;
-
-}
-
-Word16 BASOP_Util_lin2dB(Word32 x, Word16 x_e, Word16 fEnergy)
-{
-    assert(x >= 0);
-
-    /* log2 */
-    x = L_shr(BASOP_Util_Log2(x), 25-16); /* Q16 */
-
-    /* add exponent */
-    x = L_msu(x, x_e, -32768 /* 0x8000 */);
-
-    /* convert log2 to 20*log10 */
-    x = Mpy_32_16_1(x, 24660/*6.0206f Q12*/); /* Q13 */
-
-    /* if energy divide by 2 (->10*log10) */
-    if (fEnergy != 0) x = L_shr(x, 1);
-
-    /* return dB as 7Q8 */
-    return round_fx(L_shl(x, 8-13+16)); /* Q8 */
-}
-
-/* --- fixp_atan() ----    */
-#define Q_ATANINP   (25)    /* Input in q25, Output in q14 */
-#define Q_ATANOUT   (14)
-#define ATI_SF              ((32-1)-Q_ATANINP)  /* 6 */
-#define ATO_SF              ((16-1)-Q_ATANOUT)  /* 1   ] -pi/2 .. pi/2 [ */
-/* --- fixp_atan2() ---    */
-#define Q_ATAN2OUT  (13)
-#define AT2O_SF             ((16-1)-Q_ATAN2OUT) /* 2   ] -pi   .. pi   ] */
-
-
-Word16 BASOP_util_atan2(              /* o: atan2(y,x)    [-pi,pi]        Q13   */
-    Word32 y,     /* i:                                     */
-    Word32 x,     /* i:                                     */
-    Word16 e      /* i: exponent difference (exp_y - exp_x) */
-)
-{
-    Word16 q;
-    Word32 at;
-    Word16 ret = -32768/*-1.0f Q15*/;
-    Word16 sf,sfo,stf;
-    Word32 L_sign;
-
-    if(L_or(y,x) == 0)
-    {
-        return 0;
-    }
-
-    IF(x == 0)
-    {
-        ret = 12868/*+EVS_PI/2 Q13*/;
-        move16();
-        if ( y <  0 )
-        {
-            ret = negate(ret);
-        }
-
-        return ret;
-    }
-
-    /* --- division */
-    L_sign = L_and(L_xor(x,y), 0x80000000 );
-
-    q = 32767/*1.0f Q15*/;  /* y/x = neg/zero = -Inf */
-    sf = 0;
-    BASOP_SATURATE_WARNING_OFF
-    q =  BASOP_Util_Divide3232_uu_1616_Scale(L_abs(y),L_abs(x), &sf);
-    BASOP_SATURATE_WARNING_ON
-
-    BASOP_SATURATE_WARNING_OFF
-    if(L_sign < 0)
-        q = negate(q);
-    BASOP_SATURATE_WARNING_ON
-
-    sfo = add(sf,e);
-
-    /* --- atan() */
-    IF  ( sub(sfo,ATI_SF) > 0 )
-    {
-        /* --- could not calc fixp_atan() here bec of input data out of range
-             ==> therefore give back boundary values */
-
-        sfo = s_min(sfo, MAXSFTAB);
-
-        /*q = FL2WORD16( 0.0f );                              move16();*/
-
-        if(  q > 0 )
-        {
-            move16();
-            q = +f_atan_expand_range[sfo-ATI_SF-1];
-        }
-        if(  q < 0 )
-        {
-            move16();
-            q = -f_atan_expand_range[sfo-ATI_SF-1];
-        }
-    }
-    ELSE
-    {
-        /* --- calc of fixp_atan() is possible; input data within range
-             ==> set q on fixed scale level as desired from fixp_atan() */
-        stf = sub(sfo, ATI_SF);
-
-        at = L_deposit_h(q);
-        if (stf < 0)  at = L_shl(at,stf);
-
-        q = BASOP_util_atan(at);  /* ATO_SF*/
-    }
-
-
-    /* --- atan2() */
-
-    ret = shr(q,(AT2O_SF - ATO_SF)); /* now AT2O_SF for atan2 */
-    IF (  x < 0 )
-    {
-        if (  y >= 0 )
-        {
-            ret = add(ret, 25736/*EVS_PI Q13*/);
-        }
-        if(y < 0)
-        {
-            ret = sub(ret, 25736/* EVS_PI Q13*/);
-        }
-    }
-
-    return ret;
-}
-
-/* SNR of fixp_atan() = 56 dB*/
-#define ONEBY3P56  0x26800000 /* 1.0/3.56 in q31*/
-#define P281       0x00026000 /* 0.281 in q19*/
-#define ONEP571    0x6487 /* 1.571 in q14*/
-
-Word16 BASOP_util_atan(                 /* o:  atan(x)           [-pi/2;pi/2]   1Q14  */
-    Word32 x         /* i:  input data        (-64;64)       6Q25  */
-)
-{
-    Word16 sign, result, exp;
-    Word16 res_e;
-    Word16 tmp, xx;
-
-
-
-    sign = 0;
-    move16();
-    if (x < 0)
-    {
-        sign = 1;
-        move16();
-    }
-    x = L_abs(x);
-
-    /* calc of arctan */
-    IF(L_sub(x, 1509950l/*0.045f/64.0f Q31*/) < 0 )
-    {
-        result = round_fx(L_shl(x,5)); /*Q14*/
-        /*BASOP_util_atan_16(0.0444059968): max error 0.0000567511, mean 0.000017, abs mean 0.000017*/
-    }
-    ELSE
-    IF(L_sub(x,( L_shl(1,Q_ATANINP)-8482560l/*0.00395 Q31*/)) < 0 )
-    {
-        xx =round_fx(L_shl(x,6));
-        tmp = mult_r(xx, xx);            /* q15 * q15 - (16-1) = q15*/
-        tmp = mult_r(tmp, 0x1340);      /* 15 * (ONEBY3P56) q14 - (16-1) = q14*/
-        tmp = add(tmp, 0x4000); /*L_shl(1,14) = 524288*/                /* q14 + q14 = q14 */
-        res_e=Q_ATANOUT-15+14-16+1;
-        move16();
-        if(sub(xx,tmp) > 0)
-        {
-            res_e = add(res_e,1);
-        }
-        if(sub(xx,tmp) > 0)
-        {
-            xx = shr(xx,1);
-        }
-        result = div_s(xx, tmp);
-        result = msu_r(0, result, shl(-32768,res_e));
-        /*BASOP_util_atan_16(0.7471138239): max error 0.0020029545, mean 0.000715, abs mean 0.000715*/
-    }
-    ELSE IF( L_sub(x,42949673l/*1.28/64.0 Q31*/) < 0 )
-    {
-        Word16 delta_fix;
-        Word32 PI_BY_4 = 1686629684l/*3.1415926/4.0 Q31*//2; /* pi/4 in q30 */
-
-        delta_fix = round_fx(L_shl(L_sub(x,33554432l/*1.0/64.0 Q31*/), 5)); /* q30 */
-        result = round_fx(L_sub(L_add(PI_BY_4, L_msu(0,delta_fix,-16384)),(L_mult0(delta_fix, delta_fix))));
-        /* BASOP_Util_fPow(0.7472000122): max error 0.0020237688, mean 0.000026, abs mean 0.000520 */
-    }
-    ELSE
-    {
-        exp = sub(norm_l(x),1);
-        xx = round_fx(L_shl(x,exp));
-        /* q25+exp * q25+exp - (16-1) = q19+2*exp*/
-        tmp = mac_r(L_shl(P281,shl(exp,1)),xx, xx);                 /* q19+2*exp + q19+2*exp = q19+2*exp*/
-        res_e = norm_s(tmp);
-        result = div_s(xx, shl(tmp,res_e));
-        result = shl(result, add(add(Q_ATANOUT-Q_ATANINP/*-exp*/+19/*+2*exp*/-16+1, res_e ),exp));
-        result = sub(ONEP571,result);          /* q14 + q14 = q14*/
-        /*BASOP_Util_fPow(1.2799999714): max error 0.0020168927, mean 0.000066, abs mean 0.000072*/
-    }
-
-    if (sign)
-    {
-        result = negate(result);
-    }
-
-    return(result);
-}
-
-/* compare two positive normalized 16 bit mantissa/exponent values */
-/* return value: positive if first value greater, negative if second value greater, zero if equal */
-Word16 compMantExp16Unorm(Word16 m1, Word16 e1, Word16 m2, Word16 e2)
-{
-    Word16 tmp;
-
-    assert((m1 >= 0x4000) && (m2 >= 0x4000)); /* comparisons below work only for normalized mantissas */
-
-    tmp = sub(e1, e2);
-    if (tmp == 0) tmp = sub(m1, m2);
-
-    return tmp;
 }
 

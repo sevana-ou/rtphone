@@ -1,12 +1,12 @@
 /*====================================================================================
-    EVS Codec 3GPP TS26.442 Apr 03, 2018. Version 12.11.0 / 13.6.0 / 14.2.0
+    EVS Codec 3GPP TS26.443 Nov 13, 2018. Version 12.11.0 / 13.7.0 / 14.3.0 / 15.1.0
   ====================================================================================*/
 
 #ifndef EvsRXLIB_H
 #define EvsRXLIB_H
 
 /* local headers */
-#include "stat_dec_fx.h"
+#include "stat_dec.h"
 
 /*
  * ENUMS
@@ -41,7 +41,7 @@ typedef struct EVS_RX*     EVS_RX_HANDLE;
 /*! Opens the EVS Receiver instance. */
 EVS_RX_ERROR
 EVS_RX_Open(EVS_RX_HANDLE* phEvsRX,
-            Decoder_State_fx *st,
+            Decoder_State *st,
             Word16 jbmSafetyMargin);
 
 /*! Sets the name of the JBM trace file which will be created. */
@@ -52,26 +52,30 @@ EVS_RX_SetJbmTraceFileName(EVS_RX_HANDLE hEvsRX,
 /*! Feeds one frame into the receiver. */
 EVS_RX_ERROR
 EVS_RX_FeedFrame(EVS_RX_HANDLE hEvsRX,
-                 UWord8 *au,
-                 Word16 auSize,
-                 Word16 rtpSequenceNumber,
-                 Word32 rtpTimeStamp,
-                 Word32 rcvTime_ms);
+                 unsigned char *au,
+                 unsigned int   auSize,
+                 unsigned short rtpSequenceNumber,
+                 unsigned long  rtpTimeStamp,
+                 unsigned int   rcvTime_ms);
 
 /*! Retrieves one frame of output PCM data. */
 EVS_RX_ERROR
 EVS_RX_GetSamples(EVS_RX_HANDLE hEvsRX,
-                  Word16 *nOutSamples,
-                  Word16 *pcmBuf,
-                  Word16 pcmBufSize,
-                  Word32 systemTimestamp_ms) ;
+                  unsigned int* nOutSamples,
+                  Word16       *pcmBuf,
+                  unsigned int  pcmBufSize,
+                  unsigned int  systemTimestamp_ms
+                 );
 
-Word16
-EVS_RX_Get_FEC_offset( EVS_RX_HANDLE hEvsRX, Word16 *offset, Word16 *FEC_hi);
+EVS_RX_ERROR
+EVS_RX_Get_FEC_offset( EVS_RX_HANDLE hEvsRX, short* offset
+                       , short *FEC_hi
+                     );
+
 
 /*! Returns 1 if the jitter buffer is empty, otherwise 0. */
 /*  Intended for flushing at the end of the main loop but not during normal operation! */
-Word8
+unsigned int
 EVS_RX_IsEmpty(EVS_RX_HANDLE hEvsRX );
 
 /*! Closes the receiver instance. */

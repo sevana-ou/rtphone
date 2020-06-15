@@ -57,11 +57,16 @@ set (CMAKE_CXX_STANDARD_REQUIRED ON)
 set (rtphone_libs libs)
 set (rtphone_engine engine)
 
-set (USE_AMR_CODEC OFF CACHE BOOL "Use AMR codec. Requires libraries.")
-set (USE_EVS_CODEC OFF CACHE BOOL "Use EVS codec.")
+option (USE_AMR_CODEC "Use AMR codec. Requires libraries." OFF)
+option (USE_EVS_CODEC "Use EVS codec." OFF)
 
 set (CMAKE_POSITION_INDEPENDENT_CODE ON)
 
+if (NOT DEFINED LIB_PLATFORM)
+    set (LIB_PLATFORM ${CMAKE_CURRENT_SOURCE_DIR}/../../libraries)
+endif()
+
+message("Libraries: ${LIB_PLATFORM}")
 set (OPENSSL_INCLUDE ${LIB_PLATFORM}/openssl/1.0/include)
 message ("Using OpenSSL include files from ${OPENSSL_INCLUDE}")
 
@@ -164,6 +169,10 @@ if (USE_AMR_CODEC)
     set (LIBS ${LIBS} opencore-amrnb opencore-amrwb)
 endif (USE_AMR_CODEC)
 
+if (USE_EVS_CODEC)
+    add_definitions(-DUSE_EVS_CODEC)
+endif()
+
 target_link_libraries(rtphone
     ice_stack jrtplib g729_codec gsm_codec
     gsmhr_codec g722_codec srtp resiprocate
@@ -186,6 +195,9 @@ target_include_directories(rtphone
         ${LIB_PLATFORM}/opus/include
     PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/libs/
+        ${CMAKE_CURRENT_SOURCE_DIR}/libs/libevs/lib_com
+        ${CMAKE_CURRENT_SOURCE_DIR}/libs/libevs/lib_enc
+        ${CMAKE_CURRENT_SOURCE_DIR}/libs/libevs/lib_dec
         ${CMAKE_CURRENT_SOURCE_DIR}/libs/speex/include
         ${CMAKE_CURRENT_SOURCE_DIR}/libs/opus/include/
         ${CMAKE_CURRENT_SOURCE_DIR}/libs/json

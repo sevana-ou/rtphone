@@ -1,192 +1,110 @@
 /*====================================================================================
-    EVS Codec 3GPP TS26.442 Apr 03, 2018. Version 12.11.0 / 13.6.0 / 14.2.0
+    EVS Codec 3GPP TS26.443 Nov 13, 2018. Version 12.11.0 / 13.7.0 / 14.3.0 / 15.1.0
   ====================================================================================*/
-
 
 #include <stdlib.h>
 #include <stdio.h>
+#include <math.h>
 #include <assert.h>
-#include "stl.h"
 #include "options.h"
-#include "prot_fx.h"
-#include "rom_basop_util.h"
-#include "basop_util.h"
-#include "cnst_fx.h"
+#include "prot.h"
+#include "rom_com.h"
+#include "cnst.h"
 
-#define inv_int InvIntTable
-extern const Word16 int_sqr[17];
 
-static Word16 quantize(Word32 x, Word16 invGain, Word16 shift, Word32 offset)
-{
-    Word16 tmp16;
-    Word32 tmp32;
-
-    tmp32 = Mpy_32_16_1(L_abs(x), invGain);                   /* multiply */
-    tmp32 = L_shl(tmp32, shift);                            /* convert to 15Q16 */
-    tmp32 = L_add(tmp32, offset);                           /* add offset */
-    tmp16 = extract_h(tmp32);                               /* truncate */
-    if (x < 0) tmp16 = negate(tmp16);                       /* restore sign */
-
-    return tmp16;
-}
 
 /* compute noise-measure flags for spectrum filling and quantization (0: tonal, 1: noise-like) */
-void ComputeSpectrumNoiseMeasure(const Word32 *powerSpec,
-                                 Word16 L_frame,
-                                 Word16 startLine,
-                                 Word8 resetMemory,
-                                 Word8 *noiseFlags,
-                                 Word16 lowpassLine)
+static void ComputeSpectrumNoiseMeasure(
+    const float *powerSpec,
+    int L_frame,
+    int startLine,
+    int resetMemory,
+    int *noiseFlags,
+    int lowpassLine
+)
 {
-    Word16 i, lastTone;
-    Word32 s, c;
-    Word16 tmp16;
-    Word32 tmp1, tmp2 = 0; /* initialization only to avoid compiler warning, not counted */
-
-
-    IF (resetMemory != 0)
+    int i, lastTone;
+    float s;
+    if (resetMemory)
     {
-        FOR (i = 0; i < lowpassLine; i++)
+        for (i = 0; i < lowpassLine; i++)
         {
             noiseFlags[i] = 0;
-            move16();
         }
     }
-
-    FOR (i = lowpassLine; i < L_frame; i++)
+    for (i = lowpassLine; i < L_frame; i++)
     {
         noiseFlags[i] = 1;
-        move16();
     }
-
-    test();
-    IF (powerSpec != NULL && sub(add(startLine, 6), L_frame) < 0)
+    if (powerSpec && startLine+6<L_frame)
     {
         lastTone = 0;
-        move16();
-
         /* noise-measure flags for spectrum filling and quantization (0: tonal, 1: noise-like) */
-        i = sub(startLine, 1);
-
-        s = L_shr(powerSpec[i-7], 4);
-        s = L_add(s, L_shr(powerSpec[i-6], 4));
-        s = L_add(s, L_shr(powerSpec[i-5], 4));
-        s = L_add(s, L_shr(powerSpec[i-4], 4));
-        s = L_add(s, L_shr(powerSpec[i-3], 4));
-        s = L_add(s, L_shr(powerSpec[i-2], 4));
-        s = L_add(s, L_shr(powerSpec[i-1], 4));
-        s = L_add(s, L_shr(powerSpec[i  ], 4));
-        s = L_add(s, L_shr(powerSpec[i+1], 4));
-        s = L_add(s, L_shr(powerSpec[i+2], 4));
-        s = L_add(s, L_shr(powerSpec[i+3], 4));
-        s = L_add(s, L_shr(powerSpec[i+4], 4));
-        s = L_add(s, L_shr(powerSpec[i+5], 4));
-        s = L_add(s, L_shr(powerSpec[i+6], 4));
-        s = L_add(s, L_shr(powerSpec[i+7], 4));
-
-        tmp16 = sub(lowpassLine, 7);
-        FOR (i = add(i, 1); i < tmp16; i++)
+        i = startLine - 1;
+        s = powerSpec[i-7] + powerSpec[i-6] + powerSpec[i-5] +
+            powerSpec[i-4] + powerSpec[i-3] + powerSpec[i-2] +
+            powerSpec[i-1] + powerSpec[i  ] + powerSpec[i+1] +
+            powerSpec[i+2] + powerSpec[i+3] + powerSpec[i+4] +
+            powerSpec[i+5] + powerSpec[i+6] + powerSpec[i+7];
+        for (i++; i < lowpassLine - 7; i++)
         {
-            c = L_shr(powerSpec[i-1], 4);
-            c = L_add(c, L_shr(powerSpec[i], 4));
-            c = L_add(c, L_shr(powerSpec[i+1], 4));
-
-            s = L_sub(s, L_shr(powerSpec[i-8], 4));
-            s = L_add(s, L_shr(powerSpec[i+7], 4));
-
-            tmp1 = L_shr(c, 2);
-            if (noiseFlags[i] == 0) c = L_shl(c, 1);
-            if (noiseFlags[i] == 0) tmp2 = L_sub(c, tmp1); /* 1.75 * c */
-            if (noiseFlags[i] != 0) tmp2 = L_add(c, tmp1); /* 1.25 * c */
-
-            tmp2 = L_sub(s, tmp2);
-            if (tmp2 >= 0)
+            float c = powerSpec[i-1] + powerSpec[i] + powerSpec[i+1];                      /**/
+            s += powerSpec[i+7] - powerSpec[i-8];
+            if (s >= (1.75f - 0.5f * noiseFlags[i]) * c)
             {
                 noiseFlags[i] = 1;
-                move16();
             }
-            if (tmp2 < 0)
+            else
             {
                 noiseFlags[i] = 0;
-                move16();
-            }
-            if (tmp2 < 0)
-            {
                 lastTone = i;
-                move16();
             }
         }
-
         /* lower L_frame*startRatio lines are tonal (0), upper 7 lines are processed separately */
-        tmp16 = sub(lowpassLine, 1);
-        FOR (; i < tmp16; i++)
+        for (; i < lowpassLine - 1; i++)
         {
-            c = L_shr(powerSpec[i-1], 4);
-            c = L_add(c, L_shr(powerSpec[i], 4));
-            c = L_add(c, L_shr(powerSpec[i+1], 4));
-
-            tmp1 = L_shr(c, 2);
-            if (noiseFlags[i] == 0) c = L_shl(c, 1);
-            if (noiseFlags[i] == 0) tmp2 = L_sub(c, tmp1); /* 1.75 * c */
-            if (noiseFlags[i] != 0) tmp2 = L_add(c, tmp1); /* 1.25 * c */
-
+            float c = powerSpec[i-1] + powerSpec[i] + powerSpec[i+1];                      /**/
             /* running sum can't be updated any more, just use the latest one */
-            tmp2 = L_sub(s, tmp2);
-            if (tmp2 >= 0)
+            if (s >= (1.75f - 0.5f * noiseFlags[i]) * c)
             {
                 noiseFlags[i] = 1;
-                move16();
             }
-            if (tmp2 < 0)
+            else
             {
                 noiseFlags[i] = 0;
-                move16();
                 /* lastTone = i; */
             }
         }
-        noiseFlags[i] = 1;   /* uppermost line is defined as noise-like (1) */  move16();
+        noiseFlags[i] = 1;   /* uppermost line is defined as noise-like (1) */
 
         if (lastTone > 0)    /* spread uppermost tonal line one line upward */
         {
             noiseFlags[lastTone+1] = 0;
-            move16();
         }
     }
-
 }
 
-void detectLowpassFac(const Word32 *powerSpec, Word16 powerSpec_e, Word16 L_frame, Word8 rectWin, Word16 *pLpFac, Word16 lowpassLine)
+static void detectLowpassFac(const float *powerSpec, int L_frame, int rectWin, float *pLpFac, int lowpassLine)
 {
-    Word16 i, tmp;
-    Word32 threshold;
+    int i;
+    float threshold;
 
-
-    threshold = 256l/*0.1f * 2*NORM_MDCT_FACTOR Q3*/; /* Q3 */
-    BASOP_SATURATE_WARNING_OFF /* Allow saturation, because threshold is being compared to powerSpec[i] below. */
-    threshold = L_shl(threshold, sub(28, powerSpec_e));
-
-    if (rectWin != 0)
+    threshold = 0.1f * 2*NORM_MDCT_FACTOR;
+    if (rectWin)
     {
         /* compensate for bad side-lobe attenuation with asymmetric windows */
-        threshold = L_shl(threshold, 1);
+        threshold *= 2.f;
     }
-    BASOP_SATURATE_WARNING_ON
-
-    tmp = shr(lowpassLine, 1);
-    FOR (i = sub(lowpassLine, 1); i >= tmp; i--)
+    for (i = lowpassLine-1; i >= lowpassLine/2; i--)
     {
-        IF (L_sub(powerSpec[i], threshold) > 0)
+        if (powerSpec[i] > threshold)
         {
-            BREAK;
+            break;
         }
     }
-
-    tmp = getInvFrameLen(L_frame);
-
-    tmp = mult_r(22938/*0.7f Q15*/, round_fx(L_shl(L_mult0(add(i, 1), tmp), 9)));
-    *pLpFac = add(tmp, mult_r(9830/*0.3f Q15*/, *pLpFac));
-    move16();
-
+    *pLpFac =
+        (0.3f * (*pLpFac)) +
+        (0.7f * ((float) (i+1) / (float) L_frame));
 }
 
 /*-----------------------------------------------------------*
@@ -195,1394 +113,839 @@ void detectLowpassFac(const Word32 *powerSpec, Word16 powerSpec_e, Word16 L_fram
  * Detect low pass if present.                               *
  *-----------------------------------------------------------*/
 void AnalyzePowerSpectrum(
-    Encoder_State_fx *st,              /* i/o: encoder states                                  */
-    Word16 L_frame,                   /* input: frame length                                  */
-    Word16 L_frameTCX,                /* input: full band frame length                        */
-    Word16 left_overlap,              /* input: left overlap length                           */
-    Word16 right_overlap,             /* input: right overlap length                          */
-    Word32 const mdctSpectrum[],      /* input: MDCT spectrum                                 */
-    Word16 mdctSpectrum_e,
-    Word16 const signal[],            /* input: windowed signal corresponding to mdctSpectrum */
-    Word32 powerSpec[],               /* output: Power spectrum. Can point to signal          */
-    Word16 *powerSpec_e
+    Encoder_State *st,              /* i/o: encoder states                                  */
+    int L_frame,                    /* input: frame length                                  */
+    int L_frameTCX,                 /* input: full band frame length                        */
+    int left_overlap,               /* input: left overlap length                           */
+    int right_overlap,              /* input: right overlap length                          */
+    float const mdctSpectrum[],     /* input: MDCT spectrum                                 */
+    float const signal[],           /* input: windowed signal corresponding to mdctSpectrum */
+    float powerSpec[]               /* output: Power spectrum. Can point to signal          */
 )
 {
-    Word16 i, iStart, iEnd, lowpassLine;
-    Word16 tmp, s1, s2;
-    Word32 tmp32;
-    Word8 tmp8;
+    int i, iStart, iEnd, lowpassLine;
 
     lowpassLine = L_frameTCX;
-    move16();
-
-    *powerSpec_e = 16;
-    move16();
-    TCX_MDST(signal,
-             powerSpec,
-             powerSpec_e,
-             left_overlap,
-             sub(L_frameTCX, shr(add(left_overlap, right_overlap), 1)),
-             right_overlap);
-
+    {
+        TCX_MDST(signal, powerSpec, left_overlap, L_frameTCX-(left_overlap+right_overlap)/2, right_overlap);
+    }
     iStart = 0;
-    move16();
     iEnd = L_frameTCX;
-    move16();
 
-    IF (st->narrowBand != 0)
+    if(st->narrowBand)
     {
         attenuateNbSpectrum(L_frameTCX, powerSpec);
     }
 
-    /* get shift to common exponent */
-    s1 = 0;
-    move16();
-    s2 = 0;
-    move16();
-    tmp = sub(mdctSpectrum_e, *powerSpec_e);
-    if (tmp > 0)
-    {
-        s2 = negate(tmp);
-    }
-    if (tmp < 0)
-    {
-        s1 = tmp;
-        move16();
-    }
-
-    /* get headroom */
-    tmp = sub(getScaleFactor32(mdctSpectrum, L_frameTCX), s1);
-    tmp = s_min(tmp, sub(getScaleFactor32(powerSpec, L_frameTCX), s2));
-    s1 = add(s1, tmp);
-    s2 = add(s2, tmp);
-
     /* power spectrum: MDCT^2 + MDST^2 */
-    FOR (i = iStart; i < iEnd; i++)
+    for (i = iStart; i < iEnd; i++)
     {
-        tmp = round_fx(L_shl(mdctSpectrum[i], s1));
-        tmp32 = L_mult0(tmp, tmp);
-
-        tmp = round_fx(L_shl(powerSpec[i], s2));
-        tmp32 = L_mac0(tmp32, tmp, tmp);
-
-        powerSpec[i] = tmp32;
-        move32();
+        powerSpec[i] *= powerSpec[i];
+        powerSpec[i] += mdctSpectrum[i] * mdctSpectrum[i];
     }
-
-    *powerSpec_e = add(shl(sub(mdctSpectrum_e, s1), 1), 1);
-    move16();
-
-    tmp8 = 0;
-    move16();
-    test();
-    if ( L_msu0(L_mult0(st->L_frame_fx, extract_l(st->last_sr_core)), st->L_frame_past, extract_l(st->sr_core)) != 0
-            || sub(st->last_core_fx, TCX_20_CORE ) != 0 )
+    ComputeSpectrumNoiseMeasure(powerSpec, L_frameTCX, st->nmStartLine*L_frame/st->L_frame, (st->L_frame*st->last_sr_core != st->L_frame_past*st->sr_core) || (st->last_core != TCX_20_CORE), st->memQuantZeros, lowpassLine);
+    if( st->total_brate <= ACELP_24k40 )
     {
-        tmp8 = 1;
-        move16();
+        lowpassLine = (int)(2.0f*st->tcx_cfg.bandwidth*L_frame);
+        detectLowpassFac(powerSpec,  L_frame, (st->last_core == ACELP_CORE), &st->measuredBwRatio, lowpassLine);
     }
-
-    ComputeSpectrumNoiseMeasure(powerSpec,
-                                L_frameTCX,
-                                divide3216(L_mult(st->nmStartLine, L_frame), st->L_frame_fx),
-                                tmp8,
-                                st->memQuantZeros,
-                                lowpassLine);
-
-    IF( L_sub(st->total_brate_fx, ACELP_24k40) <= 0 )
+    else
     {
-        lowpassLine = shl(mult(st->tcx_cfg.bandwidth, L_frame), 1);
-
-        test();
-        detectLowpassFac(powerSpec, *powerSpec_e,
-                         L_frame,
-                         sub(st->last_core_fx, ACELP_CORE) == 0,
-                         &st->measuredBwRatio,
-                         lowpassLine);
-    }
-    ELSE
-    {
-        st->measuredBwRatio = 0x4000;
-        move16();
+        st->measuredBwRatio = 1.0f;
     }
 }
 
-void AdaptLowFreqEmph(Word32 x[],
-                      Word16 x_e,
-                      Word16 xq[],
-                      Word16 invGain,
-                      Word16 invGain_e,
-                      Word16 tcx_lpc_shaped_ari,
-                      Word16 lpcGains[], Word16 lpcGains_e[],
-                      const Word16 lg
+void mdct_preShaping(float x[], int lg, const float gains[])
+{
+    int i, j, k, l;
+    float g;
+    int m, n, k1, k2;
+
+    j = 0;                                                                            /*  not counted, is included in ptr init */
+    /* FDNS_NPTS = 64 !!! */
+    k = lg/FDNS_NPTS;
+    m = lg%FDNS_NPTS;
+    if (m)
+    {
+        if ( m <= (FDNS_NPTS/2) )
+        {
+            n = FDNS_NPTS/m;
+            k1 = k;
+            k2 = k + 1;
+        }
+        else
+        {
+            n = FDNS_NPTS/(FDNS_NPTS-m);
+            k1 = k + 1;
+            k2 = k;
+        }
+        for (i=0; i<lg; )
+        {
+            if (j%n)
+            {
+                k = k1;
+            }
+            else
+            {
+                k = k2;
+            }
+            g = 1.f/gains[j++];
+
+            /* Limit number of loops, if end is reached */
+            k = min(k, lg-i);
+            for (l=0; l < k; l++)
+            {
+                x[i++] *= g;
+            }
+        }
+    }
+    else
+    {
+        for (i=0; i<lg; )
+        {
+            g = 1.f/gains[j++];
+            for (l=0; l < k; l++)
+            {
+                x[i++] *= g;
+            }
+        }
+    }
+
+    return;
+}
+
+void AdaptLowFreqEmph(float x[],
+                      int xq[],
+                      float invGain,
+                      short tcx_lpc_shaped_ari,
+                      const float lpcGains[],
+                      const int lg
                      )
 {
-    Word16 i, i_max, i_max_old, lg_4, tmp16, s;
-    Word32 tmp32;
+    int i, i_max, i_max_old;
 
-
-    IF (tcx_lpc_shaped_ari == 0)
+    if(!tcx_lpc_shaped_ari)
     {
-        lg_4 = shr(lg, 2);
-
         /* 1. find first magnitude maximum in lower quarter of spectrum */
-        invGain_e = add(invGain_e, 1);
+        invGain *= 2.0f;
         i_max = -1;
-        move16();
-
-        FOR (i = 0; i < lg_4; i++)
+        for (i = 0; i < lg/4; i++)
         {
-            tmp32 = Mpy_32_16_1(L_abs(x[i]), invGain);            /* multiply */
-            tmp32 = L_shl(tmp32, sub(add(x_e, invGain_e), 15)); /* convert to 15Q16 */
-
-            test();
-            IF ((sub(abs_s(xq[i]), 2) >= 0) && (tmp32 >= 0x3A000))   /* 0x3A000 -> 3.625 (15Q16) */
+            if (((xq[i] <= -2) || (xq[i] >= 2)) &&
+                    ((invGain * x[i] <= -3.625f) || (invGain * x[i] >= 3.625f)))
             {
-
-                /* Debug initialization to catch illegal cases of xq[i] */
-                tmp16 = 0;
-
-                if (xq[i] > 0)
-                {
-                    tmp16 = 2;
-                    move16();
-                }
-                if (xq[i] < 0)
-                {
-                    tmp16 = -2;
-                    move16();
-                }
-
-                assert(tmp16 != 0);
-
-                xq[i] = add(xq[i], tmp16);
-                move16();
-
+                xq[i] += (xq[i] < 0) ? -2 : 2;
                 i_max = i;
-                move16();
-                BREAK;
+                break;
             }
         }
-
-        s = sub(add(x_e, invGain_e), 15);
-
         /* 2. compress value range of all xq up to i_max: add two steps */
-        FOR (i = 0; i < i_max; i++)
+        for (i = 0; i < i_max; i++)
         {
-            xq[i] = quantize(x[i], invGain, s, 0x6000);
-            move16();
+            if (x[i] < 0.0f)
+            {
+                xq[i] = (int)(invGain * x[i] - 0.375f);
+            }
+            else
+            {
+                xq[i] = (int)(invGain * x[i] + 0.375f);
+            }
         }
-
         /* 3. find first mag. maximum below i_max which is half as high */
         i_max_old = i_max;
-        move16();
-
-        IF (i_max_old >= 0)
+        if (i_max_old > -1)
         {
-            invGain_e = add(invGain_e, 1);
-            i_max = -1;  /* reset first maximum, update inverse gain */             move16();
-
-            FOR (i = 0; i < lg_4; i++)
+            invGain *= 2.0f;
+            i_max = -1;  /* reset first maximum, update inverse gain */
+            for (i = 0; i < lg/4; i++)
             {
-                tmp32 = Mpy_32_16_1(L_abs(x[i]), invGain);            /* multiply */
-                tmp32 = L_shl(tmp32, sub(add(x_e, invGain_e), 15)); /* convert to 15Q16 */
-
-                test();
-                IF ((sub(abs_s(xq[i]), 2) >= 0) && (tmp32 >= 0x3A000))   /* 0x3A000 -> 3.625 (15Q16) */
+                if (((xq[i] <= -2) || (xq[i] >= 2)) &&
+                        ((invGain * x[i] <= -3.625f) || (invGain * x[i] >= 3.625f)))
                 {
-
-                    /* Debug initialization to catch illegal cases of xq[i] */
-                    tmp16 = 0;
-
-                    if (xq[i] > 0)
-                    {
-                        tmp16 = 2;
-                        move16();
-                    }
-                    if (xq[i] < 0)
-                    {
-                        tmp16 = -2;
-                        move16();
-                    }
-
-                    assert(tmp16 != 0);
-
-                    xq[i] = add(xq[i], tmp16);
-                    move16();
-
+                    xq[i] += (xq[i] < 0) ? -2 : 2;
                     i_max = i;
-                    move16();
-                    BREAK;
+                    break;
                 }
             }
         }
-
-        s = sub(add(x_e, invGain_e), 15);
-
         /* 4. re-compress and quantize all xq up to half-height i_max+1 */
-        FOR (i = 0; i < i_max; i++)
+        for (i = 0; i < i_max; i++)
         {
-            xq[i] = quantize(x[i], invGain, s, 0x6000);
-            move16();
+            if (x[i] < 0.0f)
+            {
+                xq[i] = (int)(invGain * x[i] - 0.375f);
+            }
+            else
+            {
+                xq[i] = (int)(invGain * x[i] + 0.375f);
+            }
         }
-
         /* 5. always compress 2 lines; lines could be at index 0 and 1! */
-        IF (i_max_old >= 0)
+        if (i_max_old > -1)
         {
-            invGain_e = sub(invGain_e, 1);  /* reset inverse gain */
-            if (sub(i_max, i_max_old) < 0)
+            invGain *= 0.5f;  /* reset inverse gain */
+            if (i_max < i_max_old)
             {
                 i_max = i_max_old;
-                move16();
             }
         }
-
-        i = add(i_max, 1);
-
-        tmp32 = Mpy_32_16_1(L_abs(x[i]), invGain);            /* multiply */
-        tmp32 = L_shl(tmp32, sub(add(x_e, invGain_e), 15)); /* convert to 15Q16 */
-        IF (L_sub(tmp32, 0x3A000) >= 0)
+        i = i_max + 1;
+        if (x[i] < 0.0f)
         {
-
-            /* Debug initialization to catch illegal cases of xq[i] */
-            tmp16 = 0;
-
-            if (xq[i] > 0)
-            {
-                tmp16 = 2;
-                move16();
-            }
-            if (xq[i] < 0)
-            {
-                tmp16 = -2;
-                move16();
-            }
-
-            assert(tmp16 != 0);
-
-            xq[i] = add(xq[i], tmp16);
-            move16();
+            xq[i] = (invGain * x[i] <= -3.625f) ? xq[i] - 2 : (int)(invGain * x[i] - 0.375f);
         }
-        ELSE
+        else
         {
-            xq[i] = quantize(x[i], invGain, sub(add(x_e, invGain_e), 15), 0x6000);
-            move16();
+            xq[i] = (invGain * x[i] >=  3.625f) ? xq[i] + 2 : (int)(invGain * x[i] + 0.375f);
         }
-
-        i = add(i, 1);
-
-        tmp32 = Mpy_32_16_1(L_abs(x[i]), invGain);            /* multiply */
-        tmp32 = L_shl(tmp32, sub(add(x_e, invGain_e), 15)); /* convert to 15Q16 */
-        IF (L_sub(tmp32, 0x3A000) >= 0)
+        i++;
+        if (x[i] < 0.0f)
         {
-
-            /* Debug initialization to catch illegal cases of xq[i] */
-            tmp16 = 0;
-
-            if (xq[i] > 0)
-            {
-                tmp16 = 2;
-                move16();
-            }
-            if (xq[i] < 0)
-            {
-                tmp16 = -2;
-                move16();
-            }
-
-            assert(tmp16 != 0);
-
-            xq[i] = add(xq[i], tmp16);
-            move16();
+            xq[i] = (invGain * x[i] <= -3.625f) ? xq[i] - 2 : (int)(invGain * x[i] - 0.375f);
         }
-        ELSE
+        else
         {
-            xq[i] = quantize(x[i], invGain, sub(add(x_e, invGain_e), 15), 0x6000);
-            move16();
+            xq[i] = (invGain * x[i] >=  3.625f) ? xq[i] + 2 : (int)(invGain * x[i] + 0.375f);
         }
-
-
     }
-    ELSE   /*if(!tcx_lpc_shaped_ari)*/
+    else  /*if(!tcx_lpc_shaped_ari)*/
     {
-        PsychAdaptLowFreqEmph(x, lpcGains, lpcGains_e);
+        PsychAdaptLowFreqEmph(x, lpcGains);
     }/*if(!tcx_lpc_shaped_ari)*/
-
 }
 
-void PsychAdaptLowFreqEmph(Word32 x[],
-                           const Word16 lpcGains[], const Word16 lpcGains_e[]
+void PsychAdaptLowFreqEmph(float x[],
+                           const float lpcGains[]
                           )
 {
-    Word16 i;
-    Word16 max, max_e, fac, min, min_e, tmp, tmp_e;
-    Word32 L_tmp;
+    int i;
+    float max, fac, tmp;
+    max = tmp = lpcGains[0];
 
-
-
-    assert(lpcGains[0] >= 0x4000);
-
-    max = lpcGains[0];
-    move16();
-    max_e = lpcGains_e[0];
-    move16();
-    min = lpcGains[0];
-    move16();
-    min_e = lpcGains_e[0];
-    move16();
-
-    /* find minimum (min) and maximum (max) of LPC gains in low frequencies */
-    FOR (i = 1; i < 9; i++)
+    /* find minimum (tmp) and maximum (max) of LPC gains in low frequencies */
+    for (i = 1; i < 9; i++)
     {
-        IF (compMantExp16Unorm(lpcGains[i], lpcGains_e[i], min, min_e) < 0)
+        if (tmp > lpcGains[i])
         {
-            min = lpcGains[i];
-            move16();
-            min_e = lpcGains_e[i];
-            move16();
+            tmp = lpcGains[i];
         }
-
-        IF (compMantExp16Unorm(lpcGains[i], lpcGains_e[i], max, max_e) > 0)
+        if (max < lpcGains[i])
         {
             max = lpcGains[i];
-            move16();
-            max_e = lpcGains_e[i];
-            move16();
         }
     }
-
-    min_e = add(min_e, 5); /* min *= 32.0f; */
-
-    test();
-    IF ((compMantExp16Unorm(max, max_e, min, min_e) < 0) && (max > 0))
+    tmp *= 32.0f;
+    if ((max < tmp) && (max > FLT_MIN))
     {
-        /* fac = tmp = (float)pow(min / max, 0.0078125f); */
-        tmp_e = max_e;
-        move16();
-        tmp = Inv16(max, &tmp_e);
-        L_tmp = L_shl(L_mult(tmp, min), sub(add(tmp_e, min_e), 6)); /* Q25 */
-        L_tmp = L_add(BASOP_Util_Log2(L_tmp), 6<<25); /* Q25 */
-        L_tmp = L_shr(L_tmp, 7); /* 0.0078125f = 1.f/(1<<7) */
-        L_tmp = BASOP_Util_InvLog2(L_sub(L_tmp, 1<<25)); /* Q30 */
-        tmp = round_fx(L_tmp); /* Q14 */
-        fac = shr(tmp, 1); /* Q13 */
+        fac = tmp = (float)pow(tmp / max, 0.0078125f);
 
-        /* gradual boosting of lowest 32 bins; DC is boosted by (min/max)^1/4 */
-        FOR (i = 31; i >= 0; i--)
+        /* gradual boosting of lowest 32 bins; DC is boosted by (tmp/max)^1/4 */
+        for (i = 31; i >= 0; i--)
         {
-            x[i] = L_shl(Mpy_32_16_1(x[i], fac), 2);
-            move32();
-            fac  = shl(mult_r(fac, tmp), 1);
+            x[i] *= fac;
+            fac  *= tmp;
         }
     }
 
 }
 
-Word16 SQ_gain(     /* output: SQ gain                   */
-    Word32 x[],       /* input:  vector to quantize        */
-    Word16 x_e,       /* input:  exponent                  */
-    Word16 nbitsSQ,   /* input:  number of bits targeted   */
-    Word16 lg,        /* input:  vector size (2048 max)    */
-    Word16 *gain_e)   /* output: SQ gain exponent          */
+float SQ_gain(   /* output: SQ gain                   */
+    float x[],     /* input:  vector to quantize        */
+    int nbitsSQ,   /* input:  number of bits targeted   */
+    int lg)        /* input:  vector size (2048 max)    */
 {
-    Word16 i, iter, lg_4, s, tmp16;
-    Word32 ener, tmp32;
-    Word32 target, fac, offset;
-    Word32 en[N_MAX/4];
+    int    i, iter;
+    float  ener, tmp, target, fac, offset;
+    float  en[N_MAX/4];
 
-
-    lg_4 = shr(lg, 2);
 
     /* energy of quadruples with 9dB offset */
-    FOR (i=0; i<lg_4; i++)
+    for (i=0; i<lg; i+=4)
     {
-        /* normalization */
-        s = 15;
-        move16();
 
-        tmp16 = norm_l(x[0]);
-        if (x[0] != 0) s = s_min(s, tmp16);
-
-        tmp16 = norm_l(x[1]);
-        if (x[1] != 0) s = s_min(s, tmp16);
-
-        tmp16 = norm_l(x[2]);
-        if (x[2] != 0) s = s_min(s, tmp16);
-
-        tmp16 = norm_l(x[3]);
-        if (x[3] != 0) s = s_min(s, tmp16);
-
-        s = sub(s, 2);  /* 2 bits headroom */
-
-        /* calc quadruple energy */
-        ener = L_deposit_l(1);
-
-        tmp16 = extract_h(L_shl(x[0], s));
-        ener = L_mac(ener, tmp16, tmp16);
-
-        tmp16 = extract_h(L_shl(x[1], s));
-        ener = L_mac(ener, tmp16, tmp16);
-
-        tmp16 = extract_h(L_shl(x[2], s));
-        ener = L_mac(ener, tmp16, tmp16);
-
-        tmp16 = extract_h(L_shl(x[3], s));
-        ener = L_mac(ener, tmp16, tmp16);
-
-        s = shl(sub(x_e, s), 1);
-
-        /* log */
-        tmp32 = L_add(BASOP_Util_Log2(ener), L_shl(L_deposit_l(s), 25)); /* log2, 6Q25 */
-        en[i] = L_shr(tmp32, 9); /* 15Q16 */                                    move32();
-        x += 4;
+        ener = 0.01f + x[i]*x[i] + x[i+1]*x[i+1] + x[i+2]*x[i+2] + x[i+3]*x[i+3];
+        en[i>>2] = (float)log10(ener);  /* saves a MAC */
     }
 
     /* SQ scale: 4 bits / 6 dB per quadruple */
-    target = L_mult(0x3FC8, sub(nbitsSQ, shr(lg, 4))); /* 0x3FC8 -> 0.15*log2(10) */
-    fac = L_add(0x2A854B, 0); /* -> 12.8f*log2(10); */
-    offset = L_add(fac, 0);
+    target = 0.15f * (float)(nbitsSQ - (lg>>4));
+    fac = 12.8f;
+    offset = fac;
 
     /* find offset (0 to 128 dB with step of 0.125dB) */
-    FOR (iter=0; iter<10; iter++)
+    for (iter=0; iter<10; iter++)
     {
-        fac = L_shr(fac, 1);
-        offset = L_sub(offset, fac);
-        ener = L_deposit_l(0);
+        fac *= 0.5f;
+        offset -= fac;
+        ener = 0.0f;
 
-        FOR (i=0; i<lg_4; i++)
+        for (i=0; i<lg/4; i++)
         {
-            tmp32 = L_sub(en[i], offset);
+            tmp = en[i] - offset;
 
             /* avoid SV with 1 bin of amp < 0.5f */
-            if (L_sub(tmp32, 0xFF20) > 0)    /* 0xFF20 -> 0.3*log2(10); */
+            if (tmp > 0.3f)
             {
-                ener = L_add(ener, tmp32);
-            }
+                ener += tmp;
 
-            /* if ener is above target -> break and increase offset */
-            IF (L_sub(ener, target) > 0)
-            {
-                offset = L_add(offset, fac);
-                BREAK;
+                /* if ener is above target -> break and increase offset */
+                if (ener > target)
+                {
+                    offset += fac;
+                    break;
+                }
             }
         }
     }
 
-    offset = L_add(L_shr(offset, 1), 0x17EB0); /* 0x17EB0 -> 0.45*log2(10) */
-
-    *gain_e = add(extract_h(offset), 1);
-    move16();
-    offset = L_sub(L_and(offset, 0xFFFF), 0x10000);
-    tmp16 = extract_h(BASOP_Util_InvLog2(L_shl(offset, 9)));
-
     /* return gain */
 
-    return tmp16;
+
+    return (float)pow(10.0f, 0.45f + 0.5f*offset);
 }
 
 void tcx_scalar_quantization(
-    Word32 *x,                   /* i: input coefficients            */
-    Word16 x_e,                  /* i: exponent                      */
-    Word16 *xq,                  /* o: quantized coefficients        */
-    Word16 L_frame,              /* i: frame length                  */
-    Word16 gain,                 /* i: quantization gain             */
-    Word16 gain_e,               /* i: quantization gain exponent    */
-    Word16 offset,               /* i: rounding offset (deadzone)    */
-    Word8  const *memQuantZeros, /* i: coefficients to be set to 0   */
-    const Word16 alfe_flag
+    float *x,                 /* i: input coefficients            */
+    int *xq,                  /* o: quantized coefficients        */
+    int L_frame,              /* i: frame length                  */
+    float gain,               /* i: quantization gain             */
+    float offset,             /* i: rounding offset (deadzone)    */
+    int *memQuantZeros,       /* o: coefficients set to 0         */
+    const int alfe_flag
 )
 {
-    Word16 i, tmp16, s;
-    Word32 tmp32, offs32;
+    int i;
+    float gainInv, rounding, rounding2;
 
 
-    /* common exponent for x and gain for comparison */
-    tmp16 = sub(gain_e, x_e);
-    tmp32 = L_shl(L_deposit_h(gain), s_max(-31, s_min(tmp16, 0)));
-    tmp16 = negate(s_max(tmp16, 0));
+    /* Init scalar quantizer */
+    gainInv = 1.0f/gain;
+    rounding = offset;
+    rounding2 = -offset;
 
-    i = sub(L_frame, 1);
-    WHILE ((memQuantZeros[i] != 0) && (L_sub(L_abs(L_shl(x[i], tmp16)), tmp32) < 0))
+    for (i = L_frame - 1; (memQuantZeros[i]) && ((float)fabs(x[i]) * gainInv < 1.0f); i--)
     {
-        test();
         xq[i] = 0;
-        move16();
-        i = sub(i, 1);
     }
-
-    /* invert gain */
-    gain = Inv16(gain, &gain_e);
-
-    s = sub(add(x_e, gain_e), 15);
-
-    /*It should almost never happen and if so the quantization will be discarded later on (saturation of gain Quantizer).*/
-    IF( sub(s,31) > 0 )
+    for (; i >= 0; i--)
     {
-        /* Limit the inverse gain to maximal possible value=sqrtL_spec/NORM_MDCT_FACTOR)*/
-        gain = 22435; /*sqrt(1200/NORM_MDCT_FACTOR) in 2Q13*/
-        gain_e = 2;
-
-        s = sub(add(x_e, gain_e), 15);
+        if (x[i]>0.f)
+        {
+            xq[i] = ((int) (rounding + x[i]*gainInv));
+        }
+        else
+        {
+            xq[i] = ((int) (rounding2 + x[i]*gainInv));
+        }
     }
 
-    /* substract 0x8000 to affect the mac_r in the following loop
-       so it acts like extract_h. the 0x4000 will be multiplied by 2
-       by the mac_r to get to 0x8000 and disable the round. */
-    offset = sub(offset, 0x4000);
-
-    FOR (; i >= 0; i--)
+    /* don't instrument; BASOP code restricts to 16 bit by using 16 bit operators only*/
+    for(i=0; i<L_frame; i++)
     {
-        offs32 = Mpy_32_16_1(L_abs(x[i]), gain);         /* multiply */
-        offs32 = L_shl(offs32, s);                            /* convert to 15Q16 */
-        tmp16 = mac_r(offs32, offset, 1);                     /* add offset and truncate */
-        if (x[i] < 0) tmp16 = negate(tmp16);                  /* restore sign */
-
-        xq[i] = tmp16;
-        move16();
+        xq[i] = max(min(xq[i], 32767), -32768);
     }
 
-    IF (alfe_flag == 0)
+    if (!alfe_flag)
     {
-        AdaptLowFreqEmph(x, x_e, xq, gain, gain_e,
-                         0, NULL, NULL,
-                         L_frame
-                        );
+        AdaptLowFreqEmph( x,xq, gainInv, 0, NULL, L_frame );
     }
 
+    return;
 }
 
-Word16 tcx_scalar_quantization_rateloop(
-    Word32 *x,                  /* i  : input coefficients            */
-    Word16 x_e,                 /* i  : exponent                      */
-    Word16 *xq,                 /* o  : quantized coefficients        */
-    Word16 L_frame,             /* i  : frame length                  */
-    Word16 *gain,               /* i/o: quantization gain             */
-    Word16 *gain_e,             /* i/o: gain exponent                 */
-    Word16 offset,              /* i  : rounding offset (deadzone)    */
-    Word8  const*memQuantZeros, /* i  : coefficients to be set to 0   */
-    Word16 *lastnz_out,         /* i/o: last nonzero coeff index      */
-    Word16 target,              /* i  : target number of bits         */
-    Word16 *nEncoded,           /* o  : number of encoded coeff       */
-    Word16 *stop,               /* i/o: stop param                    */
-    Word16 sqBits_in_noStop,    /* i  : number of sqBits as determined in prev. quant. stage, w/o using stop mechanism (ie might exceed target bits) */
-    Word16 sqBits_in,           /* i  : number of sqBits as determined in prev. quant. stage, using stop mechanism (ie always <= target bits) */
-    Word16 tcxRateLoopOpt,      /* i  : turns on/off rateloop optimization */
-    const Word8 tcxonly,
-    CONTEXT_HM_CONFIG *hm_cfg   /* i  : configuration of the context-based harmonic model */
+int tcx_scalar_quantization_rateloop(
+    float *x,                 /* i  : input coefficients            */
+    int *xq,                  /* o  : quantized coefficients        */
+    int L_frame,              /* i  : frame length                  */
+    float *gain,              /* i/o: quantization gain             */
+    float offset,             /* i  : rounding offset (deadzone)    */
+    int *memQuantZeros,       /* o  : coefficients set to 0         */
+    int *lastnz_out,          /* i/o: last nonzero coeff index      */
+    int target,               /* i  : target number of bits         */
+    int *nEncoded,            /* o  : number of encoded coeff       */
+    int *stop,                /* i/o: stop param                    */
+    int sqBits_in_noStop,     /* i  : number of sqBits as determined in prev. quant. stage, w/o using stop mechanism (ie might exceed target bits) */
+    int sqBits_in,            /* i  : number of sqBits as determined in prev. quant. stage, using stop mechanism (ie always <= target bits) */
+    int tcxRateLoopOpt,       /* i  : turns on/off rateloop optimization */
+    const int tcxonly,
+    CONTEXT_HM_CONFIG *hm_cfg
 )
 {
-    const Word16 iter_max = 4;
-    Word16 sqBits;
-    Word16 stopFlag;
-    Word8 ubfound,lbfound;
-    Word16 ub, ub_e, lb, lb_e;
-    Word16 shift, shiftInv;
-    Word16 iter;
-    Word16 sqGain, sqGain_e;
-    Word16 w_lb, w_ub;
-    const Word16 kDampen = 10;
-    Word16 old_stopFlag;
-    Word16 old_nEncoded;
-    Word16 old_sqBits;
-    Word16 mod_adjust0, mod_adjust1;
-    Word16 inv_target, inv_target_e;
-    const Word16 kMargin = 0x7AE1; /* 0.96 */
-    const Word16 kMarginInv = 0x42AB; /* 1/0.96 (1Q14) */
-    Word16 tmp, fac1, fac2;
-    Word32 tmp32;
-    Word16 lastnz;
+    const int iter_max = 4;
+    int sqBits, stopFlag;
+    int ubfound,lbfound;
+    float ub=0.f,lb=0.f;
+    float shift;
+    int iter;
+    float sqGain;
+    float w_lb, w_ub;
+    const int kDampen = 10;
+    int old_stopFlag;
+    int old_nEncoded;
+    int old_sqBits;
+    float mod_adjust0, mod_adjust1;
+    float inv_target;
+    const float kMargin = 0.96f;
+    int lastnz;
 
 
 
     /* Init */
     sqGain = *gain;
-    move16();
-    sqGain_e = *gain_e;
-    move16();
     stopFlag = *stop;
-    move16();
     ubfound = 0;
-    move16();
     lbfound = 0;
-    move16();
-    shift = 0x41DE; /* 10^(1/80), 1Q14 */                                       move16();
-    shiftInv = 0x78D7; /* 10^(-1/40) */                                         move16();
-    lb = lb_e = 0;
-    move16();
-    ub = ub_e = 0;
-    move16();
-    w_lb = 0;
-    move16();
-    w_ub = 0;
-    move16();
+    shift = 0.25f;
+    w_lb = 0.0f;
+    w_ub = 0.0f;
     lastnz = *lastnz_out;
-    move16();
+
     old_stopFlag   = stopFlag;
-    move16();
     old_nEncoded   = *nEncoded;
-    move16();
     old_sqBits     = sqBits_in_noStop;
-    move16();
 
     sqBits      = sqBits_in;
-    move16();
 
-    mod_adjust0 = extract_l(L_shr(L_max(0x10000, L_sub(0x24CCD, L_mult(0x0052, target))), 3));  /* 2Q13 */
-    mod_adjust1 = div_s(0x2000, mod_adjust0);   /* 0Q15 */
+    mod_adjust0 = max(1.0f, 2.3f - 0.0025f * target);
+    mod_adjust1 = 1.0f / mod_adjust0;
 
-    inv_target_e = 15;
-    move16();
-    inv_target = Inv16(target, &inv_target_e);
-
-    fac1 = shl(mult(mult(kMarginInv, mod_adjust0), inv_target), 1); /* 2Q13 */
-    fac2 = mult(mult(kMargin, mod_adjust1), inv_target);
+    inv_target  = 1.0f/(float)target;
 
     /* Loop */
-    FOR ( iter=0 ; iter<iter_max ; iter++ )
+    for ( iter=0 ; iter<iter_max ; iter++ )
     {
-        IF (sub(tcxRateLoopOpt, 2) == 0)
+        if(tcxRateLoopOpt == 2)
         {
+
             /* Ajust sqGain */
-            IF ( stopFlag != 0 )
+            if ( stopFlag )
             {
                 lbfound = 1;
-                move16();
                 lb = sqGain;
-                move16();
-                lb_e = sqGain_e;
-                move16();
-                w_lb = add(sub(stopFlag, target), kDampen);
-
-                IF (ubfound != 0)
+                w_lb = (float)(stopFlag-target+kDampen);
+                if (ubfound)
                 {
-                    /* common exponent for addition */
-                    sqGain_e = s_max(lb_e, ub_e);
-
-                    /* multiply and add */
-                    tmp32 = L_shr(L_mult(lb, w_ub), sub(sqGain_e, lb_e));
-                    tmp32 = L_add(tmp32, L_shr(L_mult(ub, w_lb), sub(sqGain_e, ub_e)));
-
-                    /* convert to normalized 16 bit */
-                    tmp = norm_l(tmp32);
-                    sqGain = round_fx(L_shl(tmp32, tmp));
-                    sqGain_e = sub(sqGain_e, tmp);
-
-                    /* divide */
-                    sqGain = BASOP_Util_Divide1616_Scale(sqGain, add(w_ub, w_lb), &tmp);
-                    sqGain_e = add(sqGain_e, tmp);
+                    sqGain = (lb*w_ub + ub*w_lb)/(w_ub+w_lb);
                 }
-                ELSE
+                else
                 {
-                    tmp = round_fx(L_shl(L_mult(stopFlag, fac1), add(inv_target_e, 15)));
-                    sqGain = mult(sqGain, sub(tmp, sub(mod_adjust0, 0x2000)));
-                    sqGain = normalize16(sqGain, &sqGain_e);
-                    sqGain_e = add(sqGain_e, 2);
+                    sqGain *= (1.0f+((float)(stopFlag/kMargin)*inv_target-1.0f)*mod_adjust0);
                 }
             }
-            ELSE
+            else
             {
                 ubfound = 1;
-                move16();
                 ub = sqGain;
-                move16();
-                ub_e = sqGain_e;
-                move16();
-                w_ub = add(sub(target, sqBits), kDampen);
-
-                IF (lbfound != 0)
+                w_ub = (float)(target-sqBits+kDampen);
+                if (lbfound)
                 {
-                    /* common exponent for addition */
-                    sqGain_e = s_max(lb_e, ub_e);
-
-                    /* multiply and add */
-                    tmp32 = L_shr(L_mult(lb, w_ub), sub(sqGain_e, lb_e));
-                    tmp32 = L_add(tmp32, L_shr(L_mult(ub, w_lb), sub(sqGain_e, ub_e)));
-
-                    /* convert to normalized 16 bit */
-                    tmp = norm_l(tmp32);
-                    sqGain = round_fx(L_shl(tmp32, tmp));
-                    sqGain_e = sub(sqGain_e, tmp);
-
-                    /* divide */
-                    sqGain = BASOP_Util_Divide1616_Scale(sqGain, add(w_ub, w_lb), &tmp);
-                    sqGain_e = add(sqGain_e, tmp);
+                    sqGain = (lb*w_ub + ub*w_lb)/(w_ub+w_lb);
                 }
-                ELSE {
-                    tmp = round_fx(L_shl(L_mult(sqBits, fac2), add(inv_target_e, 15)));
-                    sqGain = mult(sqGain, sub(tmp, add(mod_adjust1, (Word16)0x8000)));
-                    sqGain = normalize16(sqGain, &sqGain_e);
+                else
+                {
+                    sqGain *= (1.0f-(1.0f-(float)(sqBits*kMargin)*inv_target)*mod_adjust1);
                 }
             }
+
         }
-        ELSE   /* tcxRateLoopOpt != 2 */
+        else     /* tcxRateLoopOpt != 2 */
         {
 
             /* Ajust sqGain */
-            IF ( stopFlag != 0)
+            if ( stopFlag )
             {
                 lbfound = 1;
-                move16();
                 lb = sqGain;
-                move16();
-                lb_e = sqGain_e;
-                move16();
-
-                IF (ubfound != 0)
+                if (ubfound)
                 {
-                    sqGain = mult(lb, ub);
-                    sqGain_e = add(lb_e, ub_e);
-                    sqGain = Sqrt16(sqGain, &sqGain_e);
+                    sqGain = (float)sqrt( lb * ub );
                 }
-                ELSE
+                else
                 {
-                    shift = shl(mult(shift, shift), 1);
-                    shiftInv = mult(shiftInv, shiftInv);
-
-                    sqGain = mult(sqGain, shift);
-                    sqGain = normalize16(sqGain, &sqGain_e);
-                    sqGain_e = add(sqGain_e, 1);
+                    sqGain = sqGain * (float)pow(10.0f, shift/10.0f);
+                    shift *= 2.0f;
                 }
             }
-            ELSE {
+            else
+            {
                 ubfound = 1;
-                move16();
                 ub = sqGain;
-                move16();
-                ub_e = sqGain_e;
-                move16();
-
-                IF (lbfound != 0)
+                if (lbfound)
                 {
-                    sqGain = mult(lb, ub);
-                    sqGain_e = add(lb_e, ub_e);
-                    sqGain = Sqrt16(sqGain, &sqGain_e);
+                    sqGain = (float)sqrt( lb * ub );
                 }
-                ELSE {
-                    sqGain = mult(sqGain, shiftInv);
-                    sqGain = normalize16(sqGain, &sqGain_e);
-
-                    shift = shl(mult(shift, shift), 1);
-                    shiftInv = mult(shiftInv, shiftInv);
+                else
+                {
+                    sqGain = sqGain * (float)pow(10.0f, -shift/10.0f);
+                    shift *= 2.0f;
                 }
             }
-
         }
 
         /* Quantize spectrum */
-        tcx_scalar_quantization( x, x_e, xq, L_frame, sqGain, sqGain_e, offset, memQuantZeros, tcxonly );
+        tcx_scalar_quantization( x, xq, L_frame, sqGain, offset, memQuantZeros, tcxonly );
 
         /* Estimate bitrate */
-        stopFlag = 1;
-        move16();
-        if (tcxRateLoopOpt > 0)
+        if(tcxRateLoopOpt >= 1)
         {
             stopFlag = 0;
-            move16();
+        }
+        else
+        {
+            stopFlag = 1;
         }
 
         sqBits = ACcontextMapping_encode2_estimate_no_mem_s17_LC( xq, L_frame,
                  &lastnz,
-                 nEncoded, target, &stopFlag,
-                 hm_cfg
-                                                                );
+                 nEncoded, target, &stopFlag, hm_cfg);
 
-        IF ( tcxRateLoopOpt > 0 )
+        if( tcxRateLoopOpt >= 1 )
         {
-            test();
-            test();
-            test();
-            test();
-            test();
-            test();
-            IF ( ((sub(*nEncoded, old_nEncoded) >= 0) && (sub(stopFlag, old_stopFlag) >= 0)) ||
-                 ((sub(*nEncoded, old_nEncoded) > 0) && ((stopFlag == 0) && (old_stopFlag > 0))) ||
-                 ((stopFlag == 0) && (old_stopFlag == 0)) )
+            if((*nEncoded>=old_nEncoded && (stopFlag>=old_stopFlag)) || (*nEncoded>old_nEncoded && (stopFlag==0 && old_stopFlag>0)) || (stopFlag==0 && old_stopFlag==0))
             {
                 *gain = sqGain;
-                move16();
-                *gain_e = sqGain_e;
-                move16();
-                old_nEncoded = *nEncoded;
-                move16();
-                old_stopFlag = stopFlag;
-                move16();
+                old_nEncoded=*nEncoded;
+                old_stopFlag=stopFlag;
                 old_sqBits = sqBits;
-                move16();
                 *lastnz_out = lastnz;
-                move16();
             }
         }
     } /* for ( iter=0 ; iter<iter_max ; iter++ ) */
 
-    IF ( tcxRateLoopOpt > 0 )
+    if( tcxRateLoopOpt >= 1 )
     {
         /* Quantize spectrum */
-        tcx_scalar_quantization( x, x_e, xq, L_frame, *gain, *gain_e, offset, memQuantZeros, tcxonly );
+        tcx_scalar_quantization( x, xq, L_frame, *gain, offset, memQuantZeros, tcxonly );
 
         /* Output */
         *nEncoded = old_nEncoded;
-        move16();
         sqBits = old_sqBits;
-        move16();
         *stop  = old_stopFlag;
-        move16();
     }
-    ELSE
+    else
     {
         /* Output */
         *gain = sqGain;
-        move16();
-        *gain_e = sqGain_e;
-        move16();
         *stop = stopFlag;
-        move16();
         *lastnz_out = lastnz;
-        move16();
     }
+
 
 
     return sqBits;
 }
 
-void QuantizeGain(Word16 n, Word16 *pGain, Word16 *pGain_e, Word16 *pQuantizedGain)
+void QuantizeGain(int n, float * pGain, int * pQuantizedGain)
 {
-    Word16 ener, ener_e, enerInv, enerInv_e, gain, gain_e;
-    Word16 quantizedGain;
-    Word32 tmp32;
+    float ener, gain;
+    int quantizedGain;
 
+    ener = (float)sqrt((float)n / (float)NORM_MDCT_FACTOR);
 
-    ener = mult_r(shl(n, 5), 26214/*128.f/NORM_MDCT_FACTOR Q15*/);
-    ener_e = 15-5-7;
-    move16();
-    IF( n >= 1024 )
-    {
-        /*reduce precision for avoiding overflow*/
-        ener = mult_r(shl(n, 4), 26214/*128.f/NORM_MDCT_FACTOR Q15*/);
-        ener_e = 15-4-7;
-    }
-    BASOP_Util_Sqrt_InvSqrt_MantExp(ener, ener_e, &ener, &ener_e, &enerInv, &enerInv_e);
-
-    gain = mult(*pGain, ener);
-    gain_e = *pGain_e + ener_e;
+    gain = *pGain * ener;
 
     assert(gain > 0);
 
     /* quantize gain with step of 0.714 dB */
-    quantizedGain = add(round_fx(BASOP_Util_Log2(L_deposit_h(gain))), shl(gain_e, 9)); /* 6Q9 */
-    quantizedGain = mult(quantizedGain, 0x436E); /* 10Q5;  0x436E -> 28/log2(10) (4Q11) */
-    quantizedGain = shr(add(quantizedGain, 0x10), 5); /* round */
+    quantizedGain = (int)floor(0.5f + 28.0f * (float)log10(gain));
 
     if (quantizedGain < 0)
     {
         quantizedGain = 0;
-        move16();
     }
-
     if (quantizedGain > 127)
     {
         quantizedGain = 127;
-        move16();
     }
 
     *pQuantizedGain = quantizedGain;
-    move16();
-
-    tmp32 = L_shl(L_mult0(quantizedGain, 0x797D), 7); /* 6Q25; 0x797D -> log2(10)/28 (Q18) */
-    gain_e = add(extract_l(L_shr(tmp32, 25)), 1); /* get exponent */
-    gain = round_fx(BASOP_Util_InvLog2(L_or(tmp32, 0xFE000000)));
-
-    *pGain = mult(gain, enerInv);
-    move16();
-    *pGain_e = add(gain_e, enerInv_e);
-    move16();
-
+    *pGain = (float)pow(10.0f, ((float)quantizedGain)/28.0f) / ener;
 }
 
 void tcx_noise_factor(
-    Word32 *x_orig,         /* i: unquantized mdct coefficients             */
-    Word16 x_orig_e,        /* i: exponent                                  */
-    Word32 *sqQ,            /* i: quantized mdct coefficients               */
-    Word16 iFirstLine,      /* i: first coefficient to be considered        */
-    Word16 lowpassLine,     /* i: last nonzero coefficients after low-pass  */
-    Word16 nTransWidth,     /* i: minimum size of hole to be checked        */
-    Word16 L_frame,         /* i: frame length                              */
-    Word16 gain_tcx,        /* i: tcx gain                                  */
-    Word16 gain_tcx_e,      /* i: gain exponent                             */
-    Word16 tiltCompFactor,  /* i: LPC tilt compensation factor              */
-    Word16 *fac_ns,         /* o: noise factor                              */
-    Word16 *quantized_fac_ns/* o: quantized noise factor                    */
+    float *x_orig,          /* i: unquantized mdct coefficients             */
+    float *sqQ,             /* i: quantized mdct coefficients               */
+    int iFirstLine,         /* i: first coefficient to be considered        */
+    int lowpassLine,        /* i: last nonzero coefficients after low-pass  */
+    int nTransWidth,        /* i: minimum size of hole to be checked        */
+    int L_frame,            /* i: frame length                              */
+    float gain_tcx,         /* i: tcx gain                                  */
+    float tiltCompFactor,   /* i: LPC tilt compensation factor              */
+    float *fac_ns,          /* o: noise factor                              */
+    int *quantized_fac_ns   /* o: quantized noise factor                    */
 )
 {
-    Word16 i, k, maxK, segmentOffset;
-    Word32 sqErrorNrg, n;
-    Word16 inv_gain2, inv_gain2_e, tilt_factor, nTransWidth_1;
-    Word32 accu1, accu2, tmp32;
-    Word16 tmp1, tmp2, s;
-    Word16 c1, c2;
-    Word16 att;  /* noise level attenuation factor for transient windows */
-    Word32 xMax;
+    int i, k, win, segmentOffset;
+    float inv_gain2, sqErrorNrg, n, tilt_factor, tmp;
+    float att;  /* noise level attenuation factor for transient windows */
 
-
-    assert(nTransWidth <= 16);
-
-    c1 = sub(shl(nTransWidth, 1), 4);
-    c2 = mult(9216/*0.28125f Q15*/, inv_int[nTransWidth]);
-    nTransWidth_1 = sub(nTransWidth, 1);
 
     /*Adjust noise filling level*/
-    sqErrorNrg = L_deposit_l(0);
-    n = L_deposit_l(0);
-
-    /* get inverse frame length */
-    tmp1 = getInvFrameLen(L_frame);
-
-    /* tilt_factor = 1.0f /(float)pow(max(0.375f, tiltCompFactor), 1.0f/(float)L_frame); */
-    tmp32 = BASOP_Util_Log2(L_deposit_h(s_max(0x3000, tiltCompFactor))); /* 6Q25 */
-    tmp32 = L_shr(Mpy_32_16_1(tmp32, negate(tmp1)), 6);
-    tilt_factor = round_fx(BASOP_Util_InvLog2(L_sub(tmp32, 0x2000000))); /* 1Q14 */
-
-    /* inv_gain2 = 1.0f / ((float)(nTransWidth * nTransWidth) * gain_tcx); */
-    tmp32 = L_mult(imult1616(nTransWidth, nTransWidth), gain_tcx); /* 15Q16 */
-    tmp1 = norm_l(tmp32);
-    inv_gain2 = round_fx(L_shl(tmp32, tmp1));
-    inv_gain2_e = add(sub(15, tmp1), gain_tcx_e);
-    inv_gain2 = Inv16(inv_gain2, &inv_gain2_e);
-    inv_gain2 = shr(inv_gain2, 2); /* 2 bits headroom */
-    inv_gain2_e = add(inv_gain2_e, 2);
+    sqErrorNrg = 0.0f;
+    n = 0.0f;
+    /* max() */
+    tilt_factor = 1.0f /(float)pow(max(0.375f, tiltCompFactor), 1.0f/(float)L_frame);    /* 1/(a^b) = a^-b */
+    inv_gain2 = 1.0f / ((float)(nTransWidth * nTransWidth) * gain_tcx);
 
     /* find last nonzero line below iFirstLine, use it as start offset */
-    tmp1 = shr(iFirstLine, 1);
-    FOR (i = iFirstLine; i > tmp1; i--)
+    for (i = iFirstLine; i > iFirstLine/2; i--)
     {
-        IF (sqQ[i] != 0)
+        if (sqQ[i] != 0.0f)
         {
-            BREAK;
+            break;
         }
     }
-    /* inv_gain2 *= (float)pow(tilt_factor, (float)i); */
-    FOR (k = 0; k < i; k++)
-    {
-        inv_gain2 = shl(mult(inv_gain2, tilt_factor), 1);
-    }
+    inv_gain2 *= (float)pow(tilt_factor, (float)i);
 
-    /* initialize left (k) and right (maxK) non-zero neighbor pointers */
-    k = 0;
-    move16();
-    FOR (maxK = 1; maxK < nTransWidth; maxK++)
+    segmentOffset = ++i;
+    if (nTransWidth <= 3)
     {
-        IF (sqQ[i+maxK] != 0)
+        att = tmp = FLT_MIN;
+        for (k = i & 0xFFFE; k < lowpassLine; k++)
         {
-            BREAK;
+            att += x_orig[k] * x_orig[k]; /* even-index bins, left sub-win */
+            k++;
+            tmp += x_orig[k] * x_orig[k]; /* odd-index bins, right sub-win */
         }
+        att = (float)sqrt((min(att, tmp)*2.0f) / (att + tmp));
     }
-    i = add(i, 1);
-    segmentOffset = i;
-    move16();
-
-    IF (sub(nTransWidth, 3) <= 0)
+    else
     {
-        accu1 = L_deposit_l(0);
-        accu2 = L_deposit_l(0);
-        xMax = L_deposit_l(0);
-
-        FOR (k = s_and(i, (Word16)0xFFFE); k < lowpassLine; k++)
-        {
-            xMax = L_max(xMax, L_abs(x_orig[k]));
-        }
-        s = sub(norm_l(xMax), 4);
-
-        FOR (k = s_and(i, (Word16)0xFFFE); k < lowpassLine; k += 2)
-        {
-            /* even-index bins, left sub-win */
-            tmp1 = round_fx(L_shl(x_orig[k], s));
-            accu1 = L_mac0(accu1, tmp1, tmp1);
-
-            /* odd-index bins, right sub-win */
-            tmp1 = round_fx(L_shl(x_orig[k+1], s));
-            accu2 = L_mac0(accu2, tmp1, tmp1);
-        }
-        k = 0;
-        move16();
-
-        if (accu1 == 0) accu1 = L_deposit_l(1);
-        if (accu2 == 0) accu2 = L_deposit_l(1);
-
-        att = BASOP_Util_Divide3232_Scale( L_shl(L_min(accu1, accu2), 1), L_add(accu1, accu2), &s );
-        att = Sqrt16(att, &s);
-        BASOP_SATURATE_WARNING_OFF; /* att is always <= 1.0 */
-        att = shl(att, s);
-        BASOP_SATURATE_WARNING_ON;
+        att = 1.0f;
     }
-    ELSE
+    win = 0;
+    for (; i < lowpassLine; i++)
     {
-        att = 0x7FFF;
-        move16();
-    }
-
-    accu1 = L_deposit_l(0);
-
-    tmp1 = sub(lowpassLine, nTransWidth);
-    FOR (; i <= tmp1; i++)
-    {
-        inv_gain2 = shl(mult(inv_gain2, tilt_factor), 1);
-
-        IF (sub(maxK, 1) == 0)    /* current line is not zero, so reset pointers */
+        inv_gain2 *= tilt_factor;
+        if (sqQ[i] != 0)    /* current line is not zero, so reset pointers */
         {
-            k = sub(i, segmentOffset);
-
-            IF (k > 0)     /* add segment sum to sum of segment magnitudes */
+            if (win > 0)   /* add segment sum to sum of segment magnitudes */
             {
-                IF (sub(nTransWidth, 3) <= 0)
+                k = i - segmentOffset;
+                if (nTransWidth <= 3)
                 {
-                    tmp2 = sub(k, c1);
-                    if (tmp2 > 0) n = L_msu(n, k, (Word16)0x8000);
-                    if (tmp2 > 0) n = L_mac(n, nTransWidth_1, (Word16)0x8000);
-                    if (tmp2 <= 0) n = L_mac(n, int_sqr[k], c2);
+                    n += (k > 2 * nTransWidth - 4) ? (float)(k - nTransWidth + 1)
+                         : (float)(k*k) * 0.28125f/nTransWidth;        /* table lookup instead of  */
                 }
-                ELSE
+                else
                 {
-                    tmp2 = sub(k, 12);
-                    if (tmp2 > 0) n = L_msu(n, k, (Word16)0x8000);
-                    if (tmp2 > 0) n = L_sub(n, 0x70000);
-                    if (tmp2 <= 0) n = L_mac(n, int_sqr[k], 1152/*0.03515625f Q15*/);
+                    n += (k > 12) ? (float)k - 7.0f : (float)(k*k) * 0.03515625f;
                 }
-                sqErrorNrg = L_add(sqErrorNrg, accu1);
-                accu1 = L_deposit_l(0);      /* segment ended here, so reset segment sum */
-                k = 0;
-                move16();
-            }
-
-            FOR (; maxK < nTransWidth; maxK++)
-            {
-                IF (sqQ[i+maxK] != 0)
+                for (k = segmentOffset; k < i-win; k++)
                 {
-                    BREAK;
+                    sqErrorNrg += sqQ[k] * (float)nTransWidth;
+                    sqQ[k] = 0;
+                }
+                for (; win > 0; win--)
+                {
+                    sqErrorNrg += sqQ[k] * (float)win;
+                    sqQ[k++] = 0;
                 }
             }
-            segmentOffset = add(i, 1); /* new segment might start at next line */
+            segmentOffset = i + 1; /* new segment might start at next line */
         }
-        ELSE   /* current line is zero, so update pointers & segment sum */
+        else   /* current line is zero, so update pointers & segment sum */
         {
-            if (sub(k, nTransWidth) < 0)
+            if (win < nTransWidth)
             {
-                k = add(k, 1);
+                win++;
             }
-
-            tmp2 = sub(maxK, nTransWidth);
-            if (tmp2 < 0)
-            {
-                maxK = sub(maxK, 1);
-            }
-
-            test();
-            if ((tmp2 >= 0) && (sqQ[i+sub(nTransWidth, 1)] != 0))
-            {
-                maxK = sub(nTransWidth, 1);
-            }
-
             /* update segment sum: magnitudes scaled by smoothing function */
-            /*accu1 += (float)fabs(x_orig[i]) * inv_gain2 * (float)(k * maxK);*/
-            tmp2 = mult(inv_gain2, shl(imult1616(k, maxK), 8));
-            accu1 = L_add(accu1, L_abs(Mpy_32_16_1(x_orig[i], tmp2)));
+            sqQ[i] = (float)fabs(x_orig[i]) * (float)win * inv_gain2;
         }
     }
-
-    FOR (; i < lowpassLine; i++)
+    if (win > 0)    /* add last segment sum to sum of segment magnitudes */
     {
-        inv_gain2 = shl(mult(inv_gain2, tilt_factor), 1);
-
-        IF (sub(maxK, 1) == 0)    /* current line is not zero, so reset pointers */
+        k = i - segmentOffset;
+        if (nTransWidth <= 3)
         {
-            k = sub(i, segmentOffset);
-
-            IF (k > 0)     /* add segment sum to sum of segment magnitudes */
-            {
-                IF (sub(nTransWidth, 3) <= 0)
-                {
-                    tmp2 = sub(k, c1);
-                    if (tmp2 > 0) n = L_msu(n, k, (Word16)0x8000);
-                    if (tmp2 > 0) n = L_mac(n, nTransWidth_1, (Word16)0x8000);
-                    if (tmp2 <= 0) n = L_mac(n, int_sqr[k], c2);
-                }
-                ELSE
-                {
-                    tmp2 = sub(k, 12);
-                    if (tmp2 > 0) n = L_msu(n, k, (Word16)0x8000);
-                    if (tmp2 > 0) n = L_sub(n, 0x70000);
-                    if (tmp2 <= 0) n = L_mac(n, int_sqr[k], 1152/*0.03515625f Q15*/);
-                }
-                sqErrorNrg = L_add(sqErrorNrg, accu1);
-            }
-            segmentOffset = add(i, 1); /* no new segments since maxK remains 1 */
+            n += (k > 2 * nTransWidth - 4) ? (float)(k - nTransWidth + 1)
+                 : (float)(k*k) * 0.28125f/nTransWidth;            /* table lookup instead of  */
         }
-        ELSE    /* current line is zero, so update pointers & energy sum */
+        else
         {
-            if (sub(k, nTransWidth) < 0)
-            {
-                k = add(k, 1);
-            }
-            if (sub(maxK, nTransWidth) < 0)
-            {
-                maxK = sub(maxK, 1);
-            }
-
-            /* update segment sum: magnitudes scaled by smoothing function */
-            /*accu1 += (float)fabs(x_orig[i]) * inv_gain2 * (float)(k * maxK);*/
-            tmp2 = mult(inv_gain2, shl(imult1616(k, maxK), 8));
-            accu1 = L_add(accu1, L_abs(Mpy_32_16_1(x_orig[i], tmp2)));
+            n += (k > 12) ? (float)k - 7.0f : (float)(k*k) * 0.03515625f;
         }
-    }
-
-    k = sub(i, segmentOffset);
-    IF (k > 0)    /* add last segment sum to sum of segment magnitudes */
-    {
-        IF (sub(nTransWidth, 3) <= 0)
+        for (k = segmentOffset; k < i-win; k++)
         {
-            tmp2 = sub(k, c1);
-            if (tmp2 > 0) n = L_msu(n, k, (Word16)0x8000);
-            if (tmp2 > 0) n = L_mac(n, nTransWidth_1, (Word16)0x8000);
-            if (tmp2 <= 0) n = L_mac(n, int_sqr[k], c2);
+            sqErrorNrg += sqQ[k] * (float)nTransWidth;
+            sqQ[k] = 0;
         }
-        ELSE
+        for (; win > 0; win--)
         {
-            tmp2 = sub(k, 12);
-            if (tmp2 > 0) n = L_msu(n, k, (Word16)0x8000);
-            if (tmp2 > 0) n = L_sub(n, 0x70000);
-            if (tmp2 <= 0) n = L_mac(n, int_sqr[k], 1152/*0.03515625f Q15*/);
+            sqErrorNrg += sqQ[k] * (float)win;
+            sqQ[k++] = 0;
         }
-        sqErrorNrg = L_add(sqErrorNrg, accu1);
     }
 
     /* noise level factor: average of segment magnitudes of noise bins */
-    IF (n > 0)
+    if (n > 0.0f)
     {
-        tmp1 = BASOP_Util_Divide3232_Scale(Mpy_32_16_1(sqErrorNrg, att), n, &s);
-        s = add(add(add(s, x_orig_e), inv_gain2_e), 7 - 15);
-        BASOP_SATURATE_WARNING_OFF;
-        tmp1 = shl(tmp1, s);
-        BASOP_SATURATE_WARNING_ON;
+        *fac_ns = (sqErrorNrg * att) / n;
     }
-    ELSE
+    else
     {
-        tmp1 = 0;
-        move16();
+        *fac_ns = 0.0f;
     }
 
     /* quantize, dequantize noise level factor (range 0.09375 - 0.65625) */
-    tmp2 = round_fx(L_shr(L_mult(tmp1, 22016/*1.34375f Q14*/), 14-NBITS_NOISE_FILL_LEVEL));
-
-    if (sub(tmp2, (1<<NBITS_NOISE_FILL_LEVEL)-1) > 0)
+    *quantized_fac_ns = (int)(0.5f + *fac_ns * 1.34375f*(1<<NBITS_NOISE_FILL_LEVEL));
+    if (*quantized_fac_ns > (1<<NBITS_NOISE_FILL_LEVEL) - 1)
     {
-        tmp2 = (1<<NBITS_NOISE_FILL_LEVEL)-1;
-        move16();
+        *quantized_fac_ns = (1<<NBITS_NOISE_FILL_LEVEL) - 1;
     }
+    *fac_ns = (float)(*quantized_fac_ns) * 0.75f / (1<<NBITS_NOISE_FILL_LEVEL);
 
-    *quantized_fac_ns = tmp2;
-    move16();
-
-    *fac_ns = extract_l(L_mult0(*quantized_fac_ns, shr(24576/*0.75f Q15*/, NBITS_NOISE_FILL_LEVEL)));
 }
 
-
 void tcx_encoder_memory_update(
-    Word16 *wsig,            /* i : target weighted signal */
-    Word16 *xn_buf,          /* i/o: mdct output buffer/time domain weigthed synthesis        */
-    Word16 L_frame_glob,     /* i: global frame length                         */
-    const Word16 *Ai,        /* i: Unquantized (interpolated) LPC coefficients */
-    const Word16 *A,         /* i: Quantized LPC coefficients                  */
-    Word16 preemph,          /* i: preemphasis factor                          */
-    LPD_state *LPDmem,       /* i/o: coder memory state                        */
-    Encoder_State_fx *st,
-    Word16 *synthout,
-    Word16 Q_new,
-    Word16 shift
+    const float *wsig,      /* i : target weighted signal        */
+    float *xn_buf,          /* i/o: mdct output buffer/time domain weigthed synthesis        */
+    int L_frame_glob,       /* i: global frame length                         */
+    const float *Ai,              /* i: Unquantized (interpolated) LPC coefficients */
+    float *A,               /* i: Quantized LPC coefficients                  */
+    float preemph_f,        /* i: preemphasis factor                          */
+    LPD_state *LPDmem,      /* i/o: coder memory state                        */
+    Encoder_State *st,
+    int m,
+    float *synthout
 )
 {
-    Word16 tmp;
-    Word16 buf[1+M+LFAC+L_FRAME_PLUS];
-    Word16 *synth;
+    float tmp;
+    float buf[1+M+L_FRAME_PLUS];
+    float *synth;
+
 
 
     /* Output synth */
-    Copy(xn_buf, synthout, L_frame_glob);
+    mvr2r(xn_buf, synthout, L_frame_glob);
 
 
     /* Update synth */
-    synth = buf + M+1;
-    Copy(LPDmem->syn, buf, M+1);
+    synth = buf + 1 + m;
+    mvr2r(LPDmem->syn, buf, 1+m);
 
-    Copy(xn_buf, synth, L_frame_glob);
-    Copy(synth + sub(L_frame_glob, M+1), LPDmem->syn, M+1);
+    mvr2r(xn_buf, synth, L_frame_glob);
+    mvr2r(synth+L_frame_glob-m-1, LPDmem->syn, 1+m);
 
-    IF (st->tcxonly == 0)
+    if(!st->tcxonly)
     {
         /* Update weighted synthesis */
-        Residu3_fx(Ai+(st->nb_subfr-1)*(M+1), synth + sub(L_frame_glob, 1), &tmp, 1, Q_new+shift-1);
-        LPDmem->mem_w0 =sub(wsig[sub(L_frame_glob, 1)], tmp);
-        move16();
-        LPDmem->mem_w0 =shr(LPDmem->mem_w0, shift); /*Qnew-1*/
+        residu(Ai+(st->nb_subfr-1)*(M+1), M,synth+L_frame_glob-1, &tmp, 1);
+        LPDmem->mem_w0=wsig[L_frame_glob-1]-tmp;
     }
 
 
     /* Emphasis of synth -> synth_pe */
-    tmp = synth[-(M+1)];
-    move16();
-    E_UTIL_f_preemph2(Q_new-1, synth - M, preemph, add(M, L_frame_glob), &tmp);
+    tmp = synth[-m-1];
+    preemph(synth-m, preemph_f, m+L_frame_glob, &tmp);
+    mvr2r(synth+L_frame_glob-m, LPDmem->mem_syn, m);
+    mvr2r(synth+L_frame_glob-m, LPDmem->mem_syn2, m);
+    mvr2r( synth+L_frame_glob-L_SYN_MEM, LPDmem->mem_syn_r, L_SYN_MEM);
 
-    Copy(synth + sub(L_frame_glob, M), LPDmem->mem_syn, M);
-    Copy(synth + sub(L_frame_glob, M), LPDmem->mem_syn2, M);
-    Copy(synth + sub(L_frame_glob, L_SYN_MEM), LPDmem->mem_syn_r, L_SYN_MEM);
-
-    test();
-    IF (st->tcxonly == 0 || sub(L_frame_glob,L_FRAME16k)<=0)
+    if ( !st->tcxonly || (L_frame_glob==L_FRAME16k))
     {
         /* Update excitation */
-        IF (sub(L_frame_glob, L_EXC_MEM) < 0)
+        if (L_frame_glob < L_EXC_MEM)
         {
-            Copy( LPDmem->old_exc + L_frame_glob, LPDmem->old_exc, sub(L_EXC_MEM, L_frame_glob) );
-            Residu3_fx(A, synth, LPDmem->old_exc + sub(L_EXC_MEM, L_frame_glob), L_frame_glob, 1);
+            mvr2r( LPDmem->old_exc+(L_frame_glob), LPDmem->old_exc, L_EXC_MEM-(L_frame_glob) );
+            residu(A, M,synth, LPDmem->old_exc+L_EXC_MEM-(L_frame_glob), (L_frame_glob));
         }
-        ELSE
+        else
         {
-            Residu3_fx(A, synth + sub(L_frame_glob, L_EXC_MEM), LPDmem->old_exc, L_EXC_MEM, 1);
+            residu(A, M,synth+(L_frame_glob)-L_EXC_MEM, LPDmem->old_exc, L_EXC_MEM);
         }
-
     }
-
 }
+
 
 
 /*---------------------------------------------------------------
  * Residual Quantization
  *--------------------------------------------------------------*/
 
-/* Returns: number of bits used (including "bits")  Q0 */
-Word16 tcx_ari_res_Q_spec(
-    const Word32 x_orig[],  /* i: original spectrum                   Q31-e */
-    Word16 x_orig_e,        /* i: original spectrum exponent          Q0 */
-    const Word16 signs[],   /* i: signs (x_orig[.]<0)                 Q0 */
-    Word32 x_Q[],           /* i/o: quantized spectrum                Q31-e */
-    Word16 x_Q_e,           /* i: quantized spectrum exponent         Q0 */
-    Word16 L_frame,         /* i: number of lines                     Q0 */
-    Word16 gain,            /* i: TCX gain                            Q15-e */
-    Word16 gain_e,          /* i: TCX gain exponent                   Q0 */
-    Word16 prm[],           /* o: bit-stream                          Q0 */
-    Word16 target_bits,     /* i: number of bits available            Q0 */
-    Word16 bits,            /* i: number of bits used so far          Q0 */
-    Word16 deadzone,        /* i: quantizer deadzone                  Q15 */
-    const Word16 x_fac[]    /* i: spectrum post-quantization factors  Q14 */
+/* Returns: number of bits used (including "bits") */
+int tcx_ari_res_Q_spec(
+    const float x_orig[], /* i: original spectrum                  */
+    const int signs[],    /* i: signs (x_orig[.]<0)                */
+    float x_Q[],          /* i/o: quantized spectrum               */
+    int L_frame,          /* i: number of lines                    */
+    float gain,           /* i: TCX gain                           */
+    int prm[],            /* o: bit-stream                         */
+    int target_bits,      /* i: number of bits available           */
+    int bits,             /* i: number of bits used so far         */
+    float deadzone,       /* i: quantizer deadzone                 */
+    const float x_fac[]   /* i: spectrum post-quantization factors */
 )
 {
-    Word16 i, j, num_zeros;
-    Word16 zeros[L_FRAME_PLUS];
-    Word16 fac_p, sign;
-    Word32 thres, x_Q_m, x_Q_p;
-    Word32 L_tmp, L_tmp2;
-    Word16 s, s2;
+    int i, j, num_zeros;
+    int zeros[L_FRAME_PLUS];
+    float fac_m, fac_p, thres, sign, x_Q_m, x_Q_p;
 
 
     /* Limit the number of residual bits */
-    target_bits = s_min(target_bits, NPRM_RESQ);
+    target_bits = min(target_bits, NPRM_RESQ);
 
 
     /* Requantize the spectrum line-by-line */
-    /* fac_m = deadzone * 0.5f;
-       fac_p = 0.5f - fac_m; */
+    fac_m = deadzone * 0.5f;
+    fac_p = 0.5f - fac_m;
     num_zeros = 0;
-    move16();
-
-    s = sub(add(gain_e, x_Q_e), x_orig_e);
-    FOR (i=0; i < L_frame; i++)
+    for (i=0; i<L_frame; ++i)
     {
-        IF (sub(bits, target_bits) >= 0)   /* no bits left */
+        if (bits >= target_bits)
         {
-            BREAK;
+            /* no bits left */
+            break;
         }
-
-        IF (x_Q[i] != 0)
+        if (x_Q[i] != 0)
         {
-            sign = x_fac[i];
-            move16();
-            if (signs[i] != 0) sign = negate(sign);
+            sign = (1-2*signs[i])*x_fac[i];
 
-            /* x_Q_m = x_Q[i] - sign*fac_m;
-               x_Q_p = x_Q[i] + sign*fac_p; */
-
-            L_tmp = L_mult(sign, deadzone); /* sign*deadzone/2 in Q31 */
-            x_Q_m = L_sub(x_Q[i], L_shr(L_tmp, x_Q_e));
-
-            L_tmp = L_mac(L_tmp, sign, (Word16)0x8000); /* sign*(deadzone-1)/2 in Q31 */
-            x_Q_p = L_sub(x_Q[i], L_shr(L_tmp, x_Q_e));
-
-            /* if (fabs(x_orig[i] - gain * x_Q_m) < fabs(x_orig[i] - gain * x_Q_p)) */
-            L_tmp  = L_abs(L_sub(x_orig[i], L_shl(Mpy_32_16_1(x_Q_m, gain), s)));
-            L_tmp2 = L_abs(L_sub(x_orig[i], L_shl(Mpy_32_16_1(x_Q_p, gain), s)));
-
-            IF (L_sub(L_tmp, L_tmp2) < 0)   /* Decrease magnitude */
+            x_Q_m = x_Q[i] - sign*fac_m;
+            x_Q_p = x_Q[i] + sign*fac_p;
+            if (fabs(x_orig[i] - gain * x_Q_m) < fabs(x_orig[i] - gain * x_Q_p))   /* Decrease magnitude */
             {
                 x_Q[i] = x_Q_m;
-                move32();
-                prm[bits] = 0;
-                move16();
+                prm[bits++] = 0;
             }
-            ELSE   /* Increase magnitude */
+            else   /* Increase magnitude */
             {
                 x_Q[i] = x_Q_p;
-                move32();
-                prm[bits] = 1;
-                move16();
+                prm[bits++] = 1;
             }
-            bits = add(bits, 1);
         }
-        ELSE
+        else
         {
-            zeros[num_zeros] = i;
-            move16();
-            num_zeros = add(num_zeros, 1);
+            zeros[num_zeros++] = i;
         }
     }
 
     /* Requantize zeroed-lines of the spectrum */
-    fac_p = msu_r(1417339264l/*2*0.33f Q31*/, deadzone, 21627/*2*0.33f Q15*/); /* Q16 */
-    target_bits = sub(target_bits, 1); /* reserve 1 bit for the check below */
-
-    s = sub(gain_e, x_orig_e);
-    s2 = sub(x_Q_e, 1);
-    FOR (j = 0; j < num_zeros; j++)
+    fac_p = (1.0f - deadzone)*0.33f;
+    --target_bits; /* reserve 1 bit for the check below */
+    for (j=0; j<num_zeros; ++j)
     {
-        IF (sub(bits, target_bits) >= 0)   /* 1 or 0 bits left */
+        if (bits >= target_bits)
         {
-            BREAK;
+            /* 1 or 0 bits left */
+            break;
         }
 
         i = zeros[j];
-        move16();
 
-        thres = L_mult(fac_p, x_fac[i]); /* Q31 */
-
-        IF (L_sub(L_abs(x_orig[i]), L_shl(Mpy_32_16_1(thres, gain), s)) > 0)
+        thres = fac_p * x_fac[i];
+        if (fabs(x_orig[i]) > thres * gain)
         {
-            prm[bits] = 1;
-            move16();
-            bits = add(bits, 1);
-
-            prm[bits] = sub(1, signs[i]);
-            move16();
-            bits = add(bits, 1);
-
-            L_tmp = L_shr(thres, s2);
-            if (signs[i]) L_tmp = L_negate(L_tmp);
-            x_Q[i] = L_tmp;
-            move32();
+            prm[bits++] = 1;
+            prm[bits++] = 1-signs[i];
+            x_Q[i] = (2-4*signs[i]) * thres;
         }
-        ELSE
+        else
         {
-            prm[bits] = 0;
-            move16();
-            bits = add(bits, 1);
+            prm[bits++] = 0;
         }
     }
-
 
     return bits;
 }
@@ -1590,351 +953,266 @@ Word16 tcx_ari_res_Q_spec(
 #define kMaxEstimatorOvershoot  5
 #define kMaxEstimatorUndershoot 0
 
-Word16 tcx_res_Q_gain(
-    Word16 sqGain,
-    Word16 sqGain_e,
-    Word16 *gain_tcx,
-    Word16 *gain_tcx_e,
-    Word16 *prm,
-    Word16 sqTargetBits
+
+int tcx_res_Q_gain(
+    float sqGain,
+    float *gain_tcx,
+    int *prm,
+    int sqTargetBits
 )
 {
-    Word16 bits;
-    Word16 gain_reQ, gain_reQ_e;
+    int bits;
+    float gain_reQ;
 
     /*Refine the gain quantization : Normal greedy gain coding */
-
-    gain_reQ = *gain_tcx;
-    move16();
-    gain_reQ_e = *gain_tcx_e;
-    move16();
-
-    /* make sure we have a bit of headroom */
-    IF (sub(gain_reQ, 0x7000) > 0)
+    gain_reQ=*gain_tcx;
+    for(bits=0; bits<TCX_RES_Q_BITS_GAIN; bits++)
     {
-        gain_reQ = shr(gain_reQ, 1);
-        gain_reQ_e = add(gain_reQ_e, 1);
-    }
-
-    /* bring sqGain to same exponent */
-    sqGain = shr(sqGain, sub(gain_reQ_e, sqGain_e));
-
-    FOR (bits=0; bits < TCX_RES_Q_BITS_GAIN; bits++)
-    {
-        IF (sub(sqGain, gain_reQ) < 0)
+        if(sqGain<gain_reQ)
         {
-            prm[bits] = 0;
-            move16();
-            gain_reQ = mult_r(gain_reQ, gain_corr_inv_fac[bits]);
+            prm[bits]=0;
+            gain_reQ*=gain_corr_inv_fac[bits];
         }
-        ELSE
+        else
         {
-            prm[bits] = 1;
-            move16();
-            gain_reQ = shl(mult_r(gain_reQ, gain_corr_fac[bits]), 1);
+            prm[bits]=1;
+            gain_reQ*=gain_corr_fac[bits];
         }
-
-        IF (sub(bits, sqTargetBits) < 0)
+        if(bits<sqTargetBits)
         {
-            *gain_tcx = gain_reQ;
-            move16();
-            *gain_tcx_e = gain_reQ_e;
-            move16();
+            *gain_tcx=gain_reQ;
         }
     }
 
-
-    return bits;
+    return(bits);
 }
 
-Word16 tcx_res_Q_spec(
-    Word32 *x_orig,
-    Word16 x_orig_e,
-    Word32 *x_Q,
-    Word16 x_Q_e,
-    Word16 L_frame,
-    Word16 sqGain,
-    Word16 sqGain_e,
-    Word16 *prm,
-    Word16 sqTargetBits,
-    Word16 bits,
-    Word16 sq_round,
-    const Word16 lf_deemph_factors[] /* 1Q14 */
+
+static void refine_0(float x_orig, float *x_Q, float sqGain, int *prm, int *bits, float sq_round, float lf_deemph_factor)
+{
+    float /*b,*/ thres;
+    /* was  */
+    /*b = x_orig/sqGain;*/
+    thres = (1.0f-sq_round)*0.33f*lf_deemph_factor;
+    if (x_orig > thres * sqGain)
+    {
+        /* was (b > thres) */
+        prm[(*bits)++] = 1;
+        prm[(*bits)++] = 1;
+        *x_Q = 2.f*thres;
+    }
+    else if (x_orig < -thres * sqGain)
+    {
+        /* was (b < -thres) */
+        prm[(*bits)++] = 1;
+        prm[(*bits)++] = 0;
+        *x_Q = -2.f*thres;
+    }
+    else
+    {
+        prm[(*bits)++] = 0;
+    }
+
+    return;
+}
+
+
+int tcx_res_Q_spec(
+    float *x_orig,
+    float *x_Q,
+    int L_frame,
+    float sqGain,
+    int *prm,
+    int sqTargetBits,
+    int bits,
+    float sq_round,
+    const float lf_deemph_factors[]
 )
 {
-    Word16 i;
-    Word16 fac_m, fac_p;
-    Word32 tmp1, tmp2;
-    Word16 s, s2, lf_deemph_factor;
-    Word16 c;
-    Word32 thres;
-
+    int i;
+    float fac_m, fac_p;
 
     /* Limit the number of residual bits */
-    sqTargetBits = s_min(sqTargetBits, NPRM_RESQ);
+    sqTargetBits = min(sqTargetBits, NPRM_RESQ);
 
     /* Requantize the spectrum line-by-line */
-    fac_m = shr(sq_round, 1);
-    fac_p = sub(0x4000, fac_m);
-
-    /* exponent difference of x_orig and x_Q * sqGain */
-    s = sub(x_orig_e, add(x_Q_e, sqGain_e));
-
-    lf_deemph_factor = 0x4000;
-    move16();
-    s2 = sub(x_Q_e, 1);
-
-    FOR (i = 0; i < L_frame; i++)
+    fac_p = 0.5f - sq_round * 0.5f;
+    fac_m = sq_round * 0.5f;
+    if (!lf_deemph_factors)
     {
-        IF (sub(bits, sub(sqTargetBits, kMaxEstimatorUndershoot)) >= 0)
+        for (i = 0; i < L_frame; i++)
         {
-            fac_m = 0;
-            move16();
-            fac_p = 0;
-            move16();
-
-            IF (sub(bits, s_min(NPRM_RESQ, add(sqTargetBits, kMaxEstimatorOvershoot))) >= 0)
+            if (bits >= sqTargetBits-kMaxEstimatorUndershoot)
             {
-                BREAK;
+                fac_m=fac_p=0;
+                if (bits >= min(NPRM_RESQ,sqTargetBits+kMaxEstimatorOvershoot))
+                {
+                    break;
+                }
+            }
+
+            if (x_Q[i] != 0.0f)
+            {
+                if(x_orig[i]<(sqGain)*x_Q[i])
+                {
+                    prm[bits++]=0;
+                    x_Q[i]-=(x_Q[i]>0)?fac_m : fac_p;
+                }
+                else
+                {
+                    prm[bits++]=1;
+                    x_Q[i]+=(x_Q[i]>0)?fac_p : fac_m;
+                }
+            }
+        }
+        sqTargetBits -= 2; /* Quantize zeroed lines of the spectrum */
+        for (i = 0; (i < L_frame) && (bits < sqTargetBits); i++)
+        {
+            /* bits < sqTargetBits */
+            if (x_Q[i] == 0.0f)
+            {
+                refine_0(x_orig[i], &x_Q[i], sqGain, prm, &bits, sq_round, 1.0f);  /*  inlined */
+            }
+        }
+        /* Make sure that all possible bits are initialized */
+        for (i = bits; i < NPRM_RESQ; i++)
+        {
+            prm[i] = 0;
+        }
+        return bits;
+    }
+    for (i = 0; i < L_frame; i++)
+    {
+        if (bits >= sqTargetBits-kMaxEstimatorUndershoot)
+        {
+            fac_m=fac_p=0;
+            if (bits >= min(NPRM_RESQ,sqTargetBits+kMaxEstimatorOvershoot))
+            {
+                break;
             }
         }
 
-        test();
-        test();
-        IF ((x_Q[i] != 0) && ((lf_deemph_factors == NULL) || (sub(lf_deemph_factors[i], 0x2000) > 0)))
+        if (x_Q[i] != 0 && lf_deemph_factors[i] > 0.5f)
         {
-            tmp1 = L_add(x_orig[i], 0);
-            tmp2 = Mpy_32_16_1(x_Q[i], sqGain);
-            if (s > 0) tmp2 = L_shr(tmp2, s);
-            if (s < 0) tmp1 = L_shl(tmp1, s);
-
-            if (lf_deemph_factors != NULL)
+            if(x_orig[i]<(sqGain)*x_Q[i])
             {
-                lf_deemph_factor = lf_deemph_factors[i];
-                move16();
+                prm[bits++]=0;
+                x_Q[i]-=(x_Q[i]>0)?fac_m*lf_deemph_factors[i]:fac_p*lf_deemph_factors[i];
             }
-
-            IF (L_sub(tmp1, tmp2) < 0)
+            else
             {
-                prm[bits] = 0;
-                move16();
-                bits = add(bits, 1);
-
-                if (x_Q[i] > 0) tmp1 = L_mult(fac_m, lf_deemph_factor);
-                if (x_Q[i] < 0) tmp1 = L_mult(fac_p, lf_deemph_factor);
-                x_Q[i] = L_sub(x_Q[i], L_shr(tmp1, s2));
-                move32();
-            }
-            ELSE
-            {
-                prm[bits] = 1;
-                move16();
-                bits = add(bits, 1);
-
-                if (x_Q[i] > 0) tmp1 = L_mult(fac_p, lf_deemph_factor);
-                if (x_Q[i] < 0) tmp1 = L_mult(fac_m, lf_deemph_factor);
-                x_Q[i] = L_add(x_Q[i], L_shr(tmp1, s2));
-                move32();
+                prm[bits++]=1;
+                x_Q[i]+=(x_Q[i]>0)?fac_p*lf_deemph_factors[i]:fac_m*lf_deemph_factors[i];
             }
         }
     }
 
     /*Quantize zeroed-line of the spectrum*/
-    c = sub(21627/*0.66f Q15*/, mult_r(sq_round, 21627/*0.66f Q15*/));
-
-    FOR (i = 0; i < L_frame; i++)
+    for (i = 0; (i < L_frame) && (bits < (sqTargetBits-2)); i++)
     {
-        IF (sub(bits, sub(sqTargetBits, 2)) >= 0)
+        /* For (bits >= (sqTargetBits-2)) */
+        if (x_Q[i] == 0 && lf_deemph_factors[i] > 0.5f)
         {
-            BREAK;
-        }
-
-        test();
-        test();
-        IF ((x_Q[i] == 0) && ((lf_deemph_factors == NULL) || (sub(lf_deemph_factors[i], 0x2000) > 0)))
-        {
-            if (lf_deemph_factors != NULL)
-            {
-                lf_deemph_factor = lf_deemph_factors[i];
-                move16();
-            }
-
-            thres = L_mult(c, lf_deemph_factor);
-            tmp1 = L_shl(Mpy_32_16_1(thres, sqGain), sub(sqGain_e, x_orig_e));
-
-            IF (L_sub(x_orig[i], tmp1) > 0)
-            {
-                prm[bits] = 1;
-                move16();
-                bits = add(bits, 1);
-
-                prm[bits] = 1;
-                move16();
-                bits = add(bits, 1);
-
-                x_Q[i] = L_shl(thres, sub(1, x_Q_e));
-                move32();
-            }
-            ELSE IF (L_add(x_orig[i], tmp1) < 0)
-            {
-                prm[bits] = 1;
-                move16();
-                bits = add(bits, 1);
-
-                prm[bits] = 0;
-                move16();
-                bits = add(bits, 1);
-
-                x_Q[i] = L_shl(L_negate(thres), sub(1, x_Q_e));
-                move32();
-            }
-            ELSE
-            {
-                prm[bits] = 0;
-                move16();
-                bits = add(bits, 1);
-            }
+            refine_0(x_orig[i], &x_Q[i], sqGain, prm, &bits, sq_round, lf_deemph_factors[i]);
         }
     }
 
     /*Be sure that every possible bits are initialized*/
-    FOR (i = bits; i < NPRM_RESQ; i++)
+    for (i = bits; i < NPRM_RESQ; i++)
     {
-        prm[i] = 0;
-        move16();
+        prm[i]=0;
     }
-
 
     return bits;
 }
+
+
 void ProcessIGF(
-    IGF_ENC_INSTANCE_HANDLE  const hInstance,          /**< in: instance handle of IGF Encoder */
-    Encoder_State_fx              *st,                 /**< in: Encoder state */
-    Word32                         pMDCTSpectrum[],    /**< in: MDCT spectrum */
-    Word16                        *pMDCTSpectrum_e,
-    Word32                         pPowerSpectrum[],   /**< in: MDCT^2 + MDST^2 spectrum, or estimate */
-    Word16                        *pPowerSpectrum_e,
-    Word16                         isTCX20,            /**< in: flag indicating if the input is TCX20 or TCX10/2xTCX5 */
-    Word16                         isTNSActive,        /**< in: flag indicating if the TNS is active */
-    Word16                         isTransition,       /**< in: flag indicating if the input is the transition from from ACELP to TCX20/TCX10 */
-    Word16                         frameno             /**< in: flag indicating index of current subframe */
+    IGF_ENC_INSTANCE_HANDLE         const hInstance,          /**< in: instance handle of IGF Encoder */
+    Encoder_State                        *st,                 /**< in: Encoder state */
+    float                                *pMDCTSpectrum,      /**< in: MDCT spectrum */
+    float                                *pPowerSpectrum,     /**< in: MDCT^2 + MDST^2 spectrum, or estimate */
+    int                                   isTCX20,            /**< in: flag indicating if the input is TCX20 or TCX10/2xTCX5 */
+    int                                   isTNSActive,        /**< in: flag indicating if the TNS is active */
+    int                                   isTransition,       /**< in: flag indicating if the input is the transition from from ACELP to TCX20/TCX10 */
+    int                                   frameno             /**< in: flag indicating index of current subframe */
 )
 {
-    Word16 igfGridIdx;
-    Word16 isIndepFlag;
-    Word16 bsBits;
-    Word16 bsStart;
-
+    int igfGridIdx;
+    int isIndepFlag;
+    int bsBits;
+    int pBsStart;
 
     isIndepFlag = 1;
-    move16();
-    test();
-    IF (isTransition && isTCX20)
+    if (isTransition && isTCX20)
     {
         igfGridIdx = IGF_GRID_LB_TRAN;
-        move16();
     }
-    ELSE
+    else if (isTCX20)
     {
-        IF (isTCX20)
+        igfGridIdx = IGF_GRID_LB_NORM;
+    }
+    else
+    {
+        /* It is short block */
+        igfGridIdx = IGF_GRID_LB_SHORT;
+        if (frameno == 1)
         {
-            igfGridIdx = IGF_GRID_LB_NORM;
-            move16();
-        }
-        ELSE
-        {
-            /* It is short block */
-            igfGridIdx = IGF_GRID_LB_SHORT;
-            move16();
-            if (sub(frameno, 1) == 0)
-            {
-                isIndepFlag = 0;
-                move16();
-            }
+            isIndepFlag = 0;
         }
     }
-
 
     IGFEncApplyMono(hInstance,                   /**< in: instance handle of IGF Encoder */
                     igfGridIdx,                  /**< in: IGF grid index */
                     st,                          /**< in: Encoder state */
                     pMDCTSpectrum,               /**< in: MDCT spectrum */
-                    *pMDCTSpectrum_e,
                     pPowerSpectrum,              /**< in: MDCT^2 + MDST^2 spectrum, or estimate */
-                    *pPowerSpectrum_e,
                     isTCX20,                     /**< in: flag indicating if the input is TCX20 or TCX10/2xTCX5 */
-                    isTNSActive,                 /**< in: flag indicating if the TNS is active */
-                    (st->last_core_fx == ACELP_CORE)
-                   );
+                    isTNSActive,
+                    (st->last_core == ACELP_CORE)
+                   );                /**< in: flag indicating if the TNS is active */
+
+
     {
-        const Word32 tns_predictionGain = (&st->hIGFEnc)->tns_predictionGain;
-        const Word16 startLine = (&st->hIGFEnc)->infoStartLine;
-        const Word16 endLine = (&st->hIGFEnc)->infoStopLine;
-        const Word16 maxOrder = 8;
-        const Word32 *spec_before = (&st->hIGFEnc)->spec_be_igf;
-        Word16 curr_order = 0;
-        Word16 A[ITF_MAX_FILTER_ORDER+1];
-        Word16 Q_A;
-        Word16 predictionGain = 0;
-        Word16 *flatteningTrigger = &(&st->hIGFEnc)->flatteningTrigger;
-        ITF_Detect_fx( spec_before, startLine, endLine, maxOrder, A, &Q_A, &predictionGain, &curr_order, shl((&st->hIGFEnc)->spec_be_igf_e, 1) );
-        *flatteningTrigger = 0;
-        test();
-        IF (L_sub(tns_predictionGain, 9646899l/*1.15 Q23*/) < 0 &&
-            sub(predictionGain, 147/*1.15 Q7*/) < 0)
-        {
-            *flatteningTrigger = 1;
-        }
+        const float tns_predGain = (&st->hIGFEnc)->tns_predictionGain;
+        const short int startLine = (&st->hIGFEnc)->infoStartLine;
+        const short int endLine = (&st->hIGFEnc)->infoStopLine;
+        const int maxOrder = 8;
+        const float* spec_before = (&st->hIGFEnc)->spec_be_igf;
+        int curr_order = 0;
+        float A[ITF_MAX_FILTER_ORDER+1];
+        float predictionGain = 0;
+        int* flatteningTrigger = &(&st->hIGFEnc)->flatteningTrigger;
+        ITF_Detect( spec_before, startLine, endLine, maxOrder, A, &predictionGain, &curr_order );
+
+        *flatteningTrigger = tns_predGain < 1.15 && predictionGain < 1.15;
     }
 
-    bsStart = st->next_ind_fx;
-    move16();
+    pBsStart = st->next_ind;
     hInstance->infoTotalBitsPerFrameWritten = 0;
-    move16();
-    IF (isTCX20)
+    IGFEncWriteBitstream( hInstance, isTCX20 ? NULL : st, &hInstance->infoTotalBitsPerFrameWritten, igfGridIdx, isIndepFlag );
+
+    bsBits = st->next_ind - pBsStart;
+    if (!isTCX20)
     {
-        IGFEncWriteBitstream(hInstance,
-                             NULL,
-                             &hInstance->infoTotalBitsPerFrameWritten,
-                             igfGridIdx,
-                             isIndepFlag);
-    }
-    ELSE
-    {
-        IGFEncWriteBitstream(hInstance,
-        st,
-        &hInstance->infoTotalBitsPerFrameWritten,
-        igfGridIdx,
-        isIndepFlag);
+        IGFEncConcatenateBitstream(hInstance, bsBits, &st->next_ind, &st->nb_bits_tot, st->ind_list);
     }
 
-    bsBits = sub(st->next_ind_fx, bsStart);
-    IF (!isTCX20)
-    {
-        IGFEncConcatenateBitstream(hInstance, bsBits, &st->next_ind_fx, &st->nb_bits_tot_fx, st->ind_list_fx);
-    }
-
+    return;
 }
 
-void attenuateNbSpectrum(Word16 L_frame, Word32 *spectrum)
+
+void attenuateNbSpectrum(int L_frame, float *spectrum)
 {
-    Word16 i, length, att;
+    int i;
+    int length = L_frame / 20;
+    float att = (length == 8)?0.6f:0.66f;
 
-    length = idiv1616U(L_frame, 20);
-
-    att = 21627/*0.66f Q15*/;
-    move16();
-    if (sub(length, 8) == 0)
+    for(i=0; i<length; i++)
     {
-        att = 19661/*0.6f Q15*/;
-        move16();
+        spectrum[L_frame - length + i] *= att;
+        att *= att;
     }
 
-    spectrum += sub(L_frame, length);
-    FOR (i=0; i < length; i++)
-    {
-        spectrum[i] = Mpy_32_16_1(spectrum[i], att);
-        move32();
-        att = mult_r(att, att);
-    }
+    return;
 }

@@ -1,41 +1,88 @@
 /*====================================================================================
-    EVS Codec 3GPP TS26.442 Apr 03, 2018. Version 12.11.0 / 13.6.0 / 14.2.0
+    EVS Codec 3GPP TS26.443 Nov 13, 2018. Version 12.11.0 / 13.7.0 / 14.3.0 / 15.1.0
   ====================================================================================*/
 
-/*! @file pcmdsp_window.c Window functions. */
-
-/* instrumentation headers */
-/* local headers */
-#include "jbm_pcmdsp_window.h"
+#include <math.h>
+#include <stdlib.h>
 #include "options.h"
-#include "stl.h"
+#include "jbm_pcmdsp_window.h"
+#include "cnst.h"
 
+/*-----------------------------------------------------------------------*
+* hannWindow()
+*
+* Generates a Hann window (cos-shaped) of length n
+*-----------------------------------------------------------------------*/
 
-/* Overlap/Add of two signal with a given window. */
-void overlapAdd(const Word16 *fadeOut, const Word16 *fadeIn, Word16 *out,
-                Word16 n, Word16 nChannels, const Word16 *fadeOutWin, const Word16 *fadeInWin, Word16 hannIncrementor )
+void hannWindow(
+    uint16_t n,
+    Float * w
+)
 {
-    Word32 fdOutVal, fdInVal;
-    Word16 i, j, hannIter, combinedVal;
+    uint16_t i;
+    Float arg;
+
+    for (i = 0; i < n/2; i++)
+    {
+        arg = ((2.0f * EVS_PI) * i) / (Float) (n);
+        w[i] = (Float) ((1.0f - cos (arg)) / 2.0f);
+    }
+
+    for ( ; i < n; i++)
+    {
+        w[i] = 1.0f - w[i-n/2];
+    }
+
+    return;
+}
 
 
-    FOR(j = 0; j < nChannels; j++)
+/*-----------------------------------------------------------------------*
+* overlapAdd()
+*
+*  Overlap/Add of two signal with a given window
+*-----------------------------------------------------------------------*/
+
+void overlapAdd(
+    const int16_t *fadeOut,
+    const int16_t *fadeIn,
+    int16_t *out,
+    uint16_t n,
+    uint16_t nChannels,
+    const float *fadeOutWin,
+    const float *fadeInWin
+)
+{
+    float fdOutVal, fdInVal;
+    int16_t i, j, hannIter;
+    int32_t combinedVal;
+
+    for(j = 0; j < nChannels; j++)
     {
         /* reset Hann window iterator to beginning (both channels use same window) */
         hannIter = 0;
-        move16();
-        FOR( i = j; i < n; i += nChannels )
+        for(i = j; i < n; i += nChannels)
         {
-            fdOutVal = L_mult( fadeOut[i], fadeOutWin[hannIter] );
-            fdInVal  = L_mult( fadeIn[i],  fadeInWin[hannIter] );
-            /* round to 16bit value and saturate (L_add already applies saturation) */
-            combinedVal = round_fx( L_add( fdOutVal, fdInVal ) );
+            fdOutVal = fadeOut[i] * fadeOutWin[hannIter];
+            fdInVal = fadeIn[i] * fadeInWin[hannIter];
+            /* round combinedVal value (taking care of sign) */
+            combinedVal = (int32_t)( (fdInVal + fdOutVal) + 0.5 );
 
-            out[i] = combinedVal;
-            move16();
-            /* advance the Hann window iterator by incrementor (dependent on sample rate). */
-            hannIter = add( hannIter, hannIncrementor );
+            if( fdInVal + fdOutVal < 0.0 )
+                combinedVal = (int32_t)( (fdInVal + fdOutVal) - 0.5 );
+            /* saturate value */
+            if (combinedVal > 32767)
+            {
+                combinedVal = 32767;
+            }
+            else if (combinedVal < -32768)
+            {
+                combinedVal = -32768;
+            }
+            out[i] = (int16_t) combinedVal;
+            hannIter++;
         }
     }
-}
 
+    return;
+}

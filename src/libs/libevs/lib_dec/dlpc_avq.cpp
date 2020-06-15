@@ -1,274 +1,246 @@
 /*====================================================================================
-    EVS Codec 3GPP TS26.442 Apr 03, 2018. Version 12.11.0 / 13.6.0 / 14.2.0
+    EVS Codec 3GPP TS26.443 Nov 13, 2018. Version 12.11.0 / 13.7.0 / 14.3.0 / 15.1.0
   ====================================================================================*/
 
-
-/* Header files */
 #include <assert.h>
+#include "prot.h"
 #include <stdio.h>
 #include <stdlib.h>
-#include "stl.h"
-#include "prot_fx.h"
-/* Constants */
 
-#define M 16   /* length of LPC */
 
-#define BFI_FAC 29491/*0.9f Q15*/
+/*------------------------------------------------------------------*
+* dlpc_avq()
+*
+* Variable bit-rate multiple LPC un-quantizer
+*------------------------------------------------------------------*/
 
-/***********************************************/
-/* Variable bit-rate multiple LPC un-quantizer */
-/***********************************************/
-
-Word16 dlpc_avq(
-    Word16 *index,       /* (i)   Quantization indices                       */
-    Word16 *LSF_Q,     /* (o)   Quantized LSF vectors                      */
-    Word16 numlpc,       /* (i) Number of sets of lpc */
-    Word32 sr_core
+int dlpc_avq(
+    int *index,       /* (i)   Quantization indices                       */
+    float *LSF_Q,     /* (o)   Quantized LSF vectors                      */
+    int numlpc,       /* (i) Number of sets of lpc */
+    float sr_core
 )
 {
-    Word16 i, nbi, last;
-    Word16 *p_index, q_type;
-
+    int i, nbi, last;
+    int *p_index, q_type;
 
     /* Last LPC index */
 
-    move16();
-    last = 0;
-    if ( sub(numlpc,1)!=0 )
+    if ( numlpc==1 )
     {
-        move16();
+        last = 0;
+    }
+    else
+    {
         last = M;
     }
 
-    move16();
     p_index = index;
 
     /* Decode last LPC */
-
-    FOR (i=0; i<M; i++)
+    for (i=0; i<M; i++)
     {
-        move16();
-        LSF_Q[last+i] = 0;
+        LSF_Q[last+i] = 0.0f;
     }
-    vlpc_1st_dec(p_index[0], &LSF_Q[last]);
+
+    vlpc_1st_dec(p_index[0], &LSF_Q[last], sr_core );
     p_index++;
-    vlpc_2st_dec(&LSF_Q[last], &p_index[0], 0, sr_core);
-    nbi = add(2, add(p_index[0], p_index[1]));
+    vlpc_2st_dec(&LSF_Q[last], &p_index[0], 0, sr_core );
+    nbi = 2 + p_index[0] + p_index[1];
     p_index += nbi;
 
     /* Decode intermediate LPC (512 framing) */
 
-    IF ( sub(numlpc,2)==0 )
+    if ( numlpc==2 )
     {
-        move16();
         q_type = p_index[0];
         p_index++;
 
-        IF (q_type == 0)
+        if (q_type == 0)
         {
 
-            FOR (i=0; i<M; i++)
+            for (i=0; i<M; i++)
             {
-                move16();
-                LSF_Q[i] = 0;
+                LSF_Q[i] = 0.0f;
             }
-            vlpc_1st_dec(p_index[0], &LSF_Q[0]);
+            vlpc_1st_dec(p_index[0], &LSF_Q[0], sr_core );
             p_index++;
-            vlpc_2st_dec(&LSF_Q[0], &p_index[0], 0, sr_core);
+            vlpc_2st_dec(&LSF_Q[0], &p_index[0], 0, sr_core );
         }
-        ELSE IF ( sub(q_type,1) == 0 )
+        else if (q_type == 1)
         {
-
-            FOR (i=0; i<M; i++)
+            for (i=0; i<M; i++)
             {
-                move16();
                 LSF_Q[i] = LSF_Q[M+i];
             }
-            vlpc_2st_dec(&LSF_Q[0], &p_index[0], 3, sr_core);
+
+            vlpc_2st_dec(&LSF_Q[0], &p_index[0], 3, sr_core );
+
         }
-        nbi = add(2, add(p_index[0], p_index[1]));
+
+        nbi = 2 + p_index[0] + p_index[1];
         p_index += nbi;
     }
 
-    return (Word16)(p_index-index);
+    return p_index-index;
 }
 
-static Word16 unary_decode(Decoder_State_fx *st, Word16 *ind)
+/*------------------------------------------------------------------*
+* unary_decode()
+*
+*
+*------------------------------------------------------------------*/
+
+static int unary_decode(
+    Decoder_State *st,
+    int *ind
+)
 {
+    int start_bit_pos;
 
-    Word16 start_bit_pos;
-
-
-    move16();
-    start_bit_pos = st->next_bit_pos_fx;
+    start_bit_pos = st->next_bit_pos;
 
     /* Index bits */
-
-    move16();
     *ind = 0;
-    WHILE ((get_next_indice_1_fx(st) != 0) && !st->BER_detect)
+
+    while (get_next_indice_1(st) && !st->BER_detect)
     {
-        move16();
-        *ind = add(*ind,1);
+        *ind += 1;
     }
 
     if (*ind != 0)
     {
-        move16();
-        *ind = add(*ind, 1);
+        *ind += 1;
     }
 
-    return sub(st->next_bit_pos_fx, start_bit_pos);
+    return st->next_bit_pos - start_bit_pos;
 
 }
 
-static Word16 pack4bits(Word16 nbits, Decoder_State_fx *st, Word16 *prm)
+
+/*------------------------------------------------------------------*
+* pack4bits()
+*
+*
+*------------------------------------------------------------------*/
+
+static int pack4bits(
+    int nbits,
+    Decoder_State *st,
+    int *prm
+)
 {
-    Word16 i;
+    int i;
 
-
-    move16();
     i=0;
 
-    FOR ( ; nbits > 4; nbits -= 4 )
+    while (nbits > 4)
     {
-        move16();
-        prm[i] = get_next_indice_fx(st, 4);
-        i = add(i,1);
-
-
+        prm[i] = get_next_indice(st, 4);
+        nbits -= 4;
+        i++;
     }
-    prm[i] = get_next_indice_fx(st, nbits);
-    move16();
-    i = add(i,1);
+    prm[i] = get_next_indice(st, nbits);
+    i++;
 
     return(i);
 }
 
-Word16 decode_lpc_avq( Decoder_State_fx *st, Word16 numlpc, Word16 *param_lpc )
+
+/*------------------------------------------------------------------*
+* decode_lpc_avq()
+*
+*
+*------------------------------------------------------------------*/
+
+int decode_lpc_avq(
+    Decoder_State *st,
+    int numlpc,
+    int *param_lpc
+)
 {
-    Word16 k,j;
-    Word16 nb, qn1, qn2, avqBits, q_type;
-    Word16 start_bit_pos;
+    int k,j;
+    int nb, qn1, qn2, avqBits, q_type;
+    int start_bit_pos;
 
-    move16();
-    move16();
+
     j = 0;
-    start_bit_pos = st->next_bit_pos_fx;
+    start_bit_pos = st->next_bit_pos;
 
-    FOR (k=0; k<numlpc; k++)
+
+    for (k=0; k<numlpc; k++)
     {
         /* Decode quantizer type */
 
-        IF (k==0)
+        if (k==0)
         {
-            move16();
-            move16();
             q_type = 0;
             nb = 0;
         }
-        ELSE
+        else
         {
-            move16();
             nb = 1;
-            q_type = get_next_indice_fx(st, nb);
-            move16();
-            param_lpc[j] = q_type;
-            j = add(j,1);
+            q_type = get_next_indice(st, nb);
+            param_lpc[j++] = q_type;
         }
 
         /* Decode quantization indices */
 
-        IF (q_type==0)
+        if (q_type==0)
         {
             /* Absolute quantizer with 1st stage stochastic codebook */
-            move16();
-            param_lpc[j] = get_next_indice_fx(st, 8);
-            j = add(j,1);
+            param_lpc[j++] = get_next_indice(st, 8);
         }
 
         /* 2 bits to specify Q2,Q3,Q4,ext */
-        qn1 = add(2, get_next_indice_fx(st, 2));
-        qn2 = add(2, get_next_indice_fx(st, 2));
+        qn1 = 2 + get_next_indice(st, 2);
+        qn2 = 2 + get_next_indice(st, 2);
 
         /* Unary code */
         /* Q5 = 0, Q6=10, Q0=110, Q7=1110, ... */
 
-        IF ( sub(qn1,4) > 0 )
+        if (qn1 > 4)
         {
             nb = unary_decode(st, &qn1);
 
-            if ( sub(nb,1) == 0 )
-            {
-                qn1 = add(qn1, 5);
-            }
-            if (sub(nb,2) == 0)
-            {
-                qn1 = add(qn1, 4);
-            }
-            if ( sub(nb,3) == 0 )
-            {
-                move16();
-                qn1 = 0;
-            }
-            if ( sub(nb,3) > 0 )
-            {
-                qn1 = add(qn1, 3);
-            }
+            if (nb == 1) qn1 += 5;
+            else if (nb == 2) qn1 += 4;
+            else if (nb == 3) qn1 = 0;
+            else qn1 += 3;
         }
 
-        IF ( sub(qn2,4) > 0 )
+        if (qn2 > 4)
         {
             nb = unary_decode(st, &qn2);
 
-            if ( sub(nb,1) == 0 )
-            {
-                qn2 = add(qn2, 5);
-            }
-            if (sub(nb,2) == 0)
-            {
-                qn2 = add(qn2, 4);
-            }
-            if ( sub(nb,3) == 0 )
-            {
-                move16();
-                qn2 = 0;
-            }
-            if ( sub(nb,3) > 0 )
-            {
-                qn2 = add(qn2, 3);
-            }
+            if (nb == 1) qn2 += 5;
+            else if (nb == 2) qn2 += 4;
+            else if (nb == 3) qn2 = 0;
+            else qn2 += 3;
         }
 
         /* check for potential bit errors */
-        test();
-        IF( (sub(qn1, NB_SPHERE) > 0) || (sub(qn2, NB_SPHERE) > 0) )
+        if( qn1 > NB_SPHERE || qn2 > NB_SPHERE )
         {
             qn1 = 0;
-            move16();
             qn2 = 0;
-            move16();
             st->BER_detect = 1;
-            move16();
         }
 
-        move16();
         param_lpc[j] = qn1;
-        j = add(j, 1);
-        move16();
+        j++;
         param_lpc[j] = qn2;
-        j = add(j, 1);
+        j++;
 
         /* Decode Split-by-2 algebraic VQ */
-        avqBits = shl(qn1,2);
-
+        avqBits = 4*qn1;
         pack4bits(avqBits, st, &param_lpc[j]);
-        j = add(j, qn1);
+        j += qn1;
 
-        avqBits = shl(qn2,2);
+        avqBits = 4*qn2;
         pack4bits(avqBits, st, &param_lpc[j]);
-        j = add(j, qn2);
+        j += qn2;
     }
 
-    return sub(st->next_bit_pos_fx, start_bit_pos);
+    return st->next_bit_pos - start_bit_pos;
 }

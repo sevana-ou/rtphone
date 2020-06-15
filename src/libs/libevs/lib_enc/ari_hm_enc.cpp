@@ -1,799 +1,589 @@
 /*====================================================================================
-    EVS Codec 3GPP TS26.442 Apr 03, 2018. Version 12.11.0 / 13.6.0 / 14.2.0
+    EVS Codec 3GPP TS26.443 Nov 13, 2018. Version 12.11.0 / 13.7.0 / 14.3.0 / 15.1.0
   ====================================================================================*/
 
-
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <assert.h>
+#include "cnst.h"
+#include "rom_enc.h"
 #include "stl.h"
-#include "cnst_fx.h"
 #include "basop_util.h"
-#include "rom_com_fx.h"
-#include "rom_enc_fx.h"
-#include "prot_fx.h"
+#include <assert.h>
+#include <math.h>
+#include "prot.h"
+#include "rom_com.h"
 
-Word16 EncodeIndex(
-    Word16 Bandwidth,
-    Word16 PeriodicityIndex,
-    Encoder_State_fx *st
+
+/*-------------------------------------------------------------------*
+ * EncodeIndex()
+ *
+ *
+ *-------------------------------------------------------------------*/
+
+int EncodeIndex(
+    int Bandwidth,
+    int PeriodicityIndex,
+    Encoder_State *st
 )
 {
-    Word16 NumRatioBitsBwLtpIndx;
 
-    IF ( s_and(PeriodicityIndex, kLtpHmFlag) != 0 )
+    if (PeriodicityIndex & kLtpHmFlag)
     {
-        Word16 LtpPitchIndex = shr(PeriodicityIndex, 9);
+        int LtpPitchIndex = PeriodicityIndex >> 9;
         assert(0 <= LtpPitchIndex && LtpPitchIndex <= 16);
-
-        PeriodicityIndex = sub(PeriodicityIndex, 1);
+        --PeriodicityIndex;
         assert((PeriodicityIndex & 0xff) < (1 << NumRatioBits[Bandwidth][LtpPitchIndex]));
 
-        NumRatioBitsBwLtpIndx = NumRatioBits[Bandwidth][LtpPitchIndex];
-        move16();
-
-        push_next_indice_fx(st, s_and(PeriodicityIndex, 0xff), NumRatioBitsBwLtpIndx);
-        return NumRatioBitsBwLtpIndx;
+        push_next_indice(st, PeriodicityIndex & 0xff, NumRatioBits[Bandwidth][LtpPitchIndex]);
+        return NumRatioBits[Bandwidth][LtpPitchIndex];
     }
-    ELSE
+    else
     {
-        push_next_indice_fx(st, PeriodicityIndex, 8);
+        push_next_indice(st, PeriodicityIndex, 8);
         return 8;
     }
 }
 
-static Word16 SearchPeriodicityIndex_Single(
-    const Word16 AbsMdct3[],
-    Word16 NumToConsider,
-    Word32 Lag,
-    Word16 FractionalResolution
+
+/*-------------------------------------------------------------------*
+ * GetWeight()
+ *
+ *
+ *-------------------------------------------------------------------*/
+
+static float GetWeight(int i)
+{
+    i = 3 * i - 2;
+
+    return (float)(pow(i, 0.3) / pow(256 - 1, 0.3));
+}
+
+
+/*-------------------------------------------------------------------*
+ * SearchPeriodicityIndex_Single()
+ *
+ *
+ *-------------------------------------------------------------------*/
+
+static float SearchPeriodicityIndex_Single(
+    const float AbsMdct3[],
+    int NumToConsider,
+    int Lag,
+    int FractionalResolution
 )
 {
-    Word16 HighestMultiplier;
-    Word32 AbsMeanCurrent3;        /* Mean for BucketWidth == 3 */
-    Word32 Limit, OldIndex, i;
-    Word16 Result, tmp1, tmp2;
+    int   HighestMultiplier;
+    float AbsMeanCurrent3;        /* Mean for BucketWidth == 3 */
+    int   Limit;
+    int   OldIndex, i;
 
+    Limit = (NumToConsider - 1) << FractionalResolution;
+    AbsMeanCurrent3 = 0;
+    HighestMultiplier = 1;
 
-    Limit = L_deposit_l(sub(NumToConsider, 1));
-    Limit = L_shl(Limit, FractionalResolution);
-    AbsMeanCurrent3 = L_deposit_l(0);
-    HighestMultiplier = 0;
-    move16();
-
-    FOR (i=Lag; i<Limit; i+=Lag)
+    for (i=Lag; i<Limit; i+=Lag)
     {
-        OldIndex = L_shr(i, FractionalResolution);
-        tmp1 = Weight[s_min(HighestMultiplier, 85)];
-        move16();
-        AbsMeanCurrent3 = L_add(AbsMeanCurrent3, L_shr(L_mult(AbsMdct3[OldIndex], tmp1), 7));
-        HighestMultiplier = add(HighestMultiplier, 1);
+        OldIndex = i >> FractionalResolution;
+        AbsMeanCurrent3 += AbsMdct3[OldIndex] * GetWeight(HighestMultiplier);
+        ++HighestMultiplier;
     }
 
-    tmp1 = sub(norm_l(AbsMeanCurrent3), 1);
-    tmp2 = norm_s(HighestMultiplier);
-    Result = div_s( round_fx(L_shl(AbsMeanCurrent3, tmp1)), s_max(shl(HighestMultiplier, tmp2), 0x4000) );
-    if (HighestMultiplier == 0)
-    {
-        tmp2 = 14 + 16;
-        move16();
-    }
-    Result = shr(Result, s_min(15, sub(sub(tmp1, tmp2), 7-15)));
-
-    return Result;
+    return AbsMeanCurrent3 / (HighestMultiplier - 1 + 0.00001f);
 }
+
+
+/*-------------------------------------------------------------------*
+ * SearchPeriodicityIndex_Range()
+ *
+ *
+ *-------------------------------------------------------------------*/
 
 static void SearchPeriodicityIndex_Range(
-    const Word16 AbsMdct3[],
-    Word16 NumToConsider,
-    Word16 Lo,
-    Word16 Hi,
-    Word16 FractionalResolution,
-    Word16 Adj,
-    Word16 Spacing,
-    Word16 *PeriodicityIndex,
-    Word16 *Score
+    const float AbsMdct3[],
+    int NumToConsider,
+    int Lo,
+    int Hi,
+    int FractionalResolution,
+    int Adj,
+    int Spacing,
+    int *PeriodicityIndex,
+    float *Score
 )
 {
-    Word16 Index, BestIndex;
-    Word16 CurrentScore, BestScore;
-    Word16 B;
+    int   Index, BestIndex;
+    float CurrentScore, BestScore;
+    int   B;
 
-    BestScore = -1;
-    move16();
+    BestScore = -1e30f;
     BestIndex = 0;
-    move16();
 
-    FOR (Index = Lo; Index < Hi; Index += Spacing)
+    for (Index = Lo; Index < Hi; Index += Spacing)
     {
-        CurrentScore = SearchPeriodicityIndex_Single(
-                           AbsMdct3,
-                           NumToConsider,
-                           add(Index, Adj),
-                           FractionalResolution
-                       );
+        CurrentScore = SearchPeriodicityIndex_Single( AbsMdct3, NumToConsider, Index + Adj, FractionalResolution );
 
-        if (sub(CurrentScore, BestScore) > 0)
+        if (CurrentScore > BestScore)
         {
+            BestScore = CurrentScore;
             BestIndex = Index;
-            move16();
         }
-        BestScore = s_max(BestScore, CurrentScore);
     }
 
-    if (sub(BestScore, *Score) > 0)
+    if (BestScore > *Score)
     {
+        *Score            = BestScore;
         *PeriodicityIndex = BestIndex;
-        move16();
     }
-    BestScore = s_max(BestScore, *Score);
 
-    B = sub(BestIndex, shr(Spacing, 1));
-    B = s_max(Lo, B);
 
-    FOR (Index = B; Index < BestIndex; ++Index)
+    B = BestIndex - (Spacing >> 1);
+    B = max(Lo, B);
+
+    for (Index = B; Index < BestIndex; ++Index)
     {
-        CurrentScore = SearchPeriodicityIndex_Single(
-                           AbsMdct3,
-                           NumToConsider,
-                           add(Index, Adj),
-                           FractionalResolution
-                       );
+        CurrentScore = SearchPeriodicityIndex_Single( AbsMdct3, NumToConsider, Index + Adj, FractionalResolution );
 
-        if (sub(CurrentScore, BestScore) > 0)
+        if (CurrentScore > *Score)
         {
+            *Score            = CurrentScore;
             *PeriodicityIndex = Index;
-            move16();
         }
-        BestScore = s_max(BestScore, CurrentScore);
     }
 
-    B = add(BestIndex, shr(Spacing, 1));
+    B = BestIndex + (Spacing >> 1);
 
-    FOR (Index = add(BestIndex, 1); Index <= B; ++Index)
+    for (Index = BestIndex + 1; Index <= B; ++Index)
     {
-        CurrentScore = SearchPeriodicityIndex_Single(
-                           AbsMdct3,
-                           NumToConsider,
-                           add(Index, Adj),
-                           FractionalResolution
-                       );
+        CurrentScore = SearchPeriodicityIndex_Single( AbsMdct3, NumToConsider, Index + Adj, FractionalResolution );
 
-        if (sub(CurrentScore, BestScore) > 0)
+        if (CurrentScore > *Score)
         {
+            *Score            = CurrentScore;
             *PeriodicityIndex = Index;
-            move16();
         }
-        BestScore = s_max(BestScore, CurrentScore);
     }
 
-    *Score = BestScore;
-    move16();
+    return;
 }
 
+
+/*-------------------------------------------------------------------*
+ * UnmapIndex()
+ *
+ *
+ *-------------------------------------------------------------------*/
+
 /* Returns: PeriodicityIndex */
-Word16 SearchPeriodicityIndex(
-    const Word32 Mdct[],               /* (I) Coefficients, Mdct[0..NumCoeffs-1]                      */
-    const Word32 UnfilteredMdct[],     /* (I) Unfiltered coefficients, UnfilteredMdct[0..NumCoeffs-1] */
-    Word16 NumToConsider,              /* (I) Number of coefficients                                  */
-    Word16 TargetBits,                 /* (I) Target bit budget (excl. Done flag)                     */
-    Word16 LtpPitchLag,
-    Word16 LtpGain,                    /* (I) LTP gain                                                */
-    Word16 *RelativeScore              /* (O) Energy concentration factor                      (2Q13) */
+int SearchPeriodicityIndex(
+    const float Mdct[],                /* (I) Coefficients, Mdct[0..NumCoeffs-1]                      */
+    const float UnfilteredMdct[],      /* (I) Unfiltered coefficients, UnfilteredMdct[0..NumCoeffs-1] */
+    int NumCoeffs,                     /* (I) Number of coefficients                                  */
+    int TargetBits,                    /* (I) Target bit budget (excl. Done flag)                     */
+    short LtpPitchLag,
+    float LtpGain,                     /* (I) LTP gain                                                */
+    float *RelativeScore               /* (O) Energy concentration factor                             */
 )
 {
-    Word16 AbsMdct3[MAX_LENGTH];
-    Word32 A, B, C;
-    Word16 i;
-    Word16 MaxAt;
-    Word16 Score, CurrentScore;
-    Word16 PeriodicityIndex;
-    Word32 AbsTotal; /* 16Q15 */
-    Word16 Multiplier;
-    Word16 LtpPitchIndex;
-    Word8  Bandwidth;
-    Word32 Lag;
-    Word16 s, tmp, tmp2, tmp3;
-    Word32 tmp32;
+    float    AbsMdct3[MAX_LENGTH], A, B, C=0.f;
+    int      i;
+    int      MaxAt;
+    float    Score;
+    int      PeriodicityIndex = 0;
+    int      NumToConsider = NumCoeffs;
+    float    AbsTotal;
 
-    /* Debug init (not instrumented) */
-    C = -3000;
 
-    PeriodicityIndex = 0;
-    move16();
-    Score = -1;
-    move16();
+    Score = -1e30f;
 
-    s = sub(Find_Max_Norm32(Mdct, NumToConsider), 2);
+    A = (float)fabs(Mdct[0]);
+    B = (float)fabs(Mdct[1]);
 
-    A = L_shl(L_abs(Mdct[0]), s);
-    B = L_shl(L_abs(Mdct[1]), s);
-
-    tmp = sub(NumToConsider, 3);
-    FOR (i = 1; i < tmp; i += 3)
+    for (i = 1; i < NumToConsider - 3; i += 3)
     {
-        C = L_shl(L_abs(Mdct[i + 1]), s);
-        AbsMdct3[i] = round_fx(L_add(L_add(A, B), C));
+        C = (float)fabs(Mdct[i + 1]);
+        AbsMdct3[i] = A + B + C;
 
-        A = L_shl(L_abs(Mdct[i + 2]), s);
-        AbsMdct3[i + 1] = round_fx(L_add(L_add(A, B), C));
+        A = (float)fabs(Mdct[i + 2]);
+        AbsMdct3[i + 1] = A + B + C;
 
-        B = L_shl(L_abs(Mdct[i + 3]), s);
-        AbsMdct3[i + 2] = round_fx(L_add(L_add(A, B), C));
+        B = (float)fabs(Mdct[i + 3]);
+        AbsMdct3[i + 2] = A + B + C;
     }
 
-    IF (sub(i, sub(NumToConsider, 1)) < 0)
+    if (i < NumToConsider - 1)
     {
-        C = L_shl(L_abs(Mdct[i + 1]), s);
-        AbsMdct3[i] = round_fx(L_add(L_add(A, B), C));
+        C = (float)fabs(Mdct[i + 1]);
+        AbsMdct3[i] = A + B + C;
     }
 
-    IF (sub(i, sub(NumToConsider, 2)) < 0)
+
+    if (i + 1 < NumToConsider - 1)
     {
-        A = L_shl(L_abs(Mdct[i + 2]), s);
-        assert(C != -3000);
-        AbsMdct3[i + 1] = round_fx(L_add(L_add(A, B), C));
+        A = (float)fabs(Mdct[i + 2]);
+        AbsMdct3[i + 1] = A + B + C;
     }
 
-    AbsTotal = L_deposit_l(0);
-    IF (UnfilteredMdct != NULL)
+    AbsTotal = 0.0f;
+
+    if (UnfilteredMdct != NULL)
     {
-        FOR (i = 0; i < NumToConsider; ++i)
+        for (i = 0; i < NumToConsider; ++i)
         {
-            AbsTotal = L_add(AbsTotal, L_shr(L_abs(UnfilteredMdct[i]), 16));
+            AbsTotal += (float)fabs(UnfilteredMdct[i]);
         }
-        /* balance difference between filtered and unfiltered mdct samples */
-        AbsTotal = L_shr(AbsTotal, sub(4, s));
     }
-    ELSE
+    else
     {
-        tmp = sub(NumToConsider, 1);
-        FOR (i = 1; i < tmp; i += 3)
+        for (i = 1; i < NumToConsider - 1; i += 3)
         {
-            AbsTotal = L_mac0(AbsTotal, AbsMdct3[i], 1);
+            AbsTotal += AbsMdct3[i];
         }
     }
 
-    test();
-    IF ((LtpPitchLag > 0) && (sub(LtpGain, kLtpHmGainThr) > 0))
-    {
-        Bandwidth = 0;
-        move16();
-        if (sub(NumToConsider, 256) >= 0)
-        {
-            Bandwidth = 1;
-            move16();
-        }
 
-        LtpPitchIndex = sub(mult_r(LtpPitchLag, 1 << (15-kLtpHmFractionalResolution)), 2);
+    if ((LtpPitchLag > 0) && (LtpGain > kLtpHmGainThr))
+    {
+        int FractionalResolution = kLtpHmFractionalResolution;
+        int Multiplier;
+        int LtpPitchIndex;
+        int Bandwidth;
+
+        Bandwidth = NumCoeffs >= 256;
+        LtpPitchIndex = ((LtpPitchLag + (1 << (kLtpHmFractionalResolution - 1))) >> kLtpHmFractionalResolution) - 2;
         assert(0 <= LtpPitchIndex && LtpPitchIndex <= 16);
 
-        tmp32 = L_shl(L_deposit_l(sub(NumToConsider, 2)), kLtpHmFractionalResolution);
-        tmp = shl(1, NumRatioBits[Bandwidth][LtpPitchIndex]);
-        FOR (Multiplier = 1; Multiplier <= tmp; ++Multiplier)
+        for (Multiplier = 1; Multiplier <= (1 << NumRatioBits[Bandwidth][LtpPitchIndex]); ++Multiplier)
         {
-            Lag = L_shr(L_mult0(LtpPitchLag, Ratios[Bandwidth][LtpPitchIndex][Multiplier-1]), 8);
+            float CurrentScore;
+            int Lag;
 
-            test();
-            IF ((L_sub(Lag, 4<<kLtpHmFractionalResolution) >= 0) && (L_sub(Lag, tmp32) <= 0))
+            Lag = (LtpPitchLag * (int)(4 * Ratios[Bandwidth][LtpPitchIndex][Multiplier-1])) >> 2;
+
+            if (Lag >= (4 << FractionalResolution) && (Lag <= ((NumToConsider-2) << FractionalResolution)))
             {
-                CurrentScore = SearchPeriodicityIndex_Single(
-                                   AbsMdct3,
-                                   NumToConsider,
-                                   Lag,
-                                   kLtpHmFractionalResolution
-                               );
+                CurrentScore = SearchPeriodicityIndex_Single( AbsMdct3, NumToConsider, Lag, FractionalResolution );
 
-                if (sub(CurrentScore, Score) > 0)
+                if (CurrentScore > Score)
                 {
-                    PeriodicityIndex = s_or(Multiplier, kLtpHmFlag);
+                    Score = CurrentScore;
+                    PeriodicityIndex = Multiplier | kLtpHmFlag;
                 }
-                Score = s_max(Score, CurrentScore);
             }
         }
-        PeriodicityIndex = s_or(PeriodicityIndex, shl(LtpPitchIndex, 9));
+        PeriodicityIndex |= LtpPitchIndex << 9;
     }
-    ELSE
+    else
     {
-        IF (UnfilteredMdct != NULL)
+        if (UnfilteredMdct != NULL)
         {
             MaxAt = 1;
-            move16();
-            A = L_shr(AbsMdct3[1], 6);
+            A = AbsMdct3[1];
 
-            FOR (i = 4; i < NumToConsider - 1; i += 3)
+            for (i = 4; i < NumToConsider - 1; i += 3)
             {
-                if (L_sub(AbsMdct3[i], AbsMdct3[MaxAt]) > 0)
+
+                if (AbsMdct3[i] > AbsMdct3[MaxAt])
                 {
                     MaxAt = i;
-                    move16();
                 }
-                A = L_add(A, L_shr(AbsMdct3[i], 6));
+                A += AbsMdct3[i];
             }
 
-            if (L_sub(L_shr(AbsMdct3[MaxAt], 6), Mpy_32_16_1(A, 22938/*0.7 Q15*/)) > 0)
+            if (AbsMdct3[MaxAt] > A * 0.7f)
             {
-                NumToConsider = s_min( NumToConsider, add(MaxAt, 4) );
+                NumToConsider = min(NumToConsider, MaxAt + 4);
             }
         }
 
-        SearchPeriodicityIndex_Range(
-            AbsMdct3,
-            NumToConsider,
-            0, 16,
-            3,
-            GET_ADJ2(0, 6, 3),
-            4,
-            &PeriodicityIndex,
-            &Score
-        );
+        SearchPeriodicityIndex_Range( AbsMdct3, NumToConsider, 0, 16, 3, GET_ADJ2(0, 6, 3), 4, &PeriodicityIndex, &Score );
 
-        SearchPeriodicityIndex_Range(
-            AbsMdct3,
-            NumToConsider,
-            16, 80,
-            4,
-            GET_ADJ2(16, 8, 4),
-            4,
-            &PeriodicityIndex,
-            &Score
-        );
+        SearchPeriodicityIndex_Range( AbsMdct3, NumToConsider, 16, 80, 4, GET_ADJ2(16, 8, 4), 4, &PeriodicityIndex, &Score );
 
-        SearchPeriodicityIndex_Range(
-            AbsMdct3,
-            NumToConsider,
-            80, 208,
-            3,
-            GET_ADJ2(80, 12, 3),
-            4,
-            &PeriodicityIndex,
-            &Score
-        );
+        SearchPeriodicityIndex_Range( AbsMdct3, NumToConsider, 80, 208, 3, GET_ADJ2(80, 12, 3), 4, &PeriodicityIndex, &Score );
 
-        IF (sub(NumToConsider, 128) <= 0)    /* no long lags for band-limited MDCTs */
+        if (NumToConsider <= 128)
         {
-            SearchPeriodicityIndex_Range(
-                AbsMdct3,
-                NumToConsider,
-                208, add(88, NumToConsider),
-                0,
-                GET_ADJ2(224, 188, 0),
-                1,
-                &PeriodicityIndex,
-                &Score
-            );
+            /* no long lags for band-limited MDCTs */
+
+            SearchPeriodicityIndex_Range( AbsMdct3, NumToConsider, 208, 88 + NumToConsider, 0, GET_ADJ2(224, 188, 0), 1, &PeriodicityIndex, &Score );
         }
-        ELSE {
-            test();
-            IF (sub(TargetBits, kSmallerLagsTargetBitsThreshold) > 0 && sub(NumToConsider, 256) >= 0)
+        else
+        {
+
+            if (TargetBits > kSmallerLagsTargetBitsThreshold && NumCoeffs >= 256)
             {
-                SearchPeriodicityIndex_Range(
-                    AbsMdct3,
-                    NumToConsider,
-                    208, 224,
-                    1,
-                    GET_ADJ2(208, 28, 1),
-                    1,
-                    &PeriodicityIndex,
-                    &Score
-                );
-                SearchPeriodicityIndex_Range(
-                    AbsMdct3,
-                    NumToConsider,
-                    224, 256,
-                    0,
-                    GET_ADJ2(224, 188, 0),
-                    1,
-                    &PeriodicityIndex,
-                    &Score
-                );
+                SearchPeriodicityIndex_Range( AbsMdct3, NumToConsider, 208, 224, 1, GET_ADJ2(208, 28, 1), 1, &PeriodicityIndex, &Score );
+
+                SearchPeriodicityIndex_Range( AbsMdct3, NumToConsider, 224, 256, 0, GET_ADJ2(224, 188, 0 ), 1, &PeriodicityIndex, &Score );
             }
-            ELSE {
-                SearchPeriodicityIndex_Range(
-                    AbsMdct3,
-                    NumToConsider,
-                    208, 256,
-                    1,
-                    GET_ADJ2(208, 28, 1),
-                    1,
-                    &PeriodicityIndex,
-                    &Score
-                );
+            else
+            {
+                SearchPeriodicityIndex_Range( AbsMdct3, NumToConsider, 208, 256, 1, GET_ADJ2(208, 28, 1), 1, &PeriodicityIndex, &Score );
             }
         }
     }
 
-    IF (AbsTotal > 0)
+    if (AbsTotal > 0)
     {
-        tmp32 = L_mult0(Score, NumToConsider); /* -> 16Q15 */
-        tmp = sub(norm_l(tmp32), 1);
-        tmp2 = norm_l(AbsTotal);
-        tmp3 = div_s( round_fx(L_shl(tmp32, tmp)), round_fx(L_shl(AbsTotal, tmp2)) );
-        BASOP_SATURATE_WARNING_OFF
-        *RelativeScore = shr(tmp3, add(sub(tmp, tmp2), 2)); /* -> 2Q13 */           move16();
-        BASOP_SATURATE_WARNING_ON
+        *RelativeScore = Score/AbsTotal*(float)NumCoeffs;
     }
-    ELSE
+    else
     {
         *RelativeScore = 0;
-        move16();
     }
+
 
     return PeriodicityIndex;
 }
 
+
+/*-------------------------------------------------------------------*
+ * PeakFilter()
+ *
+ *
+ *-------------------------------------------------------------------*/
+
+#define kPeakElevationThreshold 1.0f
+
 static void PeakFilter(
-    const Word32 x[],                    /* (I) absolute spectrum                              */
-    Word32 y[],                          /* (O) filtered absolute spectrum, must not alias x[] */
-    Word16 L_frame                       /* (I) number of spectral lines                       */
+    const float x[],                     /* (I) absolute spectrum                              */
+    float y[],                           /* (O) filtered absolute spectrum, must not alias x[] */
+    int L_frame                          /* (I) number of spectral lines                       */
 )
 {
-    Word16 flen, i;
-#define kPeakElevationThreshold 1.0f
-    Word16 m;
-    Word32 a;
+    int flen, i;
+    float a, m;
 
-    flen = shr(L_frame, 4);
-    /* m = kPeakElevationThreshold / (float)(2*flen + 1); */
-    m = shr(div_s(8/*kPeakElevationThreshold Q3*/, add(shl(flen,1), 1)), 3);
+    flen = (L_frame >> 4);
+    m = kPeakElevationThreshold / (float)(2*flen + 1);
 
-    a = L_deposit_l(0);
-    FOR (i=0; i<flen; ++i)
+    a = 0.0f;
+    for (i=0; i<flen; ++i)
     {
-        a = L_add(a, L_shr(x[i], 4));
+        a += x[i];
     }
 
-    FOR (i=0; i<flen; ++i)
+    for (i=0; i<flen; ++i)
     {
-        y[i] = L_max(0, L_sub(L_shr(x[i],4), Mpy_32_16_1(a, m)));
-        move32();
-        a = L_add(a, L_shr(x[i+flen], 4));
+        y[i] = max(0.0f, x[i] - a*m);
+        a += x[i+flen];
     }
-    sub(0,0);
-    FOR (; i<L_frame-flen; ++i)
+    for (; i<L_frame-flen; ++i)
     {
-        y[i] = L_max(0, L_sub(L_shr(x[i],4), Mpy_32_16_1(a, m)));
-        move32();
-        a = L_sub(a, L_shr(x[i-flen], 4));
-        a = L_add(a, L_shr(x[i+flen], 4));
+        y[i] = max(0.0f, x[i] - a*m);
+        a -= x[i-flen];
+        a += x[i+flen];
     }
 
-    FOR (; i<L_frame; ++i)
+    for (; i<L_frame; ++i)
     {
-        y[i] = L_max(0, L_sub(L_shr(x[i],4), Mpy_32_16_1(a, m)));
-        move32();
-        a = L_sub(a, L_shr(x[i-flen], 4));
+        y[i] = max(0.0f, x[i] - a*m);
+        a -= x[i-flen];
     }
 
+    return;
 }
 
 
-/* Returns: RE error */
-static Word32 tcx_hm_get_re(
-    const Word16 x[],  /* i: absolute spectrum                       */
-    Word16 gain,       /* o: quantized harmonic model gain     Q11   */
-    Word32 lag,        /* i: pitch lag                         Q0    */
-    Word16 fract_res,  /* i: fractional resolution of the lag  Q0    */
-    Word16 p[],        /* i: harmonic model                    Q13   */
-    Word32 env[],      /* i: envelope                          Q16   */
-    Word16 L_frame     /* i: number of spectral lines          Q0    */
+/*-------------------------------------------------------------------*
+ * tcx_hm_get_re()
+ *
+ *
+ *-------------------------------------------------------------------*/
+
+static float tcx_hm_get_re( /* Returns: RE error                 */
+    const float x[],   /* i: absolute spectrum                     */
+    Word16 gain,       /* i: HM gain (Q11)                         */
+    int lag,
+    int fract_res,
+    Word16 p[],        /* i: harmonic model (Q13)                  */
+    Word32 env[],      /* i: envelope (Q16)                        */
+    int L_frame        /* i: number of spectral lines              */
 )
 {
-    Word16 i, inv_G, tmp;
-    Word16 s, s_ne, s_x_ne;
-    Word16 *x_ne;
-    Word32 ne[N_MAX_ARI], G, e;
+    Word32 ne[N_MAX_ARI];
+    float G, e;
+    int i;
 
-    x_ne = (Word16*)ne;
-    assert(L_frame <= N_MAX_ARI);
-
-    /* Calculate new envelope with "gain" harmonic gain ***********************/
-
-    Copy32(env, ne, L_frame);
-
-    tcx_hm_modify_envelope(
-        gain,
-        lag,
-        fract_res,
-        p,
-        ne,
-        L_frame
-    );
-
-    /* Normalize **************************************************************/
-
-    s_ne = getScaleFactor32(ne, L_frame);
-
-    G = L_deposit_l(0);
-    FOR (i=0; i<L_frame; ++i)
+    /* Calculate new envelope with "gain" harmonic gain */
+    for (i=0; i<L_frame; ++i)
     {
-        x_ne[i] = mult(x[i], extract_h(L_shl(ne[i], s_ne))); /* exp: x_e+15-s_ne */ move16();
-        G = L_mac0(G, x_ne[i], 1); /* exp: x_e + 31 - s_ne */
-    }
-    s = norm_l(G);
-    inv_G = div_s(0x4000, extract_h(L_shl(G, s))); /* exp: 1 - (x_e + 31 - s_ne - s) */
-
-    /* Calculate error ********************************************************/
-    s_x_ne = sub(getScaleFactor16(x_ne, L_frame), 2);
-    e = L_deposit_l(0);
-    FOR (i=0; i<L_frame; ++i)
-    {
-        tmp = shl(x_ne[i], s_x_ne); /* exp: x_e + 15 - s_ne - s_x_ne */
-        tmp = mult(tmp, tmp); /* exp: 2 * (x_e + 15 - s_ne - s_x_ne) */
-        e = L_mac(e, tmp, tmp); /* exp: 4 * (x_e + 15 - s_ne - s_x_ne) */
+        ne[i] = env[i];
     }
 
-    e = Mpy_32_16_1(e, inv_G);
-    e = Mpy_32_16_1(e, inv_G);
-    e = Mpy_32_16_1(e, inv_G);
-    e = Mpy_32_16_1(e, inv_G); /* exp: 4 * (s - s_x_ne - 15) */
+    tcx_hm_modify_envelope( gain, lag, fract_res, p, ne, L_frame );
 
-    e = L_shl(e, shl(sub(sub(s, s_x_ne), 15), 2)); /* Q31 */
+    /* Normalize */
+    G = 0;
 
+    for (i=0; i<L_frame; ++i)
+    {
+        G += x[i] * ne[i];
+    }
+    G = 1.0f / G;
+
+    /* Calculate error */
+    e = 0;
+
+    for (i=0; i<L_frame; ++i)
+    {
+        e += (float)pow(x[i] * (ne[i] * G), 4);
+    }
 
     return e;
 }
 
+
+/*-------------------------------------------------------------------*
+ * tcx_hm_quantize_gain()
+ *
+ *
+ *-------------------------------------------------------------------*/
+
 static void tcx_hm_quantize_gain(
-    const Word32 x[],      /* i: absolute spectrum                 Q31-e */
-    Word16 *x_e,           /* i: absolute spectrum exponent        Q0    */
-    Word32 env[],          /* i: envelope                          Q16   */
-    Word32 lag,            /* i: pitch lag                         Q0    */
-    Word16 fract_res,      /* i: fractional resolution of the lag  Q0    */
-    Word16 p[],            /* i: harmonic model                    Q13   */
-    Word16 L_frame,        /* i: number of spectral lines          Q0    */
-    Word16 coder_type,     /* i: coder_type                        Q0    */
-    Word16 relative_score, /* i: periodicity score                 Q13   */
-    Word16 *gain_idx,      /* o: quantization index                Q0    */
-    Word16 *gain           /* o: quantized harmonic model gain     Q11   */
+    const float x[],      /* i: absolute spectrum                     */
+    Word32 env[],         /* i: envelope (Q16)                        */
+    int lag,
+    int fract_res,
+    Word16 p[],           /* i: harmonic model (Q13)                  */
+    int L_frame,          /* i: number of spectral lines              */
+    int coder_type,       /* i: GC/VC mode                            */
+    float relative_score, /* i: periodicity score                   */
+    int *gain_idx,        /* o: quantization index                    */
+    Word16 *gain          /* o: quantized harmonic model gain (Q11)   */
 )
 {
-    Word16 g;
-    Word16 pe; /* Q14 */
-    Word32 be; /* Q31 */
-    Word32 e;  /* Q31 */
-    Word16 i;
-    Word16 x16[N_MAX_ARI], s_x;
-    Word16 s;
-
+    int g;
+    float be, e, pe;
+    const float kLowPeriodicityThr[2] = { 0.5f, 0.2f };
+    int s;
 
     assert(coder_type==VOICED || coder_type == GENERIC);
+
     s=0;
-    move16();
-    if (sub(coder_type,VOICED) == 0)
+    if(coder_type==VOICED)
     {
         s=1;
-        move16();
     }
 
-
-
     *gain = 0;
-    move16();
 
     /* Disable the harmonic model if periodicity is very low */
-    IF ( sub(relative_score,kLowPeriodicityThr[s]) < 0 )
+    if (relative_score < kLowPeriodicityThr[s])
     {
         return;
     }
 
-    (void)x_e;
+    be = tcx_hm_get_re(x, *gain, lag, fract_res, p, env, L_frame);
 
-    s_x = getScaleFactor32(x, L_frame);
-    FOR (i=0; i<L_frame; ++i)
+    if (coder_type == GENERIC)
     {
-        x16[i] = extract_h(L_shl(x[i], s_x));
-    }
+        e = tcx_hm_get_re(x, qGains[s][0], lag, fract_res, p, env, L_frame);
+        pe = 1.05f;
 
-    be = tcx_hm_get_re(x16, *gain, lag, fract_res, p, env, L_frame);
-
-    IF ( sub(coder_type,GENERIC) == 0 )
-    {
-        e = tcx_hm_get_re(
-                x16,
-                qGains[s][0],
-                lag,
-                fract_res,
-                p,
-                env,
-                L_frame
-            );
-
-        pe = 17203/*1.05 Q14*/;
-        move16();
-
-        /* pe is Q14 */
-        IF ( L_sub(L_shl(Mpy_32_16_1(e,pe),1),be) < 0 )
+        if (e * pe < be)
         {
             *gain_idx = 0;
-            move16();
             *gain     = qGains[s][0];
-            move16();
         }
     }
-    ELSE
+    else
     {
         /* Iterate over all possible gain values */
-        FOR (g=0; g<(1 << kTcxHmNumGainBits); ++g)
+        for (g=0; g<(1 << kTcxHmNumGainBits); ++g)
         {
-            e = tcx_hm_get_re(
-                x16,
-                qGains[s][g],
-                lag,
-                fract_res,
-                p,
-                env,
-                L_frame
-            );
+
+            e = tcx_hm_get_re(x, qGains[s][g], lag, fract_res, p, env, L_frame);
 
             /* Add bit penalty */
-            pe = 16384/*1.0 Q14*/;
-            move16();
-            if ( *gain == 0 )
+            pe = 1.0f;
+            if (*gain == 0.0f)
             {
-                pe = 17203/*1.05 Q14*/;
-                move16();
+                pe = 1.05f;
             }
 
-            /* Minimum selection, pe is Q14 */
-            IF ( L_sub(L_shl(Mpy_32_16_1(e,pe),1),be) < 0 )
+            /*  Minimum selection */
+            if (e * pe < be)
             {
-                be        = L_add(e, 0);
+                be        = e;
                 *gain_idx = g;
-                move16();
                 *gain     = qGains[s][g];
-                move16();
             }
         }
     }
 
+    return;
 }
 
-static Word16 tcx_hm_search(
-    const Word32 abs_spectrum[], /* i:   absolute spectrum            Q31-e */
-    Word16 L_frame,              /* i:   number of spectral lines     Q0    */
-    Word16 targetBits,           /* i:   target bit budget            Q0    */
-    Word16 LtpPitchLag,          /* i:   LTP pitch lag or -1 if none  Q0    */
-    Word16 LtpGain,              /* i:   LTP gain                     Q15   */
-    Word16 *RelativeScore        /* o:   Energy concentration factor  Q13   */
+
+/*-------------------------------------------------------------------*
+ * tcx_hm_analyse()
+ *
+ *
+ *-------------------------------------------------------------------*/
+
+void tcx_hm_analyse(
+    const float abs_spectrum[], /* i: absolute spectrum            */
+    int L_frame,       /* i: number of spectral lines              */
+    Word32 env[],      /* i/o: envelope shape (Q16)                */
+    int targetBits,    /* i: target bit budget                     */
+    int coder_type,    /* i: GC/VC mode                            */
+    int prm_hm[],      /* o: HM parameters                         */
+    short LtpPitchLag, /* i: LTP pitch lag or -1 if none           */
+    float LtpGain,     /* i: LTP gain                              */
+    int *hm_bits       /* o: bit consumption                       */
 )
 {
-    Word32 fspec[N_MAX_ARI];
+    int lag, fract_res;
+    float fspec[N_MAX_ARI], RelativeScore;
+    Word16 p[2*kTcxHmParabolaHalfWidth+1], gain;
+
+    /* Disable HM for non-GC,VC modes */
+    if ((coder_type != VOICED) && (coder_type != GENERIC))
+    {
+        *hm_bits  = 0;
+        prm_hm[0] = 0;
+
+        return;
+    }
+
+    /* Bit consumption for the HM off case: 1 bit flag */
+    *hm_bits = 1;
 
     /* Filter out noise and keep the peaks */
     PeakFilter(abs_spectrum, fspec, L_frame);
 
     /* Get the best lag index */
-    return SearchPeriodicityIndex(
-               fspec,
-               abs_spectrum,
-               L_frame,
-               targetBits,
-               LtpPitchLag,
-               LtpGain,
-               RelativeScore
-           );
-}
-
-void tcx_hm_analyse(
-    const Word32 abs_spectrum[], /* i:   absolute spectrum            Q31-e */
-    Word16 *spectrum_e,          /* i:   absolute spectrum exponent   Q0    */
-    Word16 L_frame,              /* i:   number of spectral lines     Q0    */
-    Word32 env[],                /* i/o: envelope shape               Q16   */
-    Word16 targetBits,           /* i:   target bit budget            Q0    */
-    Word16 coder_type,           /* i:  coder type                    Q0    */
-    Word16 prm_hm[],             /* o:   HM parameters                Q0    */
-    Word16 LtpPitchLag,          /* i:   LTP pitch lag or -1 if none  Q0    */
-    Word16 LtpGain,              /* i:   LTP gain                     Q15   */
-    Word16 *hm_bits_out          /* o:   bit consumption              Q0    */
-)
-{
-    Word32 lag;
-    Word16 fract_res;
-    Word16 RelativeScore;                   /* Q13 */
-    Word16 gain;                            /* Q11 */
-    Word16 p[2*kTcxHmParabolaHalfWidth+1];  /* Q13 */
-    Word16 hm_bits, bw_flag;
-
-
-    /* Disable HM for non-GENERC, VOICED modes */
-    if ( sub(coder_type, VOICED) < 0 )
-    {
-        *hm_bits_out = 0;
-        move16();
-        prm_hm[0] = 0;
-        move16();
-
-        return;
-    }
-
-    bw_flag = 0;
-    move16();
-    if (sub(L_frame, 256) >= 0)
-    {
-        bw_flag = 1;
-        move16();
-    }
-
-    /* Bit consumption for the HM off case: 1 bit flag */
-    hm_bits = 1;
-    move16();
-    move16();
-    prm_hm[1] = tcx_hm_search(
-                    abs_spectrum,
-                    L_frame,
-                    sub(targetBits, hm_bits),
-                    LtpPitchLag,
-                    LtpGain,
-                    &RelativeScore
-                );
+    prm_hm[1] = SearchPeriodicityIndex( fspec, abs_spectrum, L_frame, targetBits - *hm_bits, LtpPitchLag, LtpGain, &RelativeScore );
 
     /* Convert the index to lag */
-    UnmapIndex(
-        prm_hm[1],
-        bw_flag,
-        LtpPitchLag,
-        (( sub(sub(targetBits, hm_bits),kSmallerLagsTargetBitsThreshold) <= 0 ) || !bw_flag),
-        &fract_res,
-        &lag
-    );
-    test();
+    UnmapIndex( prm_hm[1], L_frame >= 256, LtpPitchLag, (targetBits - *hm_bits <= kSmallerLagsTargetBitsThreshold) || (L_frame < 256), &fract_res, &lag );
 
     /* Render harmonic model */
-    tcx_hm_render(
-        lag,
-        fract_res,
-        p
-    );
+    tcx_hm_render( lag, fract_res, LtpGain, p );
 
     /* Calculate and quantize gain */
     gain = 0;
-    move16();
 
-    tcx_hm_quantize_gain(
-        abs_spectrum,
-        spectrum_e,
-        env,
-        lag,
-        fract_res,
-        p,
-        L_frame,
-        coder_type,
-        RelativeScore,
-        &prm_hm[2],
-        &gain
-    );
+    tcx_hm_quantize_gain( abs_spectrum, env, lag, fract_res, p, L_frame, coder_type, RelativeScore, &prm_hm[2], &gain );
 
     /* Decision */
-    IF ( gain > 0 )
+    if (gain > 0)
     {
-        prm_hm[0] = 1; /* flag: on */                                               move16();
+        prm_hm[0] = 1; /* flag: on */
 
-        hm_bits = add(hm_bits, CountIndexBits(bw_flag, prm_hm[1]));
+        *hm_bits += CountIndexBits( L_frame >= 256, prm_hm[1] );
 
-        if (sub(coder_type, VOICED) == 0)
+        if (coder_type == VOICED)
         {
-            hm_bits = add(hm_bits, kTcxHmNumGainBits);
+            *hm_bits += kTcxHmNumGainBits;
         }
 
-        tcx_hm_modify_envelope(
-            gain,
-            lag,
-            fract_res,
-            p,
-            env,
-            L_frame
-        );
+        tcx_hm_modify_envelope( gain, lag, fract_res, p, env, L_frame );
     }
-    ELSE
+    else
     {
-        prm_hm[0] = 0;  /* flag: off   */                                           move16();
-        prm_hm[1] = -1; /* pitch index */                                           move16();
-        prm_hm[2] = 0;  /* gain index  */                                           move16();
+        prm_hm[0] = 0;  /* flag: off   */
+        prm_hm[1] = -1; /* pitch index */
+        prm_hm[2] = 0;  /* gain index  */
     }
 
-    *hm_bits_out = hm_bits;
-    move16();
+    return;
 }
-

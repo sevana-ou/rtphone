@@ -1,177 +1,123 @@
 /*====================================================================================
-    EVS Codec 3GPP TS26.442 Apr 03, 2018. Version 12.11.0 / 13.6.0 / 14.2.0
+    EVS Codec 3GPP TS26.443 Nov 13, 2018. Version 12.11.0 / 13.7.0 / 14.3.0 / 15.1.0
   ====================================================================================*/
 
+#include <math.h>
+#include "options.h"
+#include "cnst.h"
+#include "prot.h"
+#include "rom_com.h"
 
-#include <assert.h>
-#include "options.h"     /* EV-VBR compilation switches            */
-#include "prot_fx.h"
-#include "basop_util.h"
-#include "stl.h"      /* Weighted mops computation related code */
 
 /*-----------------------------------------------------------------------*
- * phase_dispersion:
+ * phase_dispersion()
  *
- * post-processing to enhance noise at low bit rate.
+ * Post-processing to enhance noise at low bitrate
  *-----------------------------------------------------------------------*/
 
 void phase_dispersion(
-    const Word32 gain_code,  /* i  : gain of code  15Q16       */
-    const Word16 gain_pit,   /* i  : gain of pitch   Q14       */
-    Word16 code[],           /* i/o: code vector               */
-    Word16 *code_exp,        /* i/o: exponent of code          */
-    const Word16 mode,       /* i  : level, 0=hi, 1=lo, 2=off  */
-    Word32 *prev_gain_code,  /* i/o: static memory 15Q16       */
-    Word16 prev_gain_pit[],  /* i/o: static memory Q14, size=6 */
-    Word16 *prev_state,      /* i/o: static memory          Q0 */
-    Word16 L_subfr           /* i  : subframe length [40,64,80]*/
+    const float gain_code,  /* i  : gain of code             */
+    const float gain_pit,   /* i  : gain of pitch            */
+    float code[],     /* i/o: code vector              */
+    const short mode,       /* i  : level, 0=hi, 1=lo, 2=off */
+    float disp_mem[]  /* i/o: static memory (size = 8) */
 )
 {
-    Word16 i, j, state, scale2;
-    Word32 x32[2*L_SUBFR];
-    Word16 *code_real, *code_imag;
-    const Word16 *h_real, *h_imag;
+    short i, j, state;
+    float *prev_gain_pit, *prev_gain_code, *prev_state;
+    float code2[2*L_SUBFR];
+    float h_disp[L_SUBFR], *code2_real, *code2_imag, *code_real, *code_imag, *h_real, *h_imag;
 
+    prev_state = disp_mem;
+    prev_gain_code = disp_mem+1;
+    prev_gain_pit = disp_mem+2;
 
-
-    move16();
     state = 2;
-
-    if ( sub(gain_pit,14746/*0.9f Q14*/) < 0)
+    if (gain_pit < 0.6f)
     {
-        move16();
-        state = 1;
-    }
-    if ( sub(gain_pit, 9830/*0.6f Q14*/) < 0 )
-    {
-        move16();
         state = 0;
     }
-
-    FOR (i=5; i>0; i--)
+    else if (gain_pit < 0.9f)
     {
-        move16();
+        state = 1;
+    }
+
+    for (i=5; i>0; i--)
+    {
         prev_gain_pit[i] = prev_gain_pit[i-1];
     }
-    move16();
     prev_gain_pit[0] = gain_pit;
 
-
-    IF ( L_sub(gain_code, L_add(*prev_gain_code, L_shl(*prev_gain_code,1))) > 0 )
+    if (gain_code - 3.0f * *prev_gain_code > 0.0f)
     {
-        if (sub(state,2) < 0)
+        if (state < 2)
         {
-            state = add(state, 1);
+            state++;
         }
     }
-    ELSE
+    else
     {
         j=0;
-        FOR (i=0; i<6; i++)
+        for (i=0; i<6; i++)
         {
-
-            if ( L_sub(prev_gain_pit[i], 9830/*0.6f Q14*/) < 0 )
+            if (prev_gain_pit[i] < 0.6f)
             {
-                j = add(j,1);
+                j++;
             }
         }
 
-        if (sub(j,2) > 0)
+        if (j > 2)
         {
-            move16();
             state = 0;
         }
 
-        if ( sub(sub(state, *prev_state),1) > 0 )
+        if ((state - (short)*prev_state) > 1)
         {
-            state = sub(state,1);
+            state--;
         }
     }
 
-    move32();
-    move16();
     *prev_gain_code = gain_code;
-    *prev_state = state;
+    *prev_state = (float)state;
 
     /*-----------------------------------------------------------------*
-     * circular convolution
+     * Circular convolution
      *-----------------------------------------------------------------*/
 
-    state = add(state,  mode);                        /* level of dispersion */
-    j = *code_exp;
-    move16();
-    IF( sub(state,2) < 0 )
+    state += mode;                        /* level of dispersion */
+    if( state < 2 )
     {
-        FOR(i=0; i<L_subfr; i++)
+        fft_rel( code, L_SUBFR, 6 );
+
+        if (state == 0)
         {
-            x32[i] = L_deposit_h(code[i]);
+            mvr2r( low_H, h_disp, L_SUBFR );
         }
 
-        BASOP_rfft(x32, L_subfr, &j, -1);
-
-        /* Normalize output data. */
-        scale2 = getScaleFactor32(x32, L_subfr);
-        FOR (i=0; i<L_subfr/2-1; i++)
+        if (state == 1)
         {
-            code[i]           = round_fx(L_shl(x32[2*i+0], scale2));
-            code[L_subfr-1-i] = round_fx(L_shl(x32[2*i+3], scale2));
+            mvr2r( mid_H, h_disp, L_SUBFR );
         }
 
-        code[L_subfr/2-1] = round_fx(L_shl(x32[L_subfr-2], scale2));
-        code[L_subfr/2]   = round_fx(L_shl(x32[1], scale2));
+        code2_real = code2;
+        code2_imag = code2 + L_SUBFR - 1;
+        code_real = code;
+        code_imag = code + L_SUBFR - 1;
+        h_real = h_disp;
+        h_imag = h_disp + L_SUBFR - 1;
+        *code2_real++ = *code_real++ **h_real++;
 
-        j = sub(j, scale2);
-
-        h_real = low_H16k;
-        move16();
-        if( sub(L_subfr, 64) <= 0)
+        for (i=1; i<L_SUBFR/2; i++)
         {
-            h_real = low_H;
-            move16();
+            *code2_real++ = *code_real **h_real - *code_imag **h_imag;
+            *code2_imag-- = *code_real++ **h_imag-- + *code_imag-- **h_real++;
         }
-        IF ( sub(state, 1) == 0)
-        {
-            h_real = mid_H16k;
-            move16();
-            if( sub(L_subfr, 64) <= 0)
-            {
-                h_real = mid_H;
-                move16();
-            }
-        }
-        h_imag = h_real + L_subfr - 1;
-        move16();
 
-        code_real  = &code[0];
-        code_imag  = &code[L_subfr-1];
+        *code2_real++ = *code_real++ **h_real++;
+        ifft_rel( code2, L_SUBFR, 6 );
 
-        x32[0] = L_mult(*code_real++, *h_real++);
-        move32();
-        FOR (i=1; i<L_subfr/2; i++)
-        {
-            x32[2*i]   = L_msu(L_mult(*code_real,   *h_real)  ,*code_imag,   *h_imag);
-            move32();
-            x32[2*i+1] = L_mac(L_mult(*code_real++, *h_imag--),*code_imag--, *h_real++);
-            move32();
-        }
-        x32[1] = L_mult(*code_real++, *h_real++);
-        move32();
-
-        /* low_H and mid_H are in Q14 format, thus account that here. */
-        j = add(j,1);
-
-        BASOP_rfft(x32, L_subfr, &j, 1);
-        scale2 = getScaleFactor32(x32, L_subfr);
-        FOR (i=0; i<L_subfr; i++)
-        {
-            code[i] = round_fx(L_shl(x32[i], scale2));
-        }
-        j = sub(j, scale2);
+        mvr2r( code2, code, L_SUBFR );
     }
 
-    /* Store exponent of code */
-    move16();
-    *code_exp = j;
-
+    return;
 }
-

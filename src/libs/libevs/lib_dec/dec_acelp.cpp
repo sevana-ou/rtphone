@@ -1,19 +1,19 @@
 /*====================================================================================
-    EVS Codec 3GPP TS26.442 Apr 03, 2018. Version 12.11.0 / 13.6.0 / 14.2.0
+    EVS Codec 3GPP TS26.443 Nov 13, 2018. Version 12.11.0 / 13.7.0 / 14.3.0 / 15.1.0
   ====================================================================================*/
 
 #include <memory.h>
 #include <assert.h>
-#include "stl.h"
-#include "basop_util.h"
-#include "prot_fx.h"
-#include "rom_com_fx.h"
-#include "prot_fx.h"
-#include "rom_basop_util.h"
+#include "typedef.h"
+#include "prot.h"
+#include "rom_com.h"
 
-#define _1_CODE 0x200       /*codebook excitation Q9 */
 
-static void D_ACELP_decode_arithtrack(Word16 v[], Word32 s, Word16 p, Word16 trackstep, Word16 tracklen);
+/*---------------------------------------------------------------------*
+* Local functions
+*---------------------------------------------------------------------*/
+
+static void D_ACELP_decode_arithtrack( float v[], long unsigned s, int p, int trackstep, int tracklen );
 
 /*---------------------------------------------------------------------*
 * Function D_ACELP_indexing()
@@ -21,352 +21,312 @@ static void D_ACELP_decode_arithtrack(Word16 v[], Word32 s, Word16 p, Word16 tra
 *---------------------------------------------------------------------*/
 
 void D_ACELP_indexing(
-    Word16 code[],
+    Float32 code[],
     PulseConfig config,
-    Word16 num_tracks,
-    Word16 index[]
-    ,Word16 *BER_detect
+    int num_tracks,
+    int index[]
+    ,short *BER_detect
 )
 {
-    Word16 track, pulses, k, pulsestrack[NB_TRACK_FCB_4T];
-    Word32 s;
-    Word16 trackpos;
-    UWord16 *idxs;
-    UWord32 idxs32[4], index_n[NB_TRACK_FCB_4T];
-    Word16 restpulses, wordcnt, wordcnt32;
+    int track, pulses, k, pulsestrack[NB_TRACK_FCB_4T];
+    long unsigned s;
+    long unsigned index_n[NB_TRACK_FCB_4T];
+    unsigned short trackpos, idxs[MAX_IDX_LEN];
+    int restpulses, wordcnt;
 
     assert(num_tracks == NB_TRACK_FCB_4T);
 
-    wordcnt = shr(add(config.bits,15),4);     /* ceil(bits/16) */
+    wordcnt = (config.bits + 15) >> 4;          /* ceil(bits/16) */
 
     /* check if some tracks have more pulses */
-    restpulses = s_and((Word16)config.nb_pulse, sub(num_tracks, 1));
+    restpulses = config.nb_pulse & (num_tracks-1);
 
     /* cast to short */
-    idxs= (UWord16 *)idxs32;
-    FOR (k=0; k<wordcnt; k++)
+    for (k=0; k<wordcnt; k++)
     {
-        idxs[k] = index[k];
-        move16();
+        idxs[k] = (unsigned short)index[k];
     }
-    idxs[wordcnt] = 0;
-    move16();
 
-    /*init 32bits wordcnt*/
-    wordcnt32 = shr(add(wordcnt,1),1);
-
-    IF (restpulses)
+    if (restpulses)
     {
         /* check if we need to code track positions */
-        SWITCH (config.codetrackpos)
+        switch (config.codetrackpos)
         {
         case TRACKPOS_FREE_THREE:
             /* Find track with less pulses */
-            trackpos = s_and(idxs[0], 3);
-            longshr(idxs32,2,wordcnt32);
+            trackpos = idxs[0] & 3;
+            longshiftright(idxs,2,idxs,wordcnt,wordcnt);
 
             /* set number of pulses per track */
-            set16_fx(pulsestrack, add(shr((Word16)config.nb_pulse,2),1),4);
-            cast16();
-            pulsestrack[trackpos] = sub(pulsestrack[trackpos],1);    /* this one has less pulses */  move16();
-            BREAK;
+            set_i( pulsestrack,(config.nb_pulse>>2)+1,4);
+            pulsestrack[trackpos]--;    /* this one has less pulses */
+            break;
         case TRACKPOS_FREE_ONE:
             /* Find track with more pulses */
-            trackpos = s_and(idxs[0], 3);
-            longshr(idxs32,2,wordcnt32);
+            trackpos = idxs[0] & 3;
+            longshiftright(idxs,2,idxs,wordcnt,wordcnt);
 
             /* set number of pulses per track */
-            set16_fx(pulsestrack, shr((Word16)config.nb_pulse,2),4);
-            cast16();
-            pulsestrack[trackpos] = add(pulsestrack[trackpos],1);    /* this one has less pulses */ move16();
-            BREAK;
+            set_i( pulsestrack,(config.nb_pulse>>2),4);
+            pulsestrack[trackpos]++;    /* this one has more pulses */
+            break;
         case TRACKPOS_FIXED_EVEN:
             /* Pulses on even tracks */
-            pulsestrack[0] = shr(add((Word16)config.nb_pulse,1), 1);
-            cast16();
-            move16();
+            pulsestrack[0] = (config.nb_pulse+1) >> 1;
             pulsestrack[1] = 0;
-            move16();
-            pulsestrack[2] = shr((Word16)config.nb_pulse, 1);
-            cast16();
-            move16();
+            pulsestrack[2] = config.nb_pulse >> 1;
             pulsestrack[3] = 0;
-            move16();
-            BREAK;
+            break;
         case TRACKPOS_FIXED_FIRST:
             /* set number of pulses per track */
-            set16_fx(pulsestrack, shr((Word16)config.nb_pulse,2),4);
-            cast16();
-            FOR (k=0; k<restpulses; k++)
+            set_i( pulsestrack,config.nb_pulse/num_tracks,4);
+            for (k=0; k<restpulses; k++)
             {
-                pulsestrack[k] = add(pulsestrack[k],1);
-                move16();
+                pulsestrack[k]++;
             }
-            BREAK;
+            break;
         case TRACKPOS_FIXED_TWO:
             /* 1100, 0110, 0011, 1001 */
             /* Find track with less pulses */
-            trackpos = s_and(idxs[0], 3);
-            longshr(idxs32,2,wordcnt32);
+            trackpos = idxs[0] & 3;
+            longshiftright(idxs,2,idxs,wordcnt,wordcnt);
 
             /* set number of pulses per track */
-            set16_fx(pulsestrack, shr((Word16)config.nb_pulse,2),4);
-            cast16();
-            pulsestrack[trackpos] = add(pulsestrack[trackpos],1);
-            move16();
-            trackpos = add(trackpos,1);
-            trackpos = s_and(trackpos,3);
-            pulsestrack[trackpos] = add(pulsestrack[trackpos],1);
-            move16();
-            BREAK;
+            set_i( pulsestrack,(config.nb_pulse>>2),4);
+            pulsestrack[trackpos]++;
+            trackpos++;
+            trackpos &= 3;
+            pulsestrack[trackpos]++;
+            break;
         default:
             assert(0);
-            BREAK;
+            break;
         }
     }
-    ELSE
+    else
     {
         /* set number of pulses per track */
-        set16_fx(pulsestrack, shr((Word16)config.nb_pulse,2),4);
-        cast16();
+        set_i( pulsestrack,(config.nb_pulse/num_tracks),num_tracks);
     }
 
-    IF (sub(config.bits, 43) == 0)
+    if (config.bits == 43)
     {
         D_ACELP_decode_43bit(idxs, code, pulsestrack);
     }
-    ELSE
+    else
     {
+
         fcb_pulse_track_joint_decode(idxs, wordcnt, index_n, pulsestrack, num_tracks);
-        FOR (track = num_tracks - 1; track >=1; track--)
+
+        for (track=num_tracks-1; track >=1; track--)
         {
             pulses = pulsestrack[track];
-            move16();
 
-            IF (pulses)
+            if (pulses)
             {
-                /* divide by number of possible states: rest is actual state and
-                 * the integer part goes to next track */
                 s = index_n[track];
+
                 /* decode state to actual pulse positions on track */
+                /*D_ACELP_decode_arithtrack_old(code+track, s, pulses, 4);                    */
                 D_ACELP_decode_arithtrack(code+track, s, pulses, num_tracks, 16);
             }
-            ELSE    /* track is empty */
+            else
             {
-                FOR (k=track; k < 16*num_tracks; k+=num_tracks)
+                /* track is empty */
+                for (k=track; k < 16*num_tracks; k+=num_tracks)
                 {
-                    code[k] = 0;
-                    move16();
+                    code[k] = 0.0f;
                 }
             }
         }
-
-        s = L_add(index_n[0], 0);
+        s = index_n[0];
         pulses = pulsestrack[0];
-        move16();
-
         /* safety check in case of bit errors */
-        IF( L_sub(s,pulsestostates[16][pulses-1]) >= 0 )
+        if (s >= pulsestostates[16][pulses-1])
         {
-            set16_fx( code, 0, L_SUBFR );
+            set_f( code, 0.0f, L_SUBFR );
             *BER_detect = 1;
-            move16();
             return;
         }
-
-        IF (pulses)
+        if (pulses)
         {
             D_ACELP_decode_arithtrack(code, s, pulses, num_tracks, 16);
         }
-        ELSE {/* track is empty */
-            FOR (k=0; k < 16*num_tracks; k+=num_tracks)
-            {
-                code[k] = 0;
-                move16();
-            }
-        }
-    }
-}
-
-static void D_ACELP_decode_arithtrack(Word16 v[], Word32 s, Word16 p, Word16 trackstep, Word16 tracklen)
-{
-    Word16 k, idx;
-
-    /*initialy s was UWords32 but it seems that s is never greater then 0x80000000*/
-    /*this assumption reduces complexity but if it is not true than exit*/
-    assert(s >= 0);
-
-    FOR (k=(tracklen)-1; k>= 0; k--)
-    {
-        idx = imult1616(k,trackstep);
-        v[idx] = 0;          /* default: there is no pulse here */   move16();
-
-        FOR(; p; p--)  /* one pulse placed, so one less left */
+        else
         {
-            IF (L_sub(s, pulsestostates[k][p-1]) < 0)
+            /* track is empty */
+            for (k=0; k < 16*num_tracks; k+=num_tracks)
             {
-                BREAK;
-            }
-
-            s = L_sub(s, pulsestostates[k][p-1]);
-
-            IF (v[idx] != 0)   /* there is a pulse here already = sign is known */
-            {
-                if (v[idx] > 0)
-                {
-                    v[idx] = add(v[idx],_1_CODE); /* place one more pulse here */     move16();
-                }
-                if (v[idx] <= 0)
-                {
-                    v[idx] = sub(v[idx],_1_CODE); /* place one more pulse here */     move16();
-                }
-            }
-            ELSE      /* this is the first pulse here -> determine sign */
-            {
-                v[idx] = +_1_CODE; /* place a negative pulse here */              move16();
-                if (L_and(s, 0x1) != 0)
-                {
-                    v[idx] = -_1_CODE; /* place a negative pulse here */           move16();
-                }
-                s = L_lshr(s,1);
+                code[k] = 0.0f;
             }
         }
-    }
-}
-
-void fcb_pulse_track_joint_decode(UWord16 *idxs, Word16 wordcnt, UWord32 *index_n, Word16 *pulse_num, Word16 track_num)
-{
-    Word16 hi_to_low[10] = { 0, 0, 0, 3, 9, 5, 3, 1, 8, 8};
-
-    UWord32 index;
-    Word32 indx_tmp;
-    Word16 indx_flag, indx_flag_1;
-    Word16 track, track_num1, pulse_num0, pulse_num1;
-    Word32 div_tmp;
-    Word16 indx_flag_2;
-
-    indx_flag = 0;
-    move16();
-    indx_flag_1 = 0;
-    move16();
-    indx_flag_2 = 0;
-    move16();
-
-    FOR (track = 0; track < track_num; track++)
-    {
-        indx_flag = add(indx_flag, shr(pulse_num[track], 2));
-        indx_flag_1 = add(indx_flag_1, shr(pulse_num[track], 1));
-        indx_flag_2 = add(indx_flag_2, shr(pulse_num[track], 3));
-    }
-
-    hi_to_low[4] = 1;
-    move16();
-    if (sub(indx_flag, track_num) >= 0)
-    {
-        hi_to_low[4] = 9;
-        move16();
-    }
-
-    hi_to_low[7] = 1;
-    move16();
-    if (sub(indx_flag_2, 1) >= 0)
-    {
-        hi_to_low[7] = 9;
-        move16();
-    }
-
-    IF (sub(indx_flag_1, track_num) >= 0)
-    {
-        IF (sub(indx_flag, track_num) >= 0)
-        {
-            index = L_deposit_l(0);
-            IF (sub(indx_flag_2, 1) >= 0)
-            {
-                FOR (track = sub(wordcnt, 1); track >= 6; track--)
-                {
-                    index = L_add(L_lshl(index, 16), (UWord32) idxs[track]);
-                }
-                index_n[3] = L_add(L_lshl(idxs[5], 8), L_and(L_lshr(idxs[4], 8), 0xFF));
-                move32();
-                index_n[2] = L_and(L_add(L_lshl(idxs[4], 16), idxs[3]), 0xFFFFFF);
-                move32();
-                index_n[1] = L_add(L_lshl(idxs[2], 8), L_and(L_lshr(idxs[1], 8), 0xFF));
-                move32();
-                index_n[0] = L_and(L_add(L_lshl(idxs[1], 16), idxs[0]), 0xFFFFFF);
-                move32();
-            }
-            ELSE
-            {
-                FOR (track = (wordcnt-1); track >= track_num; track--)
-                {
-                    index = L_add(L_lshl(index, 16), (UWord32) idxs[track]);
-                }
-                FOR (track = 0; track < track_num; track++)
-                {
-                    index_n[track] = (UWord32) idxs[track];
-                    move32();
-                }
-            }
-        }
-        ELSE
-        {
-            index = L_deposit_l(0);
-            FOR (track = (wordcnt-1); track >= 2; track--)
-            {
-                index = L_add(L_lshl(index, 16), (UWord32) idxs[track]);
-            }
-
-            index_n[3] = L_and((Word32) idxs[1], 0xFF);
-            move32();
-            index_n[2] = L_lshr((Word32) idxs[1], 8);
-            move32();
-            index_n[1] = L_and((Word32) idxs[0], 0xFF);
-            move32();
-            index_n[0] = L_lshr((Word32) idxs[0], 8);
-            move32();
-        }
-
-        track_num1 = sub(track_num, 1);
-        pulse_num1 = pulse_num[track_num1];
-        move16();
-        index = L_add(L_lshl(index, hi_to_low[pulse_num1]), L_lshr(index_n[track_num1], low_len[pulse_num1]));
-        FOR (track = (track_num-1); track > 0; track--)
-        {
-            track_num1 = sub(track, 1);
-            pulse_num0 = pulse_num[track_num1];
-            move16();
-            pulse_num1 = pulse_num[track];
-            move16();
-            index = L_add(L_lshl(index, hi_to_low[pulse_num0]), L_lshr(index_n[track_num1], low_len[pulse_num0]));
-
-            iDiv_and_mod_32(index, indx_fact[pulse_num1], &div_tmp, &indx_tmp, 0);
-            index_n[track] = L_add(L_and(index_n[track], low_mask[pulse_num1]), L_lshl(indx_tmp, low_len[pulse_num1]));
-            index = L_add(div_tmp, 0);
-        }
-        pulse_num1 = pulse_num[0];
-        move16();
-        index_n[0] = L_add(L_and(index_n[0], low_mask[pulse_num1]), L_lshl(index, low_len[pulse_num1]));
-        move32();
-    }
-    ELSE
-    {
-        index = L_deposit_l(0);
-        FOR (track = (wordcnt-1); track >= 0; track--)
-        {
-            index = L_add(L_lshl(index, 16), (UWord32) idxs[track]);
-        }
-        FOR (track = 3; track > 0; track--)
-        {
-            pulse_num1 = pulse_num[track];
-            move16();
-            index_n[track] = L_and(index, index_mask_ACELP[pulse_num1]);
-            move32();
-            index = L_lshr(index, index_len[pulse_num1]);
-        }
-        index_n[0] = index;
-        move32();
     }
 
     return;
 }
 
+
+static void D_ACELP_decode_arithtrack(
+    float v[],
+    long unsigned s,
+    int p,
+    int trackstep,
+    int tracklen
+)
+{
+    int k;
+
+    for (k=(tracklen)-1; k>= 0; k--)
+    {
+        v[k*trackstep] = 0.0f;          /* default: there is no pulse here */
+        while((p) && (s >= pulsestostates[k][p-1] ))
+        {
+            s -= pulsestostates[k][p-1];
+            if (v[k*trackstep])
+            {
+                /* there is a pulse here already = sign is known */
+                if (v[k*trackstep] > 0.0f)
+                {
+                    v[k*trackstep]++; /* place one more pulse here */
+                }
+                else
+                {
+                    v[k*trackstep]--; /* place one more pulse here */
+                }
+            }
+            else
+            {
+                /* this is the first pulse here -> determine sign */
+                if (s & 1)
+                {
+                    v[k*trackstep] = -1.0f; /* place a negative pulse here */
+                }
+                else
+                {
+                    v[k*trackstep] = +1.0f; /* place a negative pulse here */
+                }
+                s >>= 1;
+            }
+            p--;                /* one pulse placed, so one less left */
+        }
+    }
+
+    return;
+}
+
+
+void fcb_pulse_track_joint_decode(unsigned short *idxs, int wordcnt, long unsigned *index_n, int *pulse_num, int track_num)
+{
+    int hi_to_low[10] = { 0, 0, 0, 3, 9, 5, 3, 1, 8, 8};
+
+    unsigned long long index;
+    int indx_tmp,indx_flag,indx_flag_1;
+    int track,track_num1,pulse_num0,pulse_num1;
+    int div_tmp;
+    int indx_flag_2;
+
+    indx_flag=0;
+    indx_flag_1=0;
+    indx_flag_2 = 0;
+    for (track=0; track < track_num; track++)
+    {
+        indx_flag += (pulse_num[track]>>2);
+        indx_flag_1 += (pulse_num[track]>>1);
+        indx_flag_2 += (pulse_num[track]>>3);
+    }
+
+    if (indx_flag >= track_num)
+    {
+        hi_to_low[4] = 9;
+    }
+    else
+    {
+        hi_to_low[4] = 1;
+    }
+
+    if (indx_flag_2 >= 1)
+    {
+        hi_to_low[7] = 9;
+    }
+    else
+    {
+        hi_to_low[7] = 1;
+    }
+    if (indx_flag_1>=track_num)
+    {
+        if (indx_flag>=track_num)
+        {
+            index = 0;
+            if (indx_flag_2 >= 1)
+            {
+                for (track=(wordcnt-1); track >= 6; track--)
+                {
+                    index = ( index << 16 ) + idxs[track] ;
+                }
+                index_n[3] = ( ((unsigned int)idxs[5]) << 8 ) + ( ( idxs[4] >> 8 ) & 0xff );
+                index_n[2] = ( ( ((unsigned int)idxs[4]) << 16 ) + idxs[3] ) & 0xffffffUL;
+                index_n[1] = ( ((unsigned int)idxs[2]) << 8 ) + ( ( idxs[1] >> 8 ) & 0xff );
+                index_n[0] = ( ( ((unsigned int) idxs[1]) << 16 ) + idxs[0] ) & 0xffffffUL;
+            }
+            else
+            {
+                for (track=(wordcnt-1); track >= track_num; track--)
+                {
+                    index = ( index << 16 ) + idxs[track] ;
+                }
+                for (track=0; track < track_num; track++)
+                {
+                    index_n[track] = idxs[track];
+                }
+            }
+        }
+        else
+        {
+            index = 0;
+            for (track=(wordcnt-1); track >= 2; track--)
+            {
+                index = ( index << 16 ) + idxs[track] ;
+            }
+
+            index_n[3] = idxs[1] & 0xff;
+            index_n[2] = idxs[1] >> 8;
+            index_n[1] = idxs[0] & 0xff;
+            index_n[0] = idxs[0] >> 8;
+        }
+
+        track_num1 = track_num - 1;
+        pulse_num1 = pulse_num[track_num1];
+        index = ( index << hi_to_low[pulse_num1] ) + ( index_n[track_num1] >> low_len[pulse_num1] );
+        for (track=(track_num-1); track > 0; track--)
+        {
+            track_num1 = track - 1;
+            pulse_num0 = pulse_num[track_num1];
+            pulse_num1 = pulse_num[track];
+            index = ( index << hi_to_low[pulse_num0] ) + ( index_n[track_num1] >> low_len[pulse_num0] );
+
+            div_tmp = index / indx_fact[pulse_num1];
+            indx_tmp = index - div_tmp * indx_fact[pulse_num1];
+            index_n[track] = ( index_n[track] & low_mask[pulse_num1]) + ( indx_tmp << low_len[pulse_num1] );
+            index = div_tmp;
+        }
+        pulse_num1 = pulse_num[0];
+        index_n[0] = ( index_n[0] & low_mask[pulse_num1]) + ( index << low_len[pulse_num1] );
+    }
+    else
+    {
+        index = 0;
+        for (track=(wordcnt-1); track >= 0; track--)
+        {
+            index = ( index << 16 ) + idxs[track];
+        }
+        for (track=3; track > 0; track--)
+        {
+            pulse_num1 = pulse_num[track];
+            index_n[track] =  index & index_mask_ACELP[pulse_num1];
+            index = index >> index_len[pulse_num1];
+        }
+        index_n[0] = index;
+    }
+
+    return;
+}

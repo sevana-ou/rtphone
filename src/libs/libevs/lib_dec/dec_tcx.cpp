@@ -1,697 +1,432 @@
 /*====================================================================================
-    EVS Codec 3GPP TS26.442 Apr 03, 2018. Version 12.11.0 / 13.6.0 / 14.2.0
+    EVS Codec 3GPP TS26.443 Nov 13, 2018. Version 12.11.0 / 13.7.0 / 14.3.0 / 15.1.0
   ====================================================================================*/
 
 #include <stdlib.h>
 #include <stdio.h>
+#include <math.h>
 #include <assert.h>
-#include "prot_fx.h"
-#include "basop_util.h"
-#include "stl.h"
+#include "prot.h"
 #include "options.h"
-#include "prot_fx.h"
+#include "stat_com.h"
+#include "cnst.h"
 
-extern const Word16 T_DIV_L_Frame[];/*0Q15 * 2^-7 */
 
-static Word32 CalculateAbsEnergy( /* o : normalized result              Q31 */
-    const Word32 L_off,  /* i : initial sum value               Qn */
-    const Word16 x[],    /* i : x vector                        Qn */
-    const Word16 lg,     /* i : vector length, range [0..7FFF]  Q0 */
-    Word16 * exp         /* o : exponent of result in [-32,31]  Q0 */
-);
+/*-----------------------------------------------------------------*
+ * Local functions
+ *-----------------------------------------------------------------*/
 
-static void IMDCT(Word32 *x, Word16 x_e,
-                  Word16 *old_syn_overl,
-                  Word16 *syn_Overl_TDAC,
-                  Word16 *xn_buf,
-                  const Word16  *tcx_aldo_window_1,
-                  const PWord16 *tcx_aldo_window_1_trunc,
-                  const PWord16 *tcx_aldo_window_2,
-                  const PWord16 *tcx_mdct_window_half,
-                  const PWord16 *tcx_mdct_window_minimum,
-                  const PWord16 *tcx_mdct_window_trans,
-                  Word16 tcx_mdct_window_half_length,
-                  Word16 tcx_mdct_window_min_length,
-                  Word16 index,
-                  Word16 left_rect,
-                  Word16 tcx_offset,
-                  Word16 overlap,
-                  Word16 L_frame,
-                  Word16 L_frameTCX,
-                  Word16 L_spec_TCX5,
-                  Word16 L_frame_glob,
-                  Word16 frame_cnt,
-                  Word16 bfi,
-                  Word16 *old_out,
-                  Word16 *Q_old_wtda,
-                  Decoder_State_fx *st
-                  ,Word16 fullbandScale
-                  ,Word16 *acelp_zir
-                 );
+static void IMDCT( float *x, float *old_syn_overl, float *syn_Overl_TDAC, float *xn_buf, float *tcx_aldo_window_1_trunc, float *tcx_aldo_window_2,
+                   float *tcx_mdct_window_half, float *tcx_mdct_window_minimum, float *tcx_mdct_window_trans, int tcx_mdct_window_half_length,
+                   int tcx_mdct_window_min_length, int index, int left_rect, int tcx_offset, int overlap, int L_frame, int L_frameTCX, int L_spec_TCX5,
+                   int L_frame_glob,
+                   int frame_cnt, int bfi, float *old_out, short FB_flag, Decoder_State *st, int fullband, float *acelp_zir );
 
+/*-----------------------------------------------------------------*
+ * decoder_tcx()
+ *
+ *
+ *-----------------------------------------------------------------*/
 
 void decoder_tcx(
-    TCX_config *tcx_cfg,  /* input: configuration of TCX               */
-    Word16 prm[],         /* input:  parameters                        */
-    Word16 A[],           /* input:  coefficients NxAz[M+1]            */
+    TCX_config *tcx_cfg,  /* input: configuration of TCX         */
+    int prm[],            /* input:  parameters                  */
+    float A[],            /* input:  coefficients NxAz[M+1]      */
     Word16 Aind[],        /* input: frame-independent coefficients Az[M+1] */
-    Word16 L_frame_glob,  /* input:  frame length                      */
-    Word16 L_frameTCX_glob,
-    Word16 L_spec,
-    Word16 synth[],        /* in/out: synth[-M-LFAC..L_frame]          */
-    Word16 synthFB[],
-    Decoder_State_fx *st,
-    Word16 coder_type,     /* input : coder type                      */
-    Word16 bfi,            /* input:  Bad frame indicator             */
-    Word16 frame_cnt,      /* input: frame counter in the super frame */
-    Word16 stab_fac        /* input: stability of isf (1Q14)          */
+    int L_frame_glob,     /* input:  frame length                */
+    int L_frameTCX_glob,
+    int L_spec,
+    float synth[],        /* in/out: synth[-M..L_frame]          */
+    float synthFB[],
+    Decoder_State *st,    /* in/out: coder memory state          */
+    const short coder_type,     /* input: coder type                   */
+    int bfi,              /* input:  Bad frame indicator         */
+    int frame_cnt,        /* input: frame counter in the super frame */
+    float stab_fac        /* input: stability of isf             */
 )
 {
-    Word16 i, index, L_frame, tcx_offset;
-    Word16 L_frameTCX, tcx_offsetFB;
-    Word16 firstLine;
-    Word16 gain_tcx, gain_tcx_e, fac_ns;
-    Word16 Ap[M+2];
-    Word32 x[N_MAX];
-    Word16 x_e;
-    Word16 *xn_buf;
-    Word16 xn_bufFB[L_MDCT_OVLP_MAX+L_FRAME_PLUS+L_MDCT_OVLP_MAX];
-    Word32 xn_buf32[N_MAX];
-    Word16 overlap;
-    Word16 overlapFB;
-    Word16 noiseFillingSize;
-    Word16 noiseTransWidth;
-    Word16 tnsSize; /* number of tns parameters put into prm   */
-    Word8 fUseTns; /* flag that is set if TNS data is present */
+    short i, index, L_frame, tcx_offset;
+    short L_frameTCX, tcx_offsetFB;
+    short firstLine;
+    float gain_tcx, fac_ns;
+    float Ap[M+2];
+    float x[N_MAX];
+    int overlap;
+    short overlapFB;
+    short noiseFillingSize;
+    short noiseTransWidth = MIN_NOISE_FILLING_HOLE;
+    int tnsSize = 0; /* number of tns parameters put into prm   */
+    int fUseTns = 0; /* flag that is set if TNS data is present */
     STnsData tnsData;
-    Word16 left_rect;
-    Word16 gainlpc2[FDNS_NPTS];
-    Word16 gainlpc2_e[FDNS_NPTS];
-    Word16 noiseTiltFactor;
-    Word16 nf_seed;
-    Word16 tmp1, tmp2, s, *tmpP16;
-    Word8 tmp8;
-    Word32 tmp32;
-    Word16 gamma1;
-    Word16 gamma;
-    Word16 gainCompensate, gainCompensate_e;
-    Word16 h1[L_FRAME_MAX/4+1];
-    Word16 mem[M];
-    Word16 temp_concealment_method = 0;
-    Word16 arith_bits, signaling_bits;
-    Word16 *prm_ltp, *prm_tns, *prm_hm, *prm_sqQ, *prm_target;
-    Word16*pInfoTCXNoise;
-    Word16 acelp_zir[L_FRAME_MAX/2];
-    Word16 noise_filling_index;
-    Word16 infoIGFStartLine;
+    short left_rect;
+    float gainlpc2[FDNS_NPTS];
+    float gamma1;
+    float gamma;
+    short nf_seed = 0;
+    float gainCompensate = 1.f;
+    float h1[L_FRAME_MAX/4+1];
+    float mem[M];
+    float tmp2;
+    int arith_bits, signaling_bits;
+    const int *prm_ltp, *prm_tns, *prm_hm, *prm_sqQ, *prm_target;
+    float xn_buf[L_MDCT_OVLP_MAX+L_FRAME_PLUS+L_MDCT_OVLP_MAX];
+    float xn_bufFB[L_MDCT_OVLP_MAX+L_FRAME_PLUS+L_MDCT_OVLP_MAX];
+    float acelp_zir[L_FRAME_MAX/2];
+    int sum_word32;
+    short temp_concealment_method = 0;      /* to avoid compilation warnings */
+    int infoIGFStartLine;
 
-    prm_target = NULL;       /* just to suppress MSVC warnigs */
+    prm_target = (const int *)NULL;       /* just to suppress MSVC warnigs */
 
 
-    x_e = 0;          /* to avoid compilation warnings */
-    nf_seed = 0;      /* to avoid compilation warnings */
-
-
-
-    /* Overlay xn_buf32 with xn_buf */
-    xn_buf = (Word16 *) xn_buf32;
-
-    noiseTransWidth = MIN_NOISE_FILLING_HOLE;
-    move16();
-    tnsSize = 0;
-    move16();
-    fUseTns = 0;
-    move16();
-    gainCompensate = 32768/2;
-    move16();
-    gainCompensate_e = 1;
-    move16();
-    FOR (i=0 ; i < (L_MDCT_OVLP_MAX+L_FRAME_PLUS+L_MDCT_OVLP_MAX)/2; i++)
-    {
-        xn_buf32[i] = L_deposit_l(0);
-    }
-
+    /*-----------------------------------------------------------------*
+     * Initializations
+     *-----------------------------------------------------------------*/
 
     /* Init lengths */
-
     overlap    = tcx_cfg->tcx_mdct_window_length;
-    move16();
     overlapFB  = tcx_cfg->tcx_mdct_window_lengthFB;
-    move16();
-    /* Modified the overlap to the delay in case of short blocks*/
     tcx_offset = tcx_cfg->tcx_offset;
-    move16();
     tcx_offsetFB = tcx_cfg->tcx_offsetFB;
-    move16();
     gamma1     = st->gamma;
-    move16();
 
-    if (st->enableTcxLpc != 0)
+    if (st->enableTcxLpc)
     {
-        gamma1 = 0x7FFF;
-        move16();
+        gamma1 = 1.0f;
     }
 
-    IF (bfi != 0)
+    if( bfi )
     {
         /* PLC: [TCX: Memory update]
          * PLC: Init buffers */
 
         assert(st->L_frame_past > 0);
         L_frame    = st->L_frame_past;
-        move16();
         L_frameTCX = st->L_frameTCX_past;
-        move16();
 
         left_rect = st->prev_widow_left_rect;
-        move16();
 
-        IF (left_rect != 0)
+        if( left_rect )
         {
             tcx_offset = tcx_cfg->lfacNext;
-            move16();
             tcx_offsetFB = tcx_cfg->lfacNextFB;
-            move16();
-            L_spec = add(L_spec, shr(st->tcx_cfg.tcx_coded_lines, 2));
-
+            L_spec += st->tcx_cfg.tcx_coded_lines >> 2;
         }
     }
-    ELSE
+    else
     {
-        test();
-        IF ( frame_cnt == 0 && st->last_core_fx == ACELP_CORE )
+        if ( frame_cnt == 0 && st->last_core == ACELP_CORE )
         {
-            if (st->prev_bfi_fx == 0)
+            if (!st->prev_bfi)
             {
                 tcx_cfg->last_aldo = 0;
-                move16();
             }
 
             /* if past frame is ACELP */
-            L_frame = add(L_frame_glob, tcx_offset);
-            L_frameTCX = add(L_frameTCX_glob, tcx_offsetFB);
-            L_spec = add(L_spec, shr(st->tcx_cfg.tcx_coded_lines, 2));
-            assert(tcx_cfg->lfacNext<=0);
-            L_frame    = sub(L_frame   , tcx_cfg->lfacNext);
-            L_frameTCX = sub(L_frameTCX, tcx_cfg->lfacNextFB);
-            tcx_offset   = tcx_cfg->lfacNext;
-            move16();
-            tcx_offsetFB = tcx_cfg->lfacNextFB;
-            move16();
-            left_rect = 1;
-            move16();
-            st->prev_widow_left_rect = 1;
-            move16();
-        }
-        ELSE
-        {
+            L_frame = L_frame_glob + tcx_offset;
+            L_frameTCX = L_frameTCX_glob + tcx_offsetFB;
+            L_spec += st->tcx_cfg.tcx_coded_lines >> 2;
 
+            assert(tcx_cfg->lfacNext<=0);
+            L_frame     -= tcx_cfg->lfacNext;
+            L_frameTCX  -= tcx_cfg->lfacNextFB;
+            tcx_offset   = tcx_cfg->lfacNext;
+            tcx_offsetFB = tcx_cfg->lfacNextFB;
+
+            left_rect = 1;
+            st->prev_widow_left_rect = 1;
+        }
+        else
+        {
             L_frame = L_frame_glob;
-            move16();
             L_frameTCX = L_frameTCX_glob;
-            move16();
             left_rect = 0;
-            move16();
             st->prev_widow_left_rect = 0;
-            move16();
         }
 
         st->L_frame_past = L_frame;
-        move16();
         st->L_frameTCX_past = L_frameTCX;
-        move16();
     }
 
-    test();
-    IF ( (sub(L_frame, shr(st->L_frame_fx, 1)) == 0) && (st->tcxonly))
+    if( (L_frame == st->L_frame >> 1) && (st->tcxonly) )
     {
-        IGFDecUpdateInfo(
-            &st->hIGFDec,
-            IGF_GRID_LB_SHORT
-        );
+        IGFDecUpdateInfo( &st->hIGFDec, IGF_GRID_LB_SHORT );
     }
-    ELSE
+    else
     {
-        test();
-        test();
-        IF ((sub(st->last_core_fx, ACELP_CORE) == 0) || (left_rect && st->bfi_fx))
-        {
-            IGFDecUpdateInfo(
-                &st->hIGFDec,
-                IGF_GRID_LB_TRAN
-            );
-        }
-        ELSE
-        {
-            IGFDecUpdateInfo(
-                &st->hIGFDec,
-                IGF_GRID_LB_NORM
-            );
-        }
+        IGFDecUpdateInfo( &st->hIGFDec, (st->last_core == ACELP_CORE || (left_rect && st->bfi))?IGF_GRID_LB_TRAN:IGF_GRID_LB_NORM );
     }
 
-    IF (0 == st->igf)
+    if( st->igf == 0 )
     {
-        IF (st->narrowBand == 0)
+        if( st->narrowBand == 0 )
         {
             /* minimum needed for output with sampling rates lower then the
                nominal sampling rate */
-            infoIGFStartLine = s_min(L_frameTCX, L_frame);
-            move16();
+            infoIGFStartLine = min(L_frameTCX, L_frame);
         }
-        ELSE
+        else
         {
             infoIGFStartLine  = L_frameTCX;
-            move16();
         }
     }
-    ELSE
+    else
     {
-        infoIGFStartLine = s_min(st->hIGFDec.infoIGFStartLine,L_frameTCX);
-        move16();
+        infoIGFStartLine = min(st->hIGFDec.infoIGFStartLine,L_frameTCX);
     }
 
     noiseFillingSize = L_spec;
-    move16();
-    if (st->igf != 0)
+    if( st->igf )
     {
         noiseFillingSize = st->hIGFDec.infoIGFStartLine;
-        move16();
     }
 
-
     prm_ltp = &prm[1+NOISE_FILL_RANGES];
-    move16();
     prm_tns = prm_ltp + LTPSIZE;
-    move16();
 
     /*-----------------------------------------------------------*
      * Read TCX parameters                                       *
      *-----------------------------------------------------------*/
 
     index = 0;
-    move16();
 
-    IF (bfi == 0)
+    if( !bfi )
     {
-
         index = prm[0];
-        move16();
 
         /* read noise level (fac_ns) */
-
-        noise_filling_index = prm[1];
-        move16();
-
-        fac_ns = extract_l(L_shr(L_mult0(noise_filling_index, 0x6000), NBITS_NOISE_FILL_LEVEL));
+        st->noise_filling_index = prm[1];
     }
-    ELSE
-    {
-        fac_ns = 0;
-        move16();
-    }
+
+    fac_ns = (float)st->noise_filling_index * 0.75f / (1<<NBITS_NOISE_FILL_LEVEL);
 
     /* read TNS data */
-    test();
-    IF ((bfi == 0) && (tcx_cfg->fIsTNSAllowed != 0))
+    if( !bfi && tcx_cfg->fIsTNSAllowed )
     {
-        cast16();
-        fUseTns = (Word8)DecodeTnsData(tcx_cfg->pCurrentTnsConfig,
-                                       prm_tns,
-                                       &tnsSize,
-                                       &tnsData);
+        fUseTns = DecodeTnsData( tcx_cfg->pCurrentTnsConfig, prm_tns, &tnsSize, &tnsData );
     }
-    ELSE
+    else
     {
         fUseTns = 0;
-        move16();
     }
 
     prm_hm = prm_tns + tnsSize;
-    move16();
     prm_sqQ = prm_hm + NPRM_CTX_HM;
-    move16();
 
     /*-----------------------------------------------------------*
      * Spectrum data                                             *
      *-----------------------------------------------------------*/
 
-    IF (bfi == 0)
+    if( !bfi)
     {
-
         /*-----------------------------------------------------------*
-         * Context HM                                        *
+         * Context HM                                                *
          *-----------------------------------------------------------*/
-        test();
-        test();
-        IF(tcx_cfg->ctx_hm != 0 && ( (st->last_core_fx != ACELP_CORE) || (frame_cnt > 0) ) )
+
+        if(tcx_cfg->ctx_hm && ( (st->last_core != ACELP_CORE) || (frame_cnt > 0) ) )
         {
             st->last_ctx_hm_enabled = prm_hm[0];
-            move16();
             {
-                FOR (i = 0; i < L_spec; i++)    /* no context harmonic model, copy MDCT coefficients to x */
+                for (i = 0; i < L_spec; i++)
                 {
-
-                    x[i] = L_mult(prm_sqQ[i],
-                                  1 << (30 - SPEC_EXP_DEC));
-                    move32();
+                    /* no context harmonic model, copy MDCT coefficients to x */
+                    x[i] = (float)prm_sqQ[i];
                 }
             }
-            x_e = SPEC_EXP_DEC;
-            move16();
         }
-        ELSE  /* tcx_cfg->ctx_hm == 0 */
+        else  /* tcx_cfg->ctx_hm == 0 */
         {
-
-            IF (st->tcx_lpc_shaped_ari != 0)  /* low rates: new arithmetic coder */
+            if( st->tcx_lpc_shaped_ari )  /* low rates: envelope based arithmetic coder */
             {
                 prm_target = prm_sqQ;
-                move16();
                 prm_sqQ = prm_target + 1;
-                move16();
 
-                tmp8 = 1;
-                move16();
-                if (sub(st->last_core_fx, ACELP_CORE) == 0)
+                tcx_arith_decode_envelope( x, L_frame, L_spec, st, coder_type, Aind, st->tcxltp_gain, *prm_target, prm_sqQ, st->last_core != ACELP_CORE,
+                                           prm_hm, /* HM parameter area */ st->tcx_hm_LtpPitchLag, &arith_bits, &signaling_bits ,(st->bwidth > WB)?1:0 );
+
+                st->resQBits[frame_cnt] = *prm_target - arith_bits;
+
+                /* Noise filling seed */
+                for (i=0; i<noiseFillingSize; ++i)
                 {
-                    tmp8 = 0;
-                    move16();
+                    nf_seed += (short)(abs((int)x[i]) * i * 2);
                 }
-
-                tcx_arith_decode_envelope(
-                    x, &x_e,
-                    L_frame,
-                    L_spec,
-                    st,
-                    Aind,
-                    *prm_target,
-                    prm_sqQ,
-                    tmp8,
-                    prm_hm, /* HM parameter area */
-                    st->tcx_hm_LtpPitchLag,
-                    &arith_bits,
-                    &signaling_bits,
-                    &nf_seed
-                    , shr(st->bwidth_fx, 1) /* equivalent to: (st->bwidth_fx > WB)?1:0 */
-                );
-
-                st->resQBits[frame_cnt] = sub(*prm_target, arith_bits);
-                move16();
             }
-            ELSE  /* TCX-only: old arithmetic coder */
+            else  /* TCX-only: context based arithmetic coder */
             {
-                FOR (i = 0; i < L_spec; i++)
+                for (i = 0; i < L_spec; i++)
                 {
-
-                    x[i] = L_mult(prm_sqQ[i],
-                    1 << (30 - SPEC_EXP_DEC));
-                    move32();
+                    x[i] = (float)prm_sqQ[i];
                 }
 
-                set32_fx(x+L_spec, 0, sub(L_frameTCX, L_spec));
-
-                x_e = SPEC_EXP_DEC;
-                move16();
+                for (i=L_spec ; i < L_frameTCX; i++)
+                {
+                    x[i] = 0.0f;
+                }
             }
 
         }  /* else of if tcx_cfg->ctx_hm */
-        tmp1 = s_max(L_frame, L_frameTCX);
-        set32_fx(x+L_spec, 0, sub(tmp1, L_spec));
 
+        for( i=L_spec ; i < max(L_frame, L_frameTCX); i++ )
+        {
+            x[i] = 0.0f;
+        }
 
         /*-----------------------------------------------------------*
          * adaptive low frequency deemphasis.                        *
          *-----------------------------------------------------------*/
 
-        weight_a_fx(A, Ap, gamma1, M);
-
-        lpc2mdct(Ap, M, NULL, NULL, gainlpc2, gainlpc2_e);
-
+        weight_a( A, Ap, gamma1, M );
+        lpc2mdct( Ap, M, gainlpc2 );
 
         /* initialize LF deemphasis factors in xn_buf */
-        tmp1 = s_max(L_spec, L_frameTCX);
-        set16_fx(xn_buf, 0x4000, tmp1);
-
-        IF (st->tcxonly == 0)
+        for( i = 0; i < max(L_spec, L_frameTCX); i++ )
         {
-            AdaptLowFreqDeemph( x, x_e, st->tcx_lpc_shaped_ari, gainlpc2, gainlpc2_e,
-                                L_frame, xn_buf /* LF deemphasis factors */ );
+            xn_buf[i] = 1.0f;
+        }
+
+        if( !st->tcxonly )
+        {
+            AdaptLowFreqDeemph( x, st->tcx_lpc_shaped_ari, gainlpc2, L_frame, xn_buf /* LF deemphasis factors */ );
         }
     }
 
-    /* Global Gain */
-    st->damping = 0;
+    st->damping = 0.f;
 
-    IF(bfi==0)
+    if( bfi == 0 )
     {
         /*-----------------------------------------------------------*
          * Compute global gain                                       *
          *-----------------------------------------------------------*/
 
-        tmp32 = L_shl(L_mult0(index, 0x797D), 7); /* 6Q25; 0x797D -> log2(10)/28 (Q18) */
-        gain_tcx_e = add(extract_l(L_shr(tmp32, 25)), 1); /* get exponent */
-        gain_tcx = round_fx(BASOP_Util_InvLog2(L_or(tmp32, 0xFE000000)));
-
-        tmp1 = mult_r(shl(L_spec, 5), 26214/*128.f/NORM_MDCT_FACTOR Q15*/);
-        s = 15-5-7;
-        if(L_spec>=1024)  /*reduce precision for avoiding overflow*/
-        {
-            tmp1 = mult_r(shl(L_spec, 4), 26214/*128.f/NORM_MDCT_FACTOR Q15*/);
-            s = 15-4-7;
-        }
-        tmp1 = ISqrt16(tmp1, &s);
-
-        gain_tcx = mult(gain_tcx, tmp1);
-        gain_tcx_e = add(gain_tcx_e, s);
+        gain_tcx = (float)pow(10.0f, index/28.0f) * (float)sqrt((float)NORM_MDCT_FACTOR / (float)L_spec);
 
         st->old_gaintcx_bfi = gain_tcx;
-        move16();
-        st->old_gaintcx_bfi_e = gain_tcx_e;
-        move16();
 
-        st->cummulative_damping_tcx = 32767/*1.0f Q15*/;
-        move16();
+        st->cummulative_damping_tcx = 1.0f;
     }
-    ELSE /* bfi = 1 */
+    else /* bfi = 1 */
     {
         /* PLC: [TCX: Fade-out]
          * derivation of damping factor */
-
-
-        IF( st->use_partial_copy != 0 )
+        if( st->use_partial_copy )
         {
-            IF( sub(st->rf_frame_type, RF_TCXFD) == 0 )
+            if( st->rf_frame_type == RF_TCXFD )
             {
-                tmp32 = L_shl(L_mult0(st->old_gaintcx_bfi, 0x797D), 7); /* 6Q25; 0x797D -> log2(10)/28 (Q18) */
-                gain_tcx_e = add(extract_l(L_shr(tmp32, 25)), 1); /* get exponent */
-                gain_tcx = round_fx(BASOP_Util_InvLog2(L_or(tmp32, 0xFE000000)));
-
-                tmp1 = mult_r(shl(L_spec, 5), 26214/*128.f/NORM_MDCT_FACTOR Q15*/);
-                s = 15-5-7;
-                tmp1 = ISqrt16(tmp1, &s);
-
-                gain_tcx = mult(gain_tcx, tmp1);
-                gain_tcx_e = add(gain_tcx_e, s);
-
+                gain_tcx = (float)pow(10.0f, (int)st->old_gaintcx_bfi/28.0f) * (float)sqrt((float)NORM_MDCT_FACTOR / (float)L_spec);
                 st->old_gaintcx_bfi = gain_tcx;
-                move16();
-                st->old_gaintcx_bfi_e = gain_tcx_e;
-                move16();
             }
-            ELSE
+            else
             {
                 gain_tcx = st->old_gaintcx_bfi;
-                move16();
-                gain_tcx_e = st->old_gaintcx_bfi_e;
-                move16();
             }
 
-            st->damping = 16384/*1.f Q14*/; /*Q14*/                   move16();
+            st->damping = 1;
         }
-        ELSE
+        else
         {
-            st->damping = Damping_fact(coder_type, st->nbLostCmpt, st->last_good_fx, stab_fac, &(st->Mode2_lp_gainp), st->last_core_fx);
             gain_tcx = st->old_gaintcx_bfi;
-            move16();
-            gain_tcx_e = st->old_gaintcx_bfi_e;
-            move16();
+            st->damping = Damping_fact( coder_type, st->nbLostCmpt, st->last_good, stab_fac, &(st->lp_gainp), st->last_core );
         }
 
-        st->cummulative_damping_tcx = shl(mult(st->cummulative_damping_tcx,st->damping),1);/*shl(Q15*Q14,1)=shl(Q14,1) = Q15*/
-
+        st->cummulative_damping_tcx *= st->damping;
     }
-    {
 
-        IF(bfi)
+    if( bfi )
+    {
+        if( bfi && st->envWeighted )
+        {
+            gamma = st->gamma;
+        }
+        else
         {
             gamma = gamma1;
-            move16();
-            if (st->envWeighted)
-            {
-                gamma = st->gamma;
-                move16();
-            }
-
-            /* PLC: [TCX: Fade-out]
-             * PLC: invert LPC weighting in case of PLC */
-            IF (st->enableTcxLpc != 0)
-            {
-                gamma = add(mult_r(st->cummulative_damping_tcx,sub(st->gamma, 32767/*1.0f Q15*/)), 32767/*1.0f Q15*/);
-            }
-            ELSE
-            {
-                gamma = add(mult_r(st->cummulative_damping_tcx,sub(gamma1, 32767/*1.0f Q15*/)), 32767/*1.0f Q15*/);
-            }
-            weight_a_fx(A, Ap, gamma, M);
-
-            lpc2mdct(Ap, M, NULL, NULL, gainlpc2, gainlpc2_e);
-
         }
-        tmp2 = 0;
-        move16();
 
-        set16_fx(h1, 0, add(L_SUBFR,1));
-        set16_fx(mem, 0, M);
-        h1[0] = 32768/32;
-        move16();
-        E_UTIL_synthesis(0,Ap, h1, h1, L_SUBFR, mem, 0, M );
-        deemph_fx(h1, st->preemph_fac, L_SUBFR, &tmp2);
-        /* impulse response level = gain introduced by synthesis+deemphasis */
-        test();
-        IF (bfi==0)
+        /* PLC: [TCX: Fade-out]
+         * PLC: invert LPC weighting in case of PLC */
+        if( bfi )
         {
-            /* st->last_gain_syn_deemph = (float)sqrt(dot_product( h1, h1, L_SUBFR)); */
-            tmp32 = Dot_productSq16HQ( 0, h1, L_SUBFR, &st->last_gain_syn_deemph_e)/*Q15, st->last_gain_syn_deemph_e*/;
-            st->last_gain_syn_deemph_e = add(st->last_gain_syn_deemph_e,10/*scaling of h1[0] and E_UTIL_synthesis * 2*/);
-            tmp32 = Sqrt32(tmp32,&st->last_gain_syn_deemph_e);
-            st->last_gain_syn_deemph = round_fx(tmp32);
-            /*for avoiding compiler warnings*/
-            st->gainHelper    = 32768/2;
-            move16();
-            st->gainHelper_e    = 1;
-            move16();
-            st->stepCompensate  = 0;
-            move16();
-            st->stepCompensate_e  = 0;
-            move16();
-        }
-        /* not instrumenting the additional test() here seems to be common practice */
-        ELSE IF (sub(TCX_20_CORE, st->core_fx)== 0 || sub(frame_cnt, 1) == 0 )
-        {
-            /* gainCompensate = st->last_gain_syn_deemph/(float)sqrt(dot_product( h1, h1, L_SUBFR)); */
-            tmp32 = Dot_productSq16HQ( 0, h1, L_SUBFR, &gainCompensate_e)/*Q15, gainCompensate_e*/;
-            gainCompensate_e = add(gainCompensate_e,10/*scaling of h1[0] and E_UTIL:synthesis*/);
-            gainCompensate = round_fx(Sqrt32(tmp32,&gainCompensate_e))/*Q15, gainCompensate_e*/;
-            BASOP_Util_Divide_MantExp (   st->last_gain_syn_deemph,
-                                          st->last_gain_syn_deemph_e,
-                                          gainCompensate,
-                                          gainCompensate_e,
-                                          &gainCompensate,
-                                          &gainCompensate_e);
-
-            tmp1 = T_DIV_L_Frame[L_shl(L_mac(-28000,st->L_frame_fx,95),1-15)];
-
-            IF (sub(st->nbLostCmpt,1)==0)
+            if (st->enableTcxLpc)
             {
-                /* stepCompensate = (1.f - gainCompensate)/st->L_frame_fx; */
-                st->stepCompensate_e = BASOP_Util_Add_MantExp(
-                                           tmp1,
-                                           -7,
-                                           negate(mult(gainCompensate,tmp1)),
-                                           add(-7,gainCompensate_e),
-                                           &st->stepCompensate);
-
-                st->gainHelper = 32768/2;
-                move16();
-                st->gainHelper_e = 1;
-                move16();
+                gamma = st->cummulative_damping_tcx * (st->gamma - 1) + 1;
             }
-            ELSE
+            else
             {
-                /* stepCompensate = (st->last_concealed_gain_syn_deemph - gainCompensate)/st->L_frame_fx; */
-                st->stepCompensate_e = BASOP_Util_Add_MantExp(
-                    mult(tmp1,st->last_concealed_gain_syn_deemph),
-                    add(-7, st->last_concealed_gain_syn_deemph_e),
-                    negate(mult(tmp1,gainCompensate)),
-                    add(-7, gainCompensate_e),
-                    &st->stepCompensate);
-                move16();
-                move16();
-                st->gainHelper = st->last_concealed_gain_syn_deemph;
-                st->gainHelper_e = st->last_concealed_gain_syn_deemph_e;
+                gamma = st->cummulative_damping_tcx * (gamma1 - 1) + 1;
             }
-            move16();
-            move16();
-            st->last_concealed_gain_syn_deemph = gainCompensate;
-            st->last_concealed_gain_syn_deemph_e = gainCompensate_e;
         }
 
+        weight_a( A, Ap, gamma, M );
+        lpc2mdct( Ap, M, gainlpc2 );
     }
 
+    tmp2 = 0;
+    set_zero( h1, L_SUBFR+1 );
+    set_zero( mem, M );
+    h1[0] = 1.0f;
+    syn_filt( Ap, M,h1, h1, L_SUBFR, mem, 0 ); /* impulse response of LPC     */
+    deemph( h1, st->preemph_fac, L_SUBFR, &tmp2 );           /* impulse response of deemph  */
+
+    /* impulse response level = gain introduced by synthesis+deemphasis */
+    if( !bfi )
+    {
+        st->last_gain_syn_deemph = (float)sqrt(dotp( h1, h1, L_SUBFR) );
+        /*for avoiding compiler warnings*/
+        st->gainHelper = 1.f;
+        st->stepCompensate=0.f;
+    }
+    else if (TCX_20_CORE == st->core || 1 == frame_cnt )
+    {
+        gainCompensate = st->last_gain_syn_deemph/(float)sqrt(dotp( h1, h1, L_SUBFR) );
+        if (st->nbLostCmpt==1)
+        {
+            st->stepCompensate = (1.f - gainCompensate)/st->L_frame;
+            st->gainHelper = 1.f;
+        }
+        else
+        {
+            st->stepCompensate = (st->last_concealed_gain_syn_deemph - gainCompensate)/st->L_frame;
+            st->gainHelper = st->last_concealed_gain_syn_deemph;
+        }
+        st->last_concealed_gain_syn_deemph = gainCompensate;
+    }
 
     /*-----------------------------------------------------------*
      * Residual inv. Q.                                          *
      *-----------------------------------------------------------*/
-    test();
-    IF ((bfi == 0) && (tcx_cfg->resq != 0))
+
+    if (!bfi && tcx_cfg->resq )
     {
-
-        IF (st->tcx_lpc_shaped_ari != 0)    /* new arithmetic coder */
+        if( st->tcx_lpc_shaped_ari )
         {
-
-            Word16 *prm_resq;
-
-            prm_resq = prm_sqQ
-                       + *prm_target /* = targetBits */
-                       - st->resQBits[frame_cnt];
-
-            i = tcx_ari_res_invQ_spec(x, x_e, L_spec,
-                                      prm_resq,
-                                      st->resQBits[frame_cnt],
-                                      0,
-                                      tcx_cfg->sq_rounding,
-                                      xn_buf /* LF deemphasis factors */ );
+            /* envelope based arithmetic coder */
+            const int *prm_resq;
+            prm_resq = prm_sqQ + *prm_target /* = targetBits */ - st->resQBits[frame_cnt];
+            i = tcx_ari_res_invQ_spec( x, L_spec, prm_resq, st->resQBits[frame_cnt], 0, tcx_cfg->sq_rounding, xn_buf /* LF deemphasis factors */ );
         }
-        ELSE   /* old arithmetic coder */
+        else
         {
-            i = tcx_res_invQ_gain(&gain_tcx, &gain_tcx_e,
-            &prm_sqQ[L_spec],
-            st->resQBits[frame_cnt]);
-
-            tmpP16 = xn_buf;
-            if (st->tcxonly != 0) tmpP16 = NULL;
-
-            tcx_res_invQ_spec(x, x_e, L_spec,
-            &prm_sqQ[L_spec],
-            st->resQBits[frame_cnt],
-            i,
-            tcx_cfg->sq_rounding,
-            tmpP16 /* LF deemphasis factors */ );
-        }
-    }
-    test();
-    IF (bfi == 0 && st->tcxonly != 0)
-    {
-        test();
-        test();
-        IF (st->tcxltp && (st->tcxltp_gain > 0) && !fUseTns)
-        {
-
-            PsychAdaptLowFreqDeemph(x, gainlpc2, gainlpc2_e, NULL);
+            /* context based arithmetic coder */
+            i = tcx_res_invQ_gain(&gain_tcx, &prm_sqQ[L_spec], st->resQBits[frame_cnt] );
+            tcx_res_invQ_spec( x, L_spec, &prm_sqQ[L_spec], st->resQBits[frame_cnt], i, tcx_cfg->sq_rounding, st->tcxonly ? NULL : xn_buf /* LF deemphasis factors */ );
         }
     }
 
-    /* for FAC */
-
-    test();
-    IF (bfi == 0 && st->tcxonly == 0)
+    if( !bfi && st->tcxonly )
     {
+        if( st->tcxltp && (st->tcxltp_gain > 0.0f) && !fUseTns )
+        {
+            PsychAdaptLowFreqDeemph(x, gainlpc2, NULL);
+        }
+    }
 
-
+    if( !bfi && !st->tcxonly )
+    {
         /* Replication of ACELP formant enhancement for low rates */
-        IF (L_sub(st->total_brate_fx, ACELP_13k20) < 0 || st->rf_flag != 0 )
+        if (st->bits_frame < 256)
         {
-            tcxFormantEnhancement(xn_buf, gainlpc2, gainlpc2_e, x, &x_e, L_frame, L_frameTCX);
+            tcxFormantEnhancement( xn_buf, gainlpc2, x, L_frame );
         }
     }
 
@@ -699,572 +434,357 @@ void decoder_tcx(
      * Add gain to the lpc gains                                 *
      *-----------------------------------------------------------*/
 
-    if(st->VAD==0 )
+    if( st->VAD == 0 )
     {
-        gain_tcx = mult_r(gain_tcx, tcx_cfg->na_scale);
+        gain_tcx *= tcx_cfg->na_scale;
     }
 
-    i = norm_s(gain_tcx);
-    gain_tcx = shl(gain_tcx, i);
-    gain_tcx_e = sub(gain_tcx_e, i);
-    FOR (i = 0; i < FDNS_NPTS; i++)
-    {
-        gainlpc2[i] = mult_r(gainlpc2[i], gain_tcx);
-        move16();
-    }
+    v_multc( gainlpc2, gain_tcx, gainlpc2, FDNS_NPTS);
 
 
     /*-----------------------------------------------------------*
      * Noise filling.                                            *
      *-----------------------------------------------------------*/
 
-    test();
-    IF (bfi==0 && (fac_ns > 0))
+    if( !bfi && (fac_ns > 0.0f) )
     {
+        float noiseTiltFactor;
 
-        tmp1 = 0;
-        move16();
-        test();
-        if ( sub(st->bits_frame, 256) >= 0 && st->rf_flag == 0 )
+        firstLine = tcxGetNoiseFillingTilt( A, L_frame, (st->bits_frame >= 256 && !st->rf_flag), &noiseTiltFactor );
+
+        if( st->tcxonly )
         {
-            tmp1 = 1;
-            move16();
-        }
+            noiseTransWidth = HOLE_SIZE_FROM_LTP(max(st->tcxltp_gain,(tcx_cfg->ctx_hm && st->last_core != 0) ? 0.3125f*st->last_ctx_hm_enabled : 0));
 
-        firstLine = tcxGetNoiseFillingTilt( A, M, L_frame, tmp1, &noiseTiltFactor );
-
-        IF (st->tcxonly != 0)
-        {
-            tmp1 = 0;
-            move16();
-            test();
-            test();
-            if ((tcx_cfg->ctx_hm != 0) && (st->last_core_fx != ACELP_CORE) && (st->last_ctx_hm_enabled != 0))
+            if (L_frame == st->L_frame >> 1)
             {
-                tmp1 = 10240/*0.3125f Q15*/;
-                move16();
-            }
-            noiseTransWidth = HOLE_SIZE_FROM_LTP(s_max(st->tcxltp_gain, tmp1));
-
-            if (sub(L_frame, shr(st->L_frame_fx, 1)) == 0)
-            {
-                noiseTransWidth = 3;  /* minimum transition fading for noise filling in TCX-10 */   move16();
+                noiseTransWidth = 3;  /* minimum transition fading for noise filling in TCX-10 */
             }
         }
 
-
-        IF (st->tcx_lpc_shaped_ari == 0)   /* old arithmetic coder */
+        if (!st->tcx_lpc_shaped_ari)
         {
+            /* context based arithmetic coder */
             /* noise filling seed */
-            tmp32 = L_deposit_l(0);
-            FOR (i = 0; i < L_spec; i++)
+            for (i = 0; i < L_spec; i++)
             {
-                tmp32 = L_macNs(tmp32, abs_s(prm_sqQ[i]), i);
+                nf_seed += (short)(abs(prm_sqQ[i]) * i * 2);
             }
-            nf_seed = extract_l(tmp32);
         }
 
-        tmp1 = nf_seed;
-        move16();
 
-        pInfoTCXNoise = NULL;
-        if (st->igf)
-        {
-            pInfoTCXNoise = st->hIGFDec.infoTCXNoise;
-            move16();
-        }
-        tcx_noise_filling(x, x_e,
-                          tmp1 /* seed */,
-                          firstLine,
-                          noiseFillingSize,
-                          noiseTransWidth,
-                          L_frame,
-                          noiseTiltFactor,
-                          fac_ns,
-                          pInfoTCXNoise
-                         );
-        st->seed_tcx_plc = tmp1;
-        move16();
+        tcx_noise_filling( x, nf_seed, firstLine, noiseFillingSize, noiseTransWidth,
+                           L_frame, noiseTiltFactor, fac_ns, (st->igf)?st->hIGFDec.infoTCXNoise:NULL );
+        st->seed_tcx_plc = nf_seed;
     }
 
-    IF (st->enablePlcWaveadjust)
+    if( st->enablePlcWaveadjust )
     {
-        IF (bfi)
+        if( bfi )
         {
-            IF (sub(st->nbLostCmpt, 1) == 0)
+            if( st->nbLostCmpt == 1 )
             {
                 st->plcInfo.concealment_method = TCX_NONTONAL;
-                move16();
                 /* tonal/non-tonal decision */
-                test();
-                test();
-                IF (0 == sub(st->plcInfo.Transient[0],1)
-                    && 0 == sub(st->plcInfo.Transient[1], 1)
-                    && 0 == sub(st->plcInfo.Transient[2], 1))
+                if (st->plcInfo.Transient[0] == 1 && st->plcInfo.Transient[1] == 1 && st->plcInfo.Transient[2] == 1)
                 {
-                    Word16 sum_word16 = 0;
-                    move16();
+                    sum_word32 = 0;
 
-                    FOR (i = 9; i >= 0; i--)
+                    for (i = 9; i >= 0; i--)
                     {
-                        sum_word16 = add(sum_word16, st->plcInfo.TCX_Tonality[i]);
+                        sum_word32 += st->plcInfo.TCX_Tonality[i];
                     }
 
-                    if(sub(sum_word16, 6) >= 0 )
+                    if (sum_word32 >= 6)
                     {
                         st->plcInfo.concealment_method = TCX_TONAL;
-                        move16();
                     }
                 }
 
-                if(st->tonal_mdct_plc_active)
+                if (st->tonal_mdct_plc_active)
                 {
                     st->plcInfo.concealment_method = TCX_TONAL;
-                    move16();
                 }
             }
 
-            if (sub(L_frameTCX, st->L_frameTCX) > 0)
+            if (L_frameTCX > st->L_frameTCX )
             {
                 st->plcInfo.concealment_method = TCX_TONAL;
-                move16();
             }
 
             temp_concealment_method = st->plcInfo.concealment_method;
-            move16();
 
-            if (0 == sub(st->core_fx, TCX_10_CORE))
+            if (st->core == TCX_10_CORE)
             {
                 temp_concealment_method = TCX_TONAL;
-                move16();
             }
         }
+
         /* get the starting location of the subframe in the frame */
-        IF (0 ==sub(st->core_fx, TCX_10_CORE))
+        if (st->core == TCX_10_CORE)
         {
-            st->plcInfo.subframe_fx =extract_l( L_mult0(frame_cnt,L_frameTCX_glob));
+            st->plcInfo.subframe = frame_cnt*L_frameTCX_glob;
         }
     }
 
     /* PLC: [TCX: Tonal Concealment] */
     /* PLC: [TCX: Fade-out]
      * PLC: Fade out to white noise */
-
-    IF (bfi == 0)
+    if( !bfi )
     {
-        TonalMDCTConceal_SaveFreqSignal(&st->tonalMDCTconceal,
-                                        x, x_e,
-                                        L_frameTCX,
-                                        L_frame,
-                                        gainlpc2, gainlpc2_e,
-                                        gain_tcx_e);
+        TonalMDCTConceal_SaveFreqSignal( &st->tonalMDCTconceal, x, L_frameTCX, L_frame, gainlpc2 );
     }
-    ELSE
+    else
     {
-        test();
-        IF( !st->enablePlcWaveadjust || sub(temp_concealment_method, TCX_TONAL) == 0 )
+        if( !st->enablePlcWaveadjust || (temp_concealment_method == TCX_TONAL))
         {
-            Word16 f, tmp;
-
             /* set f to 1 to not fade out */
             /* set f to 0 to immediately switch to white noise */
-            f = st->cummulative_damping_tcx;
-            move16();
-            if (0 != st->tcxonly)
+            float f;
+            float noiseTiltFactor;
+
+            if (st->tcxonly)
             {
-                f = 32767/*1.0f Q15*/;
-                move16();
+                f = 1.0f;
+            }
+            else
+            {
+                f = st->cummulative_damping_tcx;
             }
 
-            test();
-            test();
-            IF ( (frame_cnt == 0) && (sub(L_frameTCX, shr(st->L_frameTCX, 1)) == 0)
-                 && (st->tcxonly) && (!st->tonal_mdct_plc_active) && (sub(st->nbLostCmpt, 1) == 0)
-                 && (tcx_cfg->tcx_last_overlap_mode != FULL_OVERLAP)
-                 && (tcx_cfg->tcx_curr_overlap_mode != FULL_OVERLAP) )
+            if( (frame_cnt == 0) && (L_frameTCX == st->L_frameTCX >> 1)
+                    && (st->tcxonly) && (!st->tonal_mdct_plc_active) && (st->nbLostCmpt == 1)
+                    && (tcx_cfg->tcx_last_overlap_mode != FULL_OVERLAP)
+                    && (tcx_cfg->tcx_curr_overlap_mode != FULL_OVERLAP) )
             {
-                Word16 exp1, exp2;
-                Word32 E_2ndlast, E_last;
+                float E_2ndlast, E_last;
 
-                E_2ndlast = CalculateAbsEnergy(1, &(st->tonalMDCTconceal.lastBlockData.spectralData[0]), infoIGFStartLine, &exp2);
-                E_last = CalculateAbsEnergy(1, &(st->tonalMDCTconceal.lastBlockData.spectralData[1]), infoIGFStartLine, &exp1);
-
-                BASOP_Util_Divide_MantExp(extract_h(E_2ndlast), exp2, extract_h(E_last), exp1, &tmp1, &tmp2);
-
-                tmp1 = shr(tmp1,2); /*Q13*/
-                tmp1 = shl(tmp1,tmp2);
-                test();
-                test();
-                /* replace higher energy TCX5 frame by lower one to avoid energy fluctuation */
-                IF(sub(tmp1,16384 /*2 in Q13*/) > 0)
+                E_2ndlast = E_last = EPSILON;
+                for( i=0; i<infoIGFStartLine; i=i+2 )
                 {
-                    FOR(i=0; i<infoIGFStartLine; i+=2)
+                    E_2ndlast += st->tonalMDCTconceal.lastBlockData.spectralData[i]  *st->tonalMDCTconceal.lastBlockData.spectralData[i];
+                    E_last    += st->tonalMDCTconceal.lastBlockData.spectralData[i+1]*st->tonalMDCTconceal.lastBlockData.spectralData[i+1];
+                }
+                tmp2 = E_2ndlast/E_last;
+
+                /* replace higher energy TCX5 frame by lower one to avoid energy fluctuation */
+                if( tmp2 > 2 )
+                {
+                    for( i=0; i<infoIGFStartLine; i=i+2 )
                     {
-                        move32();
                         st->tonalMDCTconceal.lastBlockData.spectralData[i] = st->tonalMDCTconceal.lastBlockData.spectralData[i+1];
                     }
                 }
-                ELSE IF(sub(tmp1,4096/*0.5 in Q13*/) < 0)
+                else if( tmp2 < 0.5 )
                 {
-                    FOR(i=0; i<infoIGFStartLine; i+=2)
+                    for( i=0; i<infoIGFStartLine; i=i+2 )
                     {
-                        move32();
                         st->tonalMDCTconceal.lastBlockData.spectralData[i+1] = st->tonalMDCTconceal.lastBlockData.spectralData[i];
                     }
                 }
             }
 
-            noiseTiltFactor = 32767/*1.0f Q15*/;
-            move16();
+            noiseTiltFactor = 1.0f;
 
-            tmp = 0;
-            move16();
-            test();
-            IF( sub(st->bits_frame, 256) >= 0 && st->rf_flag == 0)
-            {
-                tmp = 1;
-                move16();
-            }
+            tcxGetNoiseFillingTilt( A, L_frame, (st->bits_frame >= 256 && !st->rf_flag), &noiseTiltFactor );
 
-            tcxGetNoiseFillingTilt( A, M, L_frame, tmp, &noiseTiltFactor );
-
-            TonalMDCTConceal_InsertNoise(&st->tonalMDCTconceal,
-                                         x,
-                                         &x_e,
-                                         st->tonal_mdct_plc_active,
-                                         &st->seed_tcx_plc,
-                                         noiseTiltFactor,
-                                         f,
-                                         infoIGFStartLine
-                                        );
+            TonalMDCTConceal_InsertNoise( &st->tonalMDCTconceal, x, st->tonal_mdct_plc_active,
+                                          &st->seed_tcx_plc, noiseTiltFactor, f, infoIGFStartLine );
 
         }
     }
 
-
-    IF (sub(L_spec, L_frame) < 0)
+    if( L_spec < L_frame )
     {
-        set32_fx(x+L_spec, 0, sub(L_frame,L_spec));
+        set_zero( x+L_spec, L_frame-L_spec );
     }
-    ELSE IF (sub(L_spec, L_frameTCX) > 0)
+    else if( L_spec > L_frameTCX )
     {
-        set32_fx(x+L_frameTCX, 0, sub(L_spec,L_frameTCX));
+        set_zero( x+L_frameTCX, L_spec-L_frameTCX );
     }
 
-    test();
-    test();
-    test();
-    test();
-    test();
-    test();
-    test();
-    test();
-    test();
-    IF ( bfi && (!st->enablePlcWaveadjust || sub(temp_concealment_method, TCX_TONAL) == 0)
-         &&  st->igf && (frame_cnt == 0) && (sub(L_frameTCX, shr(st->L_frameTCX, 1)) == 0)
-         && (st->tcxonly) && (!st->tonal_mdct_plc_active) && (sub(st->nbLostCmpt, 1) == 0)
-         && (tcx_cfg->tcx_last_overlap_mode != FULL_OVERLAP)
-         && (tcx_cfg->tcx_curr_overlap_mode != FULL_OVERLAP) )
+    if( bfi && (!st->enablePlcWaveadjust || (temp_concealment_method == TCX_TONAL))
+            && st->igf && (frame_cnt == 0) && (L_frameTCX == st->L_frameTCX >> 1)
+            && (st->tcxonly) && (!st->tonal_mdct_plc_active) && (st->nbLostCmpt == 1)
+            && (tcx_cfg->tcx_last_overlap_mode != FULL_OVERLAP)
+            && (tcx_cfg->tcx_curr_overlap_mode != FULL_OVERLAP) )
     {
-        IGFDecCopyLPCFlatSpectrum(
-            &st->hIGFDec,
-            x,
-            x_e,
-            IGF_GRID_LB_SHORT
-        );
-        Copy(st->hIGFDec.igfData.igf_curr_subframe[0][0], st->hIGFDec.igfData.igf_curr_subframe[1][0], IGF_MAX_SFB);
+        IGFDecCopyLPCFlatSpectrum( &st->hIGFDec, x, IGF_GRID_LB_SHORT );
+        mvi2i(st->hIGFDec.igfData.igf_curr_subframe[0][0], st->hIGFDec.igfData.igf_curr_subframe[1][0], IGF_MAX_SFB);
     }
 
     /*-----------------------------------------------------------*
      * Noise shaping in frequency domain (1/Wz)                  *
      *-----------------------------------------------------------*/
-    test();
-    IF(st->igf && ! bfi)
-    {
-        test();
-        IF ( (sub(L_frame, shr(st->L_frame_fx, 1)) == 0) && (st->tcxonly))
-        {
-            IGFDecCopyLPCFlatSpectrum(
-                &st->hIGFDec,
-                x,
-                x_e,
-                IGF_GRID_LB_SHORT
-            );
-        }
-        ELSE
-        {
-            IF (sub(st->last_core_fx, ACELP_CORE) == 0)
-            {
-                IGFDecCopyLPCFlatSpectrum(
-                    &st->hIGFDec,
-                    x,
-                    x_e,
-                    IGF_GRID_LB_TRAN
-                );
-            }
-            ELSE
-            {
-                IGFDecCopyLPCFlatSpectrum(
-                    &st->hIGFDec,
-                    x,
-                    x_e,
-                    IGF_GRID_LB_NORM
-                );
 
-            }
+    if( st->igf && ! bfi )
+    {
+        if ((L_frame == st->L_frame >> 1) && (st->tcxonly))
+        {
+            IGFDecCopyLPCFlatSpectrum( &st->hIGFDec, x, IGF_GRID_LB_SHORT );
+        }
+        else
+        {
+            IGFDecCopyLPCFlatSpectrum( &st->hIGFDec, x, (st->last_core == ACELP_CORE)?IGF_GRID_LB_TRAN:IGF_GRID_LB_NORM );
         }
     }
-
     /* LPC gains already available */
-    test();
-    test();
-    IF(!st->enablePlcWaveadjust || !bfi || (sub(temp_concealment_method, TCX_TONAL) == 0))
+
+    if( !st->enablePlcWaveadjust || !bfi || (temp_concealment_method == TCX_TONAL) )
     {
-        x_e = add(x_e, gain_tcx_e);
-        mdct_shaping(x, L_frame, gainlpc2, gainlpc2_e);
-        IF ( bfi == 0 )
+        mdct_noiseShaping( x, L_frame, gainlpc2 );
+
+        if( !bfi )
         {
-            FOR (i = L_frame; i < L_spec; i++)
-            {
-                x[i] = L_shl(Mpy_32_16_1(x[i], gainlpc2[FDNS_NPTS-1]), gainlpc2_e[FDNS_NPTS-1]);
-                move32();
-            }
+            v_multc( x+L_frame, gainlpc2[FDNS_NPTS-1], x+L_frame, L_spec-L_frame );
         }
 
-        set32_fx(x+L_spec, 0, sub(L_frameTCX, L_spec));
-        test();
-        test();
-        IF (( bfi != 0) && ( !st->enablePlcWaveadjust || sub(temp_concealment_method, TCX_TONAL) == 0 ))
-        {
-            scale_sig32(x+infoIGFStartLine, sub(L_spec, infoIGFStartLine), negate(gain_tcx_e));
-        }
+        set_zero( x+L_spec, L_frameTCX-L_spec );
     }
 
     /* PLC: [TCX: Tonal Concealment] */
-    IF( bfi && st->tonal_mdct_plc_active )
+    if( bfi && st->tonal_mdct_plc_active )
     {
-        TonalMDCTConceal_Apply(&st->tonalMDCTconceal, x, &x_e);
+        TonalMDCTConceal_Apply( &st->tonalMDCTconceal, x );
     }
 
-    tmp32 = L_deposit_h(0);
-    if(st->tcxltp_last_gain_unmodified > 0)
-    {
-        tmp32 = L_add(st->old_fpitch, 0);
-    }
-    tmp8 = 0;
-    move16();
-    test();
-    if(bfi && st->tonal_mdct_plc_active)
-    {
-        tmp8 = 1;
-        move16();
-    }
-    TonalMDCTConceal_UpdateState(&st->tonalMDCTconceal,
-                                 L_frameTCX,
-                                 tmp32,
-                                 bfi,
-                                 tmp8);
+    TonalMDCTConceal_UpdateState( &st->tonalMDCTconceal, L_frameTCX, (st->tcxltp_last_gain_unmodified > 0) ? st->old_fpitch : 0,
+                                  bfi, bfi && st->tonal_mdct_plc_active );
 
-    IF (st->enablePlcWaveadjust)
+
+    if( st->enablePlcWaveadjust )
     {
-        Word16 core;
-        core = st->core_fx;
-        move16();
+        int core;
+        core = st->core;
+
         /* spectrum concealment */
-        IF (bfi && (sub(temp_concealment_method, TCX_NONTONAL) == 0))
+        if (bfi && temp_concealment_method == TCX_NONTONAL)
         {
-            /* x_e =31-x_scale; */
-            concealment_decode_fix(core, x, &x_e, &st->plcInfo);
+            concealment_decode( core, x, &st->plcInfo );
         }
+
         /* update spectrum buffer, tonality flag, etc. */
-        concealment_update_x(bfi, core, st->tonality_flag, x, &x_e, &st->plcInfo);
+        concealment_update( bfi, core, st->tonality_flag, x, &st->plcInfo );
     }
 
     /*-----------------------------------------------------------*
-    * IGF                                                       *
-    *-----------------------------------------------------------*/
-    test();
-    test();
-    IF (st->igf && !((sub(L_frame, shr(st->L_frame_fx, 1)) == 0) && (st->tcxonly)))
+     * IGF                                                       *
+     *-----------------------------------------------------------*/
+
+    if (st->igf && !((L_frame == st->L_frame >> 1) && (st->tcxonly)))
     {
-        Word16 igfGridIdx;
+        /* copy low spectrum to IGF des buffer */
+        st->hIGFDec.igfData.igfInfo.nfSeed = (short)(nf_seed * 31821L + 13849L);
 
-        test();
-        test();
-        IF ((sub(st->last_core_fx, ACELP_CORE) == 0) || (left_rect && bfi))
-        {
-            /* packet loss after first TCX must be handled like transition frame */
-            igfGridIdx = IGF_GRID_LB_TRAN;
-        }
-        ELSE
-        {
-            igfGridIdx = IGF_GRID_LB_NORM;
-        }
+        IGFDecApplyMono( &st->hIGFDec, x, (st->last_core == ACELP_CORE || (left_rect && bfi))?IGF_GRID_LB_TRAN:IGF_GRID_LB_NORM, bfi );
 
-        st->hIGFDec.igfData.igfInfo.nfSeed = extract_l(L_mac0(13849L, nf_seed, 31821));
-
-        IGFDecApplyMono(
-            &st->hIGFDec,
-            x,
-            &x_e,
-            igfGridIdx,
-            bfi
-        );
-    }
-    test();
-    test();
-    IF (st->igf && ((sub(L_frame, shr(st->L_frame_fx, 1)) == 0) && (st->tcxonly)))
-    {
-        st->hIGFDec.igfData.igfInfo.nfSeed = extract_l(L_mac0(13849L, nf_seed, 31821));
-        IGFDecApplyMono(
-            &st->hIGFDec,
-            x,
-            &x_e,
-            IGF_GRID_LB_SHORT,
-            bfi
-        );
+        /* IGF Decoder - All */
     }
 
-    index = tcx_cfg->tcx_last_overlap_mode;  /* backup last TCX overlap mode */        move16();
-
-    /* normalize spectrum to minimize IMDCT noise */
-    tmp1 = s_max(s_max(L_frame,L_frameTCX), L_spec);
-    s = s_max(0, sub(getScaleFactor32(x, tmp1), 4)); /* Keep 4 bits headroom for TNS */
-    Scale_sig32(x, tmp1, s);
-    x_e = sub(x_e, s);
-
-    IF(st->igf)
+    if (st->igf && ((L_frame == st->L_frame >> 1) && (st->tcxonly)))
     {
-        test();
-        IF(st->hIGFDec.flatteningTrigger != 0 && fUseTns == 0)
+        /* copy low spectrum to IGF des buffer */
+        st->hIGFDec.igfData.igfInfo.nfSeed = (short)(nf_seed * 31821L + 13849L);
+
+        IGFDecApplyMono( &st->hIGFDec, x, IGF_GRID_LB_SHORT, bfi );
+
+        /* IGF Decoder - All */
+    }
+
+    index = tcx_cfg->tcx_last_overlap_mode;  /* backup last TCX overlap mode */
+
+    if( st->igf )
+    {
+        int proc = st->hIGFDec.flatteningTrigger;
+        if( proc && fUseTns != 0 )
         {
-            Word16 startLine = st->hIGFDec.infoIGFStartLine;
-            Word16 endLine = st->hIGFDec.infoIGFStopLine;
-            Word32 x_itf[N_MAX_TCX-IGF_START_MN];
-            Word16 j;
+            proc = 0;
+        }
 
-            const Word16* chk_sparse = st->hIGFDec.flag_sparse;
-            const Word32* virtualSpec = st->hIGFDec.virtualSpec;
+        if( proc )
+        {
+            short int startLine = st->hIGFDec.infoIGFStartLine;
+            short int endLine = st->hIGFDec.infoIGFStopLine;
+            float x_itf[N_MAX_TCX-IGF_START_MN];
+            int j;
 
-            const Word16 maxOrder = 8;
-            Word16 curr_order = 0; /* not counted */
-            Word16 A_itf[ITF_MAX_FILTER_ORDER+1];
-            Word16 Q_A_itf;
-            Word16 predictionGain = 0; /* not counted */
+            const int* chk_sparse = st->hIGFDec.flag_sparse;
+            const float* virtualSpec = st->hIGFDec.virtualSpec;
 
-            move16();
-            move16();
+            const int maxOrder = 8;
+            int curr_order = 0;
+            float A_itf[ITF_MAX_FILTER_ORDER+1];
+            float predictionGain = 0;
 
-            move16();
-
-            FOR (j = startLine; j < endLine; j++)
+            for (j = startLine; j < endLine; j++)
             {
-                IF (sub(chk_sparse[j-IGF_START_MN], 2) == 0)
+                if( chk_sparse[j-IGF_START_MN] == 2 )
                 {
                     x_itf[j-IGF_START_MN] = x[j];
-                    move32();
                     x[j] = virtualSpec[j-IGF_START_MN];
-                    move32();
                 }
             }
-            ITF_Detect_fx(x+IGF_START_MN, startLine, endLine, maxOrder, A_itf, &Q_A_itf, &predictionGain, &curr_order, shl(x_e, 1));
-            s = getScaleFactor32(&x[startLine], sub(endLine, startLine));
-            s = sub(s, 2);
-            FOR(j = startLine; j < endLine; j++)
-            {
-                x[j] = L_shl(x[j], s);
-                move32();
-            }
 
-            ITF_Apply_fx(x, startLine, endLine, A_itf, Q_A_itf, curr_order);
+            ITF_Detect( x+IGF_START_MN, startLine, endLine, maxOrder, A_itf, &predictionGain, &curr_order );
 
-            FOR(j = startLine; j < endLine; j++)
-            {
-                x[j] = L_shr(x[j], s);
-                move32();
-            }
+            ITF_Apply(x, startLine, endLine, A_itf, curr_order);
 
-            FOR (j = startLine; j < endLine; j++)
+            for (j = startLine; j < endLine; j++)
             {
-                if (sub(chk_sparse[j-IGF_START_MN],2) == 0)
+                if( chk_sparse[j-IGF_START_MN] == 2 )
                 {
                     x[j] = x_itf[j-IGF_START_MN];
-                    move32();
                 }
             }
         }
+        else
+        {
+
+        }
     }
 
-    test();
-    IF ((sub(L_frame, shr(st->L_frame_fx, 1)) == 0) && (st->tcxonly != 0))
+    if( (L_frame == st->L_frame >> 1) && st->tcxonly )
     {
-        Word16 L = L_frameTCX;
-        move16();
-
-        test();
-        test();
-        test();
-        if ((tcx_cfg->fIsTNSAllowed != 0 && fUseTns != 0 && bfi == 0) || (sub(L_spec, L_frameTCX) > 0))
+        int L = L_frameTCX;
+        if( (tcx_cfg->fIsTNSAllowed && fUseTns != 0 && bfi!= 1) || (L_spec > L_frameTCX) )
         {
             L = L_spec;
-            move16();
         }
-
-        tcxInvertWindowGrouping(tcx_cfg,
-                                xn_buf32,
-                                x,
-                                L,
-                                fUseTns,
-                                st->last_core_fx,
-                                index,
-                                frame_cnt,
-                                bfi
-                               );
+        tcxInvertWindowGrouping( tcx_cfg, xn_buf, x, L, fUseTns, st->last_core, index, frame_cnt, bfi );
     }
-
 
     /*-----------------------------------------------------------*
      * Temporal Noise Shaping Synthesis                          *
      *-----------------------------------------------------------*/
-
-    test();
-    test();
-    IF ((tcx_cfg->fIsTNSAllowed != 0) && (fUseTns != 0) && bfi == 0 )
+    if( tcx_cfg->fIsTNSAllowed && fUseTns != 0 && bfi!= 1 )
     {
         /* Apply TNS to get the reconstructed signal */
-        test();
-        test();
-        SetTnsConfig(tcx_cfg, L_frame_glob == st->L_frame_fx, (st->last_core_fx == ACELP_CORE) && (frame_cnt == 0));
+
+        SetTnsConfig(tcx_cfg, L_frame_glob == st->L_frame, (st->last_core == ACELP_CORE) && (frame_cnt == 0));
 
         ApplyTnsFilter(tcx_cfg->pCurrentTnsConfig, &tnsData, x, 0);
 
-        test();
-        IF ((sub(L_frame, shr(st->L_frame_fx, 1)) == 0) && (st->tcxonly != 0))
+        if ((L_frame == st->L_frame >> 1) && (st->tcxonly))
         {
-
-            test();
-            test();
-            test();
-            IF ((tcx_cfg->tcx_last_overlap_mode != FULL_OVERLAP) ||
-                ((tcx_cfg->tcx_curr_overlap_mode == FULL_OVERLAP) && (frame_cnt == 0) && (index == 0))
-               )
+            if ((tcx_cfg->tcx_last_overlap_mode != FULL_OVERLAP) ||
+                    ((tcx_cfg->tcx_curr_overlap_mode == FULL_OVERLAP) && (frame_cnt == 0) && (index == 0)) )
             {
-                tmp1 = shr(tcx_cfg->tnsConfig[0][0].iFilterBorders[0], 1);
+                const int L_win = tcx_cfg->tnsConfig[0][0].iFilterBorders[0] >> 1;
                 /* undo rearrangement of LF sub-window lines for TNS synthesis filtering */
-                IF (s_max(L_frameTCX, L_spec) > tcx_cfg->tnsConfig[0][0].iFilterBorders[0])
+                if (L_frameTCX > 2*L_win)
                 {
-                    tmp2 = shr(s_max(L_frameTCX, L_spec), 1);
-                    Copy32(x+tmp1+8, x+tmp2+8, sub(tmp1, 8));
-                    Copy32(x+8, x+tmp2, 8);
-                    Copy32(x+16, x+8, sub(tmp1, 8));
-                    set32_fx(x+tmp1, 0, sub(tmp2, tmp1));
-                    set32_fx(x+tmp2+tmp1, 0, sub(tmp2, tmp1));
+                    const int L_win2 = L_frameTCX >> 1;
+                    mvr2r( x + L_win + 8, x + L_win2 + 8, L_win - 8 );
+                    mvr2r( x + 8, x + L_win2, 8 );
+                    mvr2r( x + 16, x + 8, L_win - 8 );
+                    set_zero( x + L_win, L_win2 - L_win );
+                    set_zero( x + L_win2 + L_win, L_win2 - L_win );
                 }
-                ELSE
+                else
                 {
-                    Copy32(x+8, xn_buf32, 8);
-                    Copy32(x+16, x+8, sub(tmp1,8));
-                    Copy32(xn_buf32, x+tmp1, 8);
+                    mvr2r(x+8, xn_buf, L_win );
+                    mvr2r( xn_buf, x+L_win, 8 );
+                    mvr2r( xn_buf+8, x+8, L_win-8 );
                 }
 
             }
@@ -1273,466 +793,288 @@ void decoder_tcx(
 
 
     /*-----------------------------------------------------------*
+     * Prepare OLA buffer after waveadjustment.                  *
      * Compute inverse MDCT of x[].                              *
      *-----------------------------------------------------------*/
 
+    mvr2r( x, xn_bufFB, max(L_spec, max(L_frame, L_frameTCX)) );
 
-    Copy32(x, xn_buf32, s_max(s_max(L_frame,L_frameTCX), L_spec));
-
-    IF(st->igf != 0)
+    if( st->igf )
     {
-        set32_fx( xn_buf32+st->hIGFDec.infoIGFStartLine, 0, sub(L_frameTCX, st->hIGFDec.infoIGFStartLine) );
+        set_zero(xn_bufFB+st->hIGFDec.infoIGFStartLine, L_frameTCX-st->hIGFDec.infoIGFStartLine);
     }
-    IMDCT(xn_buf32, x_e,
-          st->syn_Overl,
-          st->syn_Overl_TDAC,
-          xn_buf,
-          tcx_cfg->tcx_aldo_window_1,
-          tcx_cfg->tcx_aldo_window_1_trunc,
-          tcx_cfg->tcx_aldo_window_2,
-          st->tcx_cfg.tcx_mdct_window_half,
-          tcx_cfg->tcx_mdct_window_minimum,
-          st->tcx_cfg.tcx_mdct_window_trans,
-          st->tcx_cfg.tcx_mdct_window_half_length,
-          tcx_cfg->tcx_mdct_window_min_length,
-          index,
-          left_rect,
-          tcx_offset,
-          overlap,
-          L_frame,
-          L_frameTCX,
-          shr(s_max(L_frameTCX, L_spec), 1),
-          L_frame_glob,
-          frame_cnt,
-          bfi,
-          st->old_out_LB_fx,
-          &st->Q_old_wtda_LB,
-          st,
-          0,
-          acelp_zir);
+
+    IMDCT( xn_bufFB,
+           st->syn_Overl,
+           st->syn_Overl_TDAC,
+           xn_buf,
+           tcx_cfg->tcx_aldo_window_1_trunc,
+           tcx_cfg->tcx_aldo_window_2,
+           tcx_cfg->tcx_mdct_window_half,
+           tcx_cfg->tcx_mdct_window_minimum,
+           tcx_cfg->tcx_mdct_window_trans,
+           tcx_cfg->tcx_mdct_window_half_length,
+           tcx_cfg->tcx_mdct_window_min_length,
+           index,
+           left_rect,
+           tcx_offset,
+           overlap,
+           L_frame,
+           L_frameTCX,
+           max(L_frameTCX, L_spec) >> 1,
+           L_frame_glob,
+           frame_cnt,
+           bfi,
+           st->old_outLB,
+           0,
+           st,
+           0,
+           acelp_zir );
 
     /* Generate additional comfort noise to mask potential coding artefacts */
-    IF ( st->flag_cna != 0 )
+    if( st->flag_cna)
     {
-        generate_masking_noise_mdct (x,
-                                     &x_e,
-                                     st->hFdCngDec_fx->hFdCngCom,
-                                     s_max(s_max(L_frame,L_frameTCX), L_spec)
-                                    );
+        generate_masking_noise_mdct(x, st->hFdCngDec->hFdCngCom);
     }
 
-    IMDCT(x, x_e,
-          st->syn_OverlFB,
-          st->syn_Overl_TDACFB,
-          xn_bufFB,
-          tcx_cfg->tcx_aldo_window_1_FB,
-          tcx_cfg->tcx_aldo_window_1_FB_trunc,
-          tcx_cfg->tcx_aldo_window_2_FB,
-          tcx_cfg->tcx_mdct_window_halfFB,
-          tcx_cfg->tcx_mdct_window_minimumFB,
-          tcx_cfg->tcx_mdct_window_transFB,
-          tcx_cfg->tcx_mdct_window_half_lengthFB,
-          tcx_cfg->tcx_mdct_window_min_lengthFB,
-          index,
-          left_rect,
-          tcx_offsetFB,
-          overlapFB,
-          L_frameTCX,
-          L_frameTCX,
-          shr(s_max(L_frameTCX, L_spec), 1),
-          L_frameTCX_glob,
-          frame_cnt,
-          bfi,
-          st->old_out_fx,
-          &st->Q_old_wtda,
-          st,
-          div_l(L_mult(FSCALE_DENOM, L_frameTCX_glob), L_frame_glob),
-          acelp_zir
-         );
-
-
-
+    IMDCT( x,
+           st->syn_OverlFB,
+           st->syn_Overl_TDACFB,
+           xn_bufFB,
+           tcx_cfg->tcx_aldo_window_1_FB_trunc,
+           tcx_cfg->tcx_aldo_window_2_FB,
+           tcx_cfg->tcx_mdct_window_halfFB,
+           tcx_cfg->tcx_mdct_window_minimumFB,
+           tcx_cfg->tcx_mdct_window_transFB,
+           tcx_cfg->tcx_mdct_window_half_lengthFB,
+           tcx_cfg->tcx_mdct_window_min_lengthFB,
+           index,
+           left_rect,
+           tcx_offsetFB,
+           overlapFB,
+           L_frameTCX,
+           L_frameTCX,
+           max(L_frameTCX, L_spec) >> 1,
+           L_frameTCX_glob,
+           frame_cnt,
+           bfi,
+           st->old_out,
+           1,
+           st,
+           FSCALE_DENOM * L_frameTCX_glob / L_frame_glob,
+           acelp_zir );
 
 
     /* PLC: [TCX: Tonal Concealment] */
-
-    IF (!bfi)
+    if (!bfi)
     {
-        st->second_last_tns_active = st->last_tns_active;
-        st->last_tns_active = 0;
-        move16();
-        test();
-        if ( tcx_cfg->fIsTNSAllowed && fUseTns)
-        {
-            st->last_tns_active = 1;
-            move16();
-        }
 
+        st->second_last_tns_active = st->last_tns_active;
+        st->last_tns_active = tcx_cfg->fIsTNSAllowed & fUseTns;
         st->tcxltp_third_last_pitch  = st->tcxltp_second_last_pitch;
-        move32();
         st->tcxltp_second_last_pitch = st->old_fpitch;
-        move32();
-        st->old_fpitch = L_add(L_deposit_h(st->tcxltp_pitch_int), L_mult( st->tcxltp_pitch_fr, div_s(1,st->pit_res_max) /*Q16*/));
-        st->old_fpitchFB = Mpy_32_16_1(st->old_fpitch/*Q16*/, mult_r(L_frameTCX/*Q0*/,getInvFrameLen(L_frame)/*Q21*/)/*Q6*/)/*Q7*/;
-        st->old_fpitchFB = L_shr(st->old_fpitchFB,7-16);/*->Q16*/
+        st->old_fpitch = st->tcxltp_pitch_int + st->tcxltp_pitch_fr/(float)st->pit_res_max;
+        st->old_fpitchFB = st->old_fpitch * (float)L_frameTCX / (float)L_frame;
     }
 
-
     /* Update old_syn_overl */
-    IF (st->tcx_cfg.last_aldo == 0)
+    if (!tcx_cfg->last_aldo)
     {
-        Copy(xn_buf+L_frame, st->syn_Overl, overlap);
-        Copy(xn_bufFB+L_frameTCX, st->syn_OverlFB, overlapFB);
+        mvr2r(xn_buf+L_frame, st->syn_Overl, overlap);
+        mvr2r(xn_bufFB+L_frameTCX, st->syn_OverlFB, overlapFB);
     }
 
     /* Output */
-    Copy(xn_buf+shr(overlap,1)-tcx_offset, synth, L_frame_glob);
-    Copy(xn_bufFB+shr(overlapFB,1)-tcx_offsetFB, synthFB, L_frameTCX_glob);
+    mvr2r( xn_buf+(overlap>>1)-tcx_offset, synth, L_frame_glob );
+    mvr2r( xn_bufFB+(overlapFB>>1)-tcx_offsetFB, synthFB, L_frameTCX_glob );
 
+    return;
 }
 
 
+/*-------------------------------------------------------------------*
+ * decoder_tcx_post()
+ *
+ *
+ *-------------------------------------------------------------------*/
 
-void decoder_tcx_post(Decoder_State_fx *st_fx,
-                      Word16 *synth,
-                      Word16 *synthFB,
-                      Word16 *A,
-                      Word16 bfi
-                     )
+void decoder_tcx_post(
+    Decoder_State *st,
+    float *synth,
+    float *synthFB,
+    float *A,
+    int bfi
+)
 {
-    Word16 i;
-    Word16 level_syn;
-    Word16 level_syn_e;
-    Word32 step;
-    Word16 gainCNG,gainCNG_e;
-    Word16 xn_buf[L_FRAME_MAX];
-    Word16 tmp1, tmp2, s;
-    Word32 tmp32;
-    Word32 tmp32_1, tmp32_2;
+    int i;
+    float level_syn, gainCNG = 0.0f, step;
+    float xn_buf[L_FRAME_MAX];
 
     /* TCX output */
-    Copy( synth, xn_buf, st_fx->L_frame_fx );
+    mvr2r( synth, xn_buf, st->L_frame );
 
     /* first TCX frame after ACELP; overwrite ltp initialization done during acelp PLC */
-    test();
-    test();
-    if (!st_fx->bfi_fx && st_fx->prev_bfi_fx && sub(st_fx->last_core_fx,ACELP_CORE) == 0)
+    if( !bfi && st->prev_bfi && !st->last_core )
     {
-        st_fx->tcxltp_last_gain_unmodified = 0;
-        move16();
+        st->tcxltp_last_gain_unmodified = 0.0f;
     }
-    IF (bfi != 0 && st_fx->use_partial_copy == 0)
+
+    if (bfi && !st->use_partial_copy)
     {
-        test();
         /* run lpc gain compensation not for waveform adjustment */
-        IF ( 0 == st_fx->enablePlcWaveadjust ||  sub(st_fx->plcInfo.concealment_method,TCX_TONAL) == 0 )
+        if (!st->enablePlcWaveadjust ||  st->plcInfo.concealment_method == TCX_TONAL )
         {
-            UWord32 dmy;
-            tmp32_1 /*gainHelperFB*/    = L_shl_r(L_deposit_h(st_fx->gainHelper)    ,sub(st_fx->gainHelper_e,    31-28));/*Q28*/
-            tmp32_2 /*stepCompensateFB*/= L_shl_r(L_deposit_h(st_fx->stepCompensate),sub(st_fx->stepCompensate_e,31-28));/*Q28*/
+            float gainHelperFB     = st->gainHelper;
+            float stepCompensateFB = st->stepCompensate * st->L_frame / st->L_frameTCX;
 
-            Mpy_32_32_ss(tmp32_2/*Q28*/,
-                         L_shl(L_mult0(st_fx->L_frame_fx,
-                                       getInvFrameLen(st_fx->L_frameTCX)/*Q21*/)/*Q21*/,
-                               8)/*Q29*/,
-                         &tmp32_2,
-                         &dmy ); /*Q26*/
-
-            tmp32_2 = L_shl(tmp32_2,3-1); /*Q28*/
-
-            FOR( i=0; i < st_fx->L_frameTCX; i++ )
+            for( i=0; i < st->L_frameTCX; i++ )
             {
-                tmp32 = L_shl(tmp32_1/*Q28*/,-(28-15)); /*16Q15*/
-                synthFB[i] = round_fx(L_shl(Mpy_32_16_1(tmp32,synthFB[i]), 16));
-                move16();
-                tmp32_1 = L_sub(tmp32_1 , tmp32_2);
+                synthFB[i] *= gainHelperFB;
+                gainHelperFB -= stepCompensateFB;
             }
         }
-        tmp32_1 /*gainHelper*/    = L_shl_r(L_deposit_h(st_fx->gainHelper)    ,sub(st_fx->gainHelper_e,    31-28));/*Q28*/
-        tmp32_2 /*stepCompensate*/= L_shl_r(L_deposit_h(st_fx->stepCompensate),sub(st_fx->stepCompensate_e,31-28));/*Q28*/
-        FOR( i=0; i < st_fx->L_frame_fx; i++ )
+
+        for( i=0; i < st->L_frame; i++ )
         {
-            tmp32 = L_shl(tmp32_1/*Q28*/,-(28-15)); /*16Q15*/
-            xn_buf[i] = extract_l(Mpy_32_16_1(tmp32,xn_buf[i]));
-            move16();
-            tmp32_1 = L_sub(tmp32_1 , tmp32_2);
+            xn_buf[i] *= st->gainHelper;
+            st->gainHelper -= st->stepCompensate;
         }
     }
 
     /* PLC: [TCX: Fade-out]
      * PLC: estimate and update CNG energy */
+    level_syn = (float)sqrt(( dotp(synthFB, synthFB, st->L_frameTCX)) / st->L_frameTCX);
 
-    /* level_syn = (float)sqrt(( dot_product(synthFB, synthFB, L_frame)) / L_frame ); */
-    s = sub(getScaleFactor16(synthFB, st_fx->L_frameTCX), 4);
-    tmp32 = L_deposit_l(0);
-    FOR (i = 0; i < st_fx->L_frameTCX; i++)
-    {
-        tmp1 = shl(synthFB[i], s);
-        tmp32 = L_mac0(tmp32, tmp1, tmp1);
-    }
-    tmp32 = Mpy_32_16_1(tmp32, getInvFrameLen(st_fx->L_frameTCX));
-    tmp2 = norm_l(tmp32);
-    tmp1 = round_fx(L_shl(tmp32, tmp2));
-    s = sub(sub(sub(1, shl(s, 1)), 6/*table lookup for inverse framelength*/), tmp2);
-    tmp1 = Sqrt16(tmp1, &s);
-    move16();
-    level_syn = tmp1; /*Q0*/
 
     /* PLC: [TCX: Fade-out]
-     * PLC: estimate and update CNG energy */
-
-    level_syn_e = add(s,15);
-    test();
-    test();
-    IF (bfi == 0 && st_fx->tcxonly != 0 && sub(st_fx->clas_dec , UNVOICED_CLAS) == 0)
+     * PLC: update or retrieve the background level */
+    if( bfi == 0 && st->tcxonly && st->clas_dec == UNVOICED_CLAS )
     {
-
-        Word16 Qnew_levelBackgroundTrace;
-        Qnew_levelBackgroundTrace = 0;
-        move16();
-        minimumStatistics(st_fx->conNoiseLevelMemory,                /*Q15*/
-                          &st_fx->conNoiseLevelIndex,                /*Q0 */
-                          &st_fx->conCurrLevelIndex,                 /*Q0 */
-                          &st_fx->conCngLevelBackgroundTrace,        /*Q15*/
-                          &st_fx->conLastFrameLevel,                 /*Q15*/
-                          level_syn,                                 /*Q15*/
-                          st_fx->conNoiseLevelMemory_e,
-                          st_fx->conCngLevelBackgroundTrace_e,
-                          &Qnew_levelBackgroundTrace,
-                          &st_fx->conLastFrameLevel_e,
-                          level_syn_e                                /*scaling of level_syn*/
-                         );
-
-        /*note: All parameters being different from Q0 have to have the same Q-format*/
-
-        st_fx->conCngLevelBackgroundTrace_e = Qnew_levelBackgroundTrace;
-        move16();
+        minimumStatistics( st->NoiseLevelMemory_bfi, &st->NoiseLevelIndex_bfi, &st->CurrLevelIndex_bfi, &st->CngLevelBackgroundTrace_bfi,
+                           &st->LastFrameLevel_bfi, level_syn, PLC_MIN_CNG_LEV, PLC_MIN_STAT_BUFF_SIZE);
     }
 
     /* PLC: [TCX: Fade-out]
      * PLC: fade-out in time domain */
-    IF (bfi != 0)
+    if( bfi )
     {
-        Word32 conceal_eof_gain32;
-        Word32 conceal_eof_gainFB;
-        move16();
-        move16();
-        gainCNG = 1;
-        gainCNG_e = 14+15+6; /*gainCNG is 2`097`152 - should be enough in case tracinglevel =~0 */
-        IF (st_fx->tcxonly != 0)
-        {
-            /*gainCNG = st_fx->conCngLevelBackgroundTrace/(tracingLevel+0.01f);*/
+        float conceal_eof_gainFB;
 
-            IF(level_syn != 0)
-            {
-                BASOP_Util_Divide_MantExp (
-                    st_fx->conCngLevelBackgroundTrace,
-                    st_fx->conCngLevelBackgroundTrace_e,
-                    level_syn,
-                    level_syn_e,
-                    &gainCNG,
-                    &gainCNG_e);
-            }
-        }
-        ELSE
+        if( st->tcxonly )
         {
-            /*gainCNG = st_fx->cngTDLevel/(tracingLevel+0.01f);*/
-            IF(level_syn != 0)
+            gainCNG = st->CngLevelBackgroundTrace_bfi/(level_syn+0.01f);
+        }
+        else
+        {
+            gainCNG = st->cngTDLevel/(level_syn+0.01f);
+        }
+        if( st->nbLostCmpt == 1 )
+        {
+            st->conceal_eof_gain = 1.0f;
+        }
+
+        step = (st->conceal_eof_gain - ( st->conceal_eof_gain * st->damping + gainCNG * (1 - st->damping) )) / st->L_frame;
+        {
+            float stepFB = step * st->L_frame / st->L_frameTCX;
+            conceal_eof_gainFB = st->conceal_eof_gain;
+
+            for( i=0; i < st->L_frameTCX; i++ )
             {
-                BASOP_Util_Divide_MantExp (
-                    st_fx->cngTDLevel,
-                    st_fx->cngTDLevel_e,
-                    level_syn,
-                    level_syn_e,
-                    &gainCNG,
-                    &gainCNG_e);
+                synthFB[i] *= conceal_eof_gainFB;
+                conceal_eof_gainFB -= stepFB;
             }
         }
 
-        if ((sub(st_fx->nbLostCmpt, 1) == 0))
+        for( i=0; i < st->L_frame; i++ )
         {
-            st_fx->conceal_eof_gain = 16384/*1.0f Q14*/; /*Q14*/                        move16();
+            xn_buf[i] *= st->conceal_eof_gain;
+            st->conceal_eof_gain -= step;
         }
 
-        /* step = (st_fx->conceal_eof_gain - ( st_fx->conceal_eof_gain * st_fx->damping + gainCNG * (1 - st_fx->damping) )) / st_fx->L_frame_fx; */
-        tmp2 = BASOP_Util_Add_MantExp(
-                   mult_r(st_fx->conceal_eof_gain /*Q14*/,
-                          st_fx->damping /*Q14*/),
-                   15-13/*->Q15*/,
-                   mult_r(gainCNG/*Q15*/,sub(0x4000,st_fx->damping/*Q14*/)) /*Q14*/,
-                   add(gainCNG_e,15-14)/*->Q15*/,
-                   &tmp1);
-        tmp2 = BASOP_Util_Add_MantExp(st_fx->conceal_eof_gain, 15-14, negate(tmp1), tmp2, &tmp1);
-
-        step = L_shl(L_mult(tmp1, getInvFrameLen(st_fx->L_frame_fx)), sub(tmp2,6/*scaling from table lookup*/ +1/*go to Q30*/)); /*Q30*/
+        /* run lpc gain compensation not for waveform adjustment */
+        if( (!st->enablePlcWaveadjust || st->plcInfo.concealment_method == TCX_TONAL ) && !st->use_partial_copy )
         {
-            Word32 stepFB;
-            UWord32 dmy;
-            conceal_eof_gainFB = L_deposit_h(st_fx->conceal_eof_gain); /*Q30*/
-            Mpy_32_32_ss(step,L_shl(L_mult0(st_fx->L_frame_fx, getInvFrameLen(st_fx->L_frameTCX)),8),&stepFB ,&dmy );
-            stepFB = L_shl(stepFB,3-1); /*Q30*/
-
-            FOR( i=0; i < st_fx->L_frameTCX; i++ )
-            {
-                synthFB[i] = round_fx(L_shl(Mpy_32_16_1(conceal_eof_gainFB, synthFB[i]),1));
-                move16();
-                conceal_eof_gainFB = L_sub(conceal_eof_gainFB, stepFB);
-            }
+            st->plcInfo.recovery_gain = conceal_eof_gainFB * st->last_concealed_gain_syn_deemph;
         }
-        conceal_eof_gain32 = L_deposit_h(st_fx->conceal_eof_gain); /*Q30*/
-        FOR( i=0; i < st_fx->L_frame_fx; i++ )
+        else
         {
-            xn_buf[i] = round_fx(L_shl(Mpy_32_16_1(conceal_eof_gain32 /*Q30*/, xn_buf[i]),1));
-            move16();
-            conceal_eof_gain32 = L_sub(conceal_eof_gain32,step);
+            st->plcInfo.recovery_gain = conceal_eof_gainFB;
         }
-        st_fx->conceal_eof_gain = round_fx(conceal_eof_gain32); /*Q14*/                     move16();
-        /* run lpc gain compensation not for waveform adjustment */                         test();
-        IF ( 0 == st_fx->enablePlcWaveadjust ||  sub(st_fx->plcInfo.concealment_method,TCX_TONAL) == 0 )
-        {
-            st_fx->plcInfo.recovery_gain =  extract_h(L_shl(Mpy_32_16_1(conceal_eof_gainFB,
-                                            st_fx->last_concealed_gain_syn_deemph),
-                                            st_fx->last_concealed_gain_syn_deemph_e
-                                                           ));/*Q30->Q14*/
-        }
-        ELSE
-        {
-            st_fx->plcInfo.recovery_gain = extract_h(conceal_eof_gainFB); /*Q14*/
-        }
-        st_fx->plcInfo.step_concealgain_fx =
-            round_fx(L_shl(L_mult0(
-                               round_fx(step),
-                               round_fx(L_shl(L_mult0(st_fx->L_frame_fx, getInvFrameLen(st_fx->L_frameTCX)),8))),3)); /*Q15*/
+        st->plcInfo.step_concealgain = step * st->L_frame / st->L_frameTCX;
     }
+
 
     /*-----------------------------------------------------------*
      * Memory update                                             *
      *-----------------------------------------------------------*/
 
-    /* Update synth, exc and old_Aq  */
-    tcx_decoder_memory_update(xn_buf, /*Q0*/
-                              synth,  /*Q0*/
-                              st_fx->L_frame_fx,
-                              A,
-                              st_fx,
-                              st_fx->syn, /*Q0*/
-                              0
-                             );
-
+    /* Update synth, exc and old_Aq */
+    tcx_decoder_memory_update( xn_buf, synth, st->L_frame, A, st, st->syn );
 
     /* PLC: [TCX: Memory update] */
+    st->old_pitch_buf[0] = st->old_pitch_buf[st->nb_subfr];
+    st->old_pitch_buf[1] = st->old_pitch_buf[st->nb_subfr+1];
+    mvr2r( &st->old_pitch_buf[st->nb_subfr+2], &st->old_pitch_buf[2], st->nb_subfr );
+    set_f( &st->old_pitch_buf[st->nb_subfr+2], st->old_fpitch, st->nb_subfr );
+    st->bfi_pitch = st->old_fpitch;
+    st->bfi_pitch_frame = st->L_frame;
 
-    st_fx->old_pitch_buf_fx[0] = st_fx->old_pitch_buf_fx[st_fx->nb_subfr];
-    move32();
-    st_fx->old_pitch_buf_fx[1] = st_fx->old_pitch_buf_fx[st_fx->nb_subfr+1];
-    move32();
-    Copy32(&st_fx->old_pitch_buf_fx[st_fx->nb_subfr+2], &st_fx->old_pitch_buf_fx[2], st_fx->nb_subfr);
-    set32_fx(&st_fx->old_pitch_buf_fx[st_fx->nb_subfr+2], st_fx->old_fpitch, st_fx->nb_subfr);
-    st_fx->bfi_pitch_fx = shl(round_fx(st_fx->old_fpitch),6);
-    st_fx->bfi_pitch_frame_fx = st_fx->L_frame_fx;
-    move16();
+    st->mem_pitch_gain[2*st->nb_subfr+1] = st->mem_pitch_gain[st->nb_subfr+1];
+    st->mem_pitch_gain[2*st->nb_subfr]   = st->mem_pitch_gain[st->nb_subfr];
 
-    st_fx->mem_pitch_gain[2*st_fx->nb_subfr+1]  = st_fx->mem_pitch_gain[st_fx->nb_subfr+1];
-    move16();
-    st_fx->mem_pitch_gain[2*st_fx->nb_subfr]  = st_fx->mem_pitch_gain[st_fx->nb_subfr];
-    move16();
-
-    FOR (i = 0; i < st_fx->nb_subfr; i++)
+    for( i = 0; i < st->nb_subfr; i++ )
     {
-        st_fx->mem_pitch_gain[2*st_fx->nb_subfr-1 - i]  = st_fx->mem_pitch_gain[st_fx->nb_subfr-1 - i];
-        move16();
-        st_fx->mem_pitch_gain[st_fx->nb_subfr-1 - i]  = st_fx->tcxltp_last_gain_unmodified;
-        move16();
+        st->mem_pitch_gain[2*st->nb_subfr-1 - i] = st->mem_pitch_gain[st->nb_subfr-1 - i];
+        st->mem_pitch_gain[st->nb_subfr-1 - i]   = st->tcxltp_last_gain_unmodified;
     }
+
+    return;
 }
 
+/*-------------------------------------------------------------------*
+ * IMDCT()
+ *
+ *
+ *-------------------------------------------------------------------*/
 
-static Word32 CalculateAbsEnergy( /* o : normalized result              Q31 */
-    const Word32 L_off,  /* i : initial sum value               Qn */
-    const Word16 x[],    /* i : x vector                        Qn */
-    const Word16 lg,     /* i : vector length, range [0..7FFF]  Q0 */
-    Word16 * exp         /* o : exponent of result in [-32,31]  Q0 */
+static void IMDCT(
+    float *x,
+    float *old_syn_overl,
+    float *syn_Overl_TDAC,
+    float *xn_buf,
+    float *tcx_aldo_window_1_trunc,
+    float *tcx_aldo_window_2,
+    float *tcx_mdct_window_half,
+    float *tcx_mdct_window_minimum,
+    float *tcx_mdct_window_trans,
+    int tcx_mdct_window_half_length,
+    int tcx_mdct_window_min_length,
+    int index,
+    int left_rect,
+    int tcx_offset,
+    int overlap,
+    int L_frame,
+    int L_frameTCX,
+    int L_spec_TCX5,
+    int L_frame_glob,
+    int frame_cnt,
+    int bfi,
+    float *old_out,
+    short FB_flag,
+    Decoder_State *st,
+    int fullbandScale,
+    float *acelp_zir
 )
 {
-    Word16 i;
-    Word32 L_sum, L_c;
-    /* Clear carry flag and init sum */
-    Carry = 0;
-    L_c = L_add(0,0);
-    L_sum = L_macNs(L_off,0,0);
-    if (L_sum > 0)
-        L_c = L_macNs(L_c,0,0);
-    if (L_sum < 0)
-        L_c = L_msuNs(L_c,0,0);
+    short i, nz, aldo;
+    TCX_config *tcx_cfg = &st->tcx_cfg;
 
-    FOR (i=0; i < lg; i+=2)
-    {
-        Carry = 0;
-        BASOP_SATURATE_WARNING_OFF /*multiplication of -32768 * -32768 throws an overflow, but is not critical*/
-        L_sum = L_macNs(L_sum, x[i], x[i]);
-        BASOP_SATURATE_WARNING_ON
-        Overflow = 0;  /* to avoid useless warning in L_macNs calling L_mult */
-        L_c = L_macNs(L_c,0,0);
-    }
-    L_sum = norm_llQ31(L_c,L_sum,exp);
-    return L_sum;
-}
-
-
-static void IMDCT(Word32 *x, Word16 x_e,
-                  Word16 *old_syn_overl,
-                  Word16 *syn_Overl_TDAC,
-                  Word16 *xn_buf,
-                  const Word16  *tcx_aldo_window_1,
-                  const PWord16 *tcx_aldo_window_1_trunc,
-                  const PWord16 *tcx_aldo_window_2,
-                  const PWord16 *tcx_mdct_window_half,
-                  const PWord16 *tcx_mdct_window_minimum,
-                  const PWord16 *tcx_mdct_window_trans,
-                  Word16 tcx_mdct_window_half_length,
-                  Word16 tcx_mdct_window_min_length,
-                  Word16 index,
-                  Word16 left_rect,
-                  Word16 tcx_offset,
-                  Word16 overlap,
-                  Word16 L_frame,
-                  Word16 L_frameTCX,
-                  Word16 L_spec_TCX5,
-                  Word16 L_frame_glob,
-                  Word16 frame_cnt,
-                  Word16 bfi,
-                  Word16 *old_out,
-                  Word16 *Q_old_wtda,
-                  Decoder_State_fx *st,
-                  Word16 fullbandScale,
-                  Word16 *acelp_zir)
-{
-    const TCX_config *tcx_cfg = &st->tcx_cfg;
-    Word16 tmp_offset;
-    Word16 tmp1, tmp2, tmp3, *tmpP16;
-    Word32 tmp32;
-    Word8 tmp8;
-    Word16 i;
-    Word16 nz;
-    Word16 aldo=0;
+    aldo = 0;
 
     /* number of zero for ALDO windows*/
-    tmp32 = L_add(st->sr_core, 0);
-    if (fullbandScale != 0)
-    {
-        tmp32 = L_add(st->output_Fs_fx, 0);
-    }
-    nz = NS2SA_fx2(tmp32, N_ZERO_MDCT_NS);
+    nz = NS2SA(st->output_Fs, N_ZERO_MDCT_NS)*L_frame/L_frameTCX;
 
-    tmp_offset = 0;
-    move16();
-    if (tcx_offset < 0)
-    {
-        tmp_offset = negate(tcx_offset);
-    }
-
-    test();
-    IF ((sub(L_frameTCX, shr(st->L_frameTCX, 1)) == 0) && (st->tcxonly != 0))
+    if( (L_frameTCX == st->L_frameTCX >> 1) && (st->tcxonly) )
     {
         /* Mode decision in PLC
 
@@ -1748,643 +1090,235 @@ static void IMDCT(Word32 *x, Word16 x_e,
             3      2         2x TCX-5  2x  TCX-5
             3      3         2x TCX-5  2x  TCX-5
         */
-        test();
-        test();
-        test();
-        test();
-        test();
-        test();
-        IF ((bfi == 0 && tcx_cfg->tcx_last_overlap_mode != FULL_OVERLAP) || (bfi!=0 && (tcx_cfg->tcx_last_overlap_mode != FULL_OVERLAP) && (tcx_cfg->tcx_curr_overlap_mode != FULL_OVERLAP)))
+
+        if( (!bfi && tcx_cfg->tcx_last_overlap_mode != FULL_OVERLAP) || (bfi && (tcx_cfg->tcx_last_overlap_mode != FULL_OVERLAP) && (tcx_cfg->tcx_curr_overlap_mode != FULL_OVERLAP)) )
         {
             /* minimum or half overlap, two transforms, grouping into one window */
-            Word16 win[(L_FRAME_PLUS+L_MDCT_OVLP_MAX)/2];
-            Word16 w;
-            Word16 L_win, L_ola;
+            float win[(L_FRAME_PLUS+L_MDCT_OVLP_MAX)/2];
+            const int L_win = L_frame >> 1;
+            const int L_ola = (tcx_cfg->tcx_last_overlap_mode == MIN_OVERLAP) ? tcx_mdct_window_min_length : tcx_mdct_window_half_length;
+            int w;
 
-            L_win = shr(L_frame, 1);
-            L_ola = tcx_mdct_window_half_length;
-            move16();
-            if (sub(tcx_cfg->tcx_last_overlap_mode, MIN_OVERLAP) == 0)
+            set_f( win, 0, (L_FRAME_PLUS+L_MDCT_OVLP_MAX)/2 );
+            set_zero(xn_buf, tcx_offset+(L_ola>>1));  /* zero left end of buffer */
+
+            for (w = 0; w < 2; w++)
             {
-                L_ola = tcx_mdct_window_min_length;
-                move16();
-            }
+                TCX_MDCT_Inverse(x+w*L_spec_TCX5, win, L_ola, L_win-L_ola, L_ola);
 
-            set16_fx(xn_buf, 0, add(tcx_offset,shr(L_ola,1)));  /* zero left end of buffer */
-            set16_fx(win, 0, (L_FRAME_PLUS+L_MDCT_OVLP_MAX)/2);
+                tcx_windowing_synthesis_current_frame( win, tcx_aldo_window_2, tcx_mdct_window_half, tcx_mdct_window_minimum, L_ola, tcx_mdct_window_half_length, tcx_mdct_window_min_length,
+                                                       (w > 0) ? 0 : left_rect, (w > 0) || (w == 0 && index == 2) ? MIN_OVERLAP : tcx_cfg->tcx_last_overlap_mode,
+                                                       acelp_zir, st->old_syn_Overl, syn_Overl_TDAC, st->old_Aq_12_8, tcx_mdct_window_trans, L_win, tcx_offset<0?-tcx_offset:0,
+                                                       (w > 0) || (frame_cnt > 0) ? 1 : st->last_core_bfi, (w > 0) || (frame_cnt > 0) ? 0 : st->last_is_cng, fullbandScale );
 
-            FOR (w = 0; w < 2 ; w++)
-            {
-
-                TCX_MDCT_Inverse(x+L_mult0(w,L_spec_TCX5), sub(x_e,TCX_IMDCT_SCALE+TCX_IMDCT_HEADROOM),win, L_ola, sub(L_win,L_ola), L_ola);
-
-                tmp1 = left_rect;
-                move16();
-                tmp2 = tcx_cfg->tcx_last_overlap_mode;
-                move16();
-                tmp3 = st->last_core_bfi;
-                move16();
-                tmp8 = st->last_is_cng;
-                move16();
-                IF (w > 0)
+                if( w > 0 )
                 {
-                    tmp1 = 0;
-                    move16();
-                    tmp2 = MIN_OVERLAP;
-                    move16();
-                    tmp3 = 1;
-                    move16();
-                    tmp8 = (Word8)0;
-                    move16();
-                }
-                test();
-                if(w == 0 && sub(index,2) == 0)
-                {
-                    tmp2 = MIN_OVERLAP;
-                    move16();
-                }
-                IF (frame_cnt>0)
-                {
-                    tmp3 = 1;
-                    move16();
-                    tmp8 = (Word8)0;
-                    move16();
+                    tcx_windowing_synthesis_past_frame( xn_buf+tcx_offset-(L_ola>>1)+w*L_win, tcx_aldo_window_1_trunc, tcx_mdct_window_half,
+                                                        tcx_mdct_window_minimum, L_ola, tcx_mdct_window_half_length, tcx_mdct_window_min_length, MIN_OVERLAP );
                 }
 
-                tcx_windowing_synthesis_current_frame(win,
-                                                      tcx_aldo_window_2,
-                                                      tcx_mdct_window_half,
-                                                      tcx_mdct_window_minimum,
-                                                      L_ola,
-                                                      tcx_mdct_window_half_length,
-                                                      tcx_mdct_window_min_length,
-                                                      tmp1,
-                                                      tmp2,
-                                                      acelp_zir,
-                                                      st->old_syn_Overl,
-                                                      syn_Overl_TDAC,
-                                                      st->old_Aq_12_8_fx,
-                                                      tcx_mdct_window_trans,
-                                                      L_win,
-                                                      tmp_offset,
-                                                      tmp3,
-                                                      tmp8,
-                                                      fullbandScale
-                                                     );
-
-                IF (w > 0)
-                {
-                    tcx_windowing_synthesis_past_frame(xn_buf+tcx_offset-shr(L_ola , 1)+ imult1616(w,L_win),
-                                                       tcx_aldo_window_1_trunc,
-                                                       tcx_mdct_window_half,
-                                                       tcx_mdct_window_minimum,
-                                                       L_ola,
-                                                       tcx_mdct_window_half_length,
-                                                       tcx_mdct_window_min_length,
-                                                       MIN_OVERLAP
-                                                      );
-                }
                 /* add part of current sub-window overlapping with previous window */
-                Vr_add(win,
-                       xn_buf+tcx_offset-shr(L_ola,1)+w*L_win,  /*instrumented only shr because in fact, its only L_win+L_win+L_win...*/
-                       xn_buf+tcx_offset-shr(L_ola,1)+w*L_win,
-                       L_ola);
+                v_add( win, xn_buf+tcx_offset-(L_ola>>1)+w*L_win, xn_buf+tcx_offset-(L_ola>>1)+w*L_win, L_ola );
+
                 /* copy new sub-window region not overlapping with previous window */
-                Copy(
-                    win+L_ola,
-                    xn_buf+tcx_offset+shr(L_ola,1)+w*L_win,
-                    L_win);
+                mvr2r( win+L_ola, xn_buf+tcx_offset+(L_ola>>1)+w*L_win, L_win );
             }
 
             /* To assure that no garbage values are passed to overlap */
-            set16_fx(xn_buf+L_frame+tcx_offset+shr(L_ola,1), 0, overlap-tcx_offset-shr(L_ola,1));
+            set_zero( xn_buf+L_frame+tcx_offset+(L_ola>>1), overlap-tcx_offset-(L_ola>>1) );
         }
-        ELSE IF ( bfi == 0 && (frame_cnt == 0) && (tcx_cfg->tcx_curr_overlap_mode == FULL_OVERLAP))
+        else if (!bfi && (frame_cnt == 0) && (tcx_cfg->tcx_curr_overlap_mode == FULL_OVERLAP))
         {
-            Word16 win[(L_FRAME_PLUS+L_MDCT_OVLP_MAX)/2];
-            Word16 L_win, L_ola, w;
-
             /* special overlap attempt, two transforms, grouping into one window */
-            L_win = shr(L_frame, 1);
-            L_ola = tcx_mdct_window_min_length;
-            move16();
+            float win[(L_FRAME_PLUS+L_MDCT_OVLP_MAX)/2];
+            const int L_win = L_frame >> 1;
+            const int L_ola = tcx_mdct_window_min_length;
+            int w;
 
-            set16_fx(win, 0, (L_FRAME_PLUS+L_MDCT_OVLP_MAX)/2);
+            set_f( win, 0, (L_FRAME_PLUS+L_MDCT_OVLP_MAX)/2 );
 
             /* 1st TCX-5 window, special MDCT with minimum overlap on right side */
+            TCX_MDCT_Inverse(x, win+L_win, 0, L_win-(L_ola>>1), L_ola);
 
-            TCX_MDCT_Inverse(x, sub(x_e, TCX_IMDCT_SCALE+TCX_IMDCT_HEADROOM),
-                             win + L_win,
-                             0, sub(L_win, shr(L_ola, 1)), L_ola);
+            set_zero(xn_buf, (overlap>>1));
 
-            set16_fx(xn_buf, 0, shr(overlap,1));
             /* copy new sub-window region not overlapping with previous window */
-            Copy(win+L_win, xn_buf+shr(overlap,1), add(L_win,shr(L_ola,1))  );
+            mvr2r(win+L_win, xn_buf+(overlap>>1), L_win+(L_ola>>1));
 
             /* 2nd TCX-5 window, regular MDCT with minimum overlap on both sides */
-            TCX_MDCT_Inverse(x + L_spec_TCX5, sub(x_e, TCX_IMDCT_SCALE+TCX_IMDCT_HEADROOM),
-                             win,
-                             L_ola, sub(L_win, L_ola), L_ola);
+            TCX_MDCT_Inverse(x+L_spec_TCX5, win, L_ola, L_win-L_ola, L_ola);
 
-            tcx_windowing_synthesis_current_frame(win,
-                                                  tcx_aldo_window_2,
-                                                  tcx_mdct_window_half,
-                                                  tcx_mdct_window_minimum,
-                                                  L_ola,
-                                                  tcx_mdct_window_half_length,
-                                                  tcx_mdct_window_min_length,
-                                                  0,  /* left_rect */
-                                                  MIN_OVERLAP,  /* left_mode */
-                                                  acelp_zir,
-                                                  st->old_syn_Overl,
-                                                  syn_Overl_TDAC,
-                                                  st->old_Aq_12_8_fx,
-                                                  tcx_mdct_window_trans,
-                                                  L_win,
-                                                  tmp_offset,
-                                                  1, /* st->last_core_bfi */
-                                                  0, /* st->last_is_cng */
-                                                  fullbandScale
-                                                 );
+            tcx_windowing_synthesis_current_frame( win, tcx_aldo_window_2, tcx_mdct_window_half, tcx_mdct_window_minimum, L_ola, tcx_mdct_window_half_length, tcx_mdct_window_min_length, 0,
+                                                   /* left_rect */ MIN_OVERLAP,  /* left_mode */ acelp_zir, st->old_syn_Overl, syn_Overl_TDAC, st->old_Aq_12_8, tcx_mdct_window_trans, L_win,
+                                                   tcx_offset<0?-tcx_offset:0,
+                                                   1, /* st->last_mode_bfi */ 0, /* st->last_is_cng */ fullbandScale );
 
-            tmpP16 = xn_buf + add(sub(L_win, shr(L_ola, 1)), shr(overlap,1));
-
-            tcx_windowing_synthesis_past_frame(tmpP16,
-                                               tcx_aldo_window_1_trunc,
-                                               tcx_mdct_window_half,
-                                               tcx_mdct_window_minimum,
-                                               L_ola,
-                                               tcx_mdct_window_half_length,
-                                               tcx_mdct_window_min_length,
-                                               MIN_OVERLAP
-                                              );
+            tcx_windowing_synthesis_past_frame( xn_buf+(overlap>>1)+L_win-(L_ola>>1), tcx_aldo_window_1_trunc, tcx_mdct_window_half, tcx_mdct_window_minimum,
+                                                L_ola, tcx_mdct_window_half_length, tcx_mdct_window_min_length, 2 );
 
             /* add part of current sub-window overlapping with previous window */
-            FOR (i = 0; i < L_ola; i++)
-            {
-                tmpP16[i] = add(tmpP16[i], win[i]);
-                move16();
-            }
+            v_add(win, xn_buf+(overlap>>1)+L_win-(L_ola>>1), xn_buf+(overlap>>1)+L_win-(L_ola>>1), L_ola);
 
             /* copy new sub-window region not overlapping with previous window */
-            Copy(win + L_ola,
-                 xn_buf + add(add(shr(overlap,1), shr(L_ola, 1)), L_win),
-                 L_win);
+            mvr2r(win+L_ola, xn_buf+(overlap>>1)+L_win+(L_ola>>1), L_win);
 
             /* extra folding-out on left side of win, for perfect reconstruction */
-            FOR (w = shr(overlap,1); w < overlap; w++)
+            for (w = (overlap>>1); w < overlap; w++)
             {
-                xn_buf[overlap-1-w] = negate(xn_buf[w]);
-                move16();
+                xn_buf[overlap-1-w] = -1.0f * xn_buf[w];
             }
 
-            tcx_windowing_synthesis_current_frame(xn_buf,
-                                                  tcx_aldo_window_2,
-                                                  tcx_mdct_window_half,
-                                                  tcx_mdct_window_minimum,
-                                                  overlap,
-                                                  tcx_mdct_window_half_length,
-                                                  tcx_mdct_window_min_length,
-                                                  left_rect,
-                                                  0,  /* left_mode */
-                                                  acelp_zir,
-                                                  st->old_syn_Overl,
-                                                  syn_Overl_TDAC,
-                                                  st->old_Aq_12_8_fx,
-                                                  tcx_mdct_window_trans,
-                                                  shl(L_win,1),
-                                                  tmp_offset,
-                                                  st->last_core_bfi,
-                                                  st->last_is_cng,
-                                                  fullbandScale
-                                                 );
-
+            tcx_windowing_synthesis_current_frame( xn_buf, tcx_aldo_window_2, tcx_mdct_window_half, tcx_mdct_window_minimum, overlap, tcx_mdct_window_half_length,
+                                                   tcx_mdct_window_min_length, left_rect, 0,  /* left_mode */ acelp_zir, st->old_syn_Overl, syn_Overl_TDAC, st->old_Aq_12_8,
+                                                   tcx_mdct_window_trans, 2*L_win, tcx_offset<0?-tcx_offset:0,
+                                                   st->last_core_bfi, st->last_is_cng, fullbandScale );
         }
-        ELSE   /* default  i.e. maximum overlap, single transform, no grouping */
+        else
         {
+            /* default, i.e. maximum overlap, single transform, no grouping */
 
-            TCX_MDCT_Inverse(x, sub(x_e, TCX_IMDCT_SCALE+TCX_IMDCT_HEADROOM),
-            xn_buf,
-            overlap, sub(L_frame, overlap), overlap);
+            TCX_MDCT_Inverse(x, xn_buf, overlap, L_frame-overlap, overlap);
 
-            tmp1 = index;
-            move16();
-            test();
-            test();
-            test();
-            if ( bfi==0 && (frame_cnt > 0) && (index == 0) && (st->last_core_fx != ACELP_CORE))
-            {
-                tmp1 = MIN_OVERLAP;
-                move16();
-            }
+            tcx_windowing_synthesis_current_frame( xn_buf, tcx_aldo_window_2, tcx_mdct_window_half, tcx_mdct_window_minimum, overlap, tcx_mdct_window_half_length,
+                                                   tcx_mdct_window_min_length, left_rect, !bfi && (frame_cnt > 0) && (index == 0) && ( st->last_core != ACELP_CORE) ? MIN_OVERLAP : index,
+                                                   acelp_zir, st->old_syn_Overl, syn_Overl_TDAC, st->old_Aq_12_8, tcx_mdct_window_trans, L_frame_glob >> 1,
+                                                   tcx_offset<0?-tcx_offset:0,
+                                                   (frame_cnt > 0 /*|| (st->last_con_tcx )*/) ? 1 : st->last_core_bfi, (frame_cnt > 0) ? 0 : st->last_is_cng, fullbandScale );
 
-            tmp3 = st->last_core_bfi;
-            move16();
-            if (frame_cnt > 0)
-            {
-                tmp3 = 1;
-                move16();
-            }
-
-            tmp8 = st->last_is_cng;
-            move16();
-            if (frame_cnt > 0)
-            {
-                tmp8 = 0;
-                move16();
-            }
-
-            tcx_windowing_synthesis_current_frame(xn_buf,
-            tcx_aldo_window_2,
-            tcx_mdct_window_half,
-            tcx_mdct_window_minimum,
-            overlap,
-            tcx_mdct_window_half_length,
-            tcx_mdct_window_min_length,
-            left_rect,
-            tmp1,
-            acelp_zir,
-            st->old_syn_Overl,
-            syn_Overl_TDAC,
-            st->old_Aq_12_8_fx,
-            tcx_mdct_window_trans,
-            shr(L_frame_glob, 1),
-            tmp_offset,
-            tmp3,
-            tmp8,
-            fullbandScale
-                                                 );
-        }
+        } /* tcx_last_overlap_mode != FULL_OVERLAP */
     }
-    ELSE   /* frame is TCX-20 or not TCX-only */
+    else
     {
+        /* frame is TCX-20 or not TCX-only */
         assert(frame_cnt == 0);
-
-        IF (sub(st->tcx_cfg.tcx_last_overlap_mode, TRANSITION_OVERLAP) != 0)
+        if (st->tcx_cfg.tcx_last_overlap_mode != TRANSITION_OVERLAP)
         {
-            Word32 tmp_buf[L_FRAME_PLUS];
-            Word16 Q;
+            float tmp[L_FRAME_PLUS];
 
-            /* DCT */
-            Q = sub(31, x_e);
-            edct_fx(x, tmp_buf, L_frame, &Q);
-
-            /* scale by sqrt(L / NORM_MDCT_FACTOR) */
-            tmp1 = mult_r(shl(L_frame, 4), 26214/*128.f / NORM_MDCT_FACTOR Q15*/); /* 4Q11 */
-            tmp2 = 4;
-            move16();
-            tmp1 = Sqrt16(tmp1, &tmp2);
-
-            FOR (i = 0; i < L_frame; i++)
-            {
-                tmp_buf[i] = Mpy_32_16_1(tmp_buf[i], tmp1);
-                move32();
-            }
-            Q = sub(Q, tmp2);
-
-
-            window_ola_fx(tmp_buf,
-                          xn_buf,
-                          &Q,
-                          old_out,
-                          Q_old_wtda,
-                          L_frame,
-                          tcx_cfg->tcx_last_overlap_mode,
-                          tcx_cfg->tcx_curr_overlap_mode,
-                          0,
-                          0,
-                          NULL);
-
-            /* scale output */
-            IF (Q <= 0)
-            {
-                FOR (i = 0; i < L_frame; i++)
-                {
-                    xn_buf[i] = shr(xn_buf[i], Q);
-                    move16();
-                }
-            }
-            ELSE
-            {
-                tmp1 = shr(0x4000, sub(Q,1));
-
-                FOR (i = 0; i < L_frame; i++)
-                {
-                    xn_buf[i] = mult_r(xn_buf[i], tmp1);
-                    move16();
-                }
-            }
-
+            edct(x, xn_buf+overlap/2+nz, L_frame);
+            v_multc( xn_buf+overlap/2+nz, (float)sqrt((float)L_frame / NORM_MDCT_FACTOR), tmp, L_frame);
+            window_ola( tmp, xn_buf, old_out, L_frame, tcx_cfg->tcx_last_overlap_mode, tcx_cfg->tcx_curr_overlap_mode, 0, 0, NULL );
             aldo = 1;
-            move16();
+
         }
-        ELSE
+        else
         {
-
-            TCX_MDCT_Inverse(x, sub(x_e, TCX_IMDCT_SCALE+TCX_IMDCT_HEADROOM),
-            xn_buf, overlap, sub(L_frame, overlap), overlap);
-
+            TCX_MDCT_Inverse(x, xn_buf, overlap, L_frame-overlap, overlap);
 
             /*-----------------------------------------------------------*
              * Windowing, overlap and add                                *
              *-----------------------------------------------------------*/
 
-
             /* Window current frame */
-            tmp3 = st->last_core_bfi;
-            move16();
-
-            tmp8 = st->last_is_cng;
-            move16();
-            tcx_windowing_synthesis_current_frame(  xn_buf,
-            tcx_aldo_window_2,
-            tcx_mdct_window_half,
-            tcx_mdct_window_minimum,
-            overlap,
-            tcx_mdct_window_half_length,
-            tcx_mdct_window_min_length,
-            left_rect,
-            tcx_cfg->tcx_last_overlap_mode,
-            acelp_zir,
-            st->old_syn_Overl,
-            syn_Overl_TDAC,
-            st->old_Aq_12_8_fx,
-            tcx_mdct_window_trans,
-            shr(L_frame_glob, 1),
-            tmp_offset,
-            tmp3,
-            tmp8,
-            fullbandScale
-                                                 );
-        } /* TRANSITION_OVERLAP */
+            tcx_windowing_synthesis_current_frame( xn_buf, tcx_aldo_window_2, tcx_mdct_window_half, tcx_mdct_window_minimum, overlap, tcx_mdct_window_half_length, tcx_mdct_window_min_length,
+                                                   left_rect, tcx_cfg->tcx_last_overlap_mode, acelp_zir, st->old_syn_Overl, syn_Overl_TDAC, st->old_Aq_12_8, tcx_mdct_window_trans, L_frame_glob >> 1,
+                                                   tcx_offset<0?-tcx_offset:0,
+                                                   st->last_core_bfi,
+                                                   st->last_is_cng,
+                                                   fullbandScale );
+        }
     } /* TCX-20 and TCX-only */
 
     /* Window and overlap-add past frame if past frame is TCX */
-    test();
-    IF ((frame_cnt != 0) || (st->last_core_bfi > ACELP_CORE))
+    if( (frame_cnt != 0) || (st->last_core_bfi > ACELP_CORE) )
     {
-        test();
-        test();
-        IF (((sub(L_frameTCX, shr(st->L_frameTCX, 1)) == 0) && (st->tcxonly != 0)) || (sub(st->tcx_cfg.tcx_last_overlap_mode, TRANSITION_OVERLAP) == 0))
+        if (((L_frameTCX == st->L_frameTCX >> 1) && (st->tcxonly)) || (st->tcx_cfg.tcx_last_overlap_mode == TRANSITION_OVERLAP))
         {
-            test();
-            test();
-            test();
-            test();
-            if ((bfi == 0) && (frame_cnt > 0) && (index == 0) &&
-                    (tcx_cfg->tcx_curr_overlap_mode == FULL_OVERLAP) && (st->last_core_fx != ACELP_CORE))
+            if (!bfi && (frame_cnt > 0) && (index == 0) && (tcx_cfg->tcx_curr_overlap_mode == FULL_OVERLAP) && (st->last_core != ACELP_CORE))
             {
-                index = MIN_OVERLAP;   /* use minimum overlap between the two TCX-10 windows */         move16();
+                index = MIN_OVERLAP;     /* use minimum overlap between the two TCX-10 windows */
             }
 
-            IF (tcx_cfg->last_aldo != 0)
+            if( tcx_cfg->last_aldo )
             {
-                Word16 tmp4;
-
-                tmp2 = add(*Q_old_wtda, TCX_IMDCT_HEADROOM);
-                tmp4 = sub(shr(overlap, 1), tcx_offset);
-
-                FOR (i = 0; i < tmp4; i++)
+                for (i=0; i < overlap - tcx_mdct_window_min_length; i++)
                 {
-                    xn_buf[i] = shl(xn_buf[i], TCX_IMDCT_HEADROOM);
-                    move16();
-                }
-
-                tmp1 = sub(overlap, tcx_mdct_window_min_length);
-                FOR (i=0; i < tmp1; i++)
-                {
-                    xn_buf[i+tmp4] = shl(add(xn_buf[i+tmp4], shr(old_out[i+nz], tmp2)), TCX_IMDCT_HEADROOM);
-                    move16();
+                    xn_buf[i+overlap/2-tcx_offset] += old_out[i+nz];
                 }
 
                 /* fade truncated ALDO window */
-                tmp1 = sub(overlap, shr(tcx_mdct_window_min_length, 1));
-                FOR ( ; i < tmp1; i++)
+                for ( ; i < overlap; i++)
                 {
-                    tmp3 = mult_r(shr(old_out[i+nz], tmp2), tcx_mdct_window_minimum[i-overlap+tcx_mdct_window_min_length].v.re);
-                    xn_buf[i+tmp4] = shl(add(xn_buf[i+tmp4], tmp3), TCX_IMDCT_HEADROOM);
-                    move16();
-                }
-                FOR ( ; i < overlap; i++)
-                {
-                    tmp3 = mult_r(shr(old_out[i+nz], tmp2), tcx_mdct_window_minimum[overlap-1-i].v.im);
-                    xn_buf[i+tmp4] = shl(add(xn_buf[i+tmp4], tmp3), TCX_IMDCT_HEADROOM);
-                    move16();
-                }
-
-                FOR (i = add(i, tmp4) ; i < L_frame; i++)
-                {
-                    xn_buf[i] = shl(xn_buf[i], TCX_IMDCT_HEADROOM);
-                    move16();
+                    xn_buf[i+overlap/2-tcx_offset] += old_out[i+nz] * tcx_mdct_window_minimum[overlap-1-i];
                 }
             }
-            ELSE
+            else
             {
-                tmp1 = index;
-                move16();
-                test();
-                if ((index == 0) || (sub(tcx_cfg->tcx_last_overlap_mode, MIN_OVERLAP) == 0))
-                {
-                    tmp1 = tcx_cfg->tcx_last_overlap_mode;
-                    move16();
-                }
-
                 tcx_windowing_synthesis_past_frame( old_syn_overl
-                ,
-                tcx_aldo_window_1_trunc,
-                tcx_mdct_window_half,
-                tcx_mdct_window_minimum,
-                overlap,
-                tcx_mdct_window_half_length,
-                tcx_mdct_window_min_length,
-                tmp1
-                                                  );
-
-                BASOP_SATURATE_WARNING_OFF;
-                IF ( bfi )
+                                                    ,
+                                                    tcx_aldo_window_1_trunc, tcx_mdct_window_half, tcx_mdct_window_minimum,
+                                                    overlap, tcx_mdct_window_half_length, tcx_mdct_window_min_length,
+                                                    (index == 0 || tcx_cfg->tcx_last_overlap_mode == MIN_OVERLAP) ? tcx_cfg->tcx_last_overlap_mode : index );
+                if (bfi)
                 {
-                    tmp1 = sub(shr(overlap, 1), tcx_offset);
-                    tmp3 = shr(tcx_mdct_window_half_length, 1);
-                    FOR (i=0; i < tmp1; i++)
+                    for (i=0; i<tcx_mdct_window_half_length; i++)
                     {
-                        xn_buf[i] = shl(xn_buf[i], TCX_IMDCT_HEADROOM);
-                        move16();
-                    }
-                    FOR (i = 0; i < tmp3; i++)
-                    {
-                        tmp2 = add(xn_buf[i+tmp1], mult_r(old_syn_overl[i], tcx_mdct_window_half[i].v.re));
-                        xn_buf[i+tmp1] = shl(tmp2, TCX_IMDCT_HEADROOM);
-                        move16();
-                    }
-                    FOR ( ; i < tcx_mdct_window_half_length; i++)
-                    {
-                        tmp2 = add(xn_buf[i+tmp1], mult_r(old_syn_overl[i], tcx_mdct_window_half[tcx_mdct_window_half_length-1-i].v.im));
-                        xn_buf[i+tmp1] = shl(tmp2, TCX_IMDCT_HEADROOM);
-                        move16();
-                    }
-                    IF (sub(add(i, tmp1), L_frame) < 0)
-                    {
-                        FOR (i = add(i, tmp1); i < L_frame; i++)
-                        {
-                            xn_buf[i] = shl(xn_buf[i], TCX_IMDCT_HEADROOM);
-                            move16();
-                        }
+                        xn_buf[i+overlap/2-tcx_offset] += old_syn_overl[i]*tcx_mdct_window_half[tcx_mdct_window_half_length-1-i];
                     }
                 }
-                ELSE IF (left_rect == 0)
+                else if(!left_rect)
                 {
-                    FOR (i=0; i<overlap; i++)
+                    for (i=0; i<overlap; i++)
                     {
-
-                        xn_buf[i] = shl(add(xn_buf[i], old_syn_overl[i]), TCX_IMDCT_HEADROOM);
-                        move16();
-                    }
-
-                    IF (sub(i, L_frame) < 0)
-                    {
-                        FOR ( ; i < L_frame; i++)
-                        {
-                            xn_buf[i] = shl(xn_buf[i], TCX_IMDCT_HEADROOM);
-                            move16();
-                        }
+                        xn_buf[i] += old_syn_overl[i];
                     }
                 }
-                ELSE
+                else
                 {
-                    tmp1 = shr(overlap, 1);
-                    FOR (i=0; i < tmp1; i++)
+                    for (i=0; i<overlap; i++)
                     {
-                        xn_buf[i] = shl(xn_buf[i], TCX_IMDCT_HEADROOM);
-                        move16();
-                    }
-
-                    tmpP16 = xn_buf + tmp1;
-                    FOR (i=0; i < overlap; i++)
-                    {
-                        tmpP16[i] = shl(add(tmpP16[i], old_syn_overl[i]), TCX_IMDCT_HEADROOM);
-                        move16();
-                    }
-
-                    IF (sub(add(i, tmp1), L_frame) < 0)
-                    {
-                        FOR (i = add(i, tmp1); i < L_frame; i++)
-                        {
-                            xn_buf[i] = shl(xn_buf[i], TCX_IMDCT_HEADROOM);
-                            move16();
-                        }
+                        xn_buf[i+(overlap>>1)] += old_syn_overl[i];
                     }
                 }
-                BASOP_SATURATE_WARNING_ON;
             }
-        }
-        /* aldo must not become 0 unless for TCX10 and frames after tansistion frames */
-        assert( aldo != 0 ||
-                (L_frameTCX == st->L_frameTCX >> 1 && st->tcxonly) ||
-                st->tcx_cfg.tcx_last_overlap_mode == TRANSITION_OVERLAP);
-    }
-    ELSE
-    {
-        IF (aldo == 0)
-        {
-            BASOP_SATURATE_WARNING_OFF;
-            FOR (i = 0; i < L_frame; i++)
-            {
-                xn_buf[i] = shl(xn_buf[i], TCX_IMDCT_HEADROOM);
-                move16();
-            }
-            BASOP_SATURATE_WARNING_ON;
         }
     }
 
-    test();
-    test();
-    test();
-    IF ( (aldo == 0) &&
-         ((sub(L_frameTCX, shr(st->L_frameTCX, 1)) == 0 && frame_cnt > 0) ||
-          sub(L_frameTCX, shr(st->L_frameTCX, 1)) != 0) )
+    if( !aldo && (((L_frameTCX == st->L_frameTCX >> 1)&&frame_cnt > 0) || L_frameTCX != (st->L_frameTCX >> 1)) )
     {
         /*Compute windowed synthesis in case of switching to ALDO windows in next frame*/
-        FOR (i = 0; i < nz; i++)
-        {
-            old_out[i] = shr(xn_buf[L_frame-nz+i], TCX_IMDCT_HEADROOM);
-            move16();
-        }
-        Copy(xn_buf+L_frame, old_out+nz, overlap);
-        set16_fx(old_out+nz+overlap, 0, nz);
+        mvr2r( xn_buf+L_frame-nz, old_out, nz+overlap );
+        set_zero( old_out+nz+overlap, nz );
 
-        tcx_windowing_synthesis_past_frame( old_out+nz,
-                                            tcx_aldo_window_1_trunc,
-                                            tcx_mdct_window_half,
-                                            tcx_mdct_window_minimum,
-                                            overlap,
-                                            tcx_mdct_window_half_length,
-                                            tcx_mdct_window_min_length,
-                                            tcx_cfg->tcx_curr_overlap_mode
-                                          );
+        tcx_windowing_synthesis_past_frame( old_out+nz, tcx_aldo_window_1_trunc, tcx_mdct_window_half, tcx_mdct_window_minimum,
+                                            overlap, tcx_mdct_window_half_length, tcx_mdct_window_min_length, tcx_cfg->tcx_curr_overlap_mode );
 
         /* If current overlap mode = FULL_OVERLAP -> ALDO_WINDOW */
-        IF (sub(tcx_cfg->tcx_curr_overlap_mode, FULL_OVERLAP) == 0)
+        if( tcx_cfg->tcx_curr_overlap_mode == FULL_OVERLAP )
         {
-            FOR (i=0; i<nz; i++)
+            for (i=0; i<nz; i++)
             {
-                old_out[nz+overlap+i] = shr(mult_r(xn_buf[L_frame-1-i], tcx_aldo_window_1[nz-1-i]), TCX_IMDCT_HEADROOM);
-                move16();
+                old_out[nz+overlap+i]=xn_buf[L_frame-1-i]*tcx_aldo_window_1_trunc[-1-i];
             }
             aldo = 1;
-            move16();
         }
-
-        *Q_old_wtda = -TCX_IMDCT_HEADROOM;
-        move16();
     }
-    if (fullbandScale != 0)
+
+    if( FB_flag )
     {
-        st->tcx_cfg.last_aldo = aldo;
-        move16();
+        tcx_cfg->last_aldo = aldo;
     }
 
     /* Smoothing between the ACELP PLC and TCX Transition frame. Using the shape of the half overlap window for the crossfading. */
-    test();
-    test();
-    test();
-    IF (left_rect && (frame_cnt == 0) && (st->last_core_bfi == ACELP_CORE)
-        && st->prev_bfi_fx)
+    if( left_rect && (frame_cnt == 0) && (st->last_core_bfi == ACELP_CORE) && st->prev_bfi )
     {
-
-        IF (fullbandScale)
+        if( FB_flag )
         {
-            tmp1 = sub(shr(overlap, 1), tcx_offset);
-            tmp3 = shr(tcx_mdct_window_half_length, 1);
-            FOR (i = 0; i < tmp3; i++)
+            for (i=0; i<tcx_mdct_window_half_length; i++)
             {
-                xn_buf[i+tmp1] = mult_r( xn_buf[i+tmp1], tcx_mdct_window_half[i].v.im );
-                xn_buf[i+tmp1] = add( xn_buf[i+tmp1], mult_r( st->syn_OverlFB[i], mult_r( tcx_mdct_window_half[i].v.re, tcx_mdct_window_half[i].v.re ) ) );
-                move16();
-            }
-            FOR ( ; i < tcx_mdct_window_half_length; i++)
-            {
-                xn_buf[i+tmp1] = mult_r( xn_buf[i+tmp1], tcx_mdct_window_half[tcx_mdct_window_half_length-1-i].v.re );
-                xn_buf[i+tmp1] = add( xn_buf[i+tmp1], mult_r( st->syn_OverlFB[i], mult_r( tcx_mdct_window_half[tcx_mdct_window_half_length-1-i].v.im, tcx_mdct_window_half[tcx_mdct_window_half_length-1-i].v.im ) ) );
-                move16();
+                xn_buf[i+overlap/2-tcx_offset] *= tcx_mdct_window_half[i];
+                xn_buf[i+overlap/2-tcx_offset] += st->syn_OverlFB[i] * tcx_mdct_window_half[tcx_mdct_window_half_length-1-i] * tcx_mdct_window_half[tcx_mdct_window_half_length-1-i];
             }
         }
-        ELSE
+        else
         {
-            tmp1 = sub(shr(overlap, 1), tcx_offset);
-            tmp3 = shr(tcx_mdct_window_half_length, 1);
-            FOR (i = 0; i < tmp3; i++)
+            for (i=0; i<tcx_mdct_window_half_length; i++)
             {
-                xn_buf[i+tmp1] = mult_r( xn_buf[i+tmp1], tcx_mdct_window_half[i].v.im );
-                xn_buf[i+tmp1] = add( xn_buf[i+tmp1], mult_r( st->syn_Overl[i], mult_r( tcx_mdct_window_half[i].v.re, tcx_mdct_window_half[i].v.re ) ) );
-                move16();
-            }
-            FOR ( ; i < tcx_mdct_window_half_length; i++)
-            {
-                xn_buf[i+tmp1] = mult_r( xn_buf[i+tmp1], tcx_mdct_window_half[tcx_mdct_window_half_length-1-i].v.re );
-                xn_buf[i+tmp1] = add( xn_buf[i+tmp1], mult_r( st->syn_Overl[i], mult_r( tcx_mdct_window_half[tcx_mdct_window_half_length-1-i].v.im, tcx_mdct_window_half[tcx_mdct_window_half_length-1-i].v.im ) ) );
-                move16();
+                xn_buf[i+overlap/2-tcx_offset] *= tcx_mdct_window_half[i];
+                xn_buf[i+overlap/2-tcx_offset] += st->syn_Overl[i] * tcx_mdct_window_half[tcx_mdct_window_half_length-1-i] * tcx_mdct_window_half[tcx_mdct_window_half_length-1-i];
             }
         }
     }
-}
 
+    return;
+}

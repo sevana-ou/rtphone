@@ -1,241 +1,151 @@
 /*====================================================================================
-    EVS Codec 3GPP TS26.442 Apr 03, 2018. Version 12.11.0 / 13.6.0 / 14.2.0
+    EVS Codec 3GPP TS26.443 Nov 13, 2018. Version 12.11.0 / 13.7.0 / 14.3.0 / 15.1.0
   ====================================================================================*/
 
-
-#include "stl.h"
-#include "prot_fx.h"
-#include "stat_dec_fx.h"
-#include "basop_util.h"
+#include "stat_enc.h"
+#include "prot.h"
 
 
-/************************************************************/
-/*       Macro for the functions to be implemented.         */
-/************************************************************/
+/*-------------------------------------------------------------------*
+* coderLookAheadInnovation()
+*
+*
+*-------------------------------------------------------------------*/
 
 void coderLookAheadInnovation(
-    Word16 A_3Q12[],                /* input: coefficients NxAz[M+1]    */
-    Word16 *pT,                     /* out:   pitch                     */
-    HANDLE_PLC_ENC_EVS st,       /* i/o:   coder memory state        */
-    Word16 *speechLookAhead_Qx,     /* i:   input speech in Q(st->Qold) */
-    Word16 *old_exc,                /* i:   input excitation in Q(st->Qold) */
-    Word16 L_frame
+    const float A[],            /* input: coefficients NxAz[M+1]   */
+    int *pT,                    /* out:   pitch                    */
+    HANDLE_PLC_ENC_EVS st,      /* i/o:   coder memory state       */
+    float *speechLookAhead,
+    float *old_exc,
+    int L_subfr,
+    int L_frame
 )
 {
-    Word16 i;
-    Word16 prev_pitch, T0_fx;
-    Word16 *exc_Qx, exc_buf_Qx[L_EXC_MEM+2*L_SUBFR+8];
-    Word32 mantissa_max = -0x7fffffffL;
-    Word16 subfr_len = 0;
-    Word16 search_range = 9;
-    Word16 exc_max;
-    Word16 exc_sh;
-    Word32 ps,alp, alp_ini;
-    Word32 alp_s1, alp_s2;
-    Word16 k;
-    Word16 ps_e,alp_e;
-    Word32 max_ps, max_ps_tmp;
-    Word16 max_ps_e;
-    Word16 tmp_loop;
+    int i;
+    float *exc, exc_buf[L_EXC_MEM+2*L_SUBFR+8] = { 0.0f };
+    int   T0=0;
+    short prev_pitch;
+    float ps, alp, max_ps;
+    short subfr_len;
+    short search_range;
 
-    /* Debug init (not instrumented) */
-    T0_fx = -3000;
-    subfr_len = shl(L_SUBFR,1); /* 2*L_SUBFR */
-    if( sub( L_FRAME16k, L_frame ) > 0 )
+    search_range = 9;
+
+    /* Framing parameters */
+    if( L_frame < L_FRAME16k )
     {
-        subfr_len = add(L_SUBFR,48); /* 1.75*L_SUBFR */
+        subfr_len = (short)(1.75*L_subfr);
+    }
+    else
+    {
+        subfr_len = (short)(2*L_subfr);
     }
 
     /*------------------------------------------------------------------------*
-     * - BASOP specific initialization.                                       *
+     * Initialize buffers                                                     *
      *------------------------------------------------------------------------*/
-    /* initialization */
-    exc_Qx = exc_buf_Qx + L_EXC_MEM + 8;
-    FOR( i=0; i<L_EXC_MEM+8; i++ )
-    {
-        exc_buf_Qx[i] = old_exc[i];
-        move16();
-    }
 
+    /* set excitation memory */
+    exc = exc_buf + L_EXC_MEM + 8;
+    mvr2r( old_exc, exc_buf, L_EXC_MEM+8);
 
     /*------------------------------------------------------------------------*
      * - Get residual signal and target at lookahead part.                    *
      *------------------------------------------------------------------------*/
+
     /* find LP residual signal for look-ahead part */
-    getLookAheadResSig( speechLookAhead_Qx, A_3Q12, exc_Qx, L_frame, 2 );
-    Scale_sig( exc_Qx, subfr_len, 1 );
+    getLookAheadResSig( speechLookAhead, A, exc, L_frame, L_subfr, M, 2 );
 
-    /* find target signals */
+    /* Initialize excitation buffer */
     prev_pitch = st->T0_4th;
-    move16();
+    /* find target signals */
     /* find best candidate of pitch lag */
-    T0_fx = st->T0_4th;
-    move16();
-    mantissa_max = -0x7fffffffL;
-    move32();
-    max_ps = -0x7fffffffL;
-    move32();
-    max_ps_e = 16;
-    move16();
-
-    /*find maximum*/
-    exc_max = 0;
-    move16();
-    tmp_loop = s_min(-prev_pitch+search_range+subfr_len,0);
-    FOR(i=-prev_pitch-search_range; i < tmp_loop; i++)
     {
-        exc_max = s_max(exc_Qx[i],exc_max);
-    }
-    FOR(i= 0; i<subfr_len; i++)
-    {
-        exc_max = s_max(exc_max,exc_Qx[i]);
-    }
-    /*calculate scaling factor for optimal precision and assure no overflow in dotproduct*/
-    exc_sh = sub(15,norm_s(sub(subfr_len,1))); /*ceil(ld(subfr_len))*/
-    exc_sh = s_max(sub(exc_sh,norm_s(s_max(abs_s(exc_max),1))),0);
-    exc_sh = shr(add(exc_sh,1),1);
-
-    /*scale buffer only where its needed*/
-    tmp_loop = s_min(-prev_pitch+search_range+subfr_len,0);
-    FOR(i=-prev_pitch-search_range; i < tmp_loop; i++)
-    {
-        exc_Qx[i] = shr(exc_Qx[i],exc_sh);
-        move16();
-    }
-    FOR(i= 0; i<subfr_len; i++)
-    {
-        exc_Qx[i] = shr(exc_Qx[i],exc_sh);
-        move16();
-    }
-
-
-
-
-
-    /*Calculate "big" dotproduct from buffer, including search range*/
-    alp_ini   = L_deposit_l(0);
-    move16();
-    FOR(i=-prev_pitch-search_range; i< -prev_pitch+search_range+subfr_len; i++)
-    {
-        alp_ini = L_mac(alp_ini,exc_Qx[i],exc_Qx[i]);
-    }
-
-
-    FOR( i=-search_range; i<search_range; i++ )
-    {
-        test();
-        IF( sub(add(prev_pitch,i),st->pit_max)>0 || sub(add(prev_pitch,i),st->pit_min)<0 )
+        max_ps = -1.0e10;
+        T0 = st->T0_4th;
+        for( i=-search_range; i<search_range; i++ )
         {
-            CONTINUE;
+            if( prev_pitch+i>st->pit_max || prev_pitch+i<st->pit_min )
+            {
+                continue;
+            }
+            ps = dotp( exc, &exc[-(prev_pitch+i)], subfr_len );
+            alp = dotp( &exc[-(prev_pitch+i)], &exc[-(prev_pitch+i)], subfr_len );
+            ps /= (float)sqrt( alp + 1.0e-10 );
+            if( max_ps < ps )
+            {
+                max_ps = ps;
+                T0 = prev_pitch + i;
+            }
         }
-        ps        = L_deposit_l(0);
-        alp_s1    = L_deposit_l(0);
-        alp_s2    = L_deposit_l(0);
-
-        FOR(k=0; k<subfr_len; k++)
+        if( max_ps < 0.0 )
         {
-            ps=L_mac(ps,exc_Qx[k],exc_Qx[k-prev_pitch-i]);
+            T0 = st->T0_4th;
         }
-
-        /*calculate "small" dotproducts in order to subtract them from the "bigger" one*/
-        FOR(k=negate(add(prev_pitch,search_range)); k<-prev_pitch-i; k++)
-        {
-            alp_s1 = L_mac(alp_s1,exc_Qx[k],exc_Qx[k]);
-        }
-        tmp_loop =  sub(add(search_range,subfr_len)  ,prev_pitch);
-        FOR(k =  + subfr_len - i -prev_pitch ; k < tmp_loop; k++)
-        {
-            alp_s2 = L_mac(alp_s2,exc_Qx[k],exc_Qx[k]);
-        }
-        alp = L_sub(alp_ini,L_add(alp_s1,alp_s2));
-        alp = L_max(alp, 1);  /* alp must not be 0 */
-        alp_e = shl(exc_sh,1);
-        ps_e = shl(exc_sh,1);
-        alp = ISqrt32(alp, &alp_e);
-        ps = Mpy_32_16_1(ps,round_fx(alp)); /*alp_e+ps_e*/
-
-        ps_e = add(alp_e,ps_e);
-
-        BASOP_SATURATE_WARNING_OFF
-        max_ps_tmp = L_shl(max_ps,sub(max_ps_e,ps_e));
-        BASOP_SATURATE_WARNING_ON
-
-
-        IF (L_sub(max_ps_tmp , ps) < 0)
-        {
-            max_ps = L_add(ps, 0);
-            max_ps_e = ps_e;
-            move16();
-            T0_fx = add(prev_pitch,i);
-        }
-
-    }
-    mantissa_max = max_ps;
-    move32();
-    if( mantissa_max < 0 )
-    {
-        T0_fx = st->T0_4th;
-        move16();
     }
 
-    /* Update excitation */
-    pT[0] = T0_fx;
-    move16();
+    pT[0] = T0;
 
     return;
 }
 
-/************************************************************/
-/*                     Static functions                     */
-/************************************************************/
-void enc_prm_side_Info( HANDLE_PLC_ENC_EVS hPlc_Ext, Encoder_State_fx *st )
-{
-    Word16 diff_pitch;
-    Word16 bits_per_subfr, search_range;
 
-    bits_per_subfr = 4;
-    move16();
-    search_range = 8;
-    move16();
+/*-------------------------------------------------------------------*
+* enc_prm_side_Info()
+*
+*
+*-------------------------------------------------------------------*/
 
-    IF( sub(hPlc_Ext->nBits,1)>0 )
-    {
-
-        push_next_indice_fx(st, 1, 1);
-
-        diff_pitch = sub(hPlc_Ext->T0, hPlc_Ext->T0_4th);
-        test();
-        if( (sub(diff_pitch,sub(search_range,1)) > 0) || (sub(diff_pitch,add(-search_range,1)) < 0) )
-        {
-            diff_pitch = -8;
-            move16();
-        }
-
-        push_next_indice_fx(st, add(diff_pitch, search_range), bits_per_subfr);
-    }
-    ELSE
-    {
-        push_next_indice_fx(st, 0, 1);
-    }
-
-    return;
-}
-
-/************************************************************/
-/*       Functions for encoder side loss simulation         */
-/************************************************************/
-void encoderSideLossSimulation(
-    Encoder_State_fx *st,
+void enc_prm_side_Info(
     HANDLE_PLC_ENC_EVS hPlc_Ext,
-    Word16 *lsf_q,                  /* Q1*1.28 */
-    Word16 stab_fac,                 /* Q15 */
-    Word8 calcOnlyISF,
-    const Word16 L_frame
+    Encoder_State *st
 )
 {
-    Word16 lspLocal_Q15[M];
-    Word16 const* xsfBase;                      /* base for differential XSF coding */
+    int diff_pitch;
+    short bits_per_subfr, search_range;
 
+    bits_per_subfr = 4;
+    search_range = 8;
+
+    if( hPlc_Ext->nBits > 1 )
+    {
+        push_next_indice(st, 1, 1);
+
+        diff_pitch = hPlc_Ext->T0 - hPlc_Ext->T0_4th;
+
+        if( ( diff_pitch > search_range-1 ) || ( diff_pitch < -search_range+1 ) )
+        {
+            diff_pitch = -8;
+        }
+
+        push_next_indice(st, (diff_pitch+search_range), bits_per_subfr);
+    }
+    else
+    {
+        push_next_indice(st, 0, 1);
+    }
+
+    return;
+}
+
+/*-------------------------------------------------------------------*
+* encoderSideLossSimulation()
+*
+* Encoder side loss simulation
+*-------------------------------------------------------------------*/
+
+void encoderSideLossSimulation(
+    Encoder_State *st,
+    HANDLE_PLC_ENC_EVS hPlc_Ext,
+    float *lsf_q,
+    float stab_fac,
+    int calcOnlylsf,
+    int L_frame
+)
+{
+    float lspLocal[M];
+    float const* lsfBase;                      /* base for differential lsf coding */
 
     /*************************************************************
      * Decoder state could be stored with memcpy,
@@ -243,203 +153,215 @@ void encoderSideLossSimulation(
      *************************************************************/
 
     /* Decoder State Update */
-    IF( sub(L_frame,L_FRAME_16k)==0 )
+    lsf2lsp( lsf_q, lspLocal, M, st->sr_core );
+
+    lsfBase = PlcGetlsfBase( st->lpcQuantization, st->narrowBand, st->sr_core );
+
+    mvr2r( st->mem_MA, hPlc_Ext->mem_MA, M );
+
+    /* lsf parameter processing for concealment */
+    updatelsfForConcealment( hPlc_Ext, lsf_q);
+    hPlc_Ext->stab_fac = stab_fac;
+
+    /* Update Decoder State for the loss simulation at the next frame */
+    mvr2r( lsf_q, hPlc_Ext->lsfold, M );
+    mvr2r( lspLocal, hPlc_Ext->lspold, M );
+
+    if (calcOnlylsf)
     {
-        lsf2lsp_fx( lsf_q, lspLocal_Q15, M, INT_FS_16k_FX );
-    }
-    ELSE
-    {
-        lsf2lsp_fx( lsf_q, lspLocal_Q15, M, INT_FS_FX );
-    }
-
-
-    xsfBase = PlcGetLsfBase (st->lpcQuantization,
-                             st->narrowBand,
-                             st->sr_core);
-
-    Copy( st->mem_MA_fx, hPlc_Ext->mem_MA_14Q1, M );
-    Copy( st->mem_AR_fx, hPlc_Ext->mem_AR, M );
-
-
-    /* ISF parameter processing for concealment */
-    updateLSFForConcealment( hPlc_Ext, lsf_q, M );
-    hPlc_Ext->stab_fac_Q15 = stab_fac;
-    move16();
-
-    Copy( lsf_q, hPlc_Ext->lsfold_14Q1, M );
-    Copy( lspLocal_Q15, hPlc_Ext->lspold_Q15, M );
-
-
-    IF (calcOnlyISF != 0)
-    {
-        /* ISF concealment simulation */
-        getConcealedLSF( hPlc_Ext, xsfBase, st->clas_fx, L_frame );
+        /* lsf concealment simulation */
+        getConcealedlsf( hPlc_Ext, lsfBase, L_frame, st->clas);
         hPlc_Ext->T0 = hPlc_Ext->T0_4th;
-        move16();
     }
-    ELSE
+    else
     {
-        Word16 old_exc_Qx[L_EXC_MEM+8];
-        Word16 A_3Q12[(NB_SUBFR16k+1)*(M+1)];
-        Word16 *speechLookAhead_Qx;
+        float AqCon[(NB_SUBFR16k+1)*(M+1)];
+        float *speechLookAhead;
+        float old_exc[L_EXC_MEM+8];
 
-        /* calculate Q-value for input speech */
-        speechLookAhead_Qx = &(st->speech_enc_pe[L_frame]);
+        /*                 Initialize pointers here                  */
+        mvr2r( hPlc_Ext->old_exc, old_exc, 8 );
+        mvr2r( hPlc_Ext->LPDmem->old_exc, &old_exc[8], L_EXC_MEM );
+        speechLookAhead = &( st->speech_enc_pe[L_frame] );
 
-        Copy( hPlc_Ext->old_exc_Qold, old_exc_Qx, 8 );
-        Copy( hPlc_Ext->LPDmem->old_exc, &old_exc_Qx[8], L_EXC_MEM );
-        Scale_sig( old_exc_Qx, 8, hPlc_Ext->Q_exp );
-
-        /* ISF concealment simulation */
-        getConcealedLP( hPlc_Ext, A_3Q12, xsfBase, st->clas_fx, L_frame );
+        /* lsf concealment simulation */
+        getConcealedLP( hPlc_Ext, AqCon, lsfBase, st->sr_core, st->clas, L_frame);
 
         /* apply encoder side PLC simulation */
         hPlc_Ext->pit_min = st->pit_min;
-        move16();
         hPlc_Ext->pit_max = st->pit_max;
-        move16();
-        coderLookAheadInnovation( A_3Q12, &(hPlc_Ext->T0), hPlc_Ext, speechLookAhead_Qx, old_exc_Qx, L_frame );
+        coderLookAheadInnovation( AqCon, &(hPlc_Ext->T0), hPlc_Ext, speechLookAhead, old_exc, L_SUBFR, st->L_frame );
+
     }
+
     return;
 }
 
+/*-------------------------------------------------------------------*
+* GplcTcxEncSetup()
+*
+*
+*-------------------------------------------------------------------*/
 
-void GplcTcxEncSetup( Encoder_State_fx *st, HANDLE_PLC_ENC_EVS hPlc_Ext, Word16 Q_new )
+void GplcTcxEncSetup(
+    Encoder_State *st,
+    HANDLE_PLC_ENC_EVS hPlc_Ext)
 {
     hPlc_Ext->T0_4th = st->tcxltp_pitch_int;
-    move16();
-    hPlc_Ext->Q_exp = sub( Q_new, hPlc_Ext->Q_new);
-    move16();
-    hPlc_Ext->Q_new = Q_new;
-    move16();
-    set16_fx( hPlc_Ext->old_exc_Qold, 0, 8);
+
+    return;
 }
 
-Word16 encSideSpecPowDiffuseDetector(
-    Word16 *lsf_ref,
-    Word16 *lsf_con,
-    Word32 sr_core,
-    Word16 *prev_lsf4_mean,
-    Word8 sw
-    , Word16 coder_type
+/*-------------------------------------------------------------------*
+* encSideSpecPowDiffuseDetector()
+*
+*
+*-------------------------------------------------------------------*/
+
+short encSideSpecPowDiffuseDetector(
+    float *lsf_ref,
+    float *lsf_con,
+    int sr_core,
+    float *prev_lsf4_mean,
+    short sw
+    ,short coder_type
 )
 {
-    Word16 tmp;
-    Word16 lsf_mod[M];
-    Word32 dist1, dist2, cum_dist1, cum_dist2;
-    Word16 lsf4_mean;
-    Word16 th;
-    Word16 idx;
-    Word16 cnt_imprv, i;
-    Word32 L_tmp;
-    Word16 th_dif;
+    float lsf_mod[M];
+    float dist1, dist2, cum_dist1, cum_dist2;
+    float lsf4_mean;
+    float th;
+    float th_dif_lsf4_mean;
+    short idx;
+    int cnt_imprv, i;
 
-    /* calculate the mean of the lowest 4 LSFs */
+    /* calculate the mean of the lowest 4 lsfs */
+    lsf4_mean = 0;
 
-    L_tmp = L_mult(lsf_ref[0], 8192/*1.0/4.0 Q15*/);
-    L_tmp = L_mac(L_tmp, lsf_ref[1], 8192/*1.0/4.0 Q15*/);
-    L_tmp = L_mac(L_tmp, lsf_ref[2], 8192/*1.0/4.0 Q15*/);
-    lsf4_mean = mac_r(L_tmp, lsf_ref[3], 8192/*1.0/4.0 Q15*/);
-
-    IF(sw)
+    for(i = 0; i < 4; i++)
     {
-        Copy(lsf_con, lsf_mod, M);
+        lsf4_mean += lsf_ref[i];
+    }
+    lsf4_mean /= 4.0f;
 
-        modify_lsf(lsf_mod, M, sr_core, 1 );
+    if(sw)
+    {
+        mvr2r( lsf_con, lsf_mod, M );
 
-        move16();
-        move16();
+        modify_lsf( lsf_mod, M, sr_core
+                    , 1
+                  );
+
         cum_dist1 = 0;
         cum_dist2 = 0;
 
         cnt_imprv = 0;
 
-        IF( L_sub( sr_core, 16000 ) == 0 )
-        {
-            th = 2560;
-            move16(); /* LSF */
-            th_dif = 288;
-            move16(); /* LSF */
-        }
-        ELSE
-        {
-            th = 2048;
-            move16(); /* LSF */
-            th_dif = 230;
-            move16(); /* LSF */
-        }
 
-        FOR(i = 0; i < M; i++)
+        for(i = 0; i < M; i++)
         {
-            tmp = sub(lsf_con[i], lsf_ref[i]);
-            dist1 = L_mult(tmp, tmp);
-            tmp = sub(lsf_mod[i], lsf_ref[i]);
-            dist2 = L_mult(tmp, tmp);
+            dist1 = (lsf_con[i] - lsf_ref[i]) * (lsf_con[i] - lsf_ref[i]);
+            dist2 = (lsf_mod[i] - lsf_ref[i]) * (lsf_mod[i] - lsf_ref[i]);
+            cum_dist1 += dist1;
+            cum_dist2 += dist2;
 
-            if(L_sub(dist1, dist2) > 0)
+            if(dist1 > dist2)
             {
-                cnt_imprv = add(cnt_imprv, 1);
+                cnt_imprv++;
             }
-            cum_dist1 = L_add(cum_dist1, dist1);
-            cum_dist2 = L_add(cum_dist2, dist2);
         }
 
-        idx = 0;
-        move16();
+        th = 800;
+        th_dif_lsf4_mean = 90;
 
-        test();
-        test();
-        test();
-        if(L_sub(cum_dist1, L_add(cum_dist2, Mpy_32_16_1(cum_dist2, 4915))) > 0
-                && sub(sub(lsf4_mean, *prev_lsf4_mean), th_dif) > 0
-                && sub(*prev_lsf4_mean, th) < 0
-                && sub(cnt_imprv, 2) > 0
-                && sub(coder_type, GENERIC) == 0 )
+        if(sr_core == 16000)
+        {
+            th *= 1.25;
+            th_dif_lsf4_mean *= 1.25;
+        }
+
+
+        if(cum_dist1 > cum_dist2 * 1.15
+                && lsf4_mean - *prev_lsf4_mean > th_dif_lsf4_mean
+                && *prev_lsf4_mean < th
+                && cnt_imprv > 2
+                && coder_type == GENERIC
+          )
         {
             idx = 1;
-            move16();
         }
-
+        else
+        {
+            idx = 0;
+        }
     }
-    ELSE
+    else
     {
-        move16();
         idx = 0;
     }
+
     /* update parameters */
-    move16();
     *prev_lsf4_mean = lsf4_mean;
 
     return idx;
 }
 
-void updateSpecPowDiffuseIdx( Encoder_State_fx *st)
+/*-------------------------------------------------------------------*
+* updateSpecPowDiffuseIdx()
+*
+*
+*-------------------------------------------------------------------*/
+
+void updateSpecPowDiffuseIdx(
+    Encoder_State *st,
+    const float gain_pitch_buf[],   /* i  : gain pitch values   */
+    const float gain_code_buf[]     /* i  : gain pitch values   */
+)
 {
-    Word16 min_gp;
-    Word16 k;
+    float min_gp;
+    int k;
 
+    st->mean_gc[1] = gain_code_buf[0];
+    min_gp = gain_pitch_buf[0];
 
-    move32();
-    move16();
-    st->mean_gc[1] = st->gain_code[0];
-    min_gp = st->bpf_gainT[0];
-
-    FOR(k = 1; k < 4; k++)
+    for(k = 1; k < 4; k++)
     {
-        st->mean_gc[1] = L_add(st->mean_gc[1], st->gain_code[k]);
-        min_gp = s_min(min_gp, st->bpf_gainT[k]);
+        st->mean_gc[1] += gain_code_buf[k];
+
+        if( gain_pitch_buf[k] < min_gp )
+        {
+            min_gp = gain_pitch_buf[k];
+        }
     }
 
-    /* Suppress saturation warning in threshold comparison. */
-    test();
-    if(L_sub(st->mean_gc[1], L_add(st->mean_gc[0], Mpy_32_16_r(st->mean_gc[0], 3211/*0.098 Q15*/))) < 0 ||
-            sub(min_gp, 13435/*0.82 Q14*/) > 0)
+    if(st->mean_gc[1] / (st->mean_gc[0] + 1e-6) < 1.098 || min_gp > 0.82)
     {
-        move16();
         st->glr_idx [0]= 0;
     }
-    move16();
     st->mean_gc[0] = st->mean_gc[1];
 
+    return;
 }
 
+
+/*-------------------------------------------------------------------*
+* getConcealedlsf()
+*
+*
+*-------------------------------------------------------------------*/
+
+void getConcealedlsf(
+    HANDLE_PLC_ENC_EVS memDecState,
+    const float lsfBase[],
+    int L_frame,
+    int last_good
+)
+{
+    float *lsf = memDecState->lsf_con;
+
+    dlpc_bfi( L_frame, &lsf[0], memDecState->lsfold, last_good,
+              1 /*assumes packet loss */, memDecState->mem_MA, memDecState->mem_AR, &(memDecState->stab_fac), memDecState->lsf_adaptive_mean,
+              1, NULL, 0, NULL, NULL, lsfBase);
+
+    return;
+}

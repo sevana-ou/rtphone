@@ -1,136 +1,109 @@
 /*====================================================================================
-    EVS Codec 3GPP TS26.442 Apr 03, 2018. Version 12.11.0 / 13.6.0 / 14.2.0
+    EVS Codec 3GPP TS26.443 Nov 13, 2018. Version 12.11.0 / 13.7.0 / 14.3.0 / 15.1.0
   ====================================================================================*/
 
-
 #include <stdlib.h>
+#include "prot.h"
+#include "typedef.h"
+#include "stat_enc.h"
+#include "cnst.h"
+#include "rom_com.h"
 
-#include "stl.h"
-#include "cnst_fx.h"
-#include "stat_enc_fx.h"
-#include "prot_fx.h"
 
-#define NBITS_GACELP 5
+#define NBITS_GACELP              5
 
-extern const Word16 lsf_init[16];
-
+/*-------------------------------------------------------------------*
+* open_PLC_ENC_EVS()
+*
+*
+*-------------------------------------------------------------------*/
 
 void open_PLC_ENC_EVS(
     HANDLE_PLC_ENC_EVS hPlcExt,
-    Word32 sampleRate           /* core coder SR */
+    int sampleRate
 )
 {
-    Word16 itr;
+    short itr;
 
 
     hPlcExt->enableGplc = 0;
-    move16();
     hPlcExt->calcOnlylsf = 1;
-    move16();
     hPlcExt->nBits = NBITS_GACELP;
-    move16();
-
-    hPlcExt->Q_exp = 0;
-    move16();
-    hPlcExt->Q_new = 0;
-    move16();
-
-    set16_fx(hPlcExt->mem_MA_14Q1,0,M);
-    set16_fx(hPlcExt->mem_AR,0,M);
-    set16_fx(hPlcExt->lsfold_14Q1,0,M);
-    set16_fx(hPlcExt->lspold_Q15,0,M);
-
-    set16_fx(hPlcExt->old_exc_Qold,0,8);
-
-    set16_fx(hPlcExt->lsfoldbfi0_14Q1,0,M);
-    set16_fx(hPlcExt->lsfoldbfi1_14Q1,0,M);
-    set16_fx(hPlcExt->lsf_adaptive_mean_14Q1,0,M);
-    hPlcExt->stab_fac_Q15 = 0;
-    move16();
-    IF( L_sub(sampleRate,12800)==0 )
+    hPlcExt->stab_fac = 0;
+    set_f(hPlcExt->lsfoldbfi0, 0.0f, M);
+    set_f(hPlcExt->lsfoldbfi1, 0.0f, M);
+    set_f(hPlcExt->lsf_adaptive_mean, 0.0f, M);
+    set_f(hPlcExt->old_exc, 0.0f, 8);
+    set_f(hPlcExt->mem_MA, 0.0f, M);
+    set_f(hPlcExt->lsfold, 0.0f, M);
+    set_f(hPlcExt->lspold, 0.0f, M);
+    if( sampleRate == 12800 )
     {
         hPlcExt->T0_4th = L_SUBFR;
-        move16();
         hPlcExt->T0 = L_SUBFR;
-        move16();
-        FOR( itr=0; itr<M; itr++ )
+        for( itr=0; itr<M; itr++ )
         {
             hPlcExt->lsf_con[itr] = lsf_init[itr];
-            move16();
             hPlcExt->last_lsf_ref[itr] = lsf_init[itr];
-            move16();
             hPlcExt->last_lsf_con[itr] = lsf_init[itr];
-            move16();
         }
     }
-    ELSE
+    else
     {
         hPlcExt->T0_4th = L_SUBFR;
-        move16();
         hPlcExt->T0 = L_SUBFR;
-        move16();
-        FOR( itr=0; itr<M; itr++ )
+        for( itr=0; itr<M; itr++ )
         {
-            hPlcExt->lsf_con[itr] = add(lsf_init[itr],shr(lsf_init[itr],2));
-            hPlcExt->last_lsf_ref[itr] = add(lsf_init[itr],shr(lsf_init[itr],2));
-            hPlcExt->last_lsf_con[itr] = add(lsf_init[itr],shr(lsf_init[itr],2));
+            hPlcExt->lsf_con[itr] = lsf_init[itr] * 1.25;
+            hPlcExt->last_lsf_ref[itr] = lsf_init[itr] * 1.25;
+            hPlcExt->last_lsf_con[itr] = lsf_init[itr] * 1.25;
         }
     }
+
 
     return;
 }
 
 
-/*
-  function to extract and write guided information
-*/
-void gPLC_encInfo (HANDLE_PLC_ENC_EVS self,
-                   Word32 modeBitrate,
-                   Word16 modeBandwidth,
-                   Word16 old_clas,
-                   Word16 coder_type
-                  )
+/*-------------------------------------------------------------------*
+* gPLC_encInfo()
+*
+* Function to extract and write guided information
+*-------------------------------------------------------------------*/
+
+void gPLC_encInfo(
+    HANDLE_PLC_ENC_EVS self,
+    const int brate,
+    const int bwidth,
+    const short last_clas,
+    const int coder_type
+)
 {
-
-
-    IF (self)
+    if (self)
     {
         self->calcOnlylsf = 1;
-        move16();
-        test();
-        test();
-        test();
-        test();
-        test();
-        IF ( ( sub(modeBandwidth, WB) == 0  && L_sub(modeBitrate, 24400) == 0 ) ||
-             ( sub(modeBandwidth, SWB) == 0 && L_sub(modeBitrate, 24400) == 0 ) ||
-             ( sub(modeBandwidth, FB) == 0 && L_sub(modeBitrate, 24400) == 0 ) )
+        if(bwidth >= WB  && brate == ACELP_24k40 )
         {
             self->enableGplc = 1;
-            move16();
-            self->nBits = 1;
-            move16();
-            test();
-            test();
-            test();
-            IF ( (sub(old_clas, VOICED_CLAS)==0 || sub(old_clas, ONSET)==0) &&
-                 (sub(coder_type, VOICED)==0 || sub(coder_type, GENERIC)==0 ) )
+
+            if( ( last_clas == VOICED_CLAS || last_clas == ONSET )
+                    && (coder_type == VOICED || coder_type == GENERIC) )
             {
                 self->nBits = NBITS_GACELP;
-                move16();
                 self->calcOnlylsf = 0;
-                move16();
+            }
+            else
+            {
+                self->nBits = 1;
             }
         }
-        ELSE
+        else
         {
             self->enableGplc = 0;
-            move16();
-            self->nBits = NBITS_GACELP;
-            move16();
+            self->nBits = 0;
         }
 
     }
 
+    return;
 }
-

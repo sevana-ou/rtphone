@@ -1,332 +1,329 @@
 /*====================================================================================
-    EVS Codec 3GPP TS26.442 Apr 03, 2018. Version 12.11.0 / 13.6.0 / 14.2.0
+    EVS Codec 3GPP TS26.443 Nov 13, 2018. Version 12.11.0 / 13.7.0 / 14.3.0 / 15.1.0
   ====================================================================================*/
-
 
 #include <stdlib.h>
 #include <stdio.h>
-#include <assert.h>
-#include "stl.h"
-#include "control.h"
-#include "prot_fx.h"
+#include "prot.h"
 
 
-/* Prototypes */
+/*-------------------------------------------------------------------*
+* qlpc_avq()
+*
+*
+*--------------------------------------------------------------------*/
 
 void qlpc_avq(
-    const Word16 *lsf,        /* (i) Input LSF vectors             (14Q1*1.28)    */
-    const Word16 *lsfmid,     /* (i) Input LSF vectors             (14Q1*1.28)    */
-    Word16 *lsf_q,      /* (o) Quantized LFS vectors         (14Q1*1.28)    */
-    Word16 *lsfmid_q,   /* (o) Quantized LFS vectors         (14Q1*1.28)    */
-    Word16 *index,      /* (o) Quantization indices                         */
-    Word16 *nb_indices, /* (o) Number of quantization indices               */
-    Word16 *nbbits,     /* (o) Number of quantization bits                  */
-    const	Word16 core,        /* (i) TCX10 or TCX20                               */
-    Word32 sr_core
+    const float *lsf,        /* (i) Input LSF vectors              */
+    const float *lsfmid,
+    float *lsf_q,            /* (o) Quantized LFS vectors          */
+    float *lsfmid_q,
+    int *index,              /* (o) Quantization indices           */
+    int *nb_indices,         /* (o) Number of quantization indices */
+    int *nbbits,             /* (o) Number of quantization bits    */
+    int core,
+    float sr_core
 )
 {
-    Word16 i;
-    Word16 lsfmid_q0[M];
-    Word16 *tmp_index, indxt[256], nit, nbits, nbt;
-    Word16 dummy[M];
-
+    int i;
+    float lsfmid_q0[M];
+    int *tmp_index, indxt[256], nbits, nbt, nit;
+    float dummy[M];
 
     /* Init */
     tmp_index = &index[0];
     *nb_indices = 0;
-    move16();
 
-    tmp_index[0] = vlpc_1st_cod(lsf, lsf_q, dummy, 0);
+    /* Quantize end_frame LPC */
+    for (i=0; i<M; i++)
+    {
+        lsf_q[i] = 0.0f;
+    }
 
-    nbt = vlpc_2st_cod(lsf, lsf_q, &tmp_index[1], 0, sr_core);
+    tmp_index[0] = vlpc_1st_cod(lsf, lsf_q, sr_core, dummy );
 
-    /*nit = 1 + 2 + index[1] + index[2]; nit < NPRM_LPC_NEW(=50) */
-    nit = add(add(3,index[1]),index[2]);
-    assert(nit < NPRM_LPC_NEW);
+    nbt = vlpc_2st_cod( lsf, lsf_q, &tmp_index[1], 0, sr_core );
 
-    /*tmp_index += nit;*/
-    tmp_index = tmp_index + nit;
-    /**nb_indices += nit;*/
-    *nb_indices = add(*nb_indices,nit);
-    move16();
-    /*nbbits[0] = 8 + nbt;*/
-    nbbits[0] = add(8,nbt);
-    move16();
+    nit = 1 + 2 + index[1] + index[2];
+    tmp_index += nit;
+    *nb_indices += nit;
+    nbbits[0] = 8 + nbt;
 
     *tmp_index = 0;
-    move16();
 
-    IF (sub(core, TCX_20_CORE) == 0)
+    /* Quantize mid-frame LPC */
+
+    if( core == TCX_10_CORE )
     {
+        tmp_index++;
+        *nb_indices +=1;
 
-        return;
-    }
-
-    /* Quantize intermediate LPC (512 framing) */
-    tmp_index++;
-    /**nb_indices +=1;*/
-    *nb_indices = add(*nb_indices,1);
-    move16();
-
-    /* LPC2: Abs? */
-    tmp_index[0] = vlpc_1st_cod(lsfmid, lsfmid_q, dummy, 0);
-
-    nbits = vlpc_2st_cod(lsfmid, lsfmid_q, &tmp_index[1], 0, sr_core);
-    /*nbt = 8 + nbits;*/
-    nbt = add(8,nbits);
-    /*nit = 1 + 2 + tmp_index[1] + tmp_index[2];*/
-    nit = add(add(3,tmp_index[1]),tmp_index[2]);
-
-    /* LPC2: RelR? */
-    FOR (i=0; i<M; i++)
-    {
-        lsfmid_q0[i] = lsf_q[i];
-        move16();
-    }
-    nbits = vlpc_2st_cod(lsfmid, lsfmid_q0, indxt, 3, sr_core);
-
-    IF (sub(nbits,nbt) < 0)
-    {
-        nbt = nbits;
-        move16();
-        /*nit = 2 + indxt[0] + indxt[1];*/
-        nit = add(add(2,indxt[0]),indxt[1]);
-        tmp_index[-1] = 1;
-        move16();
-
-        FOR (i=0; i<M; i++)
+        /* LPC2: Abs? */
+        for (i=0; i<M; i++)
         {
-            lsfmid_q[i] = lsfmid_q0[i];
-            move16();
+            lsfmid_q[i] = 0.0f;
         }
 
-        FOR (i=0; i<nit; i++)
+        tmp_index[0] = vlpc_1st_cod(lsfmid, lsfmid_q, sr_core, dummy );
+
+        nbits = vlpc_2st_cod(lsfmid, lsfmid_q, &tmp_index[1], 0, sr_core);
+
+        nbt = 8 + nbits;
+        nit = 1 + 2 + tmp_index[1] + tmp_index[2];
+
+        /* LPC2: RelR? */
+        for (i=0; i<M; i++)
         {
-            tmp_index[i] = indxt[i];
-            move16();
+            lsfmid_q0[i] = lsf_q[i];
         }
+
+        nbits = vlpc_2st_cod(lsfmid, lsfmid_q0, indxt, 3, sr_core);
+
+        if (nbits < nbt)
+        {
+            nbt = nbits;
+            nit = 2 + indxt[0] + indxt[1];
+            tmp_index[-1] = 1;
+
+            for (i=0; i<M; i++)
+            {
+                lsfmid_q[i] = lsfmid_q0[i];
+            }
+
+            for (i=0; i<nit; i++)
+            {
+                tmp_index[i] = indxt[i];
+            }
+        }
+
+        tmp_index += nit;
+        *nb_indices += nit;
+        nbbits[1] = 1 + nbt;
     }
-
-    tmp_index += nit;
-    /**nb_indices += nit;*/
-    *nb_indices = add(*nb_indices,nit);
-    move16();
-    /*nbbits[1] = 1 + nbt;*/
-    nbbits[1] = add(1,nbt);
-    move16();
-
 
     return;
 }
 
-static Word16 unary_code(Word16 ind, Encoder_State_fx *st)
-{
-    Word16 nb_bits;
 
-    move16();
+/*-------------------------------------------------------------------*
+* unary_code()
+*
+*
+*--------------------------------------------------------------------*/
+
+static int unary_code(int ind, Encoder_State *st)
+{
+    int nb_bits;
+
     nb_bits = 1;
 
     /* Index bits */
-    ind = sub(ind, 1);
+    ind -= 1;
 
-    FOR ( ; ind > 0; ind--)
+    while (ind >= 16)
     {
-        push_next_indice_fx(st, 1, 1);
-        nb_bits = add(nb_bits, 1);
+        push_next_indice(st, 0xffffU, 16);
+        nb_bits += 16;
+        ind -= 16;
+    }
+    if (ind > 0)
+    {
+        push_next_indice(st, (1U<<ind)-1, ind);
+        nb_bits += ind;
     }
 
     /* Stop bit */
-    push_next_indice_fx(st, 0, 1);
+    push_next_indice(st, 0, 1);
 
     return(nb_bits);
 }
 
-static Word16 unpack4bits(Word16 nbits, const Word16 *prm, Encoder_State_fx *st)
-{
-    Word16 i;
 
-    IF (nbits == 0)
+/*-------------------------------------------------------------------*
+* unpack4bits()
+*
+*
+*--------------------------------------------------------------------*/
+
+static int unpack4bits(int nbits, const int *prm, Encoder_State *st)
+{
+    int i;
+
+    if (nbits == 0)
     {
-        push_next_indice_fx(st, 0, 0);
+        push_next_indice(st, 0, 0);
         i = 1;
-        move16();
     }
-    ELSE
+    else
     {
-        move16();
         i=0;
 
-        FOR ( ; nbits > 4; nbits -= 4)
+        while (nbits > 4)
         {
-            push_next_indice_fx(st, prm[i], 4);
-            i = add(i, 1);
+            push_next_indice(st, prm[i], 4);
+            nbits -= 4;
+            i++;
         }
-        push_next_indice_fx(st, prm[i], nbits);
-        i = add(i, 1);
+        push_next_indice(st, prm[i], nbits);
+        i++;
     }
 
     return(i);
 }
-Word16 encode_lpc_avq( Encoder_State_fx *st, Word16 numlpc, Word16 *param_lpc, Word16 mode )
-{
-    Word16 k,j;
-    Word16 q_type, nb_ind;
-    Word16 i,qn1,qn2,nb,avqBits,st1;
-    Word16 nb_bits;
 
-    move16();
-    move16();
-    move16();
-    st1=0;
+
+/*-------------------------------------------------------------------*
+* encode_lpc_avq()
+*
+*
+*--------------------------------------------------------------------*/
+
+int encode_lpc_avq(
+    Encoder_State *st,
+    int numlpc,
+    int *param_lpc,
+    int mode
+)
+{
+    int k,j;
+    int q_type, nb_ind;
+    int i,qn1,qn2,nb,avqBits,st1=0;
+    int nb_bits;
+
     j = 0;
     nb_bits = 0;
 
-    FOR (k=0; k<numlpc; k++)
+    for (k=0; k<numlpc; k++)
     {
         /* Retrieve quantizer type */
-
-
-        move16();
-        q_type = 0;
-        IF (k!=0)
+        if (k==0)
         {
-            move16();
-            q_type = param_lpc[j];
-            j = add(j,1);
+            q_type = 0;
+        }
+        else
+        {
+            q_type = param_lpc[j++];
         }
 
         /* Determine number of AVQ indices */
-        move16();
         nb_ind = 0;
 
         if (q_type==0)
         {
-            move16();
             st1 = param_lpc[j++];
         }
-        move16();
-        move16();
         qn1 = param_lpc[j++];
         qn2 = param_lpc[j++];
-        nb_ind = add(qn1, qn2);
+        nb_ind = qn1 + qn2;
 
-        IF ( s_or(k==0, s_and(k==1, mode!=1)) )
+        if ( k==0 || (k==1 && mode!=1) )
         {
             /* Encode quantizer type */
-
-
-            move16();
-            nb = 0;
-            IF (k!=0)
+            if (k==0)
+            {
+                nb = 0;
+            }
+            else
             {
                 nb = 1;
-                push_next_indice_fx(st, q_type, nb);
+                push_next_indice(st, q_type, nb);
             }
-            nb_bits = add(nb_bits, nb);
+            nb_bits += nb;
 
             /* Encode quantizer data */
 
-            IF (q_type==0)
+            if (q_type==0)
             {
                 /* Absolute quantizer with 1st stage stochastic codebook */
-                push_next_indice_fx(st, st1, 8);
-                nb_bits = add(nb_bits, 8);
+                push_next_indice(st, st1, 8);
+                nb_bits += 8;
             }
 
             /* 2 bits to specify Q2,Q3,Q4,ext */
-            nb_bits = add(nb_bits, 4);
-            i = sub(qn1, 2);
+            nb_bits += 4;
+            i = qn1-2;
 
-            if ( s_or(i<0, sub(i,3)>0) )
+            if ((i<0) || (i>3))
             {
-                move16();
                 i = 3;
             }
-            push_next_indice_fx(st, i, 2);
+            push_next_indice(st, i, 2);
 
-            i = sub(qn2, 2);
+            i = qn2-2;
 
-            if ( s_or(i<0, sub(i,3)>0) )
+            if ((i<0) || (i>3))
             {
-                move16();
                 i = 3;
             }
-            push_next_indice_fx(st, i, 2);
+            push_next_indice(st, i, 2);
 
             /* Unary code for abs and rel LPC0/LPC2 */
             /* Q5 = 0, Q6=10, Q0=110, Q7=1110, ... */
-            move16();
             nb = qn1;
 
-            IF ( sub(nb,6) > 0)
+            if (nb > 6)
             {
-                nb = sub(nb, 3);
+                nb -= 3;
             }
-            ELSE IF ( sub(nb,4) > 0)
+            else if (nb > 4)
             {
-                nb = sub(nb, 4);
+                nb -= 4;
             }
-            ELSE IF (nb == 0)
+            else if (nb == 0)
             {
-                move16();
                 nb = 3;
             }
-            ELSE
+            else
             {
-                move16();
                 nb = 0;
             }
 
-            IF (nb > 0)
+            if (nb > 0)
             {
                 unary_code(nb, st);
             }
-            nb_bits = add(nb_bits, nb);
+            nb_bits += nb;
 
-            move16();
             nb = qn2;
 
-            IF ( sub(nb,6) > 0)
+            if (nb > 6)
             {
-                nb = sub(nb, 3);
+                nb -= 3;
             }
-            ELSE IF ( sub(nb,4) > 0)
+            else if (nb > 4)
             {
-                nb = sub(nb, 4);
+                nb -= 4;
             }
-            ELSE IF (nb == 0)
+            else if (nb == 0)
             {
-                move16();
                 nb = 3;
             }
-            ELSE
+            else
             {
-                move16();
                 nb = 0;
             }
 
-            IF (nb > 0)
+            if (nb > 0)
             {
                 unary_code(nb, st);
             }
-            nb_bits = add(nb_bits, nb);
+            nb_bits += nb;
 
-            avqBits = shl(qn1,2);
+            avqBits = 4*qn1;
             unpack4bits(avqBits, &param_lpc[j], st);
-            j = add(j, qn1);
-            nb_bits = add(nb_bits, avqBits);
+            j += qn1;
+            nb_bits += avqBits;
 
-            avqBits = shl(qn2, 2);
+            avqBits = 4*qn2;
             unpack4bits(avqBits, &param_lpc[j], st);
-            j = add(j, qn2);
-            nb_bits = add(nb_bits, avqBits);
+            j += qn2;
+            nb_bits += avqBits;
         }
-        ELSE
+        else
         {
-            j = add(j, nb_ind);
+            j += nb_ind;
         }
     }
 
     return(nb_bits);
 }
-

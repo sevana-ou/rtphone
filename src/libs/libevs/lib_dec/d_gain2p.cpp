@@ -1,52 +1,16 @@
 /*====================================================================================
-    EVS Codec 3GPP TS26.442 Apr 03, 2018. Version 12.11.0 / 13.6.0 / 14.2.0
+    EVS Codec 3GPP TS26.443 Nov 13, 2018. Version 12.11.0 / 13.7.0 / 14.3.0 / 15.1.0
   ====================================================================================*/
 
-/*-------------------------------------------------------------------*
- * Decoding of pitch and codebook gains  (see q_gain2_plus.c)        *
- *-------------------------------------------------------------------*/
+#include <math.h>
 #include <stdlib.h>
 #include <assert.h>
-#include "prot_fx.h"
-#include "basop_util.h"
-#include "stl.h"
-#include "rom_com_fx.h"
+#include "options.h"
+#include "typedef.h"
+#include "prot.h"
+#include "cnst.h"
+#include "rom_com.h"
 
-
-/*********************
- * private functions *
- *********************/
-static Word32 calc_gcode0(
-    Word16 *gcode0,
-    Word16 *exp_gcode0
-)
-{
-    Word32 L_tmp;
-
-    /*gcode0 = (float)pow(10.0,(gcode0)*0.05);*/   /* predicted gain */
-
-    L_tmp = L_mult(*gcode0, 5443/*0.166096f Q15*/);
-    *exp_gcode0 = add(1,extract_l(L_shr(L_tmp, 24)));
-    L_tmp = L_lshl(L_tmp, 7);
-    L_tmp = L_and(0x7FFFFFFF, L_tmp);
-
-    L_tmp = Pow2(30,round_fx(L_tmp));
-    *gcode0 = round_fx(L_tmp);
-
-    return L_tmp;
-}
-
-static Word32 calc_gain_code(Word16 g_code, Word16 gcode0, Word16 exp_gcode0)
-{
-    Word32 L_tmp;
-
-    L_tmp = L_mult(g_code, gcode0);            /* Q11*Q15 -> Q27 */
-    exp_gcode0 = add(exp_gcode0,-11);
-    L_tmp = L_shl(L_tmp, exp_gcode0);       /*   Q27 -> Q16 */
-
-
-    return L_tmp;
-}
 
 /*--------------------------------------------------------------------------*
 * Mode2_gain_dec_mless
@@ -55,88 +19,90 @@ static Word32 calc_gain_code(Word16 g_code, Word16 gcode0, Word16 exp_gcode0)
 *-------------------------------------------------------------------------*/
 
 static void Mode2_gain_dec_mless(
-    Word16 index,                /* i  : Quantization index vector        Q0  */
-    Word16 *code,                /* i  : algebraic code excitation        Q9  */
-    Word16 lcode,                /* i  : Subframe size                    Q0  */
-    Word16 *gain_pit,            /* o  : Quantized pitch gain            1Q14 */
-    Word32 *gain_code,           /* o  : Quantized codebook gain          Q16 */
-    Word16 mean_ener,            /* i  : mean_ener defined in open-loop   Q8  */
-    Word16 *past_gpit,           /* i/o: past gain of pitch              1Q14 */
-    Word32 *past_gcode,          /* i/o: past energy of code              Q16 */
-    Word16 *gain_inov,           /* o  : unscaled innovation gain        3Q12 */
-    Word16 coder_type            /* i  : coder type for number of bits        */
+    int index,          /* (i)  : index of quantizer                      */
+    float code[],       /* (i)  : Innovative code vector                  */
+    int lcode,          /* (i)  : Subframe size                           */
+    float *gain_pit,    /* (o)  : Quantized pitch gain                    */
+    float *gain_code,   /* (o)  : Quantized codebook gain                 */
+    float mean_ener,    /* (i)  : mean_ener defined in open-loop (2 bits) */
+    float *past_gpit,   /* (i/o): past gain of pitch                      */
+    float *past_gcode,  /* (i/o): past energy of code                     */
+    float *gain_inov,   /* (o)  : un-scaled innovation gain               */
+    short coder_type    /* (i)  : coder type for number of bits           */
 )
 {
-
-    Word16 ener_code;
+    short i;
+    float ener_code,gcode0;
     const Word16 *t_qua_gain;
-    Word16 exp_L_tmp1;
-    Word16 gcode0, exp_gcode0;
-    Word32 L_tmp, L_tmp1;
 
+    ener_code = 0.0f;
 
+    if( coder_type == 0 )
+    {
+        *gain_inov = 1.0f / (float)sqrt( ( dotp( code, code, lcode ) + 0.01f ) / lcode);
+    }
+    else
+    {
+        ener_code = 0.01f;
 
-    /**gain_inov = 1.0f / (float)sqrt( ( dot_product( code, code, lcode ) + 0.01f ) / lcode);*/
-    L_tmp = calc_gain_inov(code, lcode, &L_tmp1, &exp_L_tmp1);
-    move16();
-    *gain_inov = round_fx(L_shl(L_tmp, 15-3));  /* gain_inov in Q12 */
+        for(i=0; i<lcode; i++)
+        {
+            ener_code += code[i] * code[i];
+        }
+        *gain_inov = (float)sqrt((float)lcode / ener_code);
+    }
 
     /*-----------------------------------------------------------------*
      * Select the gains quantization table
      *-----------------------------------------------------------------*/
-    t_qua_gain = E_ROM_qua_gain7b_const;
 
     if( coder_type == 0 )
     {
         t_qua_gain = E_ROM_qua_gain5b_const;
     }
-
-    if(sub(coder_type,1) == 0)
+    else if(coder_type == 1)
     {
         t_qua_gain = E_ROM_qua_gain6b_const;
+    }
+    else
+    {
+        t_qua_gain = E_ROM_qua_gain7b_const;
     }
 
     /*-----------------------------------------------------------------*
      * decode pitch gain
      *-----------------------------------------------------------------*/
-    *gain_pit = t_qua_gain[index*2];
+
+    *gain_pit = (float)(t_qua_gain[index*2])/(1<<14);
 
     /*-----------------------------------------------------------------*
      * calculate the predicted gain code
      *-----------------------------------------------------------------*/
-    /*ener_code = 10 * log10((dot_product(code, code, lcode) + 0.01) / lcode) */
-    L_tmp = BASOP_Util_Log2(L_tmp1);
-    L_tmp = L_add(L_tmp,L_shl(L_deposit_l(exp_L_tmp1),31-LD_DATA_SCALE));
 
-    L_tmp = Mpy_32_16_1(L_tmp, 24660/*(10.0f/3.3219280948873623478703194294894f)/4.0f Q15*/);
-    /* exponent of L_tmp = 6+2 */
-    ener_code = round_fx(L_shl(L_tmp, 6+2-7)); /* Q8 */
-
-    /* predicted codebook gain */
-    gcode0 = sub(mean_ener, ener_code);            /* Q8 */
-
-    /*gcode0 = (float)pow(10.0,(gcode0)*0.05);*/   /* predicted gain */
-
-    calc_gcode0(&gcode0, &exp_gcode0);
+    if( coder_type == 0 )
+    {
+        ener_code = 10 * (float)log10( ( dotp( code, code, lcode ) + 0.01f ) / lcode );
+        gcode0 = (float) pow(10, 0.05*(mean_ener - ener_code));
+    }
+    else
+    {
+        ener_code = (float)(-10.0 * log10((float)lcode / ener_code));
+        gcode0 = mean_ener - ener_code;
+        gcode0 = (float)pow(10.0,gcode0/20.0);   /* predicted gain */
+    }
 
     /*-----------------------------------------------------------------*
      * decode normalized codebook gain
      *-----------------------------------------------------------------*/
-    /* *gain_code = t_qua_gain[index*2+1] * gcode0;*/
 
-    L_tmp = calc_gain_code(t_qua_gain[index*2+1], gcode0, exp_gcode0);
+    *gain_code = (float)(t_qua_gain[index*2+1])/(1<<11) * gcode0;
 
-    *gain_code = L_tmp;
     *past_gpit = *gain_pit;
-    /**past_gcode = *gain_code / *gain_inov;   */
-    /* Q16/Q12 => Q5 */
-    L_tmp1 = L_deposit_h(BASOP_Util_Divide3216_Scale(L_tmp,*gain_inov,&exp_L_tmp1));
-    *past_gcode = L_shl(L_tmp1,sub(exp_L_tmp1,15-12));
-
-
+    *past_gcode = *gain_code / *gain_inov;
 
     return;
 }
+
 
 /*---------------------------------------------------------------------*
  * gain_dec_uv
@@ -145,261 +111,148 @@ static void Mode2_gain_dec_mless(
  *---------------------------------------------------------------------*/
 
 static void gain_dec_uv(
-    Word16 index,                /* i  : Quantization index vector        Q0  */
-    Word16 *code,                /* i  : algebraic code excitation        Q9  */
-    Word16 lcode,                /* i  : Subframe size                    Q0  */
-    Word16 *gain_pit,            /* o  : Quantized pitch gain            1Q14 */
-    Word32 *gain_code,           /* o  : Quantized codebook gain          Q16 */
-    Word16 *past_gpit,           /* i/o: past gain of pitch              1Q14 */
-    Word32 *past_gcode,          /* i/o: past energy of code              Q16 */
-    Word16 *gain_inov            /* o  : unscaled innovation gain        3Q12 */
+    int index,            /* i/o: Quantization index vector             */
+    float *code,          /* i  : algebraic code excitation             */
+    int lcode,            /* i  : Subframe size                         */
+    float *gain_pit,      /* o  : Quantized pitch gain                  */
+    float *gain_code,     /* o  : Quantized codebook gain               */
+    float *past_gpit,     /* i/o: past gain of pitch                    */
+    float *past_gcode,    /* i/o: past energy of code                   */
+    float *gain_inov      /* o  : unscaled innovation gain              */
 )
 {
-    Word16 i, exp_L_tmp1;
-    Word32 L_tmp, L_tmp1;
-
-
     /*-----------------------------------------------------------------*
      * Innovation energy (without gain)
      *-----------------------------------------------------------------*/
-    /* *gain_inov = 1.0f / (float)sqrt( ( dot_product( code, code, lcode ) + 0.01f ) / lcode );*/
-    L_tmp = calc_gain_inov(code, lcode, &L_tmp1, &exp_L_tmp1);
-    move16();
-    *gain_inov = round_fx(L_shl(L_tmp, 15-3));  /* gain_inov in Q12 */
+
+    *gain_inov = 1.0f / (float)sqrt( ( dotp( code, code, lcode ) + 0.01f ) / lcode );
 
     /*-----------------------------------------------------------------*
     * Decode pitch gain
     *-----------------------------------------------------------------*/
-    *gain_pit = 0;
-    move16();
+    *gain_pit = 0.0f;
 
     /*-----------------------------------------------------------------*
      * Decode codebook gain
      *-----------------------------------------------------------------*/
-    /* *gain_code= (float)pow(10.f,(((index*1.9f)-30.f)/20.f));*/
-    L_tmp = L_mac(-167197708l/*-0.166096*30.0f Q25*/,shl(index, 16-7), 10341/*0.166096f*1.9f Q15*/);
-    i = add(1,extract_l(L_shr(L_tmp, 25)));
-    L_tmp = L_lshl(L_tmp, 6);
-    L_tmp = L_and(0x7FFFFFFF, L_tmp);
 
-    L_tmp = Pow2(30,round_fx(L_tmp));
-    L_tmp = L_shl(L_tmp, i-(31-16)); /* Q16 */
-
+    *gain_code= (float)pow(10.f,(((index*1.9f)-30.f)/20.f));
 
     /*-----------------------------------------------------------------*
      * past gains for error concealment
      *-----------------------------------------------------------------*/
-    *past_gpit = *gain_pit;
-    *past_gcode = L_tmp;
-    L_tmp = L_shl(Mpy_32_16_1(L_tmp, *gain_inov), 3); /* Q16*Q12 -> Q13 -> Q16 */
-    *gain_code = L_tmp;
-    move32();
 
+    *past_gpit = *gain_pit;
+    *past_gcode = *gain_code;
+    *gain_code *= *gain_inov;
 
     return;
 }
+
 
 /*---------------------------------------------------------------------*
  * gain_dec_gacelp_uv
  *
  * Decoding of pitch and codebook gains for Unvoiced mode
  *---------------------------------------------------------------------*/
-
 static void gain_dec_gacelp_uv(
-    Word16 index,                /* i  : Quantization index vector        Q0  */
-    Word16 *code,                /* i  : algebraic code excitation        Q9  */
-    Word16 *code2,               /* i  : algebraic code excitation        Q9  */
-    Word16 mean_ener,            /* i  :                                 Q8  */
-    Word16 lcode,                /* i  : Subframe size                    Q0  */
-    Word16 *gain_pit,            /* o  : Quantized pitch gain            1Q14 */
-    Word32 *gain_code,           /* o  : Quantized codebook gain          Q16 */
-    Word32 *gain_code2,          /* o  : Quantized codebook gain          Q16 */
-    Word16 *past_gpit,           /* i/o: past gain of pitch              1Q14 */
-    Word32 *past_gcode,          /* i/o: past energy of code              Q16 */
-    Word16 *gain_inov            /* o  : unscaled innovation gain        3Q12 */
+    int index,              /* i/o: Quantization index vector             */
+    float *code,            /* i  : algebraic code excitation             */
+    float *code2,           /* i  : algebraic code excitation             */
+    float mean_ener,        /* i : mean energy                            */
+    int lcode,              /* i  : Subframe size                         */
+    float *gain_pit,        /* o  : Quantized pitch gain                  */
+    float *gain_code,       /* o  : Quantized codebook gain               */
+    float *gain_code2,      /* o  : Quantized codebook gain               */
+    float *past_gpit,       /* i/o: past gain of pitch                    */
+    float *past_gcode,      /* i/o: past energy of code                   */
+    float *gain_inov        /* o  : unscaled innovation gain              */
 )
 {
-    Word16 i, exp_L_tmp1;
-    Word16 exp_gcode;
-    Word16 g_code;
-    Word32 L_tmp, L_tmp1;
-    Word32 pred_nrg_frame;
-    Word16 exp_gcode2, g_code2, norm_code2;
-    Word16 index2, s;
+    float pred_nrg_frame,norm_code2;
+    float gcode, gcode2;
+    short index2;
 
-
-
-
-    /* pred_nrg_frame = (float)pow(10.0,mean_ener/20.0); */
-    L_tmp = L_mult(mean_ener, 10885/*0.166096f * 2 Q15*/); /* 6Q25 */
-    pred_nrg_frame = BASOP_Util_InvLog2(L_sub(L_tmp, 503316480l/*15.f Q25*/)); /* 15Q16 */
+    pred_nrg_frame = (float)pow(10.0,mean_ener/20.0);
 
     /*-----------------------------------------------------------------*
      * Prediction gains
      *-----------------------------------------------------------------*/
-    /* gain_inov = 1.0f / sqrt((dot_product(code, code, L_SUBFR) + 0.01) / L_SUBFR) */
-    L_tmp = calc_gain_inov(code, lcode, NULL, NULL);
-    *gain_inov = round_fx(L_shl(L_tmp, 15-3));  /* gain_inov in Q12 */
 
-    /* gcode = pred_nrg_frame * (*gain_inov); */
-    L_tmp = Mpy_32_16_1(pred_nrg_frame, *gain_inov); /* 18Q13 */
-    i = norm_l(L_tmp);
-    g_code = round_fx(L_shl(L_tmp, i));
-    exp_gcode = sub(18, i);
+    *gain_inov = 1.0f / (float)sqrt( ( dotp( code, code, lcode ) + 0.01f ) / lcode );
+    gcode=pred_nrg_frame*(*gain_inov);
 
-    /* norm_code2 = 1.0f / sqrt((dot_product(code2, code2, lcode) + 0.01f) / lcode); */
-    L_tmp = calc_gain_inov(code2, lcode, NULL, NULL);
-    norm_code2 = round_fx(L_shl(L_tmp, 15-3));  /* Q12 */
-
-    /* g_code2 = pred_nrg_frame * norm_code2; */
-    L_tmp = Mpy_32_16_1(pred_nrg_frame, norm_code2); /* 18Q13 */
-    i = norm_l(L_tmp);
-    g_code2 = round_fx(L_shl(L_tmp, i));
-    exp_gcode2 = sub(18, i);
+    norm_code2 = 1.0f/ (float)sqrt( ( dotp( code2, code2, lcode ) + 0.01f ) / lcode );
+    gcode2=pred_nrg_frame*(norm_code2);
 
     /*-----------------------------------------------------------------*
      * Decode pitch gain
      *-----------------------------------------------------------------*/
-    *gain_pit = 0;
-    move16();
+
+    *gain_pit = 0.0f;
     *past_gpit = *gain_pit;
-    move16();
 
     /*-----------------------------------------------------------------*
      * past gains for error concealment
      *-----------------------------------------------------------------*/
-    index2=shr(index,5);
-    index=s_and(index,0x1F);
 
-    /**gain_code= (float)pow(10.f,(((index*1.25f)-20.f)/20.f))*gcode;*/
+    index2=index>>5;
+    index=index&0x1F;
 
-    L_tmp = L_mac(-111465139l/*-0.166096*20.0f Q25*/,shl(index, 16-7), 6803/*0.166096f*1.25f Q15*/);
+    *gain_code= (float)pow(10.f,(((index*1.25f)-20.f)/20.f))*gcode;
+    *gain_code2 = (float) (index2*0.25f+0.25f)*(*gain_code*(gcode2/gcode));
 
-    i = add(1,extract_l(L_shr(L_tmp, 25)));
-    L_tmp = L_lshl(L_tmp, 6);
-    L_tmp = L_and(0x7FFFFFFF, L_tmp);
-
-    L_tmp = Pow2(30,round_fx(L_tmp));
-    L_tmp = L_shl(L_tmp, i-(31-16)); /* Q16 */
-
-    /* *past_gcode = L_tmp * pred_nrg_frame; */
-    i = norm_l(L_tmp);
-    L_tmp1 = L_shl(L_tmp, i);
-    exp_L_tmp1 = sub(15, i);
-
-    i = norm_l(pred_nrg_frame);
-    L_tmp1 = Mpy_32_32(L_tmp1, L_shl(pred_nrg_frame, i));
-    exp_L_tmp1 = add(exp_L_tmp1, sub(15, i));
-
-    *past_gcode = L_shl(L_tmp1, sub(exp_L_tmp1, 15)); /* Q16 */              move32();
-
-    *gain_code = L_shl(Mpy_32_16_1(*past_gcode, *gain_inov), 3);
-    move32();
-
-
-    L_tmp = Mpy_32_16_1(*gain_code, BASOP_Util_Divide1616_Scale(g_code2, g_code, &s));
-    L_tmp = L_shl(L_tmp, sub(sub(add(s, exp_gcode2), exp_gcode), 2)); /* Q16 */
-    L_tmp1 = L_add(L_tmp, 0);
-    FOR (i = 0; i < index2; i++)
-    {
-        L_tmp1 = L_add(L_tmp1, L_tmp);
-    }
-    *gain_code2 = L_tmp1;
-
+    *past_gcode=*gain_code/ *gain_inov;  /*unscaled gain*/
 
     return;
 }
 
-/*********************
- * public functions  *
- *********************/
+
+/*---------------------------------------------------------------------*
+ * decode_acelp_gains
+ *
+ *
+ *---------------------------------------------------------------------*/
 
 void decode_acelp_gains(
-    Word16 *code,                /* i  : algebraic code excitation        Q9  */
-    Word16 gains_mode,
-    Word16 mean_ener_code,       /* i  : mean_ener defined in open-loop   Q8  */
-    Word16 *gain_pit,            /* o  : Quantized pitch gain            1Q14 */
-    Word32 *gain_code,           /* o  : Quantized codebook gain          Q16 */
-    Word16 **pt_indice,
-    Word16 *past_gpit,           /* i/o: past gain of pitch              1Q14 */
-    Word32 *past_gcode,          /* i/o: past energy of code              Q16 */
-    Word16 *gain_inov,           /* o  : unscaled innovation gain        3Q12 */
-    Word16 L_subfr,              /* i  : Subframe size                    Q0  */
-    Word16 *code2,               /* i  : algebraic code excitation        Q9  */
-    Word32 *gain_code2           /* o  : Quantized codebook gain          Q16 */
+    float *code,
+    int gains_mode,
+    float mean_ener_code,
+    float *gain_pit,
+    float *gain_code,
+    int **pt_indice,
+    float *past_gpit,
+    float *past_gcode,
+    float *gain_inov,
+    int L_subfr,
+    float *code2,
+    float *gain_code2
 )
 {
-    Word16 index = 0;
-
+    int index = 0;
 
     index = **pt_indice;
     (*pt_indice)++;
 
-    IF ( s_and(gains_mode > 0, sub(gains_mode, 4) < 0) )
+    if (((gains_mode > 0) && (gains_mode < 4)))
     {
-        /* ACELP gains quantizer (5bits/subfr) */
+        /* EVS gains quantizer (5bits/subfr) */
         Mode2_gain_dec_mless(index, code, L_subfr, gain_pit, gain_code, mean_ener_code, past_gpit, past_gcode, gain_inov, gains_mode-1 );
     }
-    ELSE IF (s_or(sub(gains_mode,4) == 0, sub(gains_mode,5) == 0))
-    {
-        /* AMR-WB gains quantizer (6bits/subfr (mode 2) or 7bits/subfr (mode 3)) */
-        assert(0);
-    }
-    ELSE IF ( sub(gains_mode,6) == 0)
+    else if(gains_mode == 6)
     {
         /* UV gains quantizer (6bits/subfr) */
-        gain_dec_uv( index, code, L_subfr, gain_pit, gain_code, past_gpit, past_gcode, gain_inov );
+        gain_dec_uv(index, code, L_subfr, gain_pit, gain_code, past_gpit, past_gcode, gain_inov );
     }
-    ELSE IF (sub(gains_mode,7) == 0)
+    else if(gains_mode == 7)
     {
         /* GACELP_UV gains quantizer (7=5-2bits/subfr) */
-        gain_dec_gacelp_uv( index, code, code2, mean_ener_code, L_subfr, gain_pit, gain_code, gain_code2, past_gpit, past_gcode, gain_inov );
+        gain_dec_gacelp_uv(index, code, code2, mean_ener_code, L_subfr, gain_pit, gain_code, gain_code2, past_gpit, past_gcode, gain_inov );
     }
-    ELSE
+    else
     {
         fprintf(stderr, "invalid gains coding for acelp!\n");
         assert(0);
-    }
-
-}
-
-
-/*---------------------------------------------------------------------*
- * d_gain_pred :
- *
- * decode the predicted value for the scaled
- * innovation energy in all subframes
- *---------------------------------------------------------------------*/
-void d_gain_pred(
-    Word16 nrg_mode,     /* i  : NRG moe                                   */
-    Word16 *Es_pred,     /* o  : predicted scaled innovation energy    Q8  */
-    Word16 **pt_indice   /* i/o: pointer to the buffer of indices          */
-)
-{
-    Word16 indice;
-
-    indice = (Word16)**pt_indice;
-    (*pt_indice)++;
-
-    *Es_pred = 0;
-    move16();
-
-    if( sub(nrg_mode,1) == 0 )
-    {
-        *Es_pred = Es_pred_qua[indice];
-        move16();
-    }
-
-    if( sub(nrg_mode,2) == 0 )
-    {
-        *Es_pred = Es_pred_qua_2[indice];
-        move16();
-    }
-
-    IF( sub(nrg_mode,2) > 0 )
-    {
-        move16();
-        *Es_pred= extract_l(L_mac(-335544320l/* -20.f Q24*/, indice, 224/* 1.75f Q7*/)); /*(Q8 - ((Q0*Q7)=Q8))*/
     }
 
     return;

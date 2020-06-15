@@ -1,32 +1,40 @@
 /*====================================================================================
-    EVS Codec 3GPP TS26.442 Apr 03, 2018. Version 12.11.0 / 13.6.0 / 14.2.0
+    EVS Codec 3GPP TS26.443 Nov 13, 2018. Version 12.11.0 / 13.7.0 / 14.3.0 / 15.1.0
   ====================================================================================*/
 
 #include <assert.h>
 #include <stdlib.h>
 #include <stdio.h>
-#include "basop_util.h"
-#include "prot_fx.h"
+#include <math.h>
 #include "options.h"
-#include "stl.h"
-#include "rom_com_fx.h"
+#include "prot.h"
+#include "rom_com.h"
+#include "rom_dec.h"
 
+/*---------------------------------------------------------------------*
+ * reconfig_decoder_LPD()
+ *
+ *
+ *---------------------------------------------------------------------*/
 
-void reconfig_decoder_LPD( Decoder_State_fx *st, Word16 bits_frame, Word16 bandwidth_mode, Word32 bitrate, Word16 L_frame_old)
+void reconfig_decoder_LPD(
+    Decoder_State *st,
+    int bits_frame,
+    int bandwidth,
+    int bitrate,
+    int L_frame_old
+)
 {
+    short i;
 
+    st->bits_frame = bits_frame;
 
-    move16();
-    st->bits_frame=bits_frame;
-
-    IF (bandwidth_mode==0)
+    if( bandwidth == NB )
     {
-        move16();
         st->narrowBand = 1;
     }
-    ELSE if (bandwidth_mode>0)
+    else if( bandwidth > NB )
     {
-        move16();
         st->narrowBand = 0;
     }
 
@@ -43,127 +51,100 @@ void reconfig_decoder_LPD( Decoder_State_fx *st, Word16 bits_frame, Word16 bandw
     st->acelp_cfg_rf.formant_enh_num = FORMANT_SHARPENING_G1;
     st->acelp_cfg_rf.formant_enh_den = FORMANT_SHARPENING_G2;
 
-
-    st->flag_cna = getCnaPresent(bitrate, bandwidth_mode);
-    move16();
+    st->flag_cna = getCnaPresent(bitrate, bandwidth);
 
     /* TCX-LTP */
     st->tcxltp = getTcxLtp(st->sr_core);
-    move16();
 
+    /*Scale TCX for non-active frames to adjust loudness with ACELP*/
+    st->tcx_cfg.na_scale = 1.f;
+
+    if( bandwidth < SWB && !(st->tcxonly) )
     {
-        Word16 i;
-
-        /*Scale TCX for non-active frames to adjust loudness with ACELP*/
-        st->tcx_cfg.na_scale=32767/*1.0f Q15*/;
-
-        test();
-        IF ((sub(bandwidth_mode,SWB)<0) && !(st->tcxonly))
+        int scaleTableSize = sizeof (scaleTcxTable) / sizeof (scaleTcxTable[0]);
+        for (i = 0 ; i < scaleTableSize ; i++)
         {
-            Word16 scaleTableSize = sizeof (scaleTcxTable) / sizeof (scaleTcxTable[0]);  /* is a constant */
-
-            FOR (i = 0 ; i < scaleTableSize ; i++)
+            if ( (bandwidth == scaleTcxTable[i].bwmode) &&
+                    (bitrate >= scaleTcxTable[i].bitrateFrom) &&
+                    (bitrate < scaleTcxTable[i].bitrateTo) )
             {
-                test();
-                test();
-                IF ( (sub (bandwidth_mode,scaleTcxTable[i].bwmode) == 0) &&
-                     (L_sub (bitrate,scaleTcxTable[i].bitrateFrom) >= 0) &&
-                     (L_sub (bitrate,scaleTcxTable[i].bitrateTo)  < 0 )
-                   )
+                if( st->rf_flag )
                 {
-                    if( st->rf_flag )
-                    {
-                        i--;
-                    }
-                    st->tcx_cfg.na_scale=scaleTcxTable[i].scale;
-                    BREAK;
+                    i--;
                 }
+                st->tcx_cfg.na_scale = scaleTcxTable[i].scale;
+                break;
             }
         }
     }
 
     /*if its not the first frame resample overlap buffer to new sampling rate */
-    IF ( st->ini_frame_fx != 0 )
+    if( st->ini_frame != 0 )
     {
-        test();
-        test();
-        test();
-        IF( sub (st->fscale,st->fscale_old) != 0
-            && ! (st->last_codec_mode == MODE1
-                  && st->last_core_fx == ACELP_CORE
-                  && st->prev_bfi_fx != 0))
-        /* no resempling is needed here when recovering from mode 1
-           acelp plc, since the buffers are already sampled with the
-           correct sampling rate in open_decoder_LPD() */
+        if( st->fscale!=st->fscale_old
+                && ! (st->last_codec_mode == MODE1
+                      && st->last_core == ACELP_CORE
+                      && st->prev_bfi != 0))
+            /* no resempling is needed here when recovering from mode 1
+               acelp plc, since the buffers are already sampled with the
+               correct sampling rate in open_decoder_LPD() */
         {
-            Word16 newLen;
-            Word16 oldLen;
+            unsigned short newLen;
+            unsigned short oldLen;
 
             newLen = st->tcx_cfg.tcx_mdct_window_length;
-            move16();
             oldLen = st->tcx_cfg.tcx_mdct_window_length_old;
-            move16();
 
-            test();
-            test();
-            IF( (st->prev_bfi_fx && sub(st->last_core_bfi,ACELP_CORE)==0) || sub(st->last_core_fx,ACELP_CORE)==0 )
+            if( (st->prev_bfi && st->last_core_bfi == ACELP_CORE) || st->last_core == ACELP_CORE )
             {
-                newLen = shr(st->L_frame_fx,1);
-                oldLen = shr(L_frame_old,1);
+                newLen = st->L_frame/2;
+                oldLen = L_frame_old/2;
             }
 
             lerp( st->old_syn_Overl, st->old_syn_Overl, newLen, oldLen );
             lerp( st->syn_Overl,     st->syn_Overl,     newLen, oldLen );
 
-            test();
-            IF( st->prev_bfi_fx && sub(st->last_core_bfi,ACELP_CORE)==0 )
+            if( st->prev_bfi && st->last_core_bfi == ACELP_CORE )
             {
                 lerp( st->syn_Overl_TDAC, st->syn_Overl_TDAC, newLen, oldLen );
             }
         }
 
-
-        IF (sub(st->L_frame_fx,L_FRAME16k) <= 0)
+        if (st->L_frame <= L_FRAME16k)
         {
-            IF (sub(st->last_L_frame_fx,L_FRAME16k) <= 0)
+            if( st->last_L_frame <= L_FRAME16k )
             {
-                IF (sub(st->L_frame_fx,st->last_L_frame_fx) != 0)
+                if( st->L_frame!=st->last_L_frame )
                 {
-                    Word16 oldLenClasBuff;
-                    Word16 newLenClasBuff;
-                    IF (sub(st->L_frame_fx,st->last_L_frame_fx) > 0)
+                    unsigned short oldLenClasBuff;
+                    unsigned short newLenClasBuff;
+
+                    if( st->L_frame > st->last_L_frame )
                     {
-                        oldLenClasBuff = extract_l(L_shr(Mpy_32_16_1(L_mult0(st->last_L_frame_fx,getInvFrameLen(st->L_frame_fx)/*Q21*/)/*Q21*/,L_SYN_MEM_CLAS_ESTIM/*Q0*/)/*Q6*/,6)/*Q0*/);
-
+                        oldLenClasBuff = L_SYN_MEM_CLAS_ESTIM * st->last_L_frame/st->L_frame;
                         newLenClasBuff = L_SYN_MEM_CLAS_ESTIM;
-                        move16();
-
                     }
-                    ELSE
+                    else
                     {
                         oldLenClasBuff = L_SYN_MEM_CLAS_ESTIM;
-                        newLenClasBuff = extract_l(L_shr(Mpy_32_16_1(L_mult0(st->L_frame_fx,getInvFrameLen(st->last_L_frame_fx)/*Q21*/)/*Q21*/,L_SYN_MEM_CLAS_ESTIM/*Q0*/)/*Q6*/,6)/*Q0*/);
+                        newLenClasBuff = L_SYN_MEM_CLAS_ESTIM * st->L_frame/st->last_L_frame;
                     }
-                    lerp( &st->mem_syn_clas_estim_fx[L_SYN_MEM_CLAS_ESTIM-oldLenClasBuff], &st->mem_syn_clas_estim_fx[L_SYN_MEM_CLAS_ESTIM-newLenClasBuff], newLenClasBuff, oldLenClasBuff );
+                    lerp( &st->mem_syn_clas_estim[L_SYN_MEM_CLAS_ESTIM-oldLenClasBuff], &st->mem_syn_clas_estim[L_SYN_MEM_CLAS_ESTIM-newLenClasBuff], newLenClasBuff, oldLenClasBuff );
                 }
             }
-            ELSE
+            else
             {
-                set16_fx(st->mem_syn_clas_estim_fx, 0, L_SYN_MEM_CLAS_ESTIM);
-                st->classifier_Q_mem_syn = 0;
-                move16();
+                set_zero( st->mem_syn_clas_estim, L_SYN_MEM_CLAS_ESTIM );
             }
         }
     }
-    test();
-    test();
+
     st->enableTcxLpc = (st->numlpc == 1) && (st->lpcQuantization == 1) && (bitrate <= LOWRATE_TCXLPC_MAX_BR || st->rf_flag);
 
-    if (st->ini_frame_fx == 0)
+    if( st->ini_frame == 0 )
     {
         st->envWeighted = 0;
     }
-
 
     return;
 }

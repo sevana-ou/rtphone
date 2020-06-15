@@ -1,130 +1,130 @@
 /*====================================================================================
-    EVS Codec 3GPP TS26.442 Apr 03, 2018. Version 12.11.0 / 13.6.0 / 14.2.0
+    EVS Codec 3GPP TS26.443 Nov 13, 2018. Version 12.11.0 / 13.7.0 / 14.3.0 / 15.1.0
   ====================================================================================*/
 
 #include <assert.h>
-#include "prot_fx.h"
-#include "rom_com_fx.h"
-#include "basop_util.h"
-#include "stl.h"
+#include "options.h"
+#include "prot.h"
+#include "cnst.h"
+#include "rom_com.h"
 
 /*-------------------------------------------------------------------*
  * Local constants
  *-------------------------------------------------------------------*/
 
-#define kLagWinThGain1 19661 /* 0.6f in Q15 */
-#define kLagWinThGain2 9830  /* 0.3f in Q15 */
+#define kLagWinThGain1      0.6f
+#define kLagWinThGain2      0.3f
+
 
 /*-------------------------------------------------------------*
- * procedure lag_wind:                                         *
+ * procedure lag_wind()                                        *
  *           ~~~~~~~~~                                         *
  * lag windowing of the autocorrelations                       *
  *-------------------------------------------------------------*/
 
 void lag_wind(
-    Word16 r_h[],           /* in/out: autocorrelations                                       */
-    Word16 r_l[],           /* in/out: autocorrelations                                       */
-    Word16 m,               /* input : order of LP filter                                     */
-    Word32 sr,              /* input : sampling rate                                          */
-    Word16 strength         /* input : LAGW_WEAK, LAGW_MEDIUM, or LAGW_STRONG                 */
+    float r[],           /* i/o: autocorrelations                       */
+    const short m,       /* i  : order of LP filter                     */
+    const int sr,        /* i  : sampling rate                          */
+    const short strength /* i  : LAGW_WEAK, LAGW_MEDIUM, or LAGW_STRONG */
 )
 {
-    Word16 i;
-    Word32 tmp;
-    const Word16 *wnd_h, *wnd_l;
-
+    short i;
+    const float *wnd;
 
     assert(0 <= strength && strength <= NUM_LAGW_STRENGTHS);
-    SWITCH (sr)
+
+    switch (sr)
     {
     case 8000:
         assert(m <= 16);
         assert(strength == LAGW_STRONG);
-        wnd_h = lag_window_8k[0];
-        wnd_l = lag_window_8k[1];
-        BREAK;
+        wnd = lag_window_8k;
+        break;
     case 12800:
         assert(m <= 16);
-        wnd_h = lag_window_12k8[strength][0];
-        wnd_l = lag_window_12k8[strength][1];
-        BREAK;
+        wnd = lag_window_12k8[strength];
+        break;
     case 16000:
         assert(m <= 16);
-        wnd_h = lag_window_16k[strength][0];
-        wnd_l = lag_window_16k[strength][1];
-        BREAK;
+        wnd = lag_window_16k[strength];
+        break;
     case 24000:
     case 25600:
         assert(m <= 16);
-        wnd_h = lag_window_25k6[strength][0];
-        wnd_l = lag_window_25k6[strength][1];
-        BREAK;
+        wnd = lag_window_25k6[strength];
+        break;
     case 32000:
         assert(m <= 16);
-        wnd_h = lag_window_32k[strength][0];
-        wnd_l = lag_window_32k[strength][1];
-        BREAK;
+        wnd = lag_window_32k[strength];
+        break;
     case 48000:
         assert(m <= 16);
         assert(strength == LAGW_STRONG);
-        wnd_h = lag_window_48k[0];
-        wnd_l = lag_window_48k[1];
-        BREAK;
+        wnd = lag_window_48k;
+        break;
     default:
         assert(!"Lag window not implemented for this sampling rate");
         return;
     }
 
-    FOR (i = 1; i <= m; i++)
+    for( i=0; i<=m; ++i )
     {
-        tmp = Mpy_32(r_h[i], r_l[i], wnd_h[i-1], wnd_l[i-1]);
-        L_Extract(tmp, &r_h[i], &r_l[i]);
+        r[i] *= wnd[i];
     }
 
+    return;
 }
 
+/*-------------------------------------------------------------*
+ * procedure adapt_lag_wind()
+ *
+ *
+ *-------------------------------------------------------------*/
+
 void adapt_lag_wind(
-    Word16 r_h[],           /* in/out: autocorrelations                                       */
-    Word16 r_l[],           /* in/out: autocorrelations                                       */
-    Word16 m,               /* input : order of LP filter                                     */
-    const Word16 Top,       /* input : open loop pitch lag                                    */
-    const Word16 Tnc,       /* input : open loop pitch gain                                   */
-    Word32 sr               /* input : sampling rate                                          */
+    float r[],            /* i/o: autocorrelations                                       */
+    int m,                /* i  : order of LP filter                                     */
+    const int Top,        /* i  : open loop pitch lags from curr. frame (or NULL if n/a) */
+    const float Tnc,      /* i  : open loop pitch gains from curr. frame (NULL if n/a)   */
+    int sr                /* i  : sampling rate                                          */
 )
 {
-    Word16 strength, pitch_lag;
-    Word16 pitch_gain;
+    short strength;
+    short pitch_lag;
+    float pitch_gain;
 
-    pitch_lag = Top;
-    move16();
-    pitch_gain = Tnc;
-    move16();
+    pitch_lag = (short)Top;
+    pitch_gain = (float)Tnc;
 
-    IF (sub(pitch_lag, 80) < 0)
+    if (pitch_lag < 80)
     {
-        strength = LAGW_STRONG;
-        move16();
-        if (sub(pitch_gain, kLagWinThGain1) <= 0)
+        if (pitch_gain > kLagWinThGain1)
+        {
+            strength = LAGW_STRONG;
+        }
+        else
         {
             strength = LAGW_MEDIUM;
-            move16();
         }
     }
-    ELSE IF (sub(pitch_lag, 160) < 0)
+    else if (pitch_lag < 160)
     {
-        strength = LAGW_MEDIUM;
-        move16();
-        if (sub(pitch_gain, kLagWinThGain2) <= 0)
+        if (pitch_gain > kLagWinThGain2)
+        {
+            strength = LAGW_MEDIUM;
+        }
+        else
         {
             strength = LAGW_WEAK;
-            move16();
         }
     }
-    ELSE
+    else
     {
         strength = LAGW_WEAK;
-        move16();
     }
 
-    lag_wind(r_h, r_l, m, sr, strength);
+    lag_wind( r, m, sr, strength );
+
+    return;
 }

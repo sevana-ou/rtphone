@@ -1,14 +1,15 @@
 /*====================================================================================
-    EVS Codec 3GPP TS26.442 Apr 03, 2018. Version 12.11.0 / 13.6.0 / 14.2.0
+    EVS Codec 3GPP TS26.443 Nov 13, 2018. Version 12.11.0 / 13.7.0 / 14.3.0 / 15.1.0
   ====================================================================================*/
 
-
-#include "stl.h"
-#include "prot_fx.h"
-#include "stl.h"
+#include "cnst.h"
+#include "rom_com.h"
+#include "prot.h"
 #include <memory.h>
+#include <math.h>
 #include <assert.h>
-#include "rom_com_fx.h"
+
+
 
 /** Linear prediction analysis/synthesis filter definition.
   * @param order filter order.
@@ -17,78 +18,54 @@
   * @param x the current input value.
   * @return the output of the filter.
   */
-typedef Word32 (* TLinearPredictionFilter)(Word16 order, Word16 const parCoeff[], Word32 * state, Word32 x);
+typedef float (* TLinearPredictionFilter)(int order, float const parCoeff[], float * state, float x);
 
 /********************************/
 /*      Interface functions     */
 /********************************/
 
-Word16 ReadTnsData(STnsConfig const * pTnsConfig, Decoder_State_fx *st, Word16 * pnBits, Word16 * stream, Word16 * pnSize)
+TNS_ERROR ReadTnsData(STnsConfig const * pTnsConfig, Decoder_State * st, int * pnBits, int * stream, int * pnSize)
 {
-    Word16 start_bit_pos;
-
-
-    move16();
-    start_bit_pos = st->next_bit_pos_fx;
-
-    IF ( sub(pTnsConfig->nMaxFilters, 1) > 0 )
+    int start_bit_pos;
+    start_bit_pos = st->next_bit_pos;
+    if (pTnsConfig->nMaxFilters > 1)
     {
-
-        IF ( sub(pTnsConfig->iFilterBorders[0],512) < 0)
+        if (pTnsConfig->iFilterBorders[0] < 512)
         {
-            ReadFromBitstream(tnsEnabledSWBTCX10BitMap, 1, st, &stream, pnSize);
+            ReadFromBitstream(&tnsEnabledSWBTCX10BitMap, 1, st, &stream, pnSize);
         }
-        ELSE
+        else
         {
-            ReadFromBitstream(tnsEnabledSWBTCX20BitMap, 1, st, &stream, pnSize);
+            ReadFromBitstream(&tnsEnabledSWBTCX20BitMap, 1, st, &stream, pnSize);
         }
     }
-    ELSE
+    else
     {
-        ReadFromBitstream(tnsEnabledWBTCX20BitMap, 1, st, &stream, pnSize);
+        ReadFromBitstream(&tnsEnabledWBTCX20BitMap, 1, st, &stream, pnSize);
     }
 
-    move16();
-    *pnBits = sub(st->next_bit_pos_fx, start_bit_pos);
-
-
+    *pnBits = st->next_bit_pos - start_bit_pos;
     return TNS_NO_ERROR;
 }
 
-Word16 DecodeTnsData(STnsConfig const * pTnsConfig, Word16 const * stream, Word16 * pnSize, STnsData * pTnsData)
+int DecodeTnsData(STnsConfig const * pTnsConfig, int const * stream, int * pnSize, STnsData * pTnsData)
 {
-    Word16 result;
-
-
-
     ResetTnsData(pTnsData);
-
-    IF ( sub(pTnsConfig->nMaxFilters, 1) > 0 )
+    if (pTnsConfig->nMaxFilters > 1)
     {
-
-        IF ( sub(pTnsConfig->iFilterBorders[0],512) < 0 )
+        if (pTnsConfig->iFilterBorders[0] < 512)
         {
-            SetParameters(tnsEnabledSWBTCX10BitMap, 1, pTnsData, &stream, pnSize);
+            SetParameters(&tnsEnabledSWBTCX10BitMap, 1, pTnsData, &stream, pnSize);
         }
-        ELSE
+        else
         {
-            SetParameters(tnsEnabledSWBTCX20BitMap, 1, pTnsData, &stream, pnSize);
+            SetParameters(&tnsEnabledSWBTCX20BitMap, 1, pTnsData, &stream, pnSize);
         }
     }
-    ELSE
+    else
     {
-        SetParameters(tnsEnabledWBTCX20BitMap, 1, pTnsData, &stream, pnSize);
+        SetParameters(&tnsEnabledWBTCX20BitMap, 1, pTnsData, &stream, pnSize);
     }
-
-    move16();
-    result = FALSE;
-    if (pTnsData->nFilters > 0)
-    {
-        move16();
-        result = TRUE;
-    }
-
-
-    return result;
+    return (pTnsData->nFilters > 0) ? TRUE : FALSE;
 }
 

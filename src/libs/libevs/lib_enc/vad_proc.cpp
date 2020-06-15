@@ -1,168 +1,110 @@
 /*====================================================================================
-    EVS Codec 3GPP TS26.442 Apr 03, 2018. Version 12.11.0 / 13.6.0 / 14.2.0
+    EVS Codec 3GPP TS26.443 Nov 13, 2018. Version 12.11.0 / 13.7.0 / 14.3.0 / 15.1.0
   ====================================================================================*/
 
-
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <memory.h>
 #include <assert.h>
 
+#include "prot.h"
+#include "rom_enc.h"
 
-#include "basop_util.h"
-#include "stl.h"
-#include "vad_basop.h"
-#include "prot_fx.h"
-#include "stat_enc_fx.h"
-#include "rom_enc_fx.h"
 
-Word16 vad_init(T_CldfbVadState *vad_state)
+/*-------------------------------------------------------------------*
+ * vad_init()
+ *
+ *
+ *-------------------------------------------------------------------*/
+
+short vad_init(
+    T_CldfbVadState *st
+)
 {
-    Word16 i = 0;
+    float sSFM[SFM_NUM]= {0.88f,0.92f,0.92f};
+    short i = 0;
 
-    IF(vad_state == NULL)
+    if(st == NULL)
     {
         return -1;
     }
 
-    vad_state->frameloop=0;
-    move16();
-    vad_state->continuous_noise_num = 0;
-    move16();
-    vad_state->continuous_speech_num = 0;
-    move16();
-    vad_state->continuous_speech_num2 = 0;
-    move16();
-    vad_state->fg_energy_est_start = L_deposit_l(0);
-    vad_state->speech_flag = 0;
-    move16();
-    vad_state->frame_sb_energy_scale = 0;
-    move16();
-    vad_state->updateNumWithSnr=0;
-    move16();
-    vad_state->update_count = 0;
-    move16();
-    vad_state->warm_hang_num = 0;
-    move16();
-
-    FOR(i = 0; i < SPEC_AMP_NUM; i++)
+    st->frameloop = 0;
+    st->lt_snr_org = 1.0f;
+    st->lf_snr_smooth = 5.0f;
+    st->l_silence_snr = 0.5f;
+    st->l_speech_snr = 5.0f;
+    st->l_silence_snr_count = 1;
+    st->l_speech_snr_count = 1;
+    st->fg_energy = 16*(3.0518e-5f);
+    st->bg_energy = 16*(4.6566e-10f);
+    st->fg_energy_count = 16;
+    st->bg_energy_count = 16;
+    st->tonality_rate3 = 0.46f;
+    st->music_background_rate = 0.46f;
+    st->lt_noise_sp_center_diff_sum = 0.4f;
+    st->lt_noise_sp_center_diff_counter = 4;
+    st->lt_noise_sp_center0 = 1.8f;
+    st->lt_noise_sp_center3 = 2.0f;
+    st->lt_bg_highf_eng = 2.0f;
+    st->t_bg_energy = 0.01f;
+    st->t_bg_energy_sum = 0.01f;
+    st->tbg_energy_count = 1;
+    st->bg_update_count = 0;
+    st->frame_energy_smooth = 1.0f;
+    st->fg_energy_est_start = 0;
+    st->speech_flag = 0;
+    st->continuous_noise_num = 0;
+    st->continuous_speech_num = 0;
+    st->continuous_speech_num2 = 0;
+    st->update_num_with_snr = 0;                                 /* the number of the background update with SNR*/
+    st->update_count = 0;
+    st->warm_hang_num = 0;
+    for(i = 0; i < PRE_SNR_NUM; i++)
     {
-        vad_state->smooth_spec_amp[i] = L_deposit_l(0);
+        st->pre_snr[i] = 0.0f;
     }
 
-    FOR(i = 0; i < PRE_SNR_NUM; i++)
+    for(i = 0; i < POWER_NUM; i++)
     {
-        vad_state->pre_snr[i] = L_deposit_l(0);
+        st->frames_power[i] = 0;
     }
 
-    FOR(i = 0; i < BG_ENG_NUM; i++)
+    for(i = 0; i < SPEC_AMP_NUM; i++)
     {
-        vad_state->frame_sb_energy[i] = L_deposit_l(0);
+        st->smooth_spec_amp[i] = 0;
     }
 
-    vad_state->sfm[0] = 28835/* 0.88 Q15 */;
-    move16();
-    vad_state->sfm[1] = 30146/* 0.92 Q15 */;
-    move16();
-    vad_state->sfm[2] = 30146/* 0.92 Q15 */;
-    move16();
-    vad_state->l_silence_snr_count = L_deposit_l(1);
-    vad_state->l_speech_snr_count = L_deposit_l(1);
-    vad_state->lt_snr_org = 33554432;
-    move32();
-    vad_state->lf_snr_smooth = 167772155/* 5.0 Q25 */;
-    move32();
-    vad_state->fg_energy = 1073741824;
-    move32();
-    vad_state->fg_energy_scale = 41;
-    move16();
-
-    vad_state->bg_energy = 1073741824;
-    move32();
-    vad_state->bg_energy_scale = 57;
-    move16();
-    vad_state->lt_noise_sp_center_diff_counter = L_deposit_l(4);
-
-    vad_state->t_bg_energy = 1374389535;
-    move32();
-    vad_state->scale_t_bg_energy = 37;
-    move16();
-
-    vad_state->t_bg_energy_sum.s16Exp = 37;
-    move16();
-    vad_state->t_bg_energy_sum.s32Mantissa = 1374389535;
-    move32();
-    vad_state->tbg_energy_count = 1;
-    move16();
-    vad_state->fg_energy_count = 16;
-    move16();
-    vad_state->bg_energy_count = 16;
-    move16();
-
-    vad_state->bg_update_count = 0;
-    move16();
-    vad_state->frame_energy_smooth = 1073741824;
-    move32();
-    vad_state->frame_energy_smooth_scale = 30;
-    move16();
-    vad_state->Q_frames_power_32 = 31;
-    move16();
-    vad_state->lt_bg_highf_eng = 131070/* 2.0 Q16 */;
-    move16();
-    vad_state->lt_noise_sp_center0 = 1841/* 0.4 Q10 */;
-    move16();
-    vad_state->lt_noise_sp_center3 = 2046/* 0.4 Q10 */;
-    move16();
-    vad_state->music_background_rate = 15073/* 0.46 Q15 */;
-    move16();
-    vad_state->tonality_rate3 = 15073/* 0.46 Q15 */;
-    move16();
-    vad_state->lt_noise_sp_center_diff_sum = 409/* 0.4 Q10 */;
-    move32();
-    vad_state->l_silence_snr = 32768/* 0.5 Q16 */;
-    move32();
-    vad_state->l_speech_snr =  327675/* 5.0 Q16 */;
-    move32();
-
-    FOR(i = 0; i < SP_CENTER_NUM; i++)
+    for(i = 0; i < SFM_NUM; i++)
     {
-        vad_state->sp_center[i] = 1228/* 1.2 Q10 */;
-        move16();
+        st->sfm[i] = sSFM[i];
     }
 
-    FOR(i = 0; i < STABLE_NUM; i++)
+    for(i = 0; i < SP_CENTER_NUM; i++)
     {
-        vad_state->ltd_stable_rate[i] = 2294/* 0.07 Q15 */;
-        move16();
+        st->sp_center[i] = 1.2f;
     }
 
-    FOR(i = 0; i < BG_ENG_NUM; i++)
+    for(i = 0; i < STABLE_NUM; i++)
     {
-        vad_state->sb_bg_energy[i] =1374389535;
-        move32();
+        st->ltd_stable_rate[i] = 0.07f;
     }
-    vad_state->sb_bg_energy_scale = 37;
-    move16();
 
-    vad_state->f_tonality_rate[0] = 7864/* 0.48 Q14 */;
-    move16();
-    vad_state->f_tonality_rate[1] = 7864/* 0.48 Q14 */;
-    move16();
-    vad_state->f_tonality_rate[2] = 7864/* 0.48 Q14 */;
-    move16();
-
-
-    FOR(i = 0; i < PRE_SPEC_DIF_NUM; i++)
+    for(i = 0; i < BG_ENG_NUM; i++)
     {
-        vad_state->pre_spec_low_dif[i] = 4095;
-        move16();
+        st->sb_bg_energy[i] = 0.01f;
+        st->frame_sb_energy[i] = 0.001f;
     }
-    vad_state->scale_spec_low_dif = 12;
-    move16();
 
-    FOR (i = 0; i < 56; i++)
+    for(i = 0; i < TONA_NUM; i++)
     {
-        vad_state->frames_power_32[i] = L_deposit_l(0);
+        st->f_tonality_rate[i] = 0.48f;
+    }
+
+    for(i = 0; i < PRE_SPEC_DIF_NUM; i++)
+    {
+        st->pre_spec_low_dif[i] = 1.0f;
     }
 
 
@@ -170,284 +112,153 @@ Word16 vad_init(T_CldfbVadState *vad_state)
 }
 
 
-void UpdateState(T_CldfbVadState *vad_state,
-                 Word16 vad_flag,
-                 Word32 frame_energy,       /*(i)  current frame energy*/
-                 Word16 sacle_sbpower,      /*(i)  the Scaling of current frame energy*/
-                 Word32 update_flag,        /*(i)  current frame update flag*/
-                 Word16 music_backgound_f,  /*(i)  backgound music flag*/
-                 Word32 HB_Power,           /*(i)  current frame high frequency energy*/
-                 Word16 HB_Power_Q          /*(i)  the Scaling of current frame high frequency energy*/
-                 ,Word32 snr
-                )
+/*-------------------------------------------------------------------*
+ * UpdateState()
+ *
+ *
+ *-------------------------------------------------------------------*/
+
+static void UpdateState(
+    T_CldfbVadState *st,
+    float frame_energy,         /*(i) current frame energy                  */
+    float high_eng,             /*(i) current frame high frequency energy   */
+    int   update_flag,          /*(i) current frame update flag             */
+    int   music_backgound_f,    /*(i) background music flag                 */
+    int   vad_flag
+    ,float snr
+)
 {
-    Word16 lt_bg_energy_scal;
-    Word32 tmp,tmp2;
+    st->frame_energy_smooth = st->frame_energy_smooth*0.95f +  frame_energy*0.05f;
 
-
-    tmp = MUL_F(vad_state->frame_energy_smooth, 31129/* 0.95 Q15 */);
-    tmp2 = MUL_F(frame_energy, 26214);
-    vad_state->frame_energy_smooth = VAD_L_ADD(tmp, vad_state->frame_energy_smooth_scale, tmp2, add(4, sacle_sbpower), &lt_bg_energy_scal);
-    move32();
-    vad_state->frame_energy_smooth_scale = lt_bg_energy_scal;
-    move16();
-
-
-    IF( vad_flag == 0 )
+    if(vad_flag==0)
     {
-        vad_state->lt_bg_highf_eng = L_add(MUL_F(vad_state->lt_bg_highf_eng, 31130), L_shr(MUL_F(HB_Power, 1638), sub(HB_Power_Q, lt_bg_highf_eng_Q)));
+        st->lt_bg_highf_eng = st->lt_bg_highf_eng*0.95f + high_eng*0.05f;
     }
 
-    if(sub(vad_state->frameloop, 1000) < 0)
+    if(st->frameloop<1000)
     {
-        vad_state->frameloop = add(vad_state->frameloop, 1);
-        move16();
+        st->frameloop++;
     }
-
-    background_update(vad_state,
-                      sacle_sbpower,
-                      frame_energy,
-                      update_flag,
-                      music_backgound_f
-                      ,snr
-                     );
-    IF( vad_flag== 0)
+    background_update( st, frame_energy, update_flag, music_backgound_f, snr);
+    if( vad_flag == 0)
     {
-        vad_state->continuous_speech_num2 = 0;
-        move16();
-        IF(sub(vad_state->continuous_noise_num, 10) > 0)
-        {
-            vad_state->continuous_speech_num = 0;
-            move16();
-        }
-        ELSE IF(L_sub(vad_state->continuous_speech_num, 9) > 0)
-        {
-            vad_state->continuous_speech_num = 9;
-            move16();
-        }
-        vad_state->continuous_noise_num = add(vad_state->continuous_noise_num, 1);
-        move16();
+        st->continuous_speech_num2 = 0;
 
-        if(sub(vad_state->continuous_noise_num, 2048) > 0)
+        if(st->continuous_noise_num > 10)
         {
-            vad_state->continuous_noise_num = 2048;
-            move16();
+            st->continuous_speech_num = 0;
+        }
+        else if (st->continuous_speech_num > 9)
+        {
+            st->continuous_speech_num = 9;
+        }
+
+        st->continuous_noise_num++;
+
+        if(st->continuous_noise_num > 2048)
+        {
+            st->continuous_noise_num = 2048;
         }
     }
-    ELSE
+    else
     {
-        vad_state->continuous_noise_num = 0;
-        move16();
+        st->continuous_noise_num = 0;
+        st->continuous_speech_num2++;
+        st->continuous_speech_num++;
 
-        vad_state->continuous_speech_num2 = add(vad_state->continuous_speech_num2, 1);
-        vad_state->continuous_speech_num = add(vad_state->continuous_speech_num, 1);
-        if(sub(vad_state->continuous_speech_num, 2048) > 0)
+        if(st->continuous_speech_num > 2048)
         {
-            vad_state->continuous_speech_num = 2048;
-            move16();
+            st->continuous_speech_num = 2048;
         }
 
-        if(sub(vad_state->continuous_speech_num2, 2048) > 0)
+        if(st->continuous_speech_num2 > 2048)
         {
-            vad_state->continuous_speech_num2 = 2048;
-            move16();
+            st->continuous_speech_num2 = 2048;
         }
     }
 
+    return;
 }
 
 
-Word16 vad_proc(T_CldfbVadState *vad_st,
-                Word32 realBuffer[CLDFB_NO_COL_MAX][CLDFB_NO_CHANNELS_MAX],    /* i: real values */
-                Word32 imagBuffer[CLDFB_NO_COL_MAX][CLDFB_NO_CHANNELS_MAX],    /* i: imag values */
-                Word16 riBuffer_exp,                                           /* i: exponent of real & imag Buffer */
-                Word16 *cldfb_addition,                                /*o: adjust the harmonized hangover */
-                Word32 enerBuffer[CLDFB_NO_CHANNELS_MAX],            /* i: energy vector per band */
-                Word16 enerBuffer_exp,                               /* i: exponent of energy vector */
-                Word16 numBands,                                     /* i: band width 1: NB; 2:WB;3:SWB;4:FB*/
-                Word16 vada_flag
-               )
+/*-------------------------------------------------------------------*
+ * vad_proc()
+ *
+ *
+ *-------------------------------------------------------------------*/
+
+short vad_proc(
+    float realValues[16][60],       /* CLDFB real values        */
+    float imagValues[16][60],       /* CLDFB imag values        */
+    float *sb_power,                /* Energy of CLDFB data     */
+    int numBands,                   /* number of input bands    */
+    T_CldfbVadState *vad_st,
+    short *cldfb_addition,
+    short vada_flag
+)
 {
-    Word16 i;
-    Word16 bandwidth;
-    Word16 music_backgound_f;
-    Word16 Q_cldfb;
-    Word16 frame_energy2_Q, HB_Power_Q;
-    Word16 sb_power_Q,frame_energy_Q;
-    Word32 frame_energy, frame_energy2, HB_Power;
-    Word32 spec_amp[120];
-    Word32 update_flag,snr_flux,lt_snr_org,lt_snr,lf_snr;
-    Word32 snr,tsnr;
-    Word16 vad_flag;
-    Word32 *cldfbBufferReal[CLDFB_NO_COL_MAX]; /* dynamic scaling; cldfbBufferReal_float[x][y] = cldfbBufferReal[x][y] * 2^(-Q_cldfb) */
-    Word32 *cldfbBufferImag[CLDFB_NO_COL_MAX]; /* dynamic scaling; cldfbBufferImag_float[x][y] = cldfbBufferReal[x][y] * 2^(-Q_cldfb) */
+    float frame_energy,frame_energy2;
+    float spec_amp[8*10]; /* 120 */
 
+    float snr, tsnr;
+    int   update_flag;
+    int   vad_flag;
+    int   music_backgound_f=0;
+    float HB_Power=0;
+    float snr_flux;
+    float lt_snr;
+    float lt_snr_org;
+    float lf_snr;
+    int bandwidth;
 
-    music_backgound_f = add(0,0);
-    frame_energy = L_add(0,0);
-
-
-    IF(sub(numBands, 20) < 0)
+    if(numBands<20)
     {
         bandwidth = 1;
-        move16();
     }
-    ELSE IF(sub(numBands, 40) < 0)
+    else if(numBands<40)
     {
         bandwidth = 2;
-        move16();
     }
-    ELSE
+    else
     {
         bandwidth = 3;
-        move16();
     }
 
     vad_st->bw_index = bandwidth;
-    move16();
-    FOR (i=0; i<CLDFB_NO_COL_MAX; i++)
-    {
-        cldfbBufferReal[i] = realBuffer[i];
-        move16();
-        cldfbBufferImag[i] = imagBuffer[i];
-        move16();
-    }
 
+    assert(numBands>=10);
 
-    Q_cldfb        = sub(31, riBuffer_exp);
+    /* new optimized structure */
+    est_energy(sb_power, vad_st->frame_sb_energy, &frame_energy, &frame_energy2, &HB_Power, bandwidth);
 
-    Q_cldfb = sub(Q_cldfb, 16);
+    subband_FFT(realValues,imagValues,spec_amp);
 
+    spec_center(sb_power,vad_st->sp_center,bandwidth);
 
-    est_energy(enerBuffer,
-               enerBuffer_exp,
-               vad_st->frame_sb_energy,
-               &frame_energy2,
-               &HB_Power,
-               &frame_energy,
-               &sb_power_Q,
-               &frame_energy2_Q,
-               &HB_Power_Q,
-               &frame_energy_Q,
-               &vad_st->frame_sb_energy_scale,
-               bandwidth
-              );
+    ltd_stable(vad_st->frames_power,vad_st->ltd_stable_rate,frame_energy,vad_st->frameloop);
 
-    subband_FFT(cldfbBufferReal,
-                cldfbBufferImag,
-                spec_amp,
-                0,
-                &Q_cldfb
-               );
+    spec_flatness( spec_amp, vad_st->smooth_spec_amp, vad_st->sfm );
 
-    frame_spec_dif_cor_rate(vad_st, spec_amp,
-                            add(Q_cldfb, 8),
-                            vad_st->f_tonality_rate
-                           );
+    frame_spec_dif_cor_rate( spec_amp, vad_st->pre_spec_low_dif, vad_st->f_tonality_rate );
 
-    spec_center(enerBuffer,
-                vad_st->sp_center,
-                bandwidth,
-                sb_power_Q
-               );
+    bg_music_decision( vad_st, &music_backgound_f, frame_energy );
 
-    ltd_stable(vad_st,
-               vad_st->ltd_stable_rate,
-               frame_energy,
-               vad_st->frameloop,
-               frame_energy_Q
-              );
+    SNR_calc( vad_st->frame_sb_energy, vad_st->sb_bg_energy, vad_st->t_bg_energy, &snr, &tsnr, frame_energy2, bandwidth );
 
-    spec_flatness(spec_amp,
-                  vad_st->smooth_spec_amp,
-                  vad_st->sfm
-                 );
+    calc_snr_flux( tsnr, vad_st->pre_snr, &snr_flux );
 
-    bg_music_decision(vad_st,
-                      &music_backgound_f,
-                      frame_energy,
-                      frame_energy_Q
-                     );
+    calc_lt_snr( &lt_snr_org, &lt_snr, vad_st->fg_energy, vad_st->fg_energy_count,
+                 vad_st->bg_energy, vad_st->bg_energy_count, bandwidth, vad_st->lt_noise_sp_center0 );
 
-    snr_calc(vad_st,
-             frame_energy2_Q,
-             &snr,
-             &tsnr,
-             frame_energy2,
-             bandwidth
-            );
+    calc_lf_snr( &vad_st->lf_snr_smooth, &lf_snr, vad_st->l_speech_snr, vad_st->l_speech_snr_count,
+                 vad_st->l_silence_snr, vad_st->l_silence_snr_count, vad_st->fg_energy_count,vad_st->bg_energy_count, bandwidth );
 
-    calc_snr_flux(tsnr,
-                  vad_st->pre_snr,
-                  &snr_flux
-                 );
+    vad_flag = comvad_decision( vad_st, snr, tsnr, snr_flux, lt_snr, lt_snr_org, lf_snr, frame_energy2, music_backgound_f, cldfb_addition, vada_flag );
 
-    calc_lt_snr(vad_st,
-                &lt_snr_org,
-                &lt_snr,
-                vad_st->fg_energy,
-                vad_st->fg_energy_count,
-                vad_st->bg_energy,
-                vad_st->bg_energy_count,
-                bandwidth,
-                vad_st->lt_noise_sp_center0
-               );
-
-    calc_lf_snr(&vad_st->lf_snr_smooth,
-                &lf_snr,
-                vad_st->l_speech_snr,
-                vad_st->l_speech_snr_count,
-                vad_st->l_silence_snr,
-                vad_st->l_silence_snr_count,
-                vad_st->fg_energy_count,
-                vad_st->bg_energy_count,
-                bandwidth
-               );
-
-
-    vad_flag = comvad_decision(vad_st,
-                               lf_snr,
-                               lt_snr_org,
-                               lt_snr,
-                               snr_flux,
-                               snr,
-                               tsnr,
-                               frame_energy2,
-                               music_backgound_f,
-                               frame_energy2_Q,
-                               cldfb_addition,
-                               vada_flag
-                              );
-
-
-    update_flag = update_decision(vad_st,
-                                  frame_energy,
-                                  HB_Power,
-                                  vad_st->frameloop,
-                                  bandwidth,
-                                  frame_energy_Q,
-                                  HB_Power_Q,
-                                  snr,
-                                  tsnr,
-                                  vad_st->vad_flag_for_bk_update,
-                                  music_backgound_f
-                                 );
-
-
-    UpdateState(vad_st,
-                vad_st->vad_flag_for_bk_update,
-                frame_energy2,
-                frame_energy2_Q,
-                update_flag,
-                music_backgound_f,
-                HB_Power,
-                HB_Power_Q
-                ,snr
-               );
+    update_flag = update_decision( vad_st,snr,tsnr, frame_energy,HB_Power,vad_st->vad_flag_for_bk_update, music_backgound_f );
+    UpdateState( vad_st, frame_energy2, HB_Power, update_flag,music_backgound_f, vad_st->vad_flag_for_bk_update,snr);
 
 
     return vad_flag;
 }
-
-
 

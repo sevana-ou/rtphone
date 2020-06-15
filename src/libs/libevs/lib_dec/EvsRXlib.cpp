@@ -1,29 +1,27 @@
 /*====================================================================================
-    EVS Codec 3GPP TS26.442 Apr 03, 2018. Version 12.11.0 / 13.6.0 / 14.2.0
+    EVS Codec 3GPP TS26.443 Nov 13, 2018. Version 12.11.0 / 13.7.0 / 14.3.0 / 15.1.0
   ====================================================================================*/
 
 #include <assert.h>
 #include <stdlib.h>
+#include <stdio.h>
+#include <math.h>
 #include <string.h>
 #include "options.h"
-#include "prot_fx.h"
+#include "prot.h"
 #include "EvsRXlib.h"
 #include "jbm_jb4sb.h"
 #include "jbm_pcmdsp_apa.h"
 #include "jbm_pcmdsp_fifo.h"
-
-#include "stl.h"
-#include "basop_util.h"
-#include "basop_util_jbm.h"
-
+#include "cnst.h"
 
 
 struct EVS_RX
 {
-    Decoder_State_fx        *st;
+    unsigned int             nSamplesFrame;
+    Decoder_State           *st;
     JB4_HANDLE               hJBM;
-    Word16                   lastDecodedWasActive;
-    Word16                   samplesPerMs;              /* sampleRate / 1000 */
+    unsigned int             lastDecodedWasActive;
     PCMDSP_APA_HANDLE        hTimeScaler;
     PCMDSP_FIFO_HANDLE       hFifoAfterTimeScaler;
 #ifdef SUPPORT_JBM_TRACEFILE
@@ -32,47 +30,41 @@ struct EVS_RX
 };
 
 /* function to check if a frame contains a SID */
-static Word16 isSidFrame( Word16 size );
+static int isSidFrame( unsigned int size );
 
 
 /* Opens the EVS Receiver instance. */
 EVS_RX_ERROR EVS_RX_Open(EVS_RX_HANDLE* phEvsRX,
-                         Decoder_State_fx *st,
+                         Decoder_State *st,
                          Word16 jbmSafetyMargin)
 {
     EVS_RX_HANDLE hEvsRX;
-    Word16 divScaleFac, wss, css;
+    uint16_t wss, css;
 
     *phEvsRX = NULL;
-    move16();
 
     /* Create EVS Receiver handle */
     *phEvsRX = (EVS_RX_HANDLE) calloc(1, sizeof(struct EVS_RX) );
-    move16();
-    IF( *phEvsRX == NULL )
+    if ( *phEvsRX == NULL )
     {
         return EVS_RX_MEMORY_ERROR;
     }
     hEvsRX = *phEvsRX;
-    move16();
 
     hEvsRX->st = st;
-    move16();
     /* do not use codec for time stretching (PLC) before initialization with first received frame */
     st->codec_mode = 0;
-    move16();
 
     /* open JBM */
     hEvsRX->hJBM = 0;
-    move16();
-    IF( JB4_Create(&(hEvsRX->hJBM)) != 0)
+    if( JB4_Create(&(hEvsRX->hJBM)) != 0)
     {
         EVS_RX_Close(phEvsRX);
         return EVS_RX_INIT_ERROR;
     }
 
     /* init JBM */
-    IF(JB4_Init(hEvsRX->hJBM, jbmSafetyMargin) != 0)
+    if(JB4_Init(hEvsRX->hJBM, jbmSafetyMargin) != 0)
     {
         EVS_RX_Close(phEvsRX);
         return EVS_RX_INIT_ERROR;
@@ -80,56 +72,41 @@ EVS_RX_ERROR EVS_RX_Open(EVS_RX_HANDLE* phEvsRX,
 
 
     hEvsRX->lastDecodedWasActive = 0;
-    move16();
-    hEvsRX->samplesPerMs  = BASOP_Util_Divide3216_Scale(st->output_Fs_fx, 1000, &divScaleFac);
-    hEvsRX->samplesPerMs  = shl(hEvsRX->samplesPerMs, add(divScaleFac, 1));
-    assert(hEvsRX->samplesPerMs  == st->output_Fs_fx / 1000);
+    hEvsRX->nSamplesFrame = st->output_Fs / 50;
 
-    IF(L_sub(st->output_Fs_fx, 8000) == 0)
+    if(st->output_Fs == 8000)
     {
         wss = 1;
-        move16();
         css = 1;
-        move16();
     }
-    ELSE IF(L_sub(st->output_Fs_fx, 16000) == 0)
+    else if(st->output_Fs == 16000)
     {
         wss = 2;
-        move16();
         css = 1;
-        move16();
     }
-    ELSE IF(L_sub(st->output_Fs_fx, 32000) == 0)
+    else if(st->output_Fs == 32000)
     {
         wss = 4;
-        move16();
         css = 2;
-        move16();
     }
-    ELSE IF(L_sub(st->output_Fs_fx, 48000) == 0)
+    else if(st->output_Fs == 48000)
     {
         wss = 6;
-        move16();
         css = 3;
-        move16();
     }
-    ELSE
+    else
     {
         assert(0 || "unknown sample rate!");
         wss = css = 1; /* just to avoid compiler warning */
     }
 
-    /* initialize time scaler and FIFO after time scaler */                     test();
-    test();
-    test();
-    test();
-    test();
-    IF( apa_init( &hEvsRX->hTimeScaler ) != 0 ||
-        apa_set_rate( hEvsRX->hTimeScaler, st->output_Fs_fx, 1 ) != 0 ||
-        apa_set_complexity_options( hEvsRX->hTimeScaler, wss, css ) != 0 ||
-        apa_set_quality( hEvsRX->hTimeScaler, L_deposit_h(1), 4, 4 ) != 0 ||
-        pcmdsp_fifo_create( &hEvsRX->hFifoAfterTimeScaler ) != 0 ||
-        pcmdsp_fifo_init( hEvsRX->hFifoAfterTimeScaler, i_mult2(4, st->output_frame_fx) /* 4 frames */, 1, 2 /* Word16 */ ) != 0 )
+    /* initialize time scaler and FIFO after time scaler */
+    if( apa_init( &hEvsRX->hTimeScaler ) != 0 ||
+            apa_set_rate( hEvsRX->hTimeScaler, st->output_Fs, 1 ) != 0 ||
+            apa_set_complexity_options( hEvsRX->hTimeScaler, wss, css) != 0 ||
+            apa_set_quality( hEvsRX->hTimeScaler, 1, 4, 4 ) != 0 ||
+            pcmdsp_fifo_create( &hEvsRX->hFifoAfterTimeScaler ) != 0 ||
+            pcmdsp_fifo_init( hEvsRX->hFifoAfterTimeScaler, st->output_Fs * 4 / 50 /* 4 frames */, 1, 2 /* Word16 */ ) != 0 )
     {
         EVS_RX_Close(phEvsRX);
         return EVS_RX_TIMESCALER_ERROR;
@@ -163,15 +140,15 @@ EVS_RX_SetJbmTraceFileName(EVS_RX_HANDLE hEvsRX,
 /* Feeds one frame into the receiver. */
 EVS_RX_ERROR
 EVS_RX_FeedFrame(EVS_RX_HANDLE hEvsRX,
-                 UWord8 *au,
-                 Word16 auSize,
-                 Word16 rtpSequenceNumber,
-                 Word32 rtpTimeStamp,
-                 Word32 rcvTime_ms)
+                 unsigned char *au,
+                 unsigned int auSize,
+                 unsigned short rtpSequenceNumber,
+                 unsigned long rtpTimeStamp,
+                 unsigned int rcvTime_ms)
 {
     JB4_DATAUNIT_HANDLE dataUnit;
-    Word16 partialCopyFrameType, partialCopyOffset;
-    Word16 result;
+    int16_t partialCopyFrameType, partialCopyOffset;
+    int result;
 
     assert( auSize != 0 );
     assert( (auSize + 7) / 8 <= MAX_AU_SIZE );
@@ -181,56 +158,42 @@ EVS_RX_FeedFrame(EVS_RX_HANDLE hEvsRX,
 
     /* create data unit for primary copy in the frame */
     dataUnit = JB4_AllocDataUnit(hEvsRX->hJBM);
-    copyWord8((Word8*)au, (Word8*)dataUnit->data, shr(add(auSize, 7), 3) );
+    memcpy(dataUnit->data, au, (auSize + 7) / 8);
     dataUnit->dataSize = auSize;
-    move16();
     dataUnit->duration = 20;
-    move32();
     dataUnit->sequenceNumber = rtpSequenceNumber;
-    move16();
     dataUnit->silenceIndicator = isSidFrame( dataUnit->dataSize );
     dataUnit->timeScale = 1000;
-    move32();
     dataUnit->rcvTime = rcvTime_ms;
-    move32();
     dataUnit->timeStamp = rtpTimeStamp;
-    move32();
     dataUnit->partial_frame = 0;
-    move16();
     dataUnit->partialCopyOffset = partialCopyOffset;
-    move16();
+
     /* add the frame to the JBM */
     result = JB4_PushDataUnit(hEvsRX->hJBM, dataUnit, rcvTime_ms);
-    IF(result != 0)
+    if(result != 0)
     {
         return EVS_RX_JBM_ERROR;
     }
-    test();
-    IF(sub(partialCopyFrameType, RF_NO_DATA) != 0 && partialCopyOffset != 0)
+
+    if(partialCopyFrameType != RF__NO_DATA && partialCopyOffset != 0)
     {
         /* create data unit for partial copy in the frame */
         dataUnit = JB4_AllocDataUnit(hEvsRX->hJBM);
-        copyWord8((Word8*)au, (Word8*)dataUnit->data, shr(add(auSize, 7), 3) );
+        memcpy(dataUnit->data, au, (auSize + 7) / 8);
         dataUnit->dataSize = auSize;
-        move16();
         dataUnit->duration = 20;
-        move32();
         dataUnit->sequenceNumber = rtpSequenceNumber;
-        move16();
-        dataUnit->silenceIndicator = 0; /* there are no partial copies for SID frames */ move16();
+        dataUnit->silenceIndicator = 0; /* there are no partial copies for SID frames */
         dataUnit->timeScale = 1000;
-        move32();
         dataUnit->rcvTime = rcvTime_ms;
-        move32();
-        dataUnit->timeStamp = rtpTs_sub(rtpTimeStamp, L_mult0(partialCopyOffset, 20));
-        assert(dataUnit->timeStamp == rtpTimeStamp - partialCopyOffset * dataUnit->duration);
+        dataUnit->timeStamp = rtpTimeStamp - partialCopyOffset * dataUnit->duration;
         dataUnit->partial_frame = 1;
-        move16();
         dataUnit->partialCopyOffset = partialCopyOffset;
-        move16();
+
         /* add the frame to the JBM */
         result = JB4_PushDataUnit(hEvsRX->hJBM, dataUnit, rcvTime_ms);
-        IF(result != 0)
+        if(result != 0)
         {
             return EVS_RX_JBM_ERROR;
         }
@@ -238,175 +201,156 @@ EVS_RX_FeedFrame(EVS_RX_HANDLE hEvsRX,
     return EVS_RX_NO_ERROR;
 }
 
+
 /* Retrieves one frame of output PCM data. */
 EVS_RX_ERROR
 EVS_RX_GetSamples(EVS_RX_HANDLE hEvsRX,
-                  Word16 *nOutSamples,
-                  Word16 *pcmBuf,
-                  Word16 pcmBufSize,
-                  Word32 systemTimestamp_ms)
+                  unsigned int*  nOutSamples,
+                  Word16        *pcmBuf,
+                  unsigned int   pcmBufSize,
+                  unsigned int  systemTimestamp_ms
+                 )
 {
-    Decoder_State_fx *st;
-    Word16 soundCardFrameSize, extBufferedSamples;
-    Word32 extBufferedTime_ms;
-    Word16 scale, maxScaling, nTimeScalerOutSamples;
-    Word16 timeScalingDone, result;
+    Decoder_State *st;
+    unsigned int soundCardFrameSize, extBufferedSamples;
+    uint32_t extBufferedTime_ms, scale, maxScaling;
+    uint16_t nTimeScalerOutSamples;
+    int timeScalingDone, result;
     JB4_DATAUNIT_HANDLE dataUnit;
-    Word16 tmp;
+    float output[3 * L_FRAME48k];       /* 'float' buffer for output synthesis */
 
-    assert(hEvsRX->st->output_frame_fx <= pcmBufSize);
-    assert(hEvsRX->st->output_frame_fx <= APA_BUF);
+    assert(hEvsRX->nSamplesFrame <= pcmBufSize);
+    assert(hEvsRX->nSamplesFrame <= APA_BUF);
 
     st = hEvsRX->st;
-    move16();
-    soundCardFrameSize = st->output_frame_fx;
-    move16();
+    soundCardFrameSize = hEvsRX->nSamplesFrame;
     timeScalingDone = 0;
-    move16();
+
 
     /* make sure that the FIFO after decoder/scaler contains at least one sound card frame (i.e. 20ms) */
-    WHILE(sub(pcmdsp_fifo_nReadableSamples(hEvsRX->hFifoAfterTimeScaler), soundCardFrameSize) < 0)
+    while( pcmdsp_fifo_nReadableSamples( hEvsRX->hFifoAfterTimeScaler ) < soundCardFrameSize )
     {
         extBufferedSamples = pcmdsp_fifo_nReadableSamples( hEvsRX->hFifoAfterTimeScaler );
-        extBufferedTime_ms = L_deposit_l(idiv1616U(extBufferedSamples, hEvsRX->samplesPerMs));
+        extBufferedTime_ms = extBufferedSamples * 1000 / st->output_Fs;
         dataUnit = NULL;
-        move16();
         /* pop one access unit from the jitter buffer */
         result = JB4_PopDataUnit(hEvsRX->hJBM, systemTimestamp_ms, extBufferedTime_ms, &dataUnit, &scale, &maxScaling);
-        IF(result != 0)
+        if(result != 0)
         {
             return EVS_RX_JBM_ERROR;
         }
-        if(sub(maxScaling, 20) > 0)
-        {
-            maxScaling = 20;
-            move16();
-        }
-        maxScaling = i_mult2(maxScaling, hEvsRX->samplesPerMs);
-        assert(maxScaling >= 0);
+        maxScaling = maxScaling * st->output_Fs / 1000;
         /* avoid time scaling multiple times in one sound card slot */
-        IF(sub(scale, 100) != 0)
+        if( scale != 100U )
         {
-            if( timeScalingDone != 0 )
-            {
+            if( timeScalingDone )
                 scale = 100;
-                move16();
-            }
-            timeScalingDone = 1;
-            move16();
+            else
+                timeScalingDone = 1;
         }
 
         /* copy bitstream into decoder state */
-        IF(dataUnit)
+        if(dataUnit)
         {
-            IF( sub(st->codec_mode,0) != 0 )
+            if( st->codec_mode != 0 )
             {
-                tmp = 0;
-                if (sub(dataUnit->partial_frame,1)==0)
-                {
-                    tmp = 1;
-                }
-                read_indices_from_djb_fx( st, dataUnit->data, dataUnit->dataSize, tmp, dataUnit->nextCoderType );
-
-                IF(dataUnit->partial_frame != 0)
+                read_indices_from_djb( st, dataUnit->data, dataUnit->dataSize, (dataUnit->partial_frame==TRUE)? 1:0, dataUnit->nextCoderType );
+                if(dataUnit->partial_frame != 0)
                 {
                     st->codec_mode = MODE2;
                     st->use_partial_copy = 1;
                 }
             }
-            ELSE /* initialize decoder with first received frame */
+            else /* initialize decoder with first received frame */
             {
                 /* initialize, since this is needed within read_indices_from_djb, to correctly set st->last_codec_mode */
-                st->ini_frame_fx = 0;
+                st->ini_frame = 0;
                 st->prev_use_partial_copy = 0;
                 /* initialize st->last_codec_mode, since this is needed for init_decoder() */
-                read_indices_from_djb_fx( st, dataUnit->data, dataUnit->dataSize, 0, 0 );
+                read_indices_from_djb( st, dataUnit->data, dataUnit->dataSize, 0, 0 );
+
                 assert(st->codec_mode != 0);
-                init_decoder_fx( st );
+                init_decoder( st );
+                /* parse frame again because init_decoder() overwrites st->total_brate */
+                read_indices_from_djb( st, dataUnit->data, dataUnit->dataSize, 0, 0 );
 
-                /* parse frame again because init_decoder() overwrites st->total_brate_fx */
-                read_indices_from_djb_fx( st, dataUnit->data, dataUnit->dataSize, 0, 0 );
             }
-
         }
-        ELSE IF( st->codec_mode != 0 )
+        else if( st->codec_mode != 0 )
         {
-            read_indices_from_djb_fx( st, NULL, 0, 0, 0 );
+            read_indices_from_djb( st, NULL, 0, 0, 0 );
         }
 
         /* run the main decoding routine */
-        SUB_WMOPS_INIT("evs_dec");
-        IF( sub(st->codec_mode, MODE1) == 0 )
+        if( st->codec_mode == MODE1 )
         {
-            IF( st->Opt_AMR_WB_fx )
+            if( st->Opt_AMR_WB )
             {
-                amr_wb_dec_fx( pcmBuf, st );
+                amr_wb_dec( st, output );
             }
-            ELSE
+            else
             {
-                evs_dec_fx( st, pcmBuf, FRAMEMODE_NORMAL );
+                evs_dec( st, output, FRAMEMODE_NORMAL );
             }
         }
-        ELSE IF( sub(st->codec_mode, MODE2) == 0 )
+        else if( st->codec_mode == MODE2 )
         {
-            IF(st->bfi_fx == 0)
+            if(st->bfi == 0)
             {
-                evs_dec_fx(st, pcmBuf, FRAMEMODE_NORMAL);
+                evs_dec(st, output, FRAMEMODE_NORMAL);   /* FRAMEMODE_NORMAL */
             }
-            ELSE IF ( sub(st->bfi_fx,2) == 0 )
+            else if ( st->bfi == 2 )
             {
-                evs_dec_fx(st, pcmBuf, FRAMEMODE_FUTURE);   /* FRAMEMODE_FUTURE */
+                evs_dec(st, output, FRAMEMODE_FUTURE);   /* FRAMEMODE_FUTURE */
             }
-            ELSE /* conceal */
+            else /* conceal */
             {
-                evs_dec_fx(st, pcmBuf, FRAMEMODE_MISSING);
+                evs_dec(st, output, FRAMEMODE_MISSING);
             }
         }
-        END_SUB_WMOPS;
-        test();
-        IF( sub(st->codec_mode, MODE1) == 0 || sub(st->codec_mode, MODE2) == 0 )
+        /* convert 'float' output data to 'short' */
+        if( st->codec_mode == MODE1 || st->codec_mode == MODE2 )
         {
+            syn_output( output, hEvsRX->nSamplesFrame, pcmBuf );
+
             /* increase the counter of initialization frames */
-            if( sub(st->ini_frame_fx, MAX_FRAME_COUNTER) < 0 )
+            if( st->ini_frame < MAX_FRAME_COUNTER )
             {
-                st->ini_frame_fx = add(st->ini_frame_fx, 1);
+                st->ini_frame++;
             }
         }
-        ELSE /* codec mode to use not known yet */
+        else /* codec mode to use not known yet */
         {
-            set16_fx( pcmBuf, 0, st->output_frame_fx );
+            set_s( pcmBuf, 0, hEvsRX->nSamplesFrame );
         }
 
-        IF(dataUnit != NULL)
+        if(dataUnit)
         {
-            IF(dataUnit->partial_frame != 0)
+            if(dataUnit->partial_frame != 0)
             {
                 hEvsRX->lastDecodedWasActive = 1;
-                move16();
             }
-            ELSE
+            else
             {
-                hEvsRX->lastDecodedWasActive = s_xor(dataUnit->silenceIndicator, 1);
+                hEvsRX->lastDecodedWasActive = !dataUnit->silenceIndicator;
             }
             /* data unit memory is no longer used */
             JB4_FreeDataUnit(hEvsRX->hJBM, dataUnit);
         }
 
         /* limit scale to range supported by time scaler */
-        if(sub(scale, APA_MIN_SCALE) < 0)
+        if( scale < APA_MIN_SCALE )
             scale = APA_MIN_SCALE;
-        move16();
-        if(sub(scale, APA_MAX_SCALE) > 0)
+        else if( scale > APA_MAX_SCALE )
             scale = APA_MAX_SCALE;
-        move16();
         /* apply time scaling on decoded/concealed samples */
-        IF( apa_set_scale( hEvsRX->hTimeScaler, scale ) != 0 )
+        if( apa_set_scale( hEvsRX->hTimeScaler, scale ) != 0 )
         {
             return EVS_RX_TIMESCALER_ERROR;
         }
-        result = apa_exec( hEvsRX->hTimeScaler, pcmBuf, st->output_frame_fx,
+        result = apa_exec( hEvsRX->hTimeScaler, pcmBuf, hEvsRX->nSamplesFrame,
                            maxScaling, pcmBuf, &nTimeScalerOutSamples );
-        IF( result != 0 )
+        if( result != 0 )
         {
             return EVS_RX_TIMESCALER_ERROR;
         }
@@ -414,8 +358,8 @@ EVS_RX_GetSamples(EVS_RX_HANDLE hEvsRX,
         assert(nTimeScalerOutSamples <= APA_BUF);
         (void)pcmBufSize;
         /* append scaled samples to FIFO */
-        IF( pcmdsp_fifo_write( hEvsRX->hFifoAfterTimeScaler,
-                               (UWord8*)pcmBuf, nTimeScalerOutSamples ) != 0 )
+        if( pcmdsp_fifo_write( hEvsRX->hFifoAfterTimeScaler,
+                               (uint8_t*)pcmBuf, nTimeScalerOutSamples ) != 0 )
         {
             return EVS_RX_TIMESCALER_ERROR;
         }
@@ -425,20 +369,20 @@ EVS_RX_GetSamples(EVS_RX_HANDLE hEvsRX,
         if( hEvsRX->jbmTraceFile )
         {
             /* the first sample of the decoded/concealed frame will be played after the samples in the ring buffer */
-            double playTime = systemTimestamp_ms + extBufferedSamples * 1000.0 / st->output_Fs_fx;
+            double playTime = systemTimestamp_ms + extBufferedSamples * 1000.0 / st->output_Fs;
             /* rtpSeqNo;rtpTs;rcvTime;playTime;active\n */
             if( dataUnit )
             {
                 if(dataUnit->partial_frame == 1)
                 {
                     fprintf( hEvsRX->jbmTraceFile, "%d;%d;%d;%f;%d;%d\n",
-                             -1, -1, -1, playTime, (int)hEvsRX->lastDecodedWasActive, dataUnit->partialCopyOffset );
+                             -1, -1, -1, playTime, hEvsRX->lastDecodedWasActive, dataUnit->partialCopyOffset );
                 }
                 else
                 {
                     fprintf( hEvsRX->jbmTraceFile, "%u;%u;%u;%f;%d\n",
                              dataUnit->sequenceNumber, dataUnit->timeStamp, dataUnit->rcvTime,
-                             playTime, (int)hEvsRX->lastDecodedWasActive );
+                             playTime, hEvsRX->lastDecodedWasActive );
                 }
 
             }
@@ -446,7 +390,7 @@ EVS_RX_GetSamples(EVS_RX_HANDLE hEvsRX,
             {
                 fprintf( hEvsRX->jbmTraceFile, "%d;%d;%d;%f;%d\n",
                          -1, -1, -1,
-                         playTime, (int)hEvsRX->lastDecodedWasActive );
+                         playTime, hEvsRX->lastDecodedWasActive );
             }
         }
 #endif
@@ -454,39 +398,38 @@ EVS_RX_GetSamples(EVS_RX_HANDLE hEvsRX,
 
     /* fetch one frame for the sound card from FIFO */
     *nOutSamples = soundCardFrameSize;
-    move16();
-    IF( pcmdsp_fifo_read( hEvsRX->hFifoAfterTimeScaler, *nOutSamples, (UWord8*)pcmBuf ) != 0 )
+    if( pcmdsp_fifo_read( hEvsRX->hFifoAfterTimeScaler, *nOutSamples, (uint8_t*)pcmBuf ) != 0 )
     {
         return EVS_RX_TIMESCALER_ERROR;
     }
     return EVS_RX_NO_ERROR;
 }
 
-Word16
-EVS_RX_Get_FEC_offset( EVS_RX_HANDLE hEvsRX, Word16 *offset, Word16 *FEC_hi)
+EVS_RX_ERROR
+EVS_RX_Get_FEC_offset( EVS_RX_HANDLE hEvsRX, short *offset
+                       , short *FEC_hi
+                     )
 {
-    *offset = (Word16)JB4_getFECoffset(hEvsRX->hJBM);
-    move16();
-    *FEC_hi = (Word16)JB4_FECoffset(hEvsRX->hJBM);
-    move16();
 
-    return 0;
+    *offset = JB4_getFECoffset(hEvsRX->hJBM);
+    *FEC_hi = JB4_FECoffset(hEvsRX->hJBM);
+    return EVS_RX_NO_ERROR;
+
 }
 
 
+
+
 /* Returns 1 if the jitter buffer is empty, otherwise 0. */
-Word8
+unsigned int
 EVS_RX_IsEmpty(EVS_RX_HANDLE hEvsRX )
 {
-    Word8 isEmpty;
+    unsigned int isEmpty;
 
     isEmpty = 0;
-    move16();
-    if(JB4_bufferedDataUnits(hEvsRX->hJBM) == 0 )
-    {
+    if(JB4_bufferedDataUnits(hEvsRX->hJBM) == 0U)
         isEmpty = 1;
-        move16();
-    }
+
     return isEmpty;
 }
 
@@ -495,29 +438,22 @@ EVS_RX_ERROR
 EVS_RX_Close(EVS_RX_HANDLE* phRX )
 {
     /* Free all memory */
-    test();
-    IF( phRX == NULL || *phRX == NULL )
+    if( phRX == NULL || *phRX == NULL )
     {
         return EVS_RX_NO_ERROR;
     }
 
     destroy_decoder( (*phRX)->st );
 
-    IF( (*phRX)->hJBM )
-    {
+    if( (*phRX)->hJBM )
         JB4_Destroy( &(*phRX)->hJBM );
-    }
 
 
-    IF( (*phRX)->hTimeScaler )
-    {
+    if( (*phRX)->hTimeScaler )
         apa_exit( &(*phRX)->hTimeScaler );
-    }
 
-    IF( (*phRX)->hFifoAfterTimeScaler )
-    {
+    if( (*phRX)->hFifoAfterTimeScaler )
         pcmdsp_fifo_destroy( &(*phRX)->hFifoAfterTimeScaler );
-    }
 
 #ifdef SUPPORT_JBM_TRACEFILE
     if( (*phRX)->jbmTraceFile )
@@ -526,27 +462,22 @@ EVS_RX_Close(EVS_RX_HANDLE* phRX )
 
     free( *phRX );
     *phRX = NULL;
-    move16();
     phRX = NULL;
-    move16();
+
     return EVS_RX_NO_ERROR;
 }
 
 /* function to check if a frame contains a SID */
-static Word16 isSidFrame( Word16 size )
+static int isSidFrame( unsigned int size )
 {
-    Word16 ret;
-
-    ret = 0;
-    move16();
-    if(sub(size, SID_1k75 / 50) == 0)
+    int ret = 0;
+    if(size == SID_1k75 / 50)
     {
-        ret = 1; /* AMR-WB SID */                                               move16();
+        ret = 1; /* AMR-WB SID */
     }
-    if(sub(size, SID_2k40 / 50) == 0)
+    else if(size == SID_2k40 / 50)
     {
-        ret = 1; /* EVS SID */                                                  move16();
+        ret = 1; /* EVS SID */
     }
     return ret;
 }
-

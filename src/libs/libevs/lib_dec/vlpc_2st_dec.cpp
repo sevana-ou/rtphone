@@ -1,59 +1,42 @@
 /*====================================================================================
-    EVS Codec 3GPP TS26.442 Apr 03, 2018. Version 12.11.0 / 13.6.0 / 14.2.0
+    EVS Codec 3GPP TS26.443 Nov 13, 2018. Version 12.11.0 / 13.7.0 / 14.3.0 / 15.1.0
   ====================================================================================*/
 
 #include <stdio.h>
 #include <stdlib.h>
-#include "prot_fx.h"
-#include "stl.h"
+#include <math.h>
+#include "prot.h"
+
+/*------------------------------------------------------------------*
+* vlpc_2st_dec()
+*
+*
+*------------------------------------------------------------------*/
 
 void vlpc_2st_dec(
-    Word16 *lsfq,    /* i/o:    i:1st stage   o:1st+2nd stage   */
-    Word16 *indx,      /* input:  index[] (4 bits per words)      */
-    Word16 mode,       /* input:  0=abs, >0=rel                   */
-    Word32 sr_core)
+    float *lsfq,    /* i/o:    i:1st stage   o:1st+2nd stage   */
+    int *indx,      /* input:  index[] (4 bits per words)      */
+    int mode,       /* input:  0=abs, >0=rel                   */
+    float sr_core
+)
 {
-    Word16 i;
-    Word16 w[M];
-    Word16 xq[M];
-    Word16  gap;
-
-
+    short i;
+    float w[M];
+    int xq[M];
+    float scale = sr_core/INT_FS_12k8;
 
     /* weighting from the 1st stage */
-    lsf_weight_2st(lsfq, w, mode);
+    lsf_weight_2st( lsfq, w, mode, sr_core );
 
     /* quantize */
-    AVQ_dec_lpc(indx, xq, 2);
+    AVQ_dec_lpc( indx, xq, 2 );
 
     /* quantized lsf */
-
-    FOR (i=0; i<M; i++)
-    {
-        lsfq[i] = add(lsfq[i], shl(mult_r(w[i], shl(xq[i],10)),2));                         /*14Q1*1.28*/ 	move16();
-    }
+    for( i=0; i<M; i++) lsfq[i] += scale*(w[i]*(float)xq[i] );
 
     /* reorder */
-    sort_fx(lsfq, 0, M-1);
-    IF ( L_sub(sr_core,16000) == 0 )
-    {
-        gap = 102;
-    }
-    ELSE IF ( L_sub(sr_core,25600) == 0 )
-    {
-        gap = 64;
-    }
-    ELSE IF ( L_sub(sr_core,32000) == 0 )
-    {
-        gap = 51;
-    }
-    ELSE
-    {
-        gap = 34;
-    }
-    reorder_lsf_fx(lsfq, gap, M, INT_FS_FX);
-
-
+    v_sort( lsfq, 0, M-1 );
+    reorder_lsf( lsfq, LSF_GAP, M, sr_core );
 
     return;
 }

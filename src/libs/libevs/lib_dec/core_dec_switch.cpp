@@ -1,227 +1,178 @@
 /*====================================================================================
-    EVS Codec 3GPP TS26.442 Apr 03, 2018. Version 12.11.0 / 13.6.0 / 14.2.0
+    EVS Codec 3GPP TS26.443 Nov 13, 2018. Version 12.11.0 / 13.7.0 / 14.3.0 / 15.1.0
   ====================================================================================*/
 
 #include <assert.h>
 #include <stdlib.h>
 #include <stdio.h>
-#include "basop_util.h"
-#include "prot_fx.h"
-#include "stl.h"
+#include <math.h>
 #include "options.h"
-#include "rom_com_fx.h"
+#include "prot.h"
+#include "rom_com.h"
 
 
-void mode_switch_decoder_LPD( Decoder_State_fx *st, Word16 bandwidth, Word32 bitrate, Word16 frame_size_index
-                            )
+/*-------------------------------------------------------------*
+ * mode_switch_decoder_LPD()
+ *
+ *
+ *-------------------------------------------------------------*/
+
+void mode_switch_decoder_LPD(
+    Decoder_State *st,
+    int bandwidth,
+    int bitrate,
+    int frame_size_index
+)
 {
-    Word16 fscale, switchWB;
-    Word32 sr_core;
-    Word8 bSwitchFromAmrwbIO;
-    Word16 frame_size;
-
+    int fscale, switchWB, sr_core;
+    int bSwitchFromAmrwbIO;
+    int frame_size;
 
     switchWB = 0;
-    move16();
     bSwitchFromAmrwbIO = 0;
-    move16();
-
-    if (sub(st->last_core_fx,AMR_WB_CORE)==0)
+    if(st->last_core == AMR_WB_CORE)
     {
         bSwitchFromAmrwbIO = 1;
-        move16();
     }
-
     sr_core = getCoreSamplerateMode2(bitrate, bandwidth, st->rf_flag);
-
     fscale = sr2fscale(sr_core);
-    move16();
 
     /* set number of coded lines */
     st->tcx_cfg.tcx_coded_lines = getNumTcxCodedLines(bandwidth);
 
-    test();
-    test();
-    IF (( (sub(bandwidth, WB) >= 0) && (sub(fscale, (FSCALE_DENOM*16000)/12800) == 0) && (sub(fscale, st->fscale) == 0) ))
+    if ( (bandwidth>=WB) && (fscale==(FSCALE_DENOM*16000)/12800) && (fscale == st->fscale) )
     {
-        test();
-        test();
-        test();
-        if ( ((L_sub(bitrate, 32000) > 0) && (st->tcxonly == 0)) || ((L_sub(bitrate, 32000) <= 0) && (st->tcxonly != 0)) )
+        if ( ((bitrate > ACELP_32k) && (st->tcxonly==0)) || ((bitrate <= ACELP_32k) && (st->tcxonly==1)) )
         {
             switchWB = 1;
-            move16();
         }
     }
 
-    test();
-    if( sub(st->last_L_frame_fx,L_FRAME16k) >0  && L_sub(st->total_brate_fx,ACELP_32k) <=0  )
+    if( st->last_L_frame > L_FRAME16k && st->total_brate <= ACELP_32k )
     {
-        switchWB = 1;
-        move16();
+        switchWB = 1;  /*force init when coming from MODE1*/
     }
 
-
-    st->igf = getIgfPresent(bitrate, bandwidth, st->rf_flag);
+    st->igf = getIgfPresent(bitrate, bandwidth, st->rf_flag );
 
     st->hIGFDec.infoIGFStopFreq = -1;
-    move16();
-    IF( st->igf )
+    if( st->igf )
     {
         /* switch IGF configuration */
-        IGFDecSetMode( &st->hIGFDec, st->total_brate_fx, bandwidth, -1, -1, st->rf_flag);
-
+        IGFDecSetMode( &st->hIGFDec, st->total_brate, bandwidth, -1, -1, st->rf_flag );
     }
 
-    test();
-    test();
-    test();
-    test();
-    IF (  sub(fscale, st->fscale) != 0 || switchWB != 0 || bSwitchFromAmrwbIO != 0 || sub(st->last_codec_mode,MODE1)==0 || st->force_lpd_reset )
+    if( fscale != st->fscale || switchWB || bSwitchFromAmrwbIO || st->last_codec_mode == MODE1 || st->force_lpd_reset )
     {
         open_decoder_LPD( st, bitrate, bandwidth );
     }
-    ELSE
+    else
     {
         assert(fscale > (FSCALE_DENOM/2));
-
         st->fscale_old  = st->fscale;
-        move16();
         st->fscale      = fscale;
-        move16();
-        st->L_frame_fx  = extract_l(Mult_32_16(st->sr_core , 0x0290));
-        st->L_frameTCX  = extract_l(Mult_32_16(st->output_Fs_fx , 0x0290));
+        st->L_frame = st->sr_core / 50;
+        st->L_frameTCX = st->output_Fs / 50;
 
         st->tcx_cfg.ctx_hm = getCtxHm(bitrate, st->rf_flag);
         st->tcx_cfg.resq   = getResq(bitrate);
-        move16();
 
-        st->tcx_lpc_shaped_ari = getTcxLpcShapedAri(
-            bitrate,
-            bandwidth
-            ,st->rf_flag
-        );
+        st->tcx_lpc_shaped_ari = getTcxLpcShapedAri( bitrate, bandwidth, st->rf_flag );
 
-        st->narrowBand = 0;
-        move16();
-        if ( sub(bandwidth, NB) == 0 )
+        if ( bandwidth == NB )
         {
             st->narrowBand = 1;
-            move16();
+        }
+        else
+        {
+            st->narrowBand = 0;
         }
         st->TcxBandwidth = getTcxBandwidth(bandwidth);
 
         st->tcx_cfg.pCurrentTnsConfig = NULL;
-        st->tcx_cfg.fIsTNSAllowed = getTnsAllowed(bitrate, st->igf );
-        move16();
-
-        IF (st->tcx_cfg.fIsTNSAllowed != 0)
+        st->tcx_cfg.fIsTNSAllowed = getTnsAllowed(st->total_brate, st->igf);
+        if( st->tcx_cfg.fIsTNSAllowed )
         {
-            InitTnsConfigs(bwMode2fs[bandwidth], st->tcx_cfg.tcx_coded_lines, st->tcx_cfg.tnsConfig, st->hIGFDec.infoIGFStopFreq, st->total_brate_fx);
+            InitTnsConfigs( bwMode2fs[bandwidth], st->tcx_cfg.tcx_coded_lines, st->tcx_cfg.tnsConfig, st->hIGFDec.infoIGFStopFreq, st->total_brate );
         }
     }
 
     frame_size = FrameSizeConfig[frame_size_index].frame_net_bits;
-    move16();
 
-    reconfig_decoder_LPD( st, frame_size, bandwidth, bitrate, st->last_L_frame_fx );
+    reconfig_decoder_LPD( st, frame_size, bandwidth, bitrate, st->last_L_frame );
 
-    test();
-    IF (st->envWeighted != 0 && st->enableTcxLpc == 0)
+    if (st->envWeighted && !st->enableTcxLpc)
     {
-        Copy(st->lspold_uw, st->lsp_old_fx, M);
-        Copy(st->lsfold_uw, st->lsf_old_fx, M);
+        mvr2r(st->lspold_uw, st->lsp_old, M);
+        mvr2r(st->lsfold_uw, st->lsf_old, M);
         st->envWeighted = 0;
-        move16();
     }
 
     /* update PLC LSF memories */
-    IF( st->tcxonly == 0 )
-    {
-        lsp2lsf_fx( st->lsp_old_fx, st->lsfoldbfi1_fx, M, extract_l(st->sr_core) );
-    }
-    ELSE
-    {
-        E_LPC_lsp_lsf_conversion( st->lsp_old_fx, st->lsfoldbfi1_fx, M );
-    }
-    mvr2r_Word16(st->lsfoldbfi1_fx, st->lsfoldbfi0_fx,M);
-    mvr2r_Word16(st->lsfoldbfi1_fx, st->lsf_adaptive_mean_fx,M);
+    lsp2lsf( st->lsp_old, st->lsfoldbfi1, M, st->sr_core );
+    mvr2r(st->lsfoldbfi1, st->lsfoldbfi0,M);
+    mvr2r(st->lsfoldbfi1, st->lsf_adaptive_mean,M);
 
-    IF( st->igf != 0 )
+    if( st->igf )
     {
-        test();
-        test();
-        test();
-        test();
-        test();
-        IF( (sub(st->bwidth_fx, WB)==0 && sub(st->last_extl_fx, WB_TBE)!=0) ||
-            (sub(st->bwidth_fx, SWB)==0 && sub(st->last_extl_fx, SWB_TBE)!=0) ||
-            (sub(st->bwidth_fx, FB)==0 && sub(st->last_extl_fx,FB_TBE)!=0) )
+        /* reset TBE */
+        if( ( st->bwidth == WB && st->last_extl != WB_TBE ) ||
+                ( st->bwidth == SWB && st->last_extl != SWB_TBE ) ||
+                ( st->bwidth == FB && st->last_extl != FB_TBE ) )
         {
-            TBEreset_dec_fx(st, st->bwidth_fx);
+            TBEreset_dec( st, st->bwidth );
         }
-        ELSE
+        else
         {
-            set16_fx( st->state_lpc_syn_fx, 0, LPC_SHB_ORDER );
-            set16_fx( st->state_syn_shbexc_fx, 0, L_SHB_LAHEAD );
-            set16_fx( st->mem_stp_swb_fx, 0, LPC_SHB_ORDER );
-            set16_fx( st->mem_zero_swb_fx, 0, LPC_SHB_ORDER );
-            st->gain_prec_swb_fx = 16384;
-            move16(); /*Q14 = 1 */
+            set_f( st->state_lpc_syn, 0.0f, LPC_SHB_ORDER );
+            set_f( st->state_syn_shbexc, 0.0f, L_SHB_LAHEAD );
+            set_f( st->mem_stp_swb, 0.0f, LPC_SHB_ORDER );
+            set_f( st->mem_zero_swb, 0, LPC_SHB_ORDER );
+            st->gain_prec_swb = 1.0f;
         }
     }
 
-    test();
-    test();
-    IF( (sub(bandwidth, SWB) == 0) &&
-        (L_sub(st->total_brate_fx, ACELP_16k40) == 0 || L_sub(st->total_brate_fx, ACELP_24k40) == 0)
-      )
+    if( bandwidth == SWB && (st->total_brate == ACELP_16k40 || st->total_brate == ACELP_24k40) )
     {
-        IF (st->tec_tfa == 0)
+        if(st->tec_tfa == 0)
         {
-            set16_fx(st->tecDec_fx.loBuffer, 0, MAX_TEC_SMOOTHING_DEG);
+            set_zero(st->tecDec.loBuffer, MAX_TEC_SMOOTHING_DEG);
         }
         st->tec_tfa = 1;
-        move16();
     }
-    ELSE
+    else
     {
         st->tec_tfa = 0;
-        move16();
     }
 
     st->tec_flag = 0;
-    move16();
     st->tfa_flag = 0;
-    move16();
 
     /* needed in decoder to read the bitstream */
-    st->enableGplc = 0;
-    move16();
-    test();
-    test();
-    test();
-    test();
-    test();
-    if( (sub(bandwidth, WB ) == 0 && L_sub(bitrate, 24400) == 0) ||
-            (sub(bandwidth, SWB) == 0 && L_sub(bitrate, 24400) == 0 )||
-            (sub(bandwidth, FB) == 0 && L_sub(bitrate, 24400) == 0 ) )
+    if (
+        ( bandwidth == FB  && bitrate == ACELP_24k40 ) ||
+        ( bandwidth == WB  && bitrate == ACELP_24k40 ) ||
+        ( bandwidth == SWB && bitrate == ACELP_24k40 )
+    )
     {
         st->enableGplc = 1;
-        move16();
     }
-    move16();
-    st->dec_glr = 0;
-    test();
-    test();
-    if( (L_sub(st->total_brate_fx, 9600)==0)||( L_sub(st->total_brate_fx, 16400)==0)||
-            (L_sub(st->total_brate_fx, 24400)==0))
+    else
+    {
+        st->enableGplc = 0;
+    }
+
+    if( st->total_brate == ACELP_9k60 || st->total_brate == ACELP_16k40 || st->total_brate == ACELP_24k40 )
     {
         st->dec_glr = 1;
-        move16();
     }
-    move16();
+    else
+    {
+        st->dec_glr = 0;
+    }
+
     st->dec_glr_idx = 0;
 
-}
 
+    return;
+}

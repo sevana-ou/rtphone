@@ -1,56 +1,47 @@
 /*====================================================================================
-    EVS Codec 3GPP TS26.442 Apr 03, 2018. Version 12.11.0 / 13.6.0 / 14.2.0
+    EVS Codec 3GPP TS26.443 Nov 13, 2018. Version 12.11.0 / 13.7.0 / 14.3.0 / 15.1.0
   ====================================================================================*/
 
-
-#include "stl.h"
+#include "stat_com.h"
+#include "prot.h"
 #include <assert.h>
-#include "prot_fx.h"
+
+
+
 
 /********************************/
 /*      Helper functions        */
 /********************************/
 
 /** Put nBits long encoded value from *pStream into bitstream. Using the function EncodeValue for encoding. */
-static Word16 PutIntoBitstream(Word16 const ** pStream, TEncodeValue EncodeValue, Word16 index, Encoder_State_fx *st_fx, Word16 nBits)
+static int PutIntoBitstream(int const ** pStream, TEncodeValue EncodeValue, int index, Encoder_State *st, int nBits)
 {
-    Word16 value;
-    Word16 codedValue;
-
-    move16();
-    value = *(*pStream)++;
-    codedValue = EncodeValue(value, index);
-
-    push_next_indice_fx(st_fx, codedValue, nBits);
+    int const value = *(*pStream)++;
+    int const codedValue = EncodeValue(value, index);
+    /* Variable initialization */
+    push_next_indice(st, codedValue, nBits);
 
     return value;
 }
 
-
 /** Get nBits long value from bitstream into *pStream. */
-static Word16 GetFromBitstream(Decoder_State_fx *st, TDecodeValue DecodeValue, Word16 index, Word16 nFixedBits, Word16 ** pStream)
+static int GetFromBitstream(Decoder_State *st, TDecodeValue DecodeValue, int index, int nFixedBits, int ** pStream)
 {
-    Word16 value;
-
-    move16();
-    move16();
-    value = 0;
-
-    IF (DecodeValue != NULL)
+    int value = 0;
+    if (DecodeValue != NULL)
     {
         DecodeValue(st, index, &value);
     }
-    ELSE
+    else
     {
-        value = get_next_indice_fx(st, nFixedBits);
+        value = get_next_indice(st, nFixedBits);
     }
-    move16();
     *(*pStream)++ = value;
 
     return value;
 }
 
-static Word16 FixedWidthEncoding(Word16 value, Word16 index)
+static int FixedWidthEncoding(int value, int index)
 {
     (void)index;
     return value;
@@ -60,217 +51,121 @@ static Word16 FixedWidthEncoding(Word16 value, Word16 index)
 /*      Interface functions     */
 /********************************/
 
-void GetParameters(ParamsBitMap const * paramsBitMap, Word16 nArrayLength, void const * pParameter, Word16 ** pStream, Word16 * pnSize, Word16 * pnBits)
+void GetParameters(ParamsBitMap const * paramsBitMap, int nArrayLength, void const * pParameter, int ** pStream, int * pnSize, int * pnBits)
 {
-    Word16 index;
-    Word16 iParam, nParams;
-    Word16 value;
+    int index;
+    int iParam, nParams;
+    int value;
     void const * pSubStruct;
 
 
     assert((paramsBitMap != NULL) && (nArrayLength > 0) && (pParameter != NULL) && (pStream != NULL) && (pnSize != NULL) && (pnBits != NULL));
-
-    move16();
     nParams = paramsBitMap->nParams;
-
-    FOR (index = 0; index < nArrayLength; index++)
+    for (index = 0; index < nArrayLength; index++)
     {
-
-        FOR (iParam = 0; iParam < nParams; iParam++)
+        for (iParam = 0; iParam < nParams; iParam++)
         {
-            ParamBitMap const * param;
-
-            move16();
-            param = & paramsBitMap->params[iParam];
+            ParamBitMap const * const param = & paramsBitMap->params[iParam];                                       /* WMOPS: Just a shortcut */
 
             pSubStruct = param->GetParamValue(pParameter, index, &value);
             /* If a function for encoding/decoding value is defined than it should take care of 0 */
-            IF ( s_or(param->fZeroAllowed != 0, param->EncodeValue != NULL) )
+            if (param->fZeroAllowed || (param->EncodeValue != NULL))
             {
-                move16();
                 *(*pStream)++ = value;
             }
-            ELSE
+            else
             {
-                move16();
-                *(*pStream)++ = sub(value, 1);
+                *(*pStream)++ = value - 1;
             }
-
-            move16();
-            *pnSize = add(*pnSize, 1);
-
-            IF (param->nBits != 0)
+            ++*pnSize;
+            *pnBits += (param->nBits != 0) ? param->nBits : param->GetNumberOfBits(value, index);
+            if ((param->pSubParamBitMap != NULL) && (value > 0))
             {
-                move16();
-                *pnBits = add(*pnBits, param->nBits);
-            }
-            ELSE
-            {
-                move16();
-                *pnBits = add(*pnBits, param->GetNumberOfBits(value, index));
-            }
-
-            IF ( s_and(param->pSubParamBitMap != NULL, value > 0) )
-            {
-                const void *pointer;
-
-                move16();
-                pointer = pParameter;
-                if (pSubStruct != NULL)
-                {
-                    move16();
-                    pointer = pSubStruct;
-                }
-                GetParameters(param->pSubParamBitMap, value, pointer, pStream, pnSize, pnBits);
+                GetParameters(param->pSubParamBitMap, value, (pSubStruct != NULL) ? pSubStruct : pParameter, pStream, pnSize, pnBits);
             }
         }
     }
-
 }
 
-void SetParameters(ParamsBitMap const * paramsBitMap, Word16 nArrayLength, void * pParameter, Word16 const ** pStream, Word16 * pnSize)
+void SetParameters(ParamsBitMap const * paramsBitMap, int nArrayLength, void * pParameter, int const ** pStream, int * pnSize)
 {
-    Word16 index;
-    Word16 iParam, nParams;
-    Word16 value;
+    int index;
+    int iParam, nParams;
+    int value;
     void * pSubStruct;
-    void * pTmp;
     assert((paramsBitMap != NULL) && (nArrayLength > 0) && (pParameter != NULL) && (pStream != NULL) && (pnSize != NULL));
     nParams = paramsBitMap->nParams;
-
-    FOR (index = 0; index < nArrayLength; index++)
+    for (index = 0; index < nArrayLength; index++)
     {
-        FOR (iParam = 0; iParam < nParams; iParam++)
+        for (iParam = 0; iParam < nParams; iParam++)
         {
-            ParamBitMap const *param;
+            ParamBitMap const * const param = & paramsBitMap->params[iParam];                                       /* WMOPS: Just a shortcut */
             /* If a function for encoding/decoding value is defined than it should take care of 0 */
 
-            move16();
-            param = &paramsBitMap->params[iParam];
-
-            move16();
-            value = 1;
-            if ( s_or(param->fZeroAllowed!=0, param->EncodeValue != NULL) )
-            {
-                move16();
-                value = 0;
-            }
-            value = add(value, *(*pStream)++);
-
+            value = *(*pStream)++ + (param->fZeroAllowed || (param->EncodeValue != NULL) ? 0 : 1);
             pSubStruct = param->SetParamValue(pParameter, index, value);
-            move16();
-            *pnSize = add(*pnSize, 1);
-
-            IF ( s_and(param->pSubParamBitMap != NULL, value > 0) )
+            ++*pnSize;
+            if ((param->pSubParamBitMap != NULL) && (value > 0))
             {
-                pTmp = pParameter;
-                if(pSubStruct != NULL) pTmp = pSubStruct;
-                SetParameters(param->pSubParamBitMap, value, pTmp, pStream, pnSize);
+                SetParameters(param->pSubParamBitMap, value, (pSubStruct != NULL) ? pSubStruct : pParameter, pStream, pnSize);
             }
         }
     }
-
 }
 
-void WriteToBitstream(ParamsBitMap const * paramsBitMap, Word16 nArrayLength, Word16 const ** pStream, Word16 * pnSize, Encoder_State_fx *st, Word16 * pnBits)
+void WriteToBitstream(ParamsBitMap const * paramsBitMap, int nArrayLength, int const ** pStream, int * pnSize, Encoder_State *st, int * pnBits)
 {
-    Word16 index;
-    Word16 iParam, nParams;
+    int index;
+    int iParam, nParams;
     assert((paramsBitMap != NULL) && (nArrayLength > 0) && (pStream != NULL) && (pnSize != NULL) && (st != NULL) && (pnBits != NULL));
     nParams = paramsBitMap->nParams;
-
-    FOR (index = 0; index < nArrayLength; index++)
+    for (index = 0; index < nArrayLength; index++)
     {
-
-        FOR (iParam = 0; iParam < nParams; iParam++)
+        for (iParam = 0; iParam < nParams; iParam++)
         {
-            ParamBitMap const *param;
-            Word16 nBits;
+            ParamBitMap const * const param = & paramsBitMap->params[iParam];                                       /* WMOPS: Just a shortcut */
+            int nBits;
             /* If a function for encoding/decoding value is defined than it should take care of 0 */
-            Word16 fShiftValue;
+            int fShiftValue;
             TEncodeValue EncodeValue;
-            Word16 value;
+            int value;
 
-            move16();
-            param = &paramsBitMap->params[iParam];
-
-            move16();
-            nBits = param->nBits;
-            IF (param->nBits == 0)
-            {
-                nBits = param->GetNumberOfBits(**pStream, index);
-            }
-
-            test();
-            test();
-            fShiftValue = s_and(param->fZeroAllowed==0, param->EncodeValue == NULL);
-            move16();
-            EncodeValue = param->EncodeValue;
-            if (param->EncodeValue == NULL)
-            {
-                move16();
-                EncodeValue = &FixedWidthEncoding;
-            }
-            value = PutIntoBitstream(pStream, EncodeValue, index, st, nBits);
-            if (fShiftValue)
-            {
-                value = add(value, 1);
-            }
-
-            move16();
-            *pnSize = add(*pnSize, 1);
-            move16();
-            *pnBits = add(*pnBits, nBits);
-
-            IF ((param->pSubParamBitMap != NULL) && (value > 0))
+            nBits = (param->nBits != 0) ? param->nBits : param->GetNumberOfBits(**pStream, index);
+            fShiftValue = !param->fZeroAllowed && (param->EncodeValue == NULL);
+            EncodeValue = (param->EncodeValue == NULL) ? &FixedWidthEncoding : param->EncodeValue;
+            value = PutIntoBitstream(pStream, EncodeValue, index, st, nBits) + (fShiftValue ? 1 : 0);
+            ++*pnSize;
+            *pnBits += nBits;
+            if ((param->pSubParamBitMap != NULL) && (value > 0))
             {
                 WriteToBitstream(param->pSubParamBitMap, value, pStream, pnSize, st, pnBits);
             }
-
         }
     }
 }
 
-void ReadFromBitstream(ParamsBitMap const * paramsBitMap, Word16 nArrayLength, Decoder_State_fx *st, Word16 ** pStream, Word16 * pnSize)
+void ReadFromBitstream(ParamsBitMap const * paramsBitMap, int nArrayLength, Decoder_State *st, int ** pStream, int * pnSize)
 {
-    Word16 index;
-    Word16 iParam, nParams;
-    Word16 fShiftValue;
-    Word16 value;
+    int index;
+    int iParam, nParams;
+    int fShiftValue;
+    int value;
     assert((paramsBitMap != NULL) && (nArrayLength > 0) && (pStream != NULL) && (pnSize != NULL) && (st != NULL));
-    move16();
     nParams = paramsBitMap->nParams;
-
-    FOR (index = 0; index < nArrayLength; index++)
+    for (index = 0; index < nArrayLength; index++)
     {
-
-        FOR (iParam = 0; iParam < nParams; iParam++)
+        for (iParam = 0; iParam < nParams; iParam++)
         {
-            ParamBitMap const * param;
-
-
+            ParamBitMap const * param = & paramsBitMap->params[iParam];                                             /* WMOPS: Just a shortcut */
             /* If a function for encoding/decoding value is defined than it should take care of 0 */
-            move16();
-            param = & paramsBitMap->params[iParam];
 
-            test();
-            test();
-            fShiftValue = s_and(param->fZeroAllowed==0, param->EncodeValue == NULL);
-            value = GetFromBitstream(st, param->DecodeValue, index, param->nBits, pStream);
-            if (fShiftValue)
+            fShiftValue = !param->fZeroAllowed && (param->EncodeValue == NULL);
+            value = GetFromBitstream(st, param->DecodeValue, index, param->nBits, pStream) + (fShiftValue ? 1 : 0);
+            if ((param->pSubParamBitMap != NULL) && (value > 0))
             {
-                move16();
-                value = add(value, 1);
-            }
-
-            IF ((param->pSubParamBitMap != NULL) && (value > 0))
-            {
-
                 ReadFromBitstream(param->pSubParamBitMap, value, st, pStream, pnSize);
             }
         }
     }
-    move16();
-    *pnSize = add(*pnSize, i_mult(nParams, nArrayLength));
-
+    *pnSize += nParams*nArrayLength;
 }

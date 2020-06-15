@@ -1,154 +1,143 @@
 /*====================================================================================
-    EVS Codec 3GPP TS26.442 Apr 03, 2018. Version 12.11.0 / 13.6.0 / 14.2.0
+    EVS Codec 3GPP TS26.443 Nov 13, 2018. Version 12.11.0 / 13.7.0 / 14.3.0 / 15.1.0
   ====================================================================================*/
 
+#include <math.h>
 #include <stdlib.h>
 #include <assert.h>
-#include "cnst_fx.h"
-#include "rom_com_fx.h"
-#include "prot_fx.h"
-#include "stl.h"
-#include "basop_util.h"
-#include "prot_fx.h"
 #include "options.h"
+#include "cnst.h"
+#include "prot.h"
+#include "rom_com.h"
+#include "stl.h"
+#include "basop_proto_func.h"
 
-#define swap(x,y,type) {type u__p; u__p=x; x=y; y=u__p;}
-
-extern const Word16 tbl_mid_gen_wb_5b_fx[];
-extern const Word16 tbl_mid_unv_wb_5b_fx[];
-
-
-
+/*---------------------------------------------------------------------*
+ * midlsf_dec()
+ *
+ *
+ *---------------------------------------------------------------------*/
 
 void midlsf_dec(
-    const Word16 qlsf0[],  /* i: quantized lsf coefficients (3Q12) */
-    const Word16 qlsf1[],  /* i: quantized lsf coefficients (3Q12) */
-    Word16 idx,        /* i: codebook index          */
-    Word16 qlsf[],      /* o: decoded lsf coefficients   (3Q12) */
-    Word16 coder_type,
-    Word16 *mid_lsf_int,
-    Word16 prev_bfi,
-    Word16 safety_net)
+    float qlsf0[],
+    float qlsf1[],
+    short idx,
+    float qlsf[],
+    int N,
+    int coder_type,
+    short *mid_lsf_int,
+    short prev_bfi,
+    short safety_net
+)
 {
-    const Word16 *ratio=NULL;
-    Word16 j;
-    Word32 L_tmp;
-    Word16 bad_spacing = 0;
-
-    move16();
+    const float *ratio=NULL;
+    int   j;
+    short bad_spacing = 0;
     /* Select codebook */
-    IF ( sub(coder_type, UNVOICED) == 0 )
+    if ( coder_type == UNVOICED )
     {
-        ratio = tbl_mid_unv_wb_5b_fx;
+        ratio = tbl_mid_unv_wb_5b;
     }
-    ELSE
+    else
     {
-        ratio = tbl_mid_gen_wb_5b_fx;
-    }
-    FOR (j=0; j<M; j++)
-    {
-        L_tmp = L_mult(sub(0x2000, ratio[idx*M+j]), qlsf0[j]); /*Q(x2.56+13+1)->Q(x2.56+14)*/
-        L_tmp = L_mac(L_tmp, ratio[idx*M+j], qlsf1[j]); /*Q(x2.56+14)*/
-        qlsf[j] = round_fx(L_shl(L_tmp,2)); /*Q(x2.56)*/
+        ratio = tbl_mid_gen_wb_5b;
     }
 
+    for (j=0; j<N; j++)
+    {
+        qlsf[j] = (1.0f - ratio[idx*N+j]) * qlsf0[j] + ratio[idx*N+j] * qlsf1[j];
+    }
 
-    IF(mid_lsf_int != NULL) /*at the decoder*/
+    if(mid_lsf_int != NULL) /*at the decoder*/
     {
         /* check for incorrect LSF ordering */
-        IF ( sub(*mid_lsf_int, 1) == 0 )
+        if ( *mid_lsf_int == 1 )
         {
-            FOR (j=1; j<M; j++)
+            for (j=1; j<N; j++)
             {
-                IF ( sub(qlsf[j] , qlsf[j-1]) < 0 )
+                if ( qlsf[j] < qlsf[j-1] )
                 {
                     bad_spacing = 1;
-                    move16();
-                    BREAK;
+                    break;
                 }
             }
         }
         /* Redo mid-LSF interpolation with 0.4 in case of LSF instability */
-        test();
-        test();
-        IF( prev_bfi || ( sub(*mid_lsf_int, 1) == 0 && bad_spacing ) )
+        if ( prev_bfi || ( *mid_lsf_int == 1 && bad_spacing ) )
         {
-            FOR (j=0; j<M; j++)
+            for (j=0; j<N; j++)
             {
                 /* redo mid-LSF interpolation with 0.4 */
-                qlsf[j] = add(mult_r(13107, qlsf0[j]), mult_r(19661, qlsf1[j])); /* Q15 +x2.56 -Q15 13107 = 0.4(Q15), 19661 = 0.6 (Q15)*/ move16();
+                qlsf[j] = 0.4f * qlsf0[j] + 0.6f * qlsf1[j];
 
                 /* ensure correct ordering of LSF indices */
-                test();
-                test();
-                IF ( j > 0 && sub(j, M) <0 && sub(qlsf[j], add( qlsf[j-1], LSF_GAP_MID_FX))<0  )
+                if ( j > 0 && j < N && qlsf[j] < qlsf[j-1] + LSF_GAP_MID  )
                 {
-                    qlsf[j] = add(qlsf[j-1], LSF_GAP_MID_FX);
-                    move16();
+                    qlsf[j] = qlsf[j-1] + LSF_GAP_MID;
                 }
 
             }
         }
-        ELSE
+        else
         {
             /* otherwise, use regular LSF spacing and ordering as in the encoder */
-            FOR (j=0; j<M; j++)
+            for (j=0; j<N; j++)
             {
-                test();
-                test();
-                IF ( j > 0 && sub(j, M) < 0 && sub(qlsf[j], add( qlsf[j-1],LSF_GAP_MID_FX))<0 )
+                if ( j > 0 && j < N && qlsf[j] < qlsf[j-1] + LSF_GAP_MID )
                 {
-                    qlsf[j] = add(qlsf[j-1], LSF_GAP_MID_FX);
-                    move16();
+                    qlsf[j] = qlsf[j-1] + LSF_GAP_MID;
                 }
+
             }
         }
         if ( prev_bfi )
         {
             /* continue redoing mid-LSF interpolation with 0.4 in order not to propagate the error */
             *mid_lsf_int = 1;
-            move16();
         }
         if ( safety_net )
         {
             /* safety-net encountered -> stop redoing mid-LSF interpolation with 0.4 */
             *mid_lsf_int = 0;
-            move16();
         }
     }
-    ELSE
+    else
     {
         /* use regular LSF spacing */
-        FOR (j=0; j<M; j++)
+        for (j=0; j<N; j++)
         {
-            test();
-            test();
-            IF ( j > 0 && sub(j, M) <0 && sub(qlsf[j], add(qlsf[j-1], LSF_GAP_MID_FX))<0 )
+            if ( j > 0 && j < N && qlsf[j] < qlsf[j-1] + LSF_GAP_MID )
             {
-                qlsf[j] = add(qlsf[j-1], LSF_GAP_MID_FX);
-                move16();
+                qlsf[j] = qlsf[j-1] + LSF_GAP_MID;
             }
         }
     }
 
     return;
 }
-Word16 lsf_ind_is_active(
+
+
+/*---------------------------------------------------------------------*
+ * lsf_ind_is_active()
+ *
+ *
+ *---------------------------------------------------------------------*/
+
+int lsf_ind_is_active(
     const Word16 lsf_q_ind[],
-    const Word16 means[],
-    Word16 narrowband,
-    Word16 cdk
+    const float means[],
+    int narrowband,
+    int cdk
 )
 {
     Word16 lsf[2], min_distance;
 
-    lsf[0] = add(lsf_q_ind[0], means[0]);
+    lsf[0] = add(lsf_q_ind[0], LSFM(means[0]));
     move16();
-    lsf[1] = add(lsf_q_ind[1], means[1]);
+    lsf[1] = add(lsf_q_ind[1], LSFM(means[1]));
     move16();
 
     min_distance = lsf[0];
-    move16();
     min_distance = s_min(min_distance, sub(lsf[1], lsf[0]));
 
     assert(narrowband == 0 || narrowband == 1);
@@ -156,4 +145,3 @@ Word16 lsf_ind_is_active(
 
     return sub(min_distance, min_distance_thr[narrowband][cdk]) < 0;
 }
-

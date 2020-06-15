@@ -1,9 +1,11 @@
 /*====================================================================================
-    EVS Codec 3GPP TS26.442 Apr 03, 2018. Version 12.11.0 / 13.6.0 / 14.2.0
+    EVS Codec 3GPP TS26.443 Nov 13, 2018. Version 12.11.0 / 13.7.0 / 14.3.0 / 15.1.0
   ====================================================================================*/
 
 #ifndef G192_H
 #define G192_H G192_H
+
+#include <stdio.h>
 
 /*
  * ENUMS
@@ -45,18 +47,18 @@ G192_Reader_Open(G192_HANDLE* phG192, FILE * filename);
 G192_ERROR
 G192_ReadVoipFrame_compact(G192_HANDLE const hG192,
                            unsigned char * const serial,
-                           Word16 * const num_bits,
-                           Word16 *rtpSequenceNumber,
-                           Word32 *rtpTimeStamp,
-                           Word32 *rcvTime_ms);
+                           short * const num_bits,
+                           unsigned short * const rtpSequenceNumber,
+                           unsigned int * const rtpTimeStamp,
+                           unsigned int * const rcvTime_ms);
 
 G192_ERROR
 G192_ReadVoipFrame_short(G192_HANDLE const hG192,
-                         Word16 * const serial,
-                         Word16 *num_bits,
-                         Word16 *rtpSequenceNumber,
-                         Word32 *rtpTimeStamp,
-                         Word32 *rcvTime_ms);
+                         short * const serial,
+                         short * const num_bits,
+                         unsigned short * const rtpSequenceNumber,
+                         unsigned int * const rtpTimeStamp,
+                         unsigned int * const rcvTime_ms);
 
 G192_ERROR
 G192_Reader_Close(G192_HANDLE* phG192);

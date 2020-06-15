@@ -1,15 +1,14 @@
 /*====================================================================================
-    EVS Codec 3GPP TS26.442 Apr 03, 2018. Version 12.11.0 / 13.6.0 / 14.2.0
+    EVS Codec 3GPP TS26.443 Nov 13, 2018. Version 12.11.0 / 13.7.0 / 14.3.0 / 15.1.0
   ====================================================================================*/
 
-/*! @file pcmdsp_fifo.c Ringbuffer (FIFO) with fixed capacity for audio samples */
+/*! @file jbm_pcmdsp_fifo.c Ringbuffer (FIFO) with fixed capacity for audio samples */
 
 /* system headers */
 #include <stdlib.h>
-/* instrumentation headers */
+#include <string.h>
 #include "options.h"
-#include "stl.h"
-#include "basop_util.h"
+/* instrumentation */
 /* local headers */
 #include "jbm_pcmdsp_fifo.h"
 
@@ -18,45 +17,38 @@
 struct PCMDSP_FIFO
 {
     /** number of currently stored samples per channel */
-    Word16 size;
+    unsigned int size;
     /** maximum allowed number of samples per channel */
-    Word16 capacity;
+    unsigned int capacity;
     /** sample size in bytes per channel */
-    Word16 nBytesPerSampleSet;
+    unsigned int nBytesPerSampleSet;
 
     /** begin of the FIFO data (pointer to bytes) */
-    UWord8 *dataBegin;
+    uint8_t *dataBegin;
     /** end of the FIFO data (pointer to bytes) */
-    UWord8 *dataEnd;
+    uint8_t *dataEnd;
     /** position of next write operation (pointer to bytes) */
-    UWord8 *dataWriteIterator;
+    uint8_t *dataWriteIterator;
     /** position of next read operation (pointer to bytes) */
-    UWord8 *dataReadIterator;
+    uint8_t *dataReadIterator;
 };
 
 
 /* Creates a FIFO. */
-Word16 pcmdsp_fifo_create( PCMDSP_FIFO_HANDLE *ph )
+int pcmdsp_fifo_create( PCMDSP_FIFO_HANDLE *ph )
 {
-    PCMDSP_FIFO_HANDLE h = (PCMDSP_FIFO_HANDLE)malloc( sizeof( struct PCMDSP_FIFO ) );
+    PCMDSP_FIFO_HANDLE h = (PCMDSP_FIFO*)malloc( sizeof( struct PCMDSP_FIFO ) );
 
     h->size               = 0;
-    move16();
     h->capacity           = 0;
-    move16();
     h->nBytesPerSampleSet = 0;
-    move16();
     h->dataBegin          = NULL;
-    move16();
     h->dataEnd            = NULL;
-    move16();
     h->dataWriteIterator  = NULL;
-    move16();
     h->dataReadIterator   = NULL;
-    move16();
 
     *ph = h;
-    move16();
+
     return 0;
 }
 
@@ -65,148 +57,106 @@ void pcmdsp_fifo_destroy( PCMDSP_FIFO_HANDLE *ph )
 {
     PCMDSP_FIFO_HANDLE h;
 
-    IF( !ph )
-    {
+    if( !ph )
         return;
-    }
     h = *ph;
-    move16();
-    IF( !h )
-    {
+    if( !h )
         return;
-    }
 
-    IF( h->dataBegin )
-    {
+    if( h->dataBegin )
         free( h->dataBegin );
-    }
     free( h );
     *ph = NULL;
-    move16();
+
 }
 
 /* Initializes the FIFO with a fixed maximum allowed number audio samples. */
-Word16 pcmdsp_fifo_init( PCMDSP_FIFO_HANDLE h, Word16 nSamples,
-                         Word16 nChannels, Word16 nBytesPerSample )
+int pcmdsp_fifo_init( PCMDSP_FIFO_HANDLE h, unsigned int nSamples,
+                      unsigned int nChannels, unsigned int nBytesPerSample )
 {
-    Word32 nDataBytes;
+    unsigned int nDataBytes;
 
     h->capacity           = nSamples;
-    move16();
-    h->nBytesPerSampleSet = i_mult2( nChannels, nBytesPerSample );
-    nDataBytes            = L_mult0( nSamples, h->nBytesPerSampleSet);
-    h->dataBegin          = (UWord8*)malloc(nDataBytes);
+    h->nBytesPerSampleSet = nChannels * nBytesPerSample;
+    nDataBytes            = nSamples * h->nBytesPerSampleSet;
+    h->dataBegin          = (uint8_t*)malloc(nDataBytes);
     h->dataEnd            = h->dataBegin + nDataBytes;
-    move16();
     h->dataWriteIterator  = h->dataBegin;
-    move16();
     h->dataReadIterator   = h->dataBegin;
-    move16();
+
     return 0;
 }
 
 /* Writes the given audio data to the FIFO. */
-Word16 pcmdsp_fifo_write( PCMDSP_FIFO_HANDLE h, const UWord8 *samples, Word16 nSamplesPerChannel )
+int pcmdsp_fifo_write( PCMDSP_FIFO_HANDLE h, const uint8_t *samples, unsigned int nSamplesPerChannel )
 {
-    Word32 nBytesToWrite, writeIter, bytesOfFirstPart, secondSize;
+    unsigned int nBytesToWrite;
 
     /* check for empty input buffer */
-    IF( nSamplesPerChannel == 0 )
-    {
+    if( nSamplesPerChannel == 0U )
         return 0;
-    }
     /* check, if enough space left */
-    IF( sub( nSamplesPerChannel, sub( h->capacity, h->size ) ) > 0 )
-    {
+    if( nSamplesPerChannel > h->capacity - h->size )
         return -1;
-    }
 
-    nBytesToWrite = L_mult0( nSamplesPerChannel, h->nBytesPerSampleSet );
-
-    IF( h->dataWriteIterator + nBytesToWrite - h->dataEnd > 0 )
+    nBytesToWrite = nSamplesPerChannel * h->nBytesPerSampleSet;
+    if( h->dataWriteIterator + nBytesToWrite > h->dataEnd )
     {
         /* wrap around: writing two parts */
+        unsigned int bytesOfFirstPart, secondSize;
         bytesOfFirstPart = h->dataEnd - h->dataWriteIterator;
-        secondSize       = L_sub( nBytesToWrite, bytesOfFirstPart );
-
-        FOR( writeIter = 0; writeIter < bytesOfFirstPart; ++writeIter )
-        {
-            *h->dataWriteIterator++ = *(samples + writeIter);
-            move16();
-        }
-        h->dataWriteIterator = h->dataBegin;
-        move16();
-        FOR( writeIter = 0; writeIter < secondSize; ++writeIter )
-        {
-            *h->dataWriteIterator++ = *(samples + bytesOfFirstPart + writeIter );
-            move16();
-        }
+        secondSize       = nBytesToWrite - bytesOfFirstPart;
+        memcpy( h->dataWriteIterator, samples, bytesOfFirstPart );
+        memcpy( h->dataBegin, samples + bytesOfFirstPart, secondSize );
+        h->dataWriteIterator = h->dataBegin + secondSize;
     }
-    ELSE
+    else
     {
         /* no wrap around: simple write */
-        FOR( writeIter = 0; writeIter < nBytesToWrite; ++writeIter )
-        {
-            *h->dataWriteIterator++ = *(samples + writeIter);
-            move16();
-        }
+        memcpy( h->dataWriteIterator, samples, nBytesToWrite );
+        h->dataWriteIterator += nBytesToWrite;
     }
-    h->size = add( h->size, nSamplesPerChannel );
+    h->size += nSamplesPerChannel;
+
     return 0;
 }
 
 /* Reads the given number of audio samples from the FIFO. */
-Word16 pcmdsp_fifo_read( PCMDSP_FIFO_HANDLE h, Word16 nSamplesPerChannel, UWord8 *samples )
+int pcmdsp_fifo_read( PCMDSP_FIFO_HANDLE h, unsigned int nSamplesPerChannel, uint8_t *samples )
 {
-    Word32 nBytesToRead, readIter, nBytesOfSecondPart, bytesOfFirstPart;
+    unsigned int nBytesToRead;
 
     /* check for empty output buffer */
-    IF( nSamplesPerChannel == 0 )
-    {
+    if( nSamplesPerChannel == 0U )
         return 0;
-    }
     /* check, if enough bytes readable */
-    IF( L_sub( nSamplesPerChannel, h->size ) > 0 )
-    {
+    if( nSamplesPerChannel > h->size )
         return -1;
-    }
 
-    nBytesToRead = L_mult0( nSamplesPerChannel, h->nBytesPerSampleSet );
-
-    IF( h->dataReadIterator + nBytesToRead - h->dataEnd > 0 )
+    nBytesToRead = nSamplesPerChannel * h->nBytesPerSampleSet;
+    if( h->dataReadIterator + nBytesToRead > h->dataEnd )
     {
         /* wrap around: reading two parts */
+        unsigned int bytesOfFirstPart, nBytesOfSecondPart;
         bytesOfFirstPart   = h->dataEnd - h->dataReadIterator;
-        nBytesOfSecondPart = L_sub( nBytesToRead, bytesOfFirstPart );
-
-        FOR( readIter = 0; readIter < bytesOfFirstPart; ++readIter )
-        {
-            *(samples + readIter) = *h->dataReadIterator++;
-            move16();
-        }
-        h->dataReadIterator = h->dataBegin;
-        move16();
-        FOR( readIter = 0; readIter < nBytesOfSecondPart; ++readIter )
-        {
-            *(samples + bytesOfFirstPart + readIter) = *h->dataReadIterator++;
-            move16();
-        }
+        nBytesOfSecondPart = nBytesToRead - bytesOfFirstPart;
+        memcpy( samples, h->dataReadIterator, bytesOfFirstPart );
+        memcpy( samples + bytesOfFirstPart, h->dataBegin, nBytesOfSecondPart );
+        h->dataReadIterator = h->dataBegin + nBytesOfSecondPart;
     }
-    ELSE
+    else
     {
         /* no wrap around: simple read */
-        FOR( readIter = 0; readIter < nBytesToRead; ++readIter )
-        {
-            *(samples + readIter) = *h->dataReadIterator++;
-            move16();
-        }
+        memcpy( samples, h->dataReadIterator, nBytesToRead );
+        h->dataReadIterator += nBytesToRead;
     }
-    h->size = sub( h->size, nSamplesPerChannel );
+    h->size -= nSamplesPerChannel;
+
     return 0;
 }
 
 /* Returns the number of samples per channel that can be read (number of currently stored samples). */
-Word16 pcmdsp_fifo_nReadableSamples( const PCMDSP_FIFO_HANDLE h )
+unsigned int pcmdsp_fifo_nReadableSamples( const PCMDSP_FIFO_HANDLE h )
 {
     return h->size;
 }

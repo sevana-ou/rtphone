@@ -35,8 +35,16 @@ target_include_directories(media_lib
             ${CMAKE_CURRENT_SOURCE_DIR}/../../libs/webrtc
             ${CMAKE_CURRENT_SOURCE_DIR}/../../libs/opus/include/
             ${CMAKE_CURRENT_SOURCE_DIR}/../../libs/resiprocate/
+            ${CMAKE_CURRENT_SOURCE_DIR}/../../libs/libevs/
             )
 
+target_include_directories(media_lib
+    PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../../libs/libevs/lib_com
+            ${CMAKE_CURRENT_SOURCE_DIR}/../../libs/libevs/lib_dec
+            ${CMAKE_CURRENT_SOURCE_DIR}/../../libs/libevs/lib_enc
+            ${CMAKE_CURRENT_SOURCE_DIR}/../../libs/libevs/basic_op
+            ${CMAKE_CURRENT_SOURCE_DIR}/../../libs/libevs/basic_math
+)
 if (USE_RESIP_INTEGRATION)
     message("USE_RESIP_INTEGRATION is turned on!")
     target_compile_definitions(media_lib PUBLIC -DUSE_RESIP_INTEGRATION)

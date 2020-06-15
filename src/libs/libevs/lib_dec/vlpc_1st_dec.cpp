@@ -1,30 +1,37 @@
 /*====================================================================================
-    EVS Codec 3GPP TS26.442 Apr 03, 2018. Version 12.11.0 / 13.6.0 / 14.2.0
+    EVS Codec 3GPP TS26.443 Nov 13, 2018. Version 12.11.0 / 13.7.0 / 14.3.0 / 15.1.0
   ====================================================================================*/
 
+#include <math.h>
 #include <assert.h>
-#include "prot_fx.h"
-#include "stl.h"
+#include "prot.h"
 
-extern Word16 const dico_lsf_abs_8b[];
+extern float const dico_lsf_abs_8b[];
+
+/*------------------------------------------------------------------*
+* vlpc_1st_dec()
+*
+*
+*------------------------------------------------------------------*/
 
 void vlpc_1st_dec(
-    Word16 index,    /* input:  codebook index                  */
-    Word16 *lsfq)    /* i/o:    i:prediction   o:quantized lsf  */
+    int index,      /* input:  codebook index                  */
+    float *lsfq,    /* i/o:    i:prediction   o:quantized lsf  */
+    float sr_core
+)
 {
-    Word16 i;
-    const Word16 *p_dico;
-
-
+    short    i;
+    const float *p_dico;
+    float scale = sr_core/INT_FS_12k8;
 
     assert(index < 256);
+
     p_dico = &dico_lsf_abs_8b[index * M];
-    FOR (i = 0; i < M; i++)
+    for (i = 0; i < M; i++)
     {
-        lsfq[i] = add(lsfq[i], *p_dico);
-        move16();
-        p_dico++;
+        lsfq[i] += scale **p_dico++;
     }
 
+    return;
 
 }

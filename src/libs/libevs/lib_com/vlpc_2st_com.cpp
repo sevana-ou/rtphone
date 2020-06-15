@@ -1,61 +1,57 @@
 /*====================================================================================
-    EVS Codec 3GPP TS26.442 Apr 03, 2018. Version 12.11.0 / 13.6.0 / 14.2.0
+    EVS Codec 3GPP TS26.443 Nov 13, 2018. Version 12.11.0 / 13.7.0 / 14.3.0 / 15.1.0
   ====================================================================================*/
 
-#include <stdio.h>
-#include <stdlib.h>
 #include <assert.h>
-#include "cnst_fx.h"
-#include "prot_fx.h"
-#include "stl.h"
-#include "control.h"
-#include "basop_util.h"
+#include <math.h>
+#include "cnst.h"
+#include "prot.h"
 
+
+/*------------------------------------------------------------------*
+* lsf_weight_2st()
+*
+*
+*------------------------------------------------------------------*/
 
 void lsf_weight_2st(
-    const Word16 *lsfq,	/* input: quantized lsf coefficients (14Q1*1.28)        */
-    Word16 *w,    /* output: weighting function (0Q15*1.28)               */
-    const Word16 mode   /* input: operational mode                              */
+    const float *lsfq,
+    float *w,
+    int mode,
+    float sr_core
 )
 {
-    Word16 i;
-    Word16 d[M+1], weight;
+    int i;
+    float d[M+1];
+    float freq_max = sr_core / 2.f;
+    float freq_div = freq_max / (float)M;
 
     /* compute lsf distance */
     d[0] = lsfq[0];
-    move16();                       /*14Q1*1.28*/
-    FOR (i=1; i<M; i++)
+    for (i=1; i<M; i++)
     {
-        d[i] = sub(lsfq[i],lsfq[i-1]);
-        move16();                       /*14Q1*1.28*/
+        d[i] = lsfq[i] - lsfq[i-1];
     }
-    d[M] = sub(FREQ_MAX,lsfq[M-1]);
-    move16();                       /*14Q1*1.28*/
+    d[M] = freq_max - lsfq[M-1];
 
     /* weighting function */
-    weight = W_MODE_ELSE;
-    move16();                       /* rel2 */
-    IF (mode == 0)
+    for( i=0; i<M; i++ )
     {
-        weight = W_MODE0;
-        move16();                       /* abs */
+        assert(d[i]>0);
+
+        if (mode == 0)
+        {
+            w[i] = (float) (60.0f / (freq_div/sqrt(d[i]*d[i+1])));    /* abs */
+        }
+        else if (mode == 1)
+        {
+            w[i] = (float) (65.0f / (freq_div/sqrt(d[i]*d[i+1])));    /* mid */
+        }
+        else
+        {
+            w[i] = (float) (63.0f / (freq_div/sqrt(d[i]*d[i+1])));    /* rel2 */
+        }
     }
-    ELSE IF (sub(mode,1) == 0)
-    {
-        weight = W_MODE1;
-        move16();                       /* mid */
-    }
-
-    FOR (i=0; i<M; i++)
-    {
-        /* assert(d[i]>0); */
-
-        /*w[i] = (weight * sqrt(d[i]*d[i+1])));*/
-
-        w[i] = mult_r(weight,getSqrtWord32(L_shl(L_mult0(d[i],d[i+1]),6)));
-        move16();
-    }
-
 
     return;
 }

@@ -1,18 +1,18 @@
 /*====================================================================================
-    EVS Codec 3GPP TS26.442 Apr 03, 2018. Version 12.11.0 / 13.6.0 / 14.2.0
+    EVS Codec 3GPP TS26.443 Nov 13, 2018. Version 12.11.0 / 13.7.0 / 14.3.0 / 15.1.0
   ====================================================================================*/
-
 
 #include <assert.h>
 #include <stdlib.h>
 #include <stdio.h>
-#include "prot_fx.h"
-#include "basop_util.h"
-#include "rom_com_fx.h"
+#include <math.h>
 #include "options.h"
-#include "stl.h"
+#include "prot.h"
+#include "rom_com.h"
+#include "cnst.h"
+#include "basop_proto_func.h"
+#include "stat_com.h"
 
-/* #if defined(_WIN32) && (_MSC_VER <= 1200)  /\* disable global optimizations to overcome an internal compiler error *\/ */
 #if defined(_MSC_VER) && (_MSC_VER <= 1200)  /* disable global optimizations to overcome an internal compiler error */
 #pragma optimize("g", off)
 #endif
@@ -24,111 +24,90 @@
 *--------------------------------------------------------------------*/
 
 void decoder_LPD(
-    Word16 signal_out[],       /* output: signal with LPD delay (7 subfrs) */
-    Word16 signal_outFB[],
-    Word16 *total_nbbits,     /* i/o:    number of bits / decoded bits    */
-    Decoder_State_fx *st,
-    Word16 * bpf_noise_buf,
-    Word16 bfi,
-    Word16 *bitsRead,
-    Word16 *coder_type,
-    Word16 param[],
-    Word16 *pitch_buf,
-    Word16 *voice_factors,
-    Word16 *ptr_bwe_exc
+    float signal_out[],     /* output: signal with LPD delay (7 subfrs) */
+    float signal_outFB[],
+    short *total_nbbits,    /* i/o:    number of bits / decoded bits    */
+    Decoder_State *st,              /* i/o:    decoder memory state pointer     */
+    float *bpf_noise_buf,   /* i/o: BPF noise buffer                    */
+    short bfi,              /* i  : BFI flag                            */
+    short *bitsRead,        /* o  : number of read bits                 */
+    short *coder_type,      /* o  : coder type                          */
+    int   param[],          /* o  : buffer of parameters                */
+    float *pitch_buf,       /* i/o: floating pitch values for each subfr*/
+    float *voice_factors,   /* o  : voicing factors                     */
+    float *ptr_bwe_exc      /* o  : excitation for SWB TBE              */
 )
 {
-    Word16 *param_lpc;
-    Word16 synth_buf[OLD_SYNTH_SIZE_DEC+L_FRAME_PLUS+M];
-    Word16 *synth;
-    Word16 synth_bufFB[OLD_SYNTH_SIZE_DEC+L_FRAME_PLUS+M];
-    Word16 *synthFB;
-    Word16 lsf[(NB_DIV+1)*M],lsp[(NB_DIV+1)*M],lspmid[M],lsfmid[M];
-    Word16 Aq[(NB_SUBFR16k+1)*(M+1)];              /* Dyn RAM: it can be reduced by M+1 if insert branch for nb_subfr==5*/
-    Word16 pitch[NB_SUBFR16k];
-    Word16 pit_gain[NB_SUBFR16k];
-    Word16 i, k, *prm;
-    Word16 L_frame,nb_subfr;
-    Word16 L_frameTCX;
+    int   *prm, param_lpc[NPRM_LPC_NEW];
+    float synth_buf[OLD_SYNTH_SIZE_DEC+L_FRAME_PLUS+M];
+    float *synth;
+    float synth_bufFB[OLD_SYNTH_SIZE_DEC+L_FRAME_PLUS+M];
+    float *synthFB;
+    float lsf[(NB_DIV+1)*M], lsp[(NB_DIV+1)*M], lspmid[M], lsfmid[M];
+    float Aq[(NB_SUBFR16k+1)*(M+1)];
+    int   pitch[NB_SUBFR16k];
+    float pit_gain[NB_SUBFR16k];
+    short i, k;
+    short  past_core_mode;
+    short L_frame, nb_subfr, L_frameTCX;
     Word16 Aind[M+1], lspind[M];
-    Word16 tmp_old[M+1], tmp_new[M+1], enr_old, enr_new;
-    Word16 xspnew_uw[NB_DIV*M], xsfnew_uw[NB_DIV*M];
-    Word16 const* xsfBase;                      /* base for differential XSF coding */
-    Word16  past_core_mode;
+    float tmp_old[M+1], tmp_new[M+1], enr_old, enr_new;
+    float lspnew_uw[NB_DIV*M], lsfnew_uw[NB_DIV*M];
+    float lsf_q_1st_rf[M], lsf_q_rf[M], lsp_q_rf[M];
+    float lsp_diff;
+    short LSF_Q_prediction;  /* o  : LSF prediction mode                 */
+    short tcx_last_overlap_mode, tcx_current_overlap_mode;
 
-    Word16 lsf_q_1st_rf[M], lsf_q_rf[M], lsp_q_rf[M];
-    Word32 lsp_diff;
-    Word16 LSF_Q_prediction;
-    Word16 tcx_last_overlap_mode, tcx_current_overlap_mode;
-
-    st->core_fx = 0;            /* to avoid compilation warnings */
-    prm = NULL;                 /* to avoid compilation warnings */
 
     /*--------------------------------------------------------------------------------*
-     * INIT
+     * Initializations
      *--------------------------------------------------------------------------------*/
 
-    enr_old = 0;
-    move16();
-    enr_new = 0;
-    move16();
+    prm = param;  /* to avoid compilation warnings */
+    LSF_Q_prediction = -1;  /* to avoid compilation warnings */
+    enr_old = 0.0f;
+    enr_new = 0.0f;
 
-    LSF_Q_prediction= -1;
-    move16();
-
-    param_lpc = param+DEC_NPRM_DIV*NB_DIV;
-
-    past_core_mode = st->last_core_bfi;
-    move16();
-
-    test();
-    test();
-    if(st->use_partial_copy && sub(st->rf_frame_type, RF_TCXFD) >= 0 && sub(st->rf_frame_type, RF_TCXTD2) <= 0)
+    if ( st->use_partial_copy && st->rf_frame_type >= RF_TCXFD && st->rf_frame_type <= RF_TCXTD2 )
     {
-        bfi = st->bfi_fx;
-        move16();
+        bfi = st->bfi;
     }
 
+    past_core_mode = st->last_core_bfi;
+
     /*Adjust bit per frame*/
-    if (bfi == 0)
+    if( !bfi )
     {
-        st->bits_frame_core = sub(st->bits_frame, bitsRead[0]);
+        st->bits_frame_core = st->bits_frame - (*bitsRead);
     }
 
     /* Framing parameters */
-    L_frame  = st->L_frame_fx;
-    move16();
+    L_frame  = st->L_frame;
     L_frameTCX = st->L_frameTCX;
-    move16();
     nb_subfr = st->nb_subfr;
-    move16();
-
 
     /* Initialize pointers */
     synth = synth_buf + st->old_synth_len;
-    /*st->old_synth: Q_0*/
-    Copy(st->old_synth, synth_buf, st->old_synth_len);
-    set16_fx(synth, 0, L_FRAME_PLUS + M);
-
     synthFB = synth_bufFB + st->old_synth_lenFB;
-    Copy(st->old_synthFB_fx, synth_bufFB, st->old_synth_lenFB);
-    set16_fx(synthFB, 0, L_FRAME_PLUS + M);
+    mvr2r( st->old_synth, synth_buf, st->old_synth_len );
+    mvr2r( st->old_synthFB, synth_bufFB, st->old_synth_lenFB );
+    set_zero( synth, L_FRAME_PLUS+M );
+    set_zero( synthFB, L_FRAME_PLUS+M );
+
 
     /*For post-processing (post-filtering+blind BWE)*/
-    IF (st->tcxonly==0)
+    if( st->tcxonly == 0 )
     {
         /* for bass postfilter */
-        set16_fx(pitch, L_SUBFR, nb_subfr);
-
-        set16_fx(pit_gain, 0, nb_subfr);
+        set_i( pitch, L_SUBFR, nb_subfr );
+        set_zero( pit_gain, nb_subfr );
     }
 
     /* PLC: [Common: Memory update]
      * PLC: Update the number of lost frames */
-    IF ( bfi != 0)
+    if( bfi )
     {
-        move16();
-        st->nbLostCmpt = add(st->nbLostCmpt, 1);
+        st->nbLostCmpt++;
     }
 
 
@@ -136,512 +115,404 @@ void decoder_LPD(
      * BITSTREAM DECODING
      *--------------------------------------------------------------------------------*/
 
-    IF (bfi == 0)
+
+    if( !bfi )
     {
-        /* PLC: [TCX: Tonal Concealment] */
-        st->second_last_core = st->last_core_fx;
-        move16();
+        st->second_last_core = st->last_core;
         tcx_last_overlap_mode = st->tcx_cfg.tcx_last_overlap_mode;
-        move16();
         tcx_current_overlap_mode = st->tcx_cfg.tcx_curr_overlap_mode;
-        move16();
-        dec_prm(&(st->core_fx), &(st->last_core_fx), coder_type, param, param_lpc, total_nbbits, st, L_frame, bitsRead);
-        IF(!st->rate_switching_init && sub((st->last_codec_mode), MODE2) == 0 && st->BER_detect)
+
+        dec_prm( &(st->core), &(st->last_core), coder_type, param, param_lpc, total_nbbits, st, L_frame, bitsRead );
+
+        if(!st->rate_switching_init && (st->last_codec_mode) == MODE2 && st->BER_detect)
         {
-            *coder_type = st->last_coder_type_fx;
-            move16();
-            st->last_core_fx = st->second_last_core;
-            move16();
+            *coder_type= st->last_coder_type;
+            st->last_core = st->second_last_core;
             st->tcx_cfg.tcx_last_overlap_mode = tcx_last_overlap_mode;
-            move16();
             st->tcx_cfg.tcx_curr_overlap_mode = tcx_current_overlap_mode;
-            move16();
-            st->bfi_fx = 1;
-            move16();
+            st->bfi = 1;
             bfi = 1;
-            move16();
             st->flagGuidedAcelp = 0;
-            move16();
             st->nbLostCmpt++;
-            move16();
-            st->core_brate_fx = st->last_core_brate_fx;
-            move16();
-            st->core_fx = GetPLCModeDecision( st );
+            st->core_brate = st->last_core_brate;
+            st->core = GetPLCModeDecision( st );
         }
     }
-    ELSE
+    else
     {
-
-        test();
-        test();
-        IF( st->use_partial_copy && sub(st->rf_frame_type, RF_TCXFD) >= 0 && sub(st->rf_frame_type, RF_TCXTD2) <= 0 )
+        if( st->use_partial_copy && st->rf_frame_type >= RF_TCXFD && st->rf_frame_type <= RF_TCXTD2 )
         {
-            dec_prm( &(st->core_fx), &(st->last_core_fx), coder_type, param, param_lpc, total_nbbits, st, L_frame, bitsRead );
+            dec_prm( &(st->core), &(st->last_core), coder_type, param, param_lpc, total_nbbits, st, L_frame, bitsRead );
         }
 
-        if (sub(st->nbLostCmpt, 1) > 0)
+        if( st->nbLostCmpt > 1 )
         {
             st->flagGuidedAcelp = 0;
-            move16();
         }
+        /* PLC: [Common: mode decision]
+         * PLC: Decide which Concealment to use. Update pitch lags if needed */
+        st->core = GetPLCModeDecision( st );
     }
 
-    /* PLC: [Common: mode decision]
-     * PLC: Decide which Concealment to use. Update pitch lags if needed */
-    IF ( bfi!=0 )
+    /* PLC: [Common: Memory update]
+     * PLC: Update the number of lost frames */
+    if( !bfi )
     {
-        st->core_fx = GetPLCModeDecision(st);
-    }
-
-    IF ( bfi == 0 )
-    {
-        IF( sub(st->prev_bfi_fx, 1)==0 )
+        if( st->prev_bfi == 1 )
         {
             st->prev_nbLostCmpt = st->nbLostCmpt;
-            move16();
         }
-        ELSE
+        else
         {
             st->prev_nbLostCmpt = 0;
-            move16();
         }
-        move16();
+
         st->nbLostCmpt = 0;
     }
+
 
     /*--------------------------------------------------------------------------------*
      * LPC PARAMETERS
      *--------------------------------------------------------------------------------*/
 
-    test();
-    test();
-    test();
-    test();
-    IF( (bfi == 0 ) || ( bfi != 0 && st->use_partial_copy != 0 && sub(st->rf_frame_type,RF_TCXFD) == 0) )
+
+    if( (bfi == 0 ) || ( bfi == 1 && st->use_partial_copy && st->rf_frame_type == RF_TCXFD) )
     {
-        test();
-        test();
-        test();
-        test();
-        test();
-        IF(sub(st->use_partial_copy,1)==0 && ( sub(st->rf_frame_type, RF_TCXFD) < 0 || sub(st->rf_frame_type, RF_TCXTD2) > 0))
+        if(st->use_partial_copy && ( st->rf_frame_type < RF_TCXFD || st->rf_frame_type > RF_TCXTD2))
         {
-            IF( sub((Word16)st->envWeighted,1)==0 )
+            if( st->envWeighted )
             {
-                Copy( st->lspold_uw, st->lsp_old_fx, M );
-                Copy( st->lsfold_uw, st->lsf_old_fx, M );
+                mvr2r( st->lspold_uw, st->lsp_old, M );
+                mvr2r( st->lsfold_uw, st->lsf_old, M );
                 st->envWeighted = 0;
-                move16();
             }
 
             /* first stage VQ, 8 bits; reuse TCX high rate codebook */
-            set16_fx(lsf_q_1st_rf, 0, M);
-            vlpc_1st_dec(param_lpc[0], lsf_q_1st_rf );
+            set_f(lsf_q_1st_rf, 0.0f, M);
+            vlpc_1st_dec(param_lpc[0], lsf_q_1st_rf, st->sr_core );
 
             /* second stage vq */
-            /* quantized lsf from two stages  */
-            /*v_add(lsf_q_1st_rf, lsf_q_diff_cb_8b_rf + M * param_lpc[1], lsf_q_rf, M);*/
-            FOR (i=0; i<M; i++)
-            {
-                Word16 tmp = lsf_q_diff_cb_8b_rf[i+ M*param_lpc[1]]; /*tmp = unquantized lsf difference (2nd VQ) in Q6*/
-                tmp = shr(mult_r(tmp,20972),4); /* bring tmp to Qx2.56 for addition */
-                lsf_q_rf[i] = add(lsf_q_1st_rf[i], tmp);
-            }
+            /* quantized lsf from two stages */
+            v_add( lsf_q_1st_rf, lsf_q_diff_cb_8b_rf + M * param_lpc[1], lsf_q_rf, M );
 
             v_sort( lsf_q_rf, 0, M-1 );
-            reorder_lsf_fx( lsf_q_rf, LSF_GAP_FX, M, st->sr_core );
+            reorder_lsf( lsf_q_rf, LSF_GAP, M, st->sr_core );
 
-            /* current n-th ACELP frame and its corresponding partial copy  */
-            /*lsf2lsp( lsf_q_rf, lsp_q_rf, M, st->sr_core );*/
-            E_LPC_lsf_lsp_conversion( lsf_q_rf, lsp_q_rf, M );
+            /* current n-th ACELP frame and its corresponding partial copy */
+            lsf2lsp( lsf_q_rf, lsp_q_rf, M, st->sr_core );
 
-            /* copy the old and current lsfs and lsps into the lsf[] and lsp[] buffer for interpolation  */
-            Copy(st->lsf_old_fx, &lsf[0], M);
-            Copy(st->lsp_old_fx, &lsp[0], M);
-            Copy(lsf_q_rf, &lsf[M], M);
-            Copy(lsp_q_rf, &lsp[M], M);
-            lsp_diff = 0;
-            FOR( i=0; i < M; i++ )
+            /* copy the old and current lsfs and lsps into the lsf[] and lsp[] buffer for interpolation */
+            mvr2r(st->lsf_old, &lsf[0], M);
+            mvr2r(st->lsp_old, &lsp[0], M);
+            mvr2r(lsf_q_rf, &lsf[M], M);
+            mvr2r(lsp_q_rf, &lsp[M], M);
+            lsp_diff = 0.0f;
+
+            for( i = 0; i < M; i++ )
             {
-                lsp_diff = L_add(lsp_diff,(Word32)abs_s(sub(lsp[i+M],lsp[i])));
+                lsp_diff += (float)fabs(lsp[i+M] - lsp[i]);
             }
 
-            IF( sub(st->core_fx,ACELP_CORE) == 0 && sub(st->last_core_fx,ACELP_CORE) == 0
-                && L_sub(lsp_diff, 52428 ) < 0 && L_sub(lsp_diff,3932) >0 && sub(st->next_coder_type,GENERIC ) == 0
-                && !st->prev_use_partial_copy && sub(st->last_coder_type_fx,UNVOICED) == 0 && sub(st->rf_frame_type,RF_GENPRED) >= 0 )
+            if( st->core == ACELP_CORE && st->last_core == ACELP_CORE
+                    && lsp_diff < 1.6f && lsp_diff > 0.12f && st->next_coder_type == GENERIC
+                    && !st->prev_use_partial_copy && st->last_coder_type == UNVOICED && st->rf_frame_type >= RF_GENPRED)
             {
-                Copy( &lsp[0], &lsp[M], M );
+                mvr2r( &lsp[0], &lsp[M], M );
             }
 
-            /* update mem_MA and mem_AR memories  */
-            lsf_update_memory( (Word16)st->narrowBand, &lsf[M], st->mem_MA_fx, st->mem_MA_fx, M );
-            Copy(&lsf[M], st->mem_AR_fx, M);
+            /* update mem_MA and mem_AR memories */
+            lsf_update_memory( st->narrowBand, &lsf[M], st->mem_MA, st->mem_MA );
+            mvr2r(&lsf[M], st->mem_AR, M);
 
-            FOR( k=0; k<st->numlpc; ++k )
+            for( k=0; k<st->numlpc; ++k )
             {
-                Copy( &lsp[(k+1)*M], &xspnew_uw[k*M], M );
-                Copy( &lsf[(k+1)*M], &xsfnew_uw[k*M], M );
+                mvr2r( &lsp[(k+1)*M], &lspnew_uw[k*M], M );
+                mvr2r( &lsf[(k+1)*M], &lsfnew_uw[k*M], M );
             }
         }
-        ELSE
-        IF ((st->enableTcxLpc !=0 && sub(st->core_fx , ACELP_CORE)!= 0) || (bfi && st->use_partial_copy && st->rf_frame_type == RF_TCXFD))
+        else if( (st->enableTcxLpc && st->core != ACELP_CORE) || (bfi && st->use_partial_copy && st->rf_frame_type == RF_TCXFD) )
         {
-            Word16 tcx_lpc_cdk;
-            IF(bfi && st->use_partial_copy && sub(st->rf_frame_type, RF_TCXFD) == 0)
+            int tcx_lpc_cdk;
+
+            if( bfi && st->use_partial_copy && st->rf_frame_type == RF_TCXFD )
             {
                 tcx_lpc_cdk = tcxlpc_get_cdk(GENERIC);
             }
-            ELSE
+            else
             {
-                tcx_lpc_cdk = tcxlpc_get_cdk(*coder_type); /* inlined */
+                tcx_lpc_cdk = tcxlpc_get_cdk(*coder_type);
             }
 
-            Copy(st->lsf_old_fx, &lsf[0], M);
-            Copy(st->lsp_old_fx, &lsp[0], M);
+            mvr2r( st->lsf_old, &lsf[0], M );
+            mvr2r( st->lsp_old, &lsp[0], M );
 
-            D_lsf_tcxlpc( param_lpc, &lsf[M], lspind, st->narrowBand, tcx_lpc_cdk, st->mem_MA_fx );
+            D_lsf_tcxlpc( param_lpc, &lsf[M], lspind, st->narrowBand, tcx_lpc_cdk, st->mem_MA );
 
-            E_LPC_lsf_lsp_conversion( &lsf[M], &lsp[M], M );
+            lsf2lsp( &lsf[M], &lsp[M], M, st->sr_core );
 
-            lsf_update_memory( (Word16)st->narrowBand, &lsf[M], st->mem_MA_fx, st->mem_MA_fx, M );
-            Copy(&lsf[M], st->mem_AR_fx, M);
-
+            lsf_update_memory( st->narrowBand, &lsf[M], st->mem_MA, st->mem_MA );
+            mvr2r(&lsf[M], st->mem_AR, M);
             st->envWeighted = 1;
-            move16();
 
-            E_LPC_lsp_unweight( &lsp[M], xspnew_uw, xsfnew_uw, st->inv_gamma, M );
+            E_LPC_lsp_unweight( &lsp[M], lspnew_uw, lsfnew_uw, 1.0f/st->gamma );
         }
-        ELSE
+        else
         {
-
-            IF (st->envWeighted)
+            if( st->envWeighted )
             {
-                Copy(st->lspold_uw, st->lsp_old_fx, M);
-                Copy(st->lsfold_uw, st->lsf_old_fx, M);
+                mvr2r( st->lspold_uw, st->lsp_old, M );
+                mvr2r( st->lsfold_uw, st->lsf_old, M );
                 st->envWeighted = 0;
-                move16();
             }
-            IF (sub(st->core_fx, TCX_20_CORE) == 0)
+
+            /* Unquantize LPC */
+            if( st->core == TCX_20_CORE )
             {
-                lpc_unquantize( st, st->lsf_old_fx, st->lsp_old_fx, lsf, lsp, M, st->lpcQuantization, param_lpc, st->numlpc, st->core_fx,
-                st->mem_MA_fx, st->mem_AR_fx, lspmid, lsfmid, AUDIO, st->acelp_cfg.midLpc, st->narrowBand, &(st->seed_acelp),
-                st->sr_core, &st->mid_lsf_int_fx, st->prev_bfi_fx, &LSF_Q_prediction, &st->safety_net_fx );
+                lpc_unquantize( st, st->lsf_old, st->lsp_old, lsf, lsp, st->lpcQuantization, param_lpc, st->numlpc, st->core, st->mem_MA,
+                                lspmid, lsfmid, AUDIO, st->acelp_cfg.midLpc, st->narrowBand, &(st->seed_acelp), st->sr_core,
+                                &st->mid_lsf_int, st->prev_bfi, &LSF_Q_prediction, &st->safety_net );
             }
-            ELSE
+            else
             {
-                lpc_unquantize( st, st->lsf_old_fx, st->lsp_old_fx, lsf, lsp, M, st->lpcQuantization, param_lpc, st->numlpc, st->core_fx,
-                st->mem_MA_fx, st->mem_AR_fx, lspmid, lsfmid, *coder_type, st->acelp_cfg.midLpc, st->narrowBand, &(st->seed_acelp),
-                st->sr_core, &st->mid_lsf_int_fx, st->prev_bfi_fx, &LSF_Q_prediction, &st->safety_net_fx );
-                IF(sub(st->prev_use_partial_copy,1)==0 && sub(st->last_core_fx,ACELP_CORE) == 0 && sub(st->core_fx,ACELP_CORE) == 0
-                && sub(st->prev_rf_frame_type, RF_GENPRED) >= 0 && sub(*coder_type,UNVOICED) == 0 )
+                lpc_unquantize( st, st->lsf_old, st->lsp_old, lsf, lsp, st->lpcQuantization, param_lpc, st->numlpc, st->core, st->mem_MA,
+                                lspmid, lsfmid, *coder_type, st->acelp_cfg.midLpc, st->narrowBand, &(st->seed_acelp), st->sr_core,
+                                &st->mid_lsf_int, st->prev_bfi, &LSF_Q_prediction, &st->safety_net );
+
+                if( st->prev_use_partial_copy && st->last_core == ACELP_CORE && st->core == ACELP_CORE && st->prev_rf_frame_type >= RF_GENPRED && *coder_type == UNVOICED )
                 {
-                    IF ( st->lpcQuantization && st->acelp_cfg.midLpc )
+                    if( st->lpcQuantization && st->acelp_cfg.midLpc )
                     {
-                        Copy(lspmid, &lsp[0], M );
-                        Copy(&lsp[M], lspmid, M );
+                        mvr2r( lspmid, &lsp[0], M );
+                        mvr2r( &lsp[M], lspmid, M );
                     }
                 }
             }
 
-            FOR(k=0; k<st->numlpc; ++k)
+            for( k=0; k<st->numlpc; ++k )
             {
-                Copy(&lsp[(k+1)*M], &xspnew_uw[k*M], M);
-                Copy(&lsf[(k+1)*M], &xsfnew_uw[k*M], M);
+                mvr2r( &lsp[(k+1)*M], &lspnew_uw[k*M], M );
+                mvr2r( &lsf[(k+1)*M], &lsfnew_uw[k*M], M );
             }
         }
 
-        /* PLC: [LPD: LPC concealment]
-         * built the moving average for the LPC concealment */
-
-        FOR (k=0; k<st->numlpc; k++)
+        /* PLC: [LPD: LPC concealment] built the moving average for the LPC concealment */
+        for( k=0; k<st->numlpc; k++ )
         {
-            FOR (i=0; i<M; i++)
+            for( i=0; i<M; i++ )
             {
-                move16();
-                st->lsf_adaptive_mean_fx[i] = add(add(mult_r(st->lsfoldbfi1_fx[i], 10923/*1.0f/3.0f Q15*/), mult_r(st->lsfoldbfi0_fx[i], 10923/*1.0f/3.0f Q15*/)), mult_r(xsfnew_uw[k*M+i], 10923/*1.0f/3.0f Q15*/));
-                move16();
-                st->lsfoldbfi1_fx[i] = st->lsfoldbfi0_fx[i];
-                move16();
-                st->lsfoldbfi0_fx[i] = xsfnew_uw[k*M+i];
+                st->lsf_adaptive_mean[i] = (st->lsfoldbfi1[i]+st->lsfoldbfi0[i]+lsfnew_uw[k*M+i])/3;
+                st->lsfoldbfi1[i] = st->lsfoldbfi0[i];
+                st->lsfoldbfi0[i] = lsfnew_uw[k*M+i];
             }
         }
     }
-    ELSE
+    else
     {
-        /* PLC: [LPD: LPC concealment]
-         * Conceal the LPC from the lost frame */
-        st->numlpc = 2;
-        move16();
-        test();
-        if ( st->tcxonly == 0 || sub(st->core_fx, TCX_10_CORE) < 0 )
+        /* PLC: [LPD: LPC concealment] Conceal the LPC from the lost frame */
+        float const* lsfBase;                      /* base for differential lsf coding */
+
+        if( st->tcxonly == 0 || st->core < TCX_10_CORE )
         {
-            move16();
             st->numlpc = 1;
         }
-        IF(sub(st->nbLostCmpt,1)==0)
+        else
         {
-            Copy(st->lsf_old_fx, st->old_lsf_q_cng, M);
-            Copy(st->lsp_old_fx, st->old_lsp_q_cng, M);
+            st->numlpc = 2;
         }
-        move16();
-        xsfBase = PlcGetLsfBase (st->lpcQuantization,
-        (Word16)st->narrowBand,
-        st->sr_core);
 
-        dlpc_bfi( st->L_frame_fx,
-        xsfnew_uw,
-        st->lsfold_uw,
-        st->last_good_fx,
-        st->nbLostCmpt,
-        st->mem_MA_fx,
-        st->mem_AR_fx,
-        &(st->stab_fac_fx),
-        st->lsf_adaptive_mean_fx,
-        st->numlpc,
-        st->lsf_cng,
-        st->plcBackgroundNoiseUpdated,
-        st->lsf_q_cng,
-        st->old_lsf_q_cng,
-        xsfBase,
-        st->tcxonly
-                );
+        if( st->nbLostCmpt == 1)
+        {
+            mvr2r( st->lsf_old, st->old_lsf_q_cng, M );
+            mvr2r( st->lsp_old, st->old_lsp_q_cng, M );
+        }
+
+
+        lsfBase = PlcGetlsfBase( st->lpcQuantization, st->narrowBand, st->sr_core );
+
+        dlpc_bfi( st->L_frame, lsfnew_uw, st->lsfold_uw, st->last_good, st->nbLostCmpt, st->mem_MA, st->mem_AR, &(st->stab_fac),
+                  st->lsf_adaptive_mean, st->numlpc, st->lsf_cng, st->plcBackgroundNoiseUpdated, st->lsf_q_cng, st->old_lsf_q_cng, lsfBase);
 
         st->envWeighted = 0;
-        move16();
 
-        Copy( st->lspold_uw, lsp, M );
-        Copy( st->lsfold_uw, lsf, M );
+        mvr2r( st->lspold_uw, lsp, M );
+        mvr2r( st->lsfold_uw, lsf, M );
 
-        FOR ( k = 0; k < st->numlpc; k++ )
+        for( k = 0; k < st->numlpc; k++ )
         {
-            Copy( &xsfnew_uw[k*M], &lsf[(k+1)*M], M );
+            mvr2r( &lsfnew_uw[k*M], &lsf[(k+1)*M], M );
 
-            IF ( st->tcxonly )
-            {
-                E_LPC_lsf_lsp_conversion(&lsf[(k+1)*M], &lsp[(k+1)*M], M);
-                E_LPC_lsf_lsp_conversion(st->lsf_q_cng, st->lsp_q_cng, M);
-            }
-            ELSE
-            {
-                lsf2lsp_fx( &lsf[(k+1)*M], &lsp[(k+1)*M], M, st->sr_core );
-                lsf2lsp_fx( st->lsf_q_cng, st->lsp_q_cng, M, st->sr_core );
-            }
+            lsf2lsp( &lsf[(k+1)*M], &lsp[(k+1)*M], M, st->sr_core );
+            lsf2lsp( st->lsf_q_cng, st->lsp_q_cng, M, st->sr_core );
 
-            Copy( &lsp[(k+1)*M], &xspnew_uw[k*M], M );
+            mvr2r( &lsp[(k+1)*M], &lspnew_uw[k*M], M );
         }
     }
+
 
     /*--------------------------------------------------------------*
-     * Rate switching
-     *---------------------------------------------------------------*/
-    IF( st->rate_switching_reset!=0 )
+      * Rate switching
+      *---------------------------------------------------------------*/
+    if( st->rate_switching_reset )
     {
-        Copy( &(lsf[M]),&(lsf[0]), M );
-        Copy( &(lsp[M]),&(lsp[0]), M );
-        Copy( &(lsf[M]),st->lsf_old_fx, M );
-        Copy( &(lsp[M]),st->lsp_old_fx, M );
-        Copy( &(lsf[M]),lsfmid, M );
-        Copy( &(lsp[M]),lspmid, M );
-        E_LPC_f_lsp_a_conversion(st->lsp_old_fx, st->old_Aq_12_8_fx, M);
+        mvr2r( &(lsf[M]),&(lsf[0]), M );
+        mvr2r( &(lsp[M]),&(lsp[0]), M );
+        mvr2r( &(lsf[M]),st->lsf_old, M );
+        mvr2r( &(lsp[M]),st->lsp_old, M );
+        mvr2r( &(lsf[M]),lsfmid, M );
+        mvr2r( &(lsp[M]),lspmid, M );
+        lsp2a_stab( st->lsp_old, st->old_Aq_12_8, M );
     }
 
-
-    IF(st->enablePlcWaveadjust)
+    if(st->enablePlcWaveadjust)
     {
-        if(sub(st->core_fx, ACELP_CORE)  == 0)
+        if (st->core == ACELP_CORE)
         {
             st->tonality_flag = 0;
-            move16();
         }
-        if(bfi)
+        if (bfi)
         {
             st->plcInfo.nbLostCmpt++;
-            move16();
         }
     }
 
     /*--------------------------------------------------------------------------------*
      * ACELP
      *--------------------------------------------------------------------------------*/
-    test();
-    test();
-    test();
-    IF( (st->prev_bfi_fx!=0) && (bfi==0) && (sub(*coder_type,VOICED)==0) && sub(st->prev_nbLostCmpt,4)>0 )
+
+
+    if( (st->prev_bfi!=0) && (bfi==0) && (*coder_type==VOICED) && (st->prev_nbLostCmpt>4) )
     {
         st->dec_glr_idx = 1;
-        move16();
         st->reset_mem_AR = 1;
-        move16();
     }
 
-    IF ( st->core_fx == ACELP_CORE )
+    if( st->core == ACELP_CORE )
     {
-        IF (st->tcxonly==0)
+        if( !st->tcxonly )
         {
             /* Set pointer to parameters */
             prm = param;
 
             /* Stability Factor */
-            IF ( bfi == 0 )
+            if( !bfi )
             {
-                st->stab_fac_fx = lsf_stab_fx(&lsf[M], &lsf[0], 0, st->L_frame_fx);
+                st->stab_fac = lsf_stab( &lsf[M], &lsf[0], 0, st->L_frame );
             }
 
-            test();
-            IF( bfi==0 && st->prev_bfi_fx != 0 )
+            if( !bfi && st->prev_bfi )
             {
                 /* check if LSP interpolation can be relaxed or if LPC power can be diffused*/
-                E_LPC_f_lsp_a_conversion(&lsp[0], tmp_old, M);
-                enr_old = Enr_1_Az_fx(tmp_old, 2*L_SUBFR);
+                lsp2a_stab( &lsp[0], tmp_old, M);
+                enr_old = enr_1_Az( tmp_old, 2*L_SUBFR );
 
-                E_LPC_f_lsp_a_conversion(&lsp[M], tmp_new, M);
-                enr_new = Enr_1_Az_fx(tmp_new, 2*L_SUBFR);
+                lsp2a_stab( &lsp[M], tmp_new, M);
+                enr_new = enr_1_Az( tmp_new, 2*L_SUBFR );
             }
 
-            test();
-            test();
-            test();
-            test();
-            IF( (bfi == 0) && ((sub(st->dec_glr_idx, 1) == 0) || ((st->safety_net_fx==0) && (shr(enr_new,11) > 0) && (sub(shr(enr_new,1),enr_old)>0))) && (st->prev_bfi_fx != 0 ) )
+            if( !bfi && (st->dec_glr_idx == 1 || (!(st->safety_net) && enr_new>=256.f && enr_new > 2*enr_old)) && st->prev_bfi  )
             {
-                Word16 reset_q = 0;
-                if( sub(st->dec_glr_idx, 1) == 0 )
-                {
-                    reset_q = 1;
-                    move16();
-                }
-                RecLpcSpecPowDiffuseLc( &lsp[M], &lsp[0], &lsf[M], st, reset_q);
-
-                int_lsp_fx( L_frame, &lsp[0], &lsp[M], Aq, M, interpol_frac_fx, 0 );
-
-                Copy(&lsf[M], xsfnew_uw, M);
+                RecLpcSpecPowDiffuseLc( &lsp[M], &lsp[0], &lsf[M], st, st->dec_glr_idx == 1 ? 1 : 0 );
+                int_lsp( L_frame, &lsp[0], &lsp[M], Aq, M, interpol_frac_12k8, 0 );
+                mvr2r( &lsf[M], lsfnew_uw, M );
             }
-            ELSE
+            else
             {
                 /* LPC Interpolation for ACELP */
-                test();
-                IF ( bfi==0 && st->acelp_cfg.midLpc )
+                if( !bfi && st->acelp_cfg.midLpc )
                 {
-                    st->relax_prev_lsf_interp_fx = 0;
-                    move16();
-                    IF (st->prev_bfi_fx)
+                    st->relax_prev_lsf_interp = 0;
+
+                    if( st->prev_bfi )
                     {
                         /* check if LSP interpolation can be relaxed */
-                        IF ( sub(enr_new, shr(enr_old, 2)) < 0 )
+                        if ( enr_new < (0.25f * enr_old) )
                         {
-                            st->relax_prev_lsf_interp_fx = -1;
-                            move16();
-                            test();
-                            test();
-                            test();
-                            test();
-                            if ( sub(st->clas_dec, UNVOICED_CLAS) == 0 || sub(st->clas_dec, SIN_ONSET) == 0 || sub(st->clas_dec, INACTIVE_CLAS) == 0 || sub(*coder_type, GENERIC) == 0 || sub(*coder_type, TRANSITION) == 0 )
+                            /* don't use safety_net as this is getting impacted with lsf_restruct */
+                            if ( (st->clas_dec == UNVOICED_CLAS) || (st->clas_dec == SIN_ONSET) || (st->clas_dec == INACTIVE_CLAS) || (*coder_type == GENERIC) || (*coder_type == TRANSITION) )
                             {
-                                st->relax_prev_lsf_interp_fx = 1;
-                                move16();
+                                st->relax_prev_lsf_interp = 1;
+                            }
+                            else
+                            {
+                                st->relax_prev_lsf_interp = -1;
                             }
                         }
                     }
 
-                    test();
-                    test();
-                    test();
-                    test();
-                    if (st->stab_fac_fx == 0 && st->old_bfi_cnt_fx > 0 && sub(st->clas_dec, VOICED_CLAS) != 0 && sub(st->clas_dec, ONSET) != 0 && st->relax_prev_lsf_interp_fx == 0 )
+                    if( st->stab_fac == 0 && st->old_bfi_cnt > 0 && st->clas_dec != VOICED_CLAS && st->clas_dec != ONSET && st->relax_prev_lsf_interp == 0 )
                     {
-                        st->relax_prev_lsf_interp_fx = 2;
-                        move16();
+                        st->relax_prev_lsf_interp = 2;
                     }
-                    int_lsp4_fx( L_frame, &lsp[0], lspmid, &lsp[M], Aq, M, st->relax_prev_lsf_interp_fx );
+                    int_lsp4( L_frame, &lsp[0], lspmid, &lsp[M], Aq, M, st->relax_prev_lsf_interp );
                 }
-                ELSE
+                else
                 {
-                    int_lsp_fx( L_frame, &lsp[0], &lsp[M], Aq, M, interpol_frac_fx, 0 );
-                    int_lsp_fx( L_frame, st->old_lsp_q_cng, st->lsp_q_cng, st->Aq_cng, M, interpol_frac_fx, 0 );
+                    int_lsp( L_frame, &lsp[0], &lsp[M], Aq, M, interpol_frac_12k8, 0 );
+                    int_lsp( L_frame, st->old_lsp_q_cng, st->lsp_q_cng, st->Aq_cng, M, interpol_frac_12k8, 0 );
                 }
             }
         }
 
-        test();
-        IF (bfi!=0 && st->last_core_fx != ACELP_CORE)
+        if( bfi && st->last_core != ACELP_CORE )
         {
             /* PLC: [TCX: TD PLC] */
             con_tcx( st, &synthFB[0] );
-            lerp( synthFB, synth, st->L_frame_fx, st->L_frameTCX );
+            lerp(synthFB, synth, st->L_frame, st->L_frameTCX);
             st->con_tcx = 1;
-            move16();
-            set16_fx (st->mem_pitch_gain+2,round_fx(L_shl(st->Mode2_lp_gainp , 1)), st->nb_subfr);
+            set_f( &st->mem_pitch_gain[2], st->lp_gainp, st->nb_subfr);
         }
-        ELSE
+        else
         {
             /* ACELP decoder */
-            IF (sub(st->L_frame_fx,L_FRAME)== 0)
+            if (st->L_frame == L_FRAME)
             {
-                Copy(Aq+2*(M+1), st->cur_sub_Aq_fx, (M+1));
+                mvr2r(Aq+2*(M+1), st->cur_sub_Aq, (M+1));
             }
-            ELSE
+            else
             {
-                Copy(Aq+3*(M+1), st->cur_sub_Aq_fx, (M+1));
+                mvr2r(Aq+3*(M+1), st->cur_sub_Aq, (M+1));
             }
-            IF ( bfi != 0 )
+
+            if( bfi )
             {
                 /* PLC: [ACELP: general]
                  * PLC: Use the ACELP like concealment */
-                con_acelp(Aq,
-                st->core_ext_mode,
-                &synth[0],
-                pitch,
-                pit_gain,
-                st->stab_fac_fx,
-                st,
-                &st->Q_exc,
-                &st->Q_syn, /*Q format of st->mem_syn*/
-                pitch_buf,
-                voice_factors,
-                ptr_bwe_exc
-                         );
-
-                Copy(&st->mem_pitch_gain[2], &st->mem_pitch_gain[st->nb_subfr+2], st->nb_subfr);
-                set16_fx(&st->mem_pitch_gain[2],0,st->nb_subfr);
+                con_acelp( Aq, st->core_ext_mode, &synth[0], pitch, pit_gain, st->stab_fac, st, pitch_buf, voice_factors, ptr_bwe_exc );
+                mvr2r( &st->mem_pitch_gain[2], &st->mem_pitch_gain[st->nb_subfr+2], st->nb_subfr );
+                set_zero( &st->mem_pitch_gain[2],st->nb_subfr );
             }
-            ELSE
+            else
             {
-                decoder_acelp(st, *coder_type, prm, Aq, st->acelp_cfg, &synth[0],
-                pitch, pit_gain, st->stab_fac_fx, pitch_buf, voice_factors, LSF_Q_prediction, ptr_bwe_exc);
-                IF(st->flagGuidedAcelp > 0)
+                decoder_acelp( st, *coder_type, prm, Aq, st->acelp_cfg, &synth[0], pitch, pit_gain, st->stab_fac, pitch_buf, voice_factors, LSF_Q_prediction, ptr_bwe_exc );
+
+                if( st->flagGuidedAcelp > 0 )
                 {
-                    st->guidedT0 = s_max(s_min(add(st->T0_4th, st->guidedT0), NBPSF_PIT_MAX), PIT_MIN_16k);
+                    st->guidedT0 = max(min(st->T0_4th + st->guidedT0, NBPSF_PIT_MAX), PIT_MIN_16k);
                 }
 
-                FOR (i=0; i<st->nb_subfr; i++)
+                for (i = 0; i < st->nb_subfr; i++)
                 {
-                    move16();
-                    move16();
                     st->mem_pitch_gain[2+(2*st->nb_subfr-1)-i] = st->mem_pitch_gain[2+ (st->nb_subfr-1) -i];
                     st->mem_pitch_gain[2+(st->nb_subfr-1)-i] = pit_gain[i];
                 }
             }
         }
 
-
         /* LPC for ACELP/BBWE */
-        test();
-        test();
-        IF( st->narrowBand || (L_sub(st->sr_core, 12800) == 0) || (L_sub(st->sr_core, 16000) == 0) )
+        if( st->narrowBand || st->sr_core==12800 || st->sr_core==16000 )
         {
-            Copy(Aq, st->mem_Aq, nb_subfr*(M+1));
+            mvr2r( Aq, st->mem_Aq, nb_subfr*(M+1) );
         }
 
         /* PLC: [TCX: Tonal Concealment] */
         /* Signal that this frame is not TCX */
-        TonalMDCTConceal_UpdateState(&st->tonalMDCTconceal, 0, 0, 0, 0);
+        TonalMDCTConceal_UpdateState( &st->tonalMDCTconceal, 0, 0, 0, 0 );
 
-        IF (bfi==0)
+        if( !bfi )
         {
             st->second_last_tns_active = st->last_tns_active;
             st->last_tns_active = 0;
-            st->tcxltp_last_gain_unmodified = 0;
-            move16();
+            st->tcxltp_last_gain_unmodified = 0.0f;
         }
 
     }
@@ -652,77 +523,54 @@ void decoder_LPD(
      * TCX20
      *--------------------------------------------------------------------------------*/
 
-    IF ( sub(st->core_fx, TCX_20_CORE) == 0 )
+
+    if( st->core == TCX_20_CORE )
     {
         /* Set pointer to parameters */
         prm = param;
 
         /* Stability Factor */
-        IF ( bfi == 0 )
+        if( !bfi )
         {
-            IF ( st->tcxonly != 0 )
-            {
-                st->stab_fac_fx = lsf_stab_fx(&lsf[M], &lsf[0],0, L_FRAME);
-            }
-            ELSE
-            {
-                st->stab_fac_fx = lsf_stab_fx(&lsf[M], &lsf[0],0, st->L_frame_fx);
-            }
+            st->stab_fac = lsf_stab( &lsf[M], &lsf[0], 0, st->L_frame );
         }
 
-        IF (st->enableTcxLpc)
+        if (st->enableTcxLpc)
         {
-            /* Convert quantized xSP to A */
-            E_LPC_f_lsp_a_conversion(&lsp[M], Aq, M);
+            /* Convert quantized lsp to A */
+            lsp2a_stab( &lsp[M], Aq, M );
         }
-        ELSE
+        else
         {
-            IF (st->tcxonly == 0)
+            if (!st->tcxonly)
             {
-                test();
-                test();
-                test();
-                IF( (bfi == 0) && (st->prev_bfi_fx != 0 ) && (st->safety_net_fx==0) && (st->rate_switching_reset != 0) )
+                if( !bfi && st->prev_bfi && !(st->safety_net) && st->rate_switching_reset )
                 {
                     /* diffuse LPC power on rate switching*/
                     RecLpcSpecPowDiffuseLc( &lsp[M], &lsp[0], &lsf[M], st, 0 );
-                    int_lsp_fx( L_frame, &lsp[0], &lsp[M], Aq, M, interpol_frac_fx, 0 );
-                    Copy(&lsf[M], xsfnew_uw, M);
+                    int_lsp( L_frame, &lsp[0], &lsp[M], Aq, M, interpol_frac_12k8, 0 );
+                    mvr2r( &lsf[M], lsfnew_uw, M );
                 }
-                ELSE
+                else
                 {
                     /* LPC Interpolation for TCX */
-                    E_LPC_int_lpc_tcx(&lsp[0], &lsp[M], Aq);
+                    E_LPC_int_lpc_tcx( &lsp[0], &lsp[M], Aq );
                 }
             }
-            ELSE
+            else
             {
-                E_LPC_f_lsp_a_conversion(&lsp[M], Aq, M);
+                lsp2a_stab( &lsp[M], Aq, M );
             }
         }
 
-        test();
-        IF ( bfi == 0 && st->tcx_lpc_shaped_ari != 0 )
+        if( !bfi && st->tcx_lpc_shaped_ari )
         {
-            E_LPC_f_lsp_a_conversion(lspind, Aind, M);
+            basop_E_LPC_f_lsp_a_conversion(lspind, Aind, M);
         }
 
         /* TCX decoder */
-        decoder_tcx(&st->tcx_cfg,
-                    prm,
-                    Aq,
-                    Aind,
-                    L_frame,
-                    L_frameTCX,
-                    st->tcx_cfg.tcx_coded_lines,
-                    &synth[0],
-                    &synthFB[0],
-                    st,
-                    *coder_type,
-                    bfi,
-                    0,
-                    st->stab_fac_fx
-                   );
+        decoder_tcx( &st->tcx_cfg, prm, Aq, Aind, L_frame, L_frameTCX, st->tcx_cfg.tcx_coded_lines,
+                     &synth[0], &synthFB[0], st, *coder_type, bfi, 0, st->stab_fac );
 
     }
 
@@ -730,291 +578,205 @@ void decoder_LPD(
      * TCX10
      *--------------------------------------------------------------------------------*/
 
-    IF ( sub(st->core_fx, TCX_10_CORE) == 0 )
+    if( st->core == TCX_10_CORE )
     {
-        FOR (k=0; k<2; k++)
-        {
+        prm = NULL;                   /* just to avoid MSVC warnings */
 
+        for (k=0; k<2; k++)
+        {
             /* Set pointer to parameters */
             prm = param + (k*DEC_NPRM_DIV);
 
             /* Stability Factor */
-            IF ( bfi==0 )
+            if( !bfi )
             {
-                st->stab_fac_fx = lsf_stab_fx(&lsf[(k+1)*M], &lsf[k*M],0, L_FRAME);
+                st->stab_fac = lsf_stab( &lsf[(k+1)*M], &lsf[k*M], 0, st->L_frame );
             }
 
-            E_LPC_f_lsp_a_conversion(&lsp[(k+1)*M], Aq, M);
+            lsp2a_stab( &lsp[(k+1)*M], Aq, M );
+            IGFDecRestoreTCX10SubFrameData( &st->hIGFDec, k );
 
             /* TCX decoder */
-
-            IGFDecRestoreTCX10SubFrameData( &st->hIGFDec, k );
-            decoder_tcx(&st->tcx_cfg,
-                        prm,
-                        Aq,
-                        Aind,
-                        shr(L_frame, 1),
-                        shr(L_frameTCX, 1),
-                        shr(st->tcx_cfg.tcx_coded_lines, 1),
-                        &synth[k*L_frame/2],
-                        &synthFB[k*L_frameTCX/2],
-                        st,
-                        *coder_type,
-                        bfi,
-                        k,
-                        st->stab_fac_fx
-                       );
+            decoder_tcx( &st->tcx_cfg, prm, Aq, Aind, L_frame/2, L_frameTCX/2, st->tcx_cfg.tcx_coded_lines/2,
+                         &synth[k*L_frame/2], &synthFB[k*L_frameTCX/2], st, *coder_type, bfi, k, st->stab_fac );
         }
 
     }
 
-
-    test();
-    IF (sub(st->core_fx, TCX_10_CORE) == 0 || sub(st->core_fx, TCX_20_CORE) == 0)
+    if (st->core == TCX_10_CORE || st->core == TCX_20_CORE)
     {
-        test();
-        test();
-        IF(st->enablePlcWaveadjust ||                       /* bfi      */
-           (L_sub(st->last_total_brate_fx, HQ_48k) >= 0 &&  /* recovery */
-            sub(st->last_codec_mode, MODE2) == 0) )
+        if( st->enablePlcWaveadjust ||           /* bfi      */
+                ( st->last_total_brate >= HQ_48k &&  /* recovery */
+                  st->last_codec_mode == MODE2 ) )
         {
             /* waveform adjustment */
-            concealment_signal_tuning_fx( bfi, st->core_fx,
-                                          synthFB, &st->plcInfo, st->nbLostCmpt, st->prev_bfi_fx,
-                                          st->tonalMDCTconceal.secondLastPcmOut,
-                                          past_core_mode,st->tonalMDCTconceal.lastPcmOut, st );
-            test();
-            test();
-            test();
-            IF ((bfi || st->prev_bfi_fx) && st->plcInfo.Pitch_fx && (sub(st->plcInfo.concealment_method, TCX_NONTONAL) == 0))
+            concealment_signal_tuning( bfi, st->core, synthFB, &st->plcInfo, st->nbLostCmpt, st->prev_bfi,
+                                       st->tonalMDCTconceal.secondLastPcmOut, past_core_mode,st->tonalMDCTconceal.lastPcmOut, st );
+
+            if( (bfi || st->prev_bfi) && st->plcInfo.Pitch && st->plcInfo.concealment_method == TCX_NONTONAL )
             {
                 lerp( synthFB, synth, L_frame, L_frameTCX );
-                test();
-                if( !bfi && st->prev_bfi_fx )
+
+                if( !bfi && st->prev_bfi )
                 {
-                    st->plcInfo.Pitch_fx = 0;
-                    move16();
+                    st->plcInfo.Pitch = 0;
                 }
             }
         }
 
-        IF (!bfi)
+        if (!bfi)
         {
             TonalMDCTConceal_SaveTimeSignal( &st->tonalMDCTconceal, synthFB, L_frameTCX );
         }
+
         decoder_tcx_post( st, synth, synthFB, Aq, bfi );
 
-        IF (sub(st->core_fx, TCX_20_CORE) == 0)
+        if( st->core == TCX_20_CORE )
         {
             /* LPC Interpolation for BBWE/post-processing */
-            test();
-            test();
-            IF( st->narrowBand || (L_sub(st->sr_core, 12800) == 0) || (L_sub(st->sr_core, 16000) == 0) )
+            if( st->narrowBand || st->sr_core==12800 || st->sr_core==16000 )
             {
-                int_lsp_fx( L_frame, st->lspold_uw, xspnew_uw, Aq, M, interpol_frac_fx, 0 );
-                Copy(Aq, st->mem_Aq, nb_subfr*(M+1));
+                int_lsp( L_frame, st->lspold_uw, lspnew_uw, Aq, M, interpol_frac_12k8, 0 );
+                mvr2r( Aq, st->mem_Aq, nb_subfr*(M+1) );
             }
         }
     }
+
 
     /* PLC: [Common: Classification] */
-
-    IF( L_sub( st->sr_core, 16000) <= 0 )
+    /* the classifier buffer is always updated if the sr is at
+       16000 or below - the classification itself is just performed if(!st->tcxonly ) */
+    if( st->sr_core <= 16000 )
     {
-        test();
-        test();
-        test();
-        IF ( sub(st->core_fx, TCX_20_CORE) == 0 || sub(st->core_fx, TCX_10_CORE) == 0 || (st->tcxonly && st->bfi_fx) )
+        if( st->core == TCX_20_CORE || st->core == TCX_10_CORE || (st->tcxonly && st->bfi) )
         {
-            Word16 pitch_C[NB_SUBFR16k];
-            Word16 core_ext_mode, LTP_Gain;
+            float pitch_C[4];
 
-            set16_fx(pitch_C, shl(round_fx(st->old_fpitch), 6), NB_SUBFR16k);
+            /* note: the classifier needs the pitch only for tcx_only == 0 , i.e. not for TCX10 */
+            pitch_C[0] = pitch_C[1] = pitch_C[2] = pitch_C[3] = (float)floor(st->old_fpitch+0.5f);
 
-            core_ext_mode = GENERIC;
-            move16();
-            if(st->tcxonly == 0)
-            {
-                core_ext_mode = st->core_ext_mode;
-                move16();
-            }
-
-            LTP_Gain = -32768/*-1.0f Q15*/;
-            if(st->tcxltp)
-            {
-                LTP_Gain = st->tcxltp_last_gain_unmodified;
-                move16();
-            }
-
-
-            FEC_clas_estim_fx(
-                st,
-                /*Opt_AMR_WB*/0, /*A*/
-                st->L_frame_fx,
-                &(st->clas_dec),
-                core_ext_mode,
-                pitch_C,
-                synth,
-                &st->lp_ener_FER_fx,
-                /**decision_hyst*/NULL,     /* i/o: hysteresis of the music/speech decision          */
-                /**UV_cnt*/ NULL,           /* i/o: number of consecutive frames classified as       */
-                /**LT_UV_cnt*/ NULL,        /* i/o: long term consecutive frames classified as UV    */
-                /**Last_ener*/ NULL,        /* i/o: last_energy frame                                */
-                /**locattack*/ NULL,        /* i/o: detection of attack (mainly to localized speech burst) */
-                /**lt_diff_etot*/NULL,      /* i/o: long-term total energy variation                 */
-                /**amr_io_class*/ NULL,     /* i/o: classification for AMR-WB IO mode                */
-                /*bitrate*/ 0  ,            /* i  : Decoded bitrate                                  */
-                0,                          /* i  : Synthesis scaling                                */
-                /**class_para*/ NULL,       /* o  : classification para. fmerit1                     */
-                st->mem_syn_clas_estim_fx,  /* i/o: memory of the synthesis signal for frame class estimation */
-                &st->classifier_Q_mem_syn,  /* i/o: exponent for memory of synthesis signal for frame class estimation */
-                LTP_Gain,                   /* i  : means LTP Gain                                   */
-                1  /*CLASSIFIER_TCX*/,      /* i  : signal classifier mode                           */
-                bfi,                        /* i  : bad frame indicator                              */
-                st->last_core_brate_fx      /* i  : bitrate of previous frame                        */
-            );
-
+            FEC_clas_estim( synth, pitch_C, st->L_frame, st->tcxonly? GENERIC : st->core_ext_mode, st->codec_mode, st->mem_syn_clas_estim,
+                            &st->clas_dec, &st->lp_ener_bfi, st->core_brate, 0, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+                            st->tcxltp ? st->tcxltp_last_gain_unmodified : -1.0f, st->narrowBand, (SIGNAL_CLASSIFIER_MODE)1,
+                            bfi, st->preemph_fac, st->tcxonly, st->last_core_brate );
         }
     }
+
+
+
 
     /*--------------------------------------------------------------------------------*
-     * END
+     * Updates
      *--------------------------------------------------------------------------------*/
 
-    test();
-    IF( bfi && sub(st->last_core_bfi , ACELP_CORE) != 0 )
+
+    if( bfi && st->last_core != ACELP_CORE )
     {
         /* Update FEC_scale_syn parameters */
-        IF(st->tcxltp_gain == 0)
+        if (st->tcxltp_gain == 0)
         {
-            frame_ener_fx( L_frame, UNVOICED_CLAS, synth, shr(L_frame,1), &st->enr_old_fx, L_frame, 0, 0, 0 );
+            fer_energy( L_frame, UNVOICED, synth, L_frame/2, &st->enr_old, L_frame );
         }
-        ELSE
+        else
         {
-            Word16 pitch_Q0;
-            pitch_Q0 = round_fx(st->old_fpitch);
-            frame_ener_fx( L_frame, st->clas_dec, synth, pitch_Q0, &st->enr_old_fx, L_frame, 0, 0, 0 );
+            fer_energy( L_frame, st->clas_dec, synth, st->old_fpitch, &st->enr_old, L_frame );
         }
     }
 
-
-    test();
-    test();
-    IF(!bfi && sub(st->clas_dec, VOICED_TRANSITION) >= 0 && sub(st->clas_dec, INACTIVE_CLAS) < 0)
+    if( !bfi && st->clas_dec >= VOICED_TRANSITION && st->clas_dec < INACTIVE_CLAS)
     {
-        Word16 offset;
+        short offset;
 
-        IF(sub(st->core_fx, ACELP_CORE)==0)
+        if( st->core == ACELP_CORE )
         {
-            offset = sub(st->nb_subfr,1);
-            offset = imult1616(offset,add(M,1));
+            offset = (st->nb_subfr-1)*(M+1);
         }
-        ELSE
+        else
         {
+            /* TCX */
             offset = 0;
-            move16();
         }
+
         /* use latest LPC set */
-        st->old_enr_LP = Enr_1_Az_fx(Aq+offset, L_SUBFR); /*Q3*/
+        st->old_enr_LP = enr_1_Az( Aq+offset, L_SUBFR );
     }
 
 
     /* Update */
-    Copy(synth_buf+L_frame, st->old_synth, st->old_synth_len);
+    mvr2r( synth_buf+L_frame, st->old_synth, st->old_synth_len );
+    mvr2r( st->old_synthFB + L_frameTCX - NS2SA(st->output_Fs, PH_ECU_MEM_NS), st->synth_history, NS2SA(st->output_Fs, PH_ECU_MEM_NS) );
+    mvr2r( synth_bufFB+L_frameTCX, st->old_synthFB, st->old_synth_lenFB );
+    mvr2r( st->old_out+NS2SA(st->output_Fs,N_ZERO_MDCT_NS), st->old_synthFB+st->old_synth_lenFB, NS2SA(st->output_Fs, PH_ECU_LOOKAHEAD_NS));
 
-    Copy( st->old_synthFB_fx + L_frameTCX - NS2SA_fx2(st->output_Fs_fx, PH_ECU_MEM_NS), st->synth_history_fx, NS2SA_fx2(st->output_Fs_fx, PH_ECU_MEM_NS) );
-    Copy(synth_bufFB+L_frameTCX, st->old_synthFB_fx, st->old_synth_lenFB);
-    Copy_Scale_sig( st->old_out_fx+NS2SA_fx2(st->output_Fs_fx, N_ZERO_MDCT_NS), st->old_synthFB_fx+st->old_synth_lenFB, NS2SA_fx2(st->output_Fs_fx, PH_ECU_LOOKAHEAD_NS), negate(st->Q_old_wtda));
+    mvr2r( &lspnew_uw[(st->numlpc-1)*M], st->lspold_uw, M );
+    mvr2r( &lsfnew_uw[(st->numlpc-1)*M], st->lsfold_uw, M );
 
-
-    Copy(&xspnew_uw[(st->numlpc-1)*M], st->lspold_uw, M);
-    Copy(&xsfnew_uw[(st->numlpc-1)*M], st->lsfold_uw, M);
-
-    IF (bfi)
+    if( bfi == 1 )
     {
-        Copy(st->lspold_uw, st->lsp_old_fx, M); /* for recovery */
-        Copy(st->lsfold_uw, st->lsf_old_fx, M); /* for recovery */
+        mvr2r( st->lspold_uw, st->lsp_old, M ); /* for recovery */
+        mvr2r( st->lsfold_uw, st->lsf_old, M ); /* for recovery */
     }
-    ELSE
+    else
     {
-        Copy(&lsp[st->numlpc*M], st->lsp_old_fx, M);
-        Copy(&lsf[st->numlpc*M], st->lsf_old_fx, M);
+        mvr2r( &lsp[st->numlpc*M], st->lsp_old, M );
+        mvr2r( &lsf[st->numlpc*M], st->lsf_old, M );
     }
-    Copy(st->lsp_q_cng, st->old_lsp_q_cng, M);
-    Copy(st->lsf_q_cng, st->old_lsf_q_cng, M);
+    mvr2r( st->lsp_q_cng, st->old_lsp_q_cng, M );
+    mvr2r( st->lsf_q_cng, st->old_lsf_q_cng, M );
 
-    /* Update LP_CNG parameters */
-    IF( st->tcxonly == 0 )
+    /* Update MODE1 CNG parameters */
+    if( !st->tcxonly )
     {
         /* update CNG parameters in active frames */
-        IF (sub(st->bwidth_fx,NB) == 0 && st->enableTcxLpc !=0 && sub(st->core_fx , ACELP_CORE)!= 0)
+        if ( st->bwidth == NB && st->enableTcxLpc && st->core != ACELP_CORE )
         {
-            Word16 buf[L_LP], res[L_FRAME], A[M+1], Qexc, r_l[M+1], r_h[M+1], lsptmp[M], Q_r, tmp;
-
-            assert(st->L_frame_fx==L_FRAME);
-            Copy(synth+L_FRAME-L_LP, buf, L_LP);
+            float buf[L_LP], res[L_FRAME], A[M+1], r[M+1], tmp, lsptmp[M];
+            assert(st->L_frame==L_FRAME);
+            mvr2r(synth+L_FRAME-L_LP, buf, L_LP);
             tmp = synth[L_FRAME-L_LP-1];
-            Qexc = E_UTIL_f_preemph3(buf, st->preemph_fac, L_LP, &tmp, 1);
-            autocorr_fx( buf, M, r_h, r_l, &Q_r, L_LP, Assym_window_W16fx, 0, 0 );
-            lag_wind(r_h, r_l, M, INT_FS_FX, LAGW_WEAK);
-            E_LPC_lev_dur(r_h, r_l, A, NULL, M, NULL);
-            E_LPC_a_lsp_conversion(A, lsptmp, &xspnew_uw[0], M);
-            Residu3_fx(A, buf+L_LP-L_FRAME, res, L_FRAME, 1);
-            cng_params_upd_fx( lsptmp, res, st->L_frame_fx, &st->ho_circ_ptr_fx,
-                               st->ho_ener_circ_fx, &st->ho_circ_size_fx, st->ho_lsp_circ_fx,
-                               Qexc, DEC, st->ho_env_circ_fx, NULL, NULL, NULL, NULL, st->last_active_brate_fx );
+            preemph(buf, st->preemph_fac, L_LP, &tmp);
+            autocorr( buf, r, M, L_LP, LP_assym_window, 0, 0, 0 );
+            lag_wind(r, M, INT_FS_12k8, LAGW_WEAK);
+            lev_dur( A, r, M, NULL );
+            a2lsp_stab( A, lsptmp, &lspnew_uw[0] );
+            residu(A, M, buf+L_LP-L_FRAME, res, L_FRAME );
+
+            cng_params_upd( lsptmp, res, st->L_frame, &st->ho_circ_ptr, st->ho_ener_circ, &st->ho_circ_size, st->ho_lsp_circ,
+                            DEC, st->ho_env_circ, NULL, NULL, NULL, st->last_active_brate );
         }
-        ELSE
+        else
         {
-            cng_params_upd_fx( &lsp[M], st->old_exc_fx+L_EXC_MEM_DEC-st->L_frame_fx,
-            st->L_frame_fx, &st->ho_circ_ptr_fx, st->ho_ener_circ_fx,
-            &st->ho_circ_size_fx, st->ho_lsp_circ_fx, st->Q_exc, DEC,
-            st->ho_env_circ_fx, NULL, NULL, NULL, NULL, st->last_active_brate_fx );
+            cng_params_upd( &lsp[M], st->old_exc+L_EXC_MEM_DEC-st->L_frame, st->L_frame, &st->ho_circ_ptr, st->ho_ener_circ,
+                            &st->ho_circ_size, st->ho_lsp_circ, DEC, st->ho_env_circ, NULL, NULL, NULL, st->last_active_brate );
         }
 
         /* Set 16k LSP flag for CNG buffer */
-        st->ho_16k_lsp_fx[st->ho_circ_ptr_fx] = 1;
-        move16();
-        if ( sub(st->L_frame_fx,L_FRAME) == 0 )
-        {
-            st->ho_16k_lsp_fx[st->ho_circ_ptr_fx] = 0;
-            move16();
-        }
+        st->ho_16k_lsp[st->ho_circ_ptr] = (st->L_frame == L_FRAME ? 0 : 1 );
     }
 
-    move16();
     st->last_is_cng = 0;
 
     /* Postfiltering */
-    post_decoder( st,
-                  *coder_type,
-                  synth_buf,
-                  pit_gain,
-                  pitch,
-                  signal_out,
-                  bpf_noise_buf
-                );
+    post_decoder( st, *coder_type, synth_buf, pit_gain, pitch, signal_out, bpf_noise_buf );
 
-    IF( signal_outFB )
+    if( signal_outFB )
     {
-        Copy( synthFB, signal_outFB, L_frameTCX );
+        mvr2r( synthFB, signal_outFB, L_frameTCX );
     }
 
-    IF( st->enablePlcWaveadjust)
+    if( st->enablePlcWaveadjust)
     {
         if(!bfi)
         {
-            st->plcInfo.nbLostCmpt = L_deposit_l(0);
+            st->plcInfo.nbLostCmpt = 0;
         }
 
-        IF (st->core_fx == 0)
+        if( st->core == ACELP_CORE ) /* may happen only if bfi==1 */
         {
-            set_state(st->plcInfo.Transient, st->core_fx, MAX_POST_LEN);
+            set_state( st->plcInfo.Transient, st->core, MAX_POST_LEN );
         }
     }
 
 
     return;
 }
-
-
