@@ -11,6 +11,7 @@
 #include "cnst.h"
 #include "rom_com.h"
 
+namespace evs {
 
 /*-------------------------------------------------------------------*
 * E_ACELP_toeplitz_mul()
@@ -45,3 +46,5 @@ void E_ACELP_toeplitz_mul(
 
     return;
 }
+
+} // end of namespace evs

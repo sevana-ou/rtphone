@@ -10,8 +10,7 @@
 #include "basop_util.h"
 #include "basop_proto_func.h"
 
-
-
+namespace evs {
 
 /*-------------------------------------------------------*
  * expfp()
@@ -508,3 +507,5 @@ void tcx_arith_render_envelope(
 
     return;
 }
+
+} // end of namespace

@@ -7,6 +7,7 @@
 #include "rom_com.h"
 #include "prot.h"
 
+namespace evs {
 
 /*---------------------------------------------------------------------*
  * Local functions
@@ -558,3 +559,5 @@ static void decod_gen_voic_core_switch(
 
     return;
 }
+
+} // end of namespace

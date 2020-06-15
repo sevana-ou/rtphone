@@ -9,6 +9,8 @@
 #include "rom_com.h"
 #include "prot.h"
 
+namespace evs {
+
 
 static void find_enr( const float data[], float band[], float *ptE, float *Etot, const short min_band,
                       const short max_band, float *Bin_E, const short bin_freq, float *band_ener );
@@ -207,3 +209,5 @@ static void find_enr(
 
     return;
 }
+
+} // end of namespace

@@ -11,6 +11,8 @@
 #include "prot.h"
 #include "prot.h"
 
+namespace evs {
+
 /*---------------------------------------------------------------------*
  * Local functions
  *---------------------------------------------------------------------*/
@@ -436,3 +438,5 @@ static void bwe_switch_enc(
 
     return;
 }
+
+} // end of namespace

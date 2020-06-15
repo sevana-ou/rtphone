@@ -7,6 +7,8 @@
 #include "prot.h"
 #include "rom_com.h"
 
+namespace evs {
+
 /*-------------------------------------------------------------------*
  * Function AVQ_cod()                                                *
  *                                                                   *
@@ -377,3 +379,5 @@ void AVQ_cod_lpc(
 
     return;
 }
+
+} // end of namespace

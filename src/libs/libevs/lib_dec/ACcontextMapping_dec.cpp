@@ -7,6 +7,8 @@
 #include "rom_com.h"
 #include "prot.h"
 
+namespace evs {
+
 /*-------------------------------------------------------------------*
 * ACcontextMapping_decode2_no_mem_s17_LC()
 *
@@ -276,3 +278,5 @@ long ACcontextMapping_decode2_no_mem_s17_LC(    /* o: resQBits              */
 
     return resQBits;
 }
+
+} // end of namespace EVS

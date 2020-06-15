@@ -1,4 +1,4 @@
-/* Copyright(C) 2007-2015 VoIP objects (voipobjects.com)
+/* Copyright(C) 2007-2020 VoIP objects (voipobjects.com)
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -78,6 +78,9 @@
 
 #define MT_GSMEFR_PAYLOADTYPE -1
 #define MT_GSMEFR_CODECNAME "GERAN-EFR"
+
+#define MT_EVS_PAYLOADTYPE -1
+#define MT_EVS_CODECNAME "EVS"
 
 // OPUS codec defines
 // #define USE_OPUS_CODEC

@@ -11,6 +11,7 @@
 #include "basop_util.h"
 #include "basop_proto_func.h"
 
+namespace evs {
 
 /*-------------------------------------------------------*
  * tcx_arith_decode()
@@ -180,3 +181,5 @@ void tcx_arith_decode_envelope(
 
     return;
 }
+
+} // end of namespace

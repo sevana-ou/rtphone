@@ -7,6 +7,8 @@
 #include "rom_com.h"
 #include "prot.h"
 
+namespace evs {
+
 /*-------------------------------------------------------------------*
  * analy_lp()
  *
@@ -141,3 +143,4 @@ void analy_lp_AMR_WB(
     return;
 }
 
+// end of namespace

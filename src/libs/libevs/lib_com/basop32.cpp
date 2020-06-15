@@ -130,7 +130,9 @@ HISTORY:
 #include <stdlib.h>
 #include "stl.h"
 
+namespace evs {
 
+}
 /*___________________________________________________________________________
  |                                                                           |
  |   Local Functions                                                         |
@@ -2535,6 +2537,6 @@ Word32 L_msu0 (Word32 L_var3, Word16 var1, Word16 var2)
     return(L_var_out);
 }
 
-
+} // end of namespace evs
 /* end of file */
 

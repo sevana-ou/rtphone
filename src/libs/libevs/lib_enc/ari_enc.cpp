@@ -10,8 +10,7 @@
 #include "assert.h"
 #include "basop_util.h"
 
-
-
+namespace evs {
 
 /**
  * \brief 	Copy state
@@ -408,3 +407,4 @@ long ari_done_cbr_encoding_14bits(int *ptr, long bp, long bits, Tastat *s)
     return bp;
 }
 
+} // end of namespace

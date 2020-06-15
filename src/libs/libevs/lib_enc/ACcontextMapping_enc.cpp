@@ -8,6 +8,7 @@
 #include "rom_com.h"
 #include "prot.h"
 
+namespace evs {
 
 /*-------------------------------------------------------------------*
 * ACcontextMapping_encode2_no_mem_s17_LC()
@@ -634,3 +635,5 @@ int ACcontextMapping_encode2_estimate_no_mem_s17_LC(
 
     return nbits_old;
 }
+
+} // end of namespace

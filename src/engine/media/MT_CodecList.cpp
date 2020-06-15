@@ -1,7 +1,8 @@
-/* Copyright(C) 2007-2019 VoIPobjects (voipobjects.com)
+/* Copyright(C) 2007-2020 VoIPobjects (voipobjects.com)
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+#include <algorithm>
 
 #include "../config.h"
 #include "MT_CodecList.h"
@@ -11,7 +12,7 @@
 # include "MT_AmrCodec.h"
 #endif
 
-#include <algorithm>
+#include "MT_EvsCodec.h"
 
 using namespace MT;
 
@@ -60,6 +61,9 @@ CodecList::CodecList(const Settings& settings)
 #ifndef TARGET_ANDROID
   mFactoryList.push_back(new GsmHrCodec::GsmHrFactory(mSettings.mGsmHrPayloadType));
 #endif
+
+  if (mSettings.mEvsPayloadType != -1)
+    mFactoryList.push_back(new EVSCodec::EVSFactory(EVSCodec::StreamParameters()));
 }
 
 CodecList::~CodecList()

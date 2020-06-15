@@ -10,6 +10,8 @@
 #include "prot.h"
 #include "rom_com.h"
 
+namespace evs {
+
 /*-------------------------------------------------------------------*
  * DecodeIndex()
  *
@@ -125,3 +127,5 @@ void tcx_hm_decode(
 
     return;
 }
+
+} // end of namespace

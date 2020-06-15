@@ -44,6 +44,7 @@ public:
         int mGsmFrPayloadLength     = 33; // Expected GSM payload length
         int mGsmHrPayloadType       = MT_GSMHR_PAYLOADTYPE;
         int mGsmEfrPayloadType      = MT_GSMEFR_PAYLOADTYPE;
+        int mEvsPayloadType         = MT_EVS_PAYLOADTYPE;
 
         struct OpusSpec
         {

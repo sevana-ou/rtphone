@@ -10,6 +10,8 @@
 #include "rom_com.h"
 #include "prot.h"
 
+namespace evs {
+
 /*-------------------------------------------------------------------*
  * amr_wb_enc()
  *
@@ -537,3 +539,5 @@ void amr_wb_enc(
 
     return;
 }
+
+} // end of namespace

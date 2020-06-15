@@ -7,6 +7,8 @@
 #include "rom_com.h"
 #include "prot.h"
 
+namespace evs {
+
 /*-------------------------------------------------------------------*
  * acelp_core_dec()
  *
@@ -917,3 +919,5 @@ void acelp_core_dec(
 
     return;
 }
+
+} // end of namespace EVS

@@ -10,6 +10,7 @@
 #include "assert.h"
 #include "basop_util.h"
 
+namespace evs {
 
 
 /*---------------------------------------------------------------
@@ -637,3 +638,4 @@ long ari_decode_14bits_sign(const int *ptr, long bp, long bits, int *res, Tastat
     return bp;
 }
 
+} // end of namespace

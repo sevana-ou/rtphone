@@ -14,6 +14,7 @@
 #define int32   int
 #endif
 
+namespace evs {
 
 
 /*---------------------------------------------------------------
@@ -37,3 +38,5 @@ long mul_sbc_14bits(long r,long c)
 
     /*function in line*/
 }
+
+} // end of namespace

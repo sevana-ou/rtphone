@@ -8,6 +8,8 @@
 #include "prot.h"
 
 
+namespace evs {
+
 /*------------------------------------------------------------------*
  * amr_wb_dec()
  *
@@ -863,3 +865,5 @@ void amr_wb_dec(
 
     return;
 }
+
+} // end of namespace

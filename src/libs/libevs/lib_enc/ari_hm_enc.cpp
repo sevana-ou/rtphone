@@ -11,6 +11,7 @@
 #include "prot.h"
 #include "rom_com.h"
 
+namespace evs {
 
 /*-------------------------------------------------------------------*
  * EncodeIndex()
@@ -587,3 +588,5 @@ void tcx_hm_analyse(
 
     return;
 }
+
+} // end of namespace

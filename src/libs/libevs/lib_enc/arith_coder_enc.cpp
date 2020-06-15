@@ -14,6 +14,7 @@
 #include "basop_util.h"
 #include "basop_proto_func.h"
 
+namespace evs {
 
 /*-------------------------------------------------------------------*
  * Local constants
@@ -623,3 +624,5 @@ void tcx_arith_encode_envelope(
 
     return;
 }
+
+} // end of namespace

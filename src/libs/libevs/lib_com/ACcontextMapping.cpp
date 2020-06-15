@@ -6,6 +6,8 @@
 #include "cnst.h"
 #include "prot.h"
 
+namespace evs {
+
 
 /*-------------------------------------------------------------------*
 * get_next_coeff_mapped()
@@ -71,3 +73,5 @@ int update_mixed_context(
 
     return (ctx & 0xf) * 16 + t + 13;
 }
+
+} // end of namespace evs

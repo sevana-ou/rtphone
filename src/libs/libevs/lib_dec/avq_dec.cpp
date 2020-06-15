@@ -8,6 +8,8 @@
 #include "options.h"
 #include "cnst.h"
 
+namespace evs {
+
 
 /*-----------------------------------------------------------------*
  * AVQ_demuxdec()
@@ -218,3 +220,5 @@ void AVQ_dec_lpc(
 
     return;
 }
+
+} // end of namespace

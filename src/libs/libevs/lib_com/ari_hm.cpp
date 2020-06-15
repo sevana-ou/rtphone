@@ -10,6 +10,8 @@
 #include "prot.h"
 #include "rom_com.h"
 
+namespace evs {
+
 
 /*-------------------------------------------------------------------*
  * UnmapIndex()
@@ -268,3 +270,5 @@ void tcx_hm_modify_envelope(
 
     return;
 }
+
+} // end of namespace
