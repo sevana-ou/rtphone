@@ -53,9 +53,7 @@ public:
 
     const char* name() { return MT_EVS_CODECNAME; };
     int samplerate();
-    int samplerate(int CodecMode); // DEC or ENC defined in cnst.h
     int pcmLength();
-    int pcmLength(int CodecMode); // DEC or ENC defined in cnst.h
     int frameTime();
     int rtpLength();
     int encode(const void* input, int inputBytes, void* output, int outputCapacity);

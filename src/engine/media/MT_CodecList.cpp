@@ -62,8 +62,7 @@ CodecList::CodecList(const Settings& settings)
   mFactoryList.push_back(new GsmHrCodec::GsmHrFactory(mSettings.mGsmHrPayloadType));
 #endif
 
-  if (mSettings.mEvsPayloadType != -1)
-    mFactoryList.push_back(new EVSCodec::EVSFactory(EVSCodec::StreamParameters()));
+  mFactoryList.push_back(new EVSCodec::EVSFactory(EVSCodec::StreamParameters()));
 }
 
 CodecList::~CodecList()
@@ -79,7 +78,7 @@ int CodecList::count() const
 
 Codec::Factory& CodecList::codecAt(int index) const
 {
-  return *mFactoryList[index];
+  return *mFactoryList[static_cast<size_t>(index)];
 }
 
 int CodecList::findCodec(const std::string &name) const
@@ -157,12 +156,12 @@ void CodecListPriority::setupFrom(PVariantMap vmap)
   }
 }
 
-int CodecListPriority::count(const CodecList &cl) const
+int CodecListPriority::count(const CodecList & /*cl*/) const
 {
-  return mPriorityList.size();
+  return static_cast<int>(mPriorityList.size());
 }
 
 Codec::Factory& CodecListPriority::codecAt(const CodecList& cl, int index) const
 {
-  return cl.codecAt(mPriorityList[index].mCodecIndex);
+  return cl.codecAt(mPriorityList[static_cast<size_t>(index)].mCodecIndex);
 }

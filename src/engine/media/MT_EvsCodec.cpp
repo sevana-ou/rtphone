@@ -129,7 +129,7 @@ int EVSCodec::EVSFactory::samplerate()
 
 int EVSCodec::EVSFactory::payloadType()
 {
-	return 0;
+    return MT_EVS_PAYLOADTYPE;
 }
 
 PCodec EVSCodec::EVSFactory::create()
@@ -145,19 +145,10 @@ EVSCodec::EVSCodec(const StreamParameters &sp)
 {
 	EVSCodec::sp = sp;
 
-    if ((st_dec = (evs::Decoder_State*)malloc(sizeof(evs::Decoder_State))) == NULL)
-	{
-		std::stringstream out;
-		out << "Can not allocate memory for decoder state structure\n";
-		throw std::out_of_range(out.str());
-	}
-    /*if ((st_enc = (Encoder_State*)malloc(sizeof(Encoder_State))) == NULL)
-	{
-		std::stringstream out;
-		out << "Can not allocate memory for encoder state structure\n";
-		throw std::out_of_range(out.str());
-    }*/
-	initDecoder(sp);
+    if ((st_dec = reinterpret_cast<evs::Decoder_State*>(malloc(sizeof(evs::Decoder_State)))) == nullptr)
+        throw std::bad_alloc();
+
+    initDecoder(sp);
 }
 
 EVSCodec::~EVSCodec()
@@ -165,7 +156,7 @@ EVSCodec::~EVSCodec()
     if (st_dec)
     {
         destroy_decoder(st_dec);
-        free(st_dec);
+        free(st_dec); st_dec = nullptr;
     }
 }
 
@@ -174,19 +165,9 @@ int EVSCodec::samplerate()
     return st_dec->output_Fs;
 }
 
-int EVSCodec::samplerate(int CodecMode)
-{
-    return samplerate();
-}
-
 int EVSCodec::pcmLength()
 {
-    return samplerate() / 50;
-}
-
-int EVSCodec::pcmLength(int CodecMode)
-{
-    return pcmLength();
+    return samplerate() / 50 * 2;
 }
 
 int EVSCodec::frameTime()
@@ -196,22 +177,20 @@ int EVSCodec::frameTime()
 
 int EVSCodec::rtpLength()
 {
+    // Variable sized codec - bitrate can be changed during the call
 	return 0;
 }
 
 int EVSCodec::encode(const void* input, int inputBytes, void* output, int outputCapacity)
 {
+    // Encoding is not supported yet.
 	return 0;
 }
 
 int EVSCodec::decode(const void* input, int input_length, void* output, int outputCapacity)
 {
-    if (outputCapacity < L_FRAME8k)
-    {
-		std::stringstream out;
-		out << "Buffer for pcm frame is to small\n";
-		throw std::out_of_range(out.str());
-	}
+    if (outputCapacity < pcmLength())
+        return 0;
 
     std::string buffer;
 
@@ -260,15 +239,15 @@ int EVSCodec::decode(const void* input, int input_length, void* output, int outp
 		}
 
 		/* convert 'float' output data to 'short' */
-        evs::syn_output(data, this->pcmLength(), static_cast<short*>(output) + offset);
-		offset += this->pcmLength();
+        evs::syn_output(data, static_cast<short>(pcmLength() / 2), static_cast<short*>(output) + offset);
+        offset += pcmLength() / 2;
         if (st_dec->ini_frame < MAX_FRAME_COUNTER)
 		{
             st_dec->ini_frame++;
 		}
 	}
-    // std::fclose(temp);
-	return 1;
+
+    return pcmLength();
 }
 
 int EVSCodec::plc(int lostFrames, void* output, int outputCapacity)

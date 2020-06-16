@@ -53,7 +53,7 @@ bool RtpHelper::isRtp(const void* buffer, size_t length)
         return false;
 
     unsigned char _type = reinterpret_cast<const RtpHeader*>(buffer)->pt;
-    bool rtp = ( (_type & 0x7F) >= 96 && (_type & 0x7F) < 127) || ((_type & 0x7F) < 35);
+    bool rtp = ( (_type & 0x7F) >= 96 && (_type & 0x7F) <= 127) || ((_type & 0x7F) < 35);
     return rtp;
 }
 

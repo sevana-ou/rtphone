@@ -49,10 +49,20 @@ public:
     virtual const char* name() = 0;
     virtual int samplerate() = 0;
     virtual float timestampUnit() { return float(1.0 / samplerate()); }
+
+    // Size of decoded audio frame in bytes
     virtual int pcmLength() = 0;
+
+    // Time length of single audio frame
     virtual int frameTime() = 0;
+
+    // Size of RTP frame in bytes. Can be zero for variable sized codecs.
     virtual int rtpLength() = 0;
+
+    // Number of audio channels
     virtual int channels() { return 1; }
+
+
     virtual int encode(const void* input, int inputBytes, void* output, int outputCapacity) = 0;
     virtual int decode(const void* input, int inputBytes, void* output, int outputCapacity) = 0;
     virtual int plc(int lostFrames, void* output, int outputCapacity) = 0;

@@ -738,11 +738,17 @@ int AudioReceiver::timelengthFor(jrtplib::RTPPacket& p)
     PCodec codec = codecIter->second;
     if (codec)
     {
-        int frameCount = static_cast<int>(p.GetPayloadLength() / codec->rtpLength());
-        if (p.GetPayloadType() == 9/*G729A silence*/ && p.GetPayloadLength() % codec->rtpLength())
-            frameCount++;
+        int frame_count = 0;
+        if (codec->rtpLength() != 0)
+        {
+            frame_count = static_cast<int>(p.GetPayloadLength() / codec->rtpLength());
+            if (p.GetPayloadType() == 9/*G729A silence*/ && p.GetPayloadLength() % codec->rtpLength())
+                frame_count++;
+        }
+        else
+            frame_count = 1;
 
-        return frameCount * codec->frameTime();
+        return frame_count * codec->frameTime();
     }
     else
         return 0;
