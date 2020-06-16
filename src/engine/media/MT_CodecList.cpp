@@ -62,7 +62,10 @@ CodecList::CodecList(const Settings& settings)
   mFactoryList.push_back(new GsmHrCodec::GsmHrFactory(mSettings.mGsmHrPayloadType));
 #endif
 
-  mFactoryList.push_back(new EVSCodec::EVSFactory(EVSCodec::StreamParameters()));
+  EVSCodec::StreamParameters evs_params;
+  evs_params.mime = true;
+  evs_params.bw = WB;
+  mFactoryList.push_back(new EVSCodec::EVSFactory(evs_params));
 }
 
 CodecList::~CodecList()
