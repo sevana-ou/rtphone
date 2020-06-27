@@ -337,7 +337,7 @@ void AgentImpl::processStartSession(Json::Value& request, Json::Value& answer)
         if (temp_path.size())
             config += " -fau " + temp_path;
 
-        MT::PSevanaAqua qc = std::make_shared<MT::SevanaAqua>();
+        auto qc = std::make_shared<sevana::aqua>();
         qc->setTempPath(temp_path);
         qc->configureWith(MT::SevanaAqua::parseConfig(config));
 

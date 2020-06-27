@@ -13,6 +13,8 @@
 #include "Agent_AudioManager.h"
 #include <mutex>
 #include <condition_variable>
+#include "aqua++.h"
+#include "pvqa++.h"
 
 class AgentImpl: public UserAgent
 #if defined(USE_AQUA_LIBRARY)
@@ -34,7 +36,7 @@ protected:
 
 #if defined(USE_AQUA_LIBRARY)
   // Keys are the same as used in mSessionMap
-  typedef std::map<int, MT::PSevanaAqua> AquaMap;
+  typedef std::map<int, std::shared_ptr<sevana::aqua> AquaMap;
   AquaMap mAquaMap;
   ByteBuffer mAquaIncoming, mAquaOutgoing;
 #endif
