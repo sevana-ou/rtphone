@@ -57,9 +57,11 @@ set (CMAKE_CXX_STANDARD_REQUIRED ON)
 set (rtphone_libs libs)
 set (rtphone_engine engine)
 
-option (USE_AMR_CODEC "Use AMR codec. Requires libraries." OFF)
-option (USE_EVS_CODEC "Use EVS codec." OFF)
+option (USE_AMR_CODEC       "Use AMR codec. Requires libraries."    OFF)
+option (USE_EVS_CODEC       "Use EVS codec."                        OFF)
+option (USE_SEVANA_LIB      "Build with Sevana libraries"           OFF)
 
+# PIC code by default
 set (CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 if (NOT DEFINED LIB_PLATFORM)
@@ -80,6 +82,11 @@ endif()
 
 if (CMAKE_SYSTEM MATCHES "Darwin*")
     add_definitions (-DTARGET_OSX)
+endif()
+
+if (USE_SEVANA_LIB)
+    add_definitions( -DUSE_AQUA_LIBRARY -DUSE_PVQA_LIBRARY)
+    include_directories(${CMAKE_CURRENT_SOURCE_DIR}/libs/pvqa/include)
 endif()
 
 set (RTPHONE_SOURCES
@@ -203,4 +210,5 @@ target_include_directories(rtphone
         ${CMAKE_CURRENT_SOURCE_DIR}/libs/json
     )
 
+# For MSVC static builds
 configure_msvc_runtime()

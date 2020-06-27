@@ -163,7 +163,7 @@ void AgentImpl::processConfig(Json::Value &d, Json::Value &answer)
 #if !defined(TARGET_ANDROID) && defined(USE_AQUA_LIBRARY)
     std::string aquaLicense = d["aqua-license"].asString();
     if (!aquaLicense.empty())
-        sevana::aqua::initializeLibrary(aquaLicense);
+        sevana::aqua::initialize(aquaLicense.c_str(), aquaLicense.size());
 #endif
 
     std::string transport = d["transport"].asString();
@@ -333,13 +333,13 @@ void AgentImpl::processStartSession(Json::Value& request, Json::Value& answer)
 
 #if defined(USE_AQUA_LIBRARY)
         std::string temp_path = request["aqua_temp_path"].asString();
-        std::string config = "-avlp on -smtnrm on -decor off -mprio off -npnt auto -voip off -enorm off -g711 on -spfrcor off -grad off -tmc on -miter 1 -trim a 10";
-        if (temp_path.size())
-            config += " -fau " + temp_path;
+        std::string config = "-avlp on -smtnrm on -decor off -mprio off -npnt auto -voip off -enorm off -g711 on -spfrcor off -grad off -tmc on -miter 1 -trim a 10 -output json";
+        /*if (temp_path.size())
+            config += " -fau " + temp_path; */
 
         auto qc = std::make_shared<sevana::aqua>();
-        qc->setTempPath(temp_path);
-        qc->configureWith(MT::SevanaAqua::parseConfig(config));
+        //qc->setTempPath(temp_path);
+        qc->configure_with(sevana::aqua::parse(config));
 
         mAquaMap[sessionIter->first] = qc;
         dynamic_cast<AudioProvider*>(audioProvider.get())->configureMediaObserver(this, (void*)qc.get());
@@ -551,24 +551,16 @@ void AgentImpl::processGetMediaStats(Json::Value& request, Json::Value& answer)
                     while (wasRead == 1024);
                 }
             }
-            MT::PSevanaAqua sa = mAquaMap[sessionIter->first];
-            MT::SevanaAqua::AudioBuffer test(mAquaIncoming.data(), mAquaIncoming.size()),
+
+            auto sa = mAquaMap[sessionIter->first];
+            sevana::aqua::audio_buffer test(mAquaIncoming.data(), mAquaIncoming.size()),
                     reference(referenceAudio.data(), referenceAudio.size());
             test.mRate = AUDIO_SAMPLERATE;              reference.mRate = AUDIO_SAMPLERATE;
             test.mChannels = AUDIO_CHANNELS;            reference.mChannels = AUDIO_CHANNELS;
 
-            MT::SevanaAqua::CompareResult r = sa->compare(reference, test);
+            auto r = sa->compare(reference, test);
             answer["aqua_mos"] = r.mMos;
-
-            if (r.mFaults)
-            {
-                Json::Value json(r.mReport);
-                Json::Value faults = r.mFaults->toJson();
-                json["faults"] = faults;
-                answer["aqua_report"] = json.toStyledString();
-            }
-            else
-                answer["aqua_report"] = r.mReport;
+            answer["aqua_report"] = r.mFaultsText;
         }
 #endif
 
@@ -745,7 +737,7 @@ void AgentImpl::onMedia(const void* data, int length, MT::Stream::MediaDirection
     mOutgoingAudioDump->write(data, length);*/
 
     // User tag points to accumulator object which includes
-    MT::SevanaAqua* sa = reinterpret_cast<MT::SevanaAqua*>(userTag);
+    // auto* sa = reinterpret_cast<sevana::aqua*>(userTag);
 
     switch (direction)
     {

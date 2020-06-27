@@ -41,7 +41,7 @@ protected:
 
 #if defined(USE_AQUA_LIBRARY)
   // Keys are the same as used in mSessionMap
-  typedef std::map<int, std::shared_ptr<sevana::aqua> AquaMap;
+  typedef std::map<int, std::shared_ptr<sevana::aqua>> AquaMap;
   AquaMap mAquaMap;
   ByteBuffer mAquaIncoming, mAquaOutgoing;
 #endif
