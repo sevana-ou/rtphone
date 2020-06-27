@@ -13,8 +13,13 @@
 #include "Agent_AudioManager.h"
 #include <mutex>
 #include <condition_variable>
-#include "aqua++.h"
-#include "pvqa++.h"
+#if defined(USE_AQUA_LIBRARY)
+# include "aqua++.h"
+#endif
+
+#if defined(USE_PVQA_LIBRARY)
+# include "pvqa++.h"
+#endif
 
 class AgentImpl: public UserAgent
 #if defined(USE_AQUA_LIBRARY)
