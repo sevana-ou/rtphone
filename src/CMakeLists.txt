@@ -167,13 +167,13 @@ set (LIBS ice_stack jrtplib g729_codec gsm_codec
     uuid)
 
 if (CMAKE_SYSTEM MATCHES "Win*")
-    set (LIBS ${LIBS} opus )
+    set (LIBS ${LIBS} )
 else ()
-    set (LIBS ${LIBS} dl opus uuid)
+    set (LIBS ${LIBS} dl uuid)
 endif ()
 
 if (USE_AMR_CODEC)
-    set (LIBS ${LIBS} opencore-amrnb opencore-amrwb)
+    set (LIBS ${LIBS})
 endif (USE_AMR_CODEC)
 
 if (USE_EVS_CODEC)
@@ -187,7 +187,7 @@ target_link_libraries(rtphone
     audio_lib
     webrtc
     speexdsp
-    opus
+    # opus
     uuid
     ${OPENSSL_SSL}
     ${OPENSSL_CRYPTO}

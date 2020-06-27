@@ -119,17 +119,25 @@ static const std::map<int, int> FixedPayload_EVSAMR_WB{
 namespace MT
 {
 
-EVSCodec::EVSFactory::EVSFactory(StreamParameters sp) : _sp(sp)
+EVSCodec::EVSFactory::EVSFactory(StreamParameters& sp) : _sp(sp)
 {}
 
 int EVSCodec::EVSFactory::samplerate()
 {
-	return 0;
+    switch (_sp.bw)
+    {
+    case 0:     return 8000;
+    case 1:     return 16000;
+    case 2:     return 32000;
+    case 3:     return 48000;
+    }
+
+    return 0;
 }
 
 int EVSCodec::EVSFactory::payloadType()
 {
-    return MT_EVS_PAYLOADTYPE;
+    return _sp.ptype;
 }
 
 PCodec EVSCodec::EVSFactory::create()

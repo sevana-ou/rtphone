@@ -44,13 +44,41 @@ public:
         int mGsmFrPayloadLength     = 33; // Expected GSM payload length
         int mGsmHrPayloadType       = MT_GSMHR_PAYLOADTYPE;
         int mGsmEfrPayloadType      = MT_GSMEFR_PAYLOADTYPE;
-        int mEvsPayloadType         = MT_EVS_PAYLOADTYPE;
+
+        struct EvsSpec
+        {
+            int mPayloadType = 0;
+            enum Bandwidth
+            {
+                Bandwidth_NB = 0,
+                Bandwidth_WB,
+                Bandwidth_SWB,
+                Bandwidth_FB
+            };
+
+            Bandwidth mBandwidth = Bandwidth_NB;
+
+            enum Encoding
+            {
+                Encoding_MIME,
+                Encoding_G192
+            };
+
+            Encoding mEncodingType = Encoding_MIME;
+            bool isValid() const;
+            static EvsSpec parse(const std::string& spec);
+        };
+
+        std::vector<EvsSpec> mEvsSpec;
 
         struct OpusSpec
         {
-            int mPayloadType = 0;
-            int mRate = 0;
-            int mChannels = 0;
+            int mPayloadType    = -1;
+            int mRate           = -1;
+            int mChannels       = -1;
+
+            bool isValid() const;
+            static OpusSpec parse(const std::string& spec);
         };
         std::vector<OpusSpec> mOpusSpec;
 

@@ -24,12 +24,13 @@ public:
     // Emulated SDP config/media type parameters
     struct StreamParameters
     {
-        bool mime = false;
-        bool fh_only = false;           /*not use*/
-        int CRMByte = -1/*CMR_OFF*/;    /*not use*/
-        int br = 0;                     /*not use*/
-        int bw = NB;
-        int ptime = 20;
+        bool mime = false;              /* encoding */
+        bool fh_only = false;           /* not use*/
+        int CRMByte = -1/*CMR_OFF*/;    /* not use*/
+        int br = 0;                     /* not use*/
+        int bw = NB;                    /* bandwidth */
+        int ptime = 20;                 /* ptime */
+        int ptype = -1;                 /* payload type */
     };
 
 public:
@@ -39,7 +40,7 @@ public:
         StreamParameters _sp;
 
     public:
-        EVSFactory(StreamParameters sp);
+        EVSFactory(StreamParameters& sp);
         const char* name() { return MT_EVS_CODECNAME; };
         int samplerate();
         int payloadType();

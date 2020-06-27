@@ -13,9 +13,74 @@
 #endif
 
 #include "MT_EvsCodec.h"
+#include "helper/HL_String.h"
 
 using namespace MT;
 
+using strx = StringHelper;
+
+// ---------------- EvsSpec ---------------
+bool CodecList::Settings::EvsSpec::isValid() const
+{
+    return mPayloadType >= 96 && mPayloadType <= 127;
+}
+
+CodecList::Settings::EvsSpec CodecList::Settings::EvsSpec::parse(const std::string& spec)
+{
+    EvsSpec result;
+
+    auto parts = strx::split(spec, "-/");
+    if (parts.size() == 3)
+    {
+        result.mPayloadType = strx::toInt(strx::trim(parts.front()).c_str(), -1);
+        std::string& encoding_type = parts[1];
+        if (encoding_type == "mime")
+            result.mEncodingType = Encoding_MIME;
+        else
+        if (encoding_type == "g192")
+            result.mEncodingType = Encoding_G192;
+        else
+            throw std::logic_error("Bad EVS codec encoding type");
+
+        std::string& bandwidth = parts.back();
+        if (bandwidth == "nb" || bandwidth == "NB")
+            result.mBandwidth = Bandwidth_NB;
+        else
+        if (bandwidth == "wb" || bandwidth == "WB")
+            result.mBandwidth = Bandwidth_WB;
+        else
+        if (bandwidth == "swb" || bandwidth == "SWB")
+            result.mBandwidth = Bandwidth_SWB;
+        else
+        if (bandwidth == "fb" || bandwidth == "FB")
+            result.mBandwidth = Bandwidth_FB;
+    }
+
+    return result;
+}
+
+bool CodecList::Settings::OpusSpec::isValid() const
+{
+    return (mPayloadType >= 96 && mPayloadType <= 127 &&
+            mRate > 0 &&
+            mChannels > 0);
+}
+
+CodecList::Settings::OpusSpec CodecList::Settings::OpusSpec::parse(const std::string &spec)
+{
+    OpusSpec result;
+
+    auto parts = strx::split(spec, "-");
+    if (parts.size() == 3)
+    {
+        result.mPayloadType = strx::toInt(strx::trim(parts.front()).c_str(), -1);
+        result.mRate = strx::toInt(strx::trim(parts[1]).c_str(), -1);
+        result.mChannels = strx::toInt(strx::trim(parts.back()).c_str(), -1);
+    }
+    return result;
+}
+
+// ----------------------------------------
 CodecList::Settings CodecList::Settings::DefaultSettings;
 
 CodecList::CodecList(const Settings& settings)
@@ -60,6 +125,19 @@ CodecList::CodecList(const Settings& settings)
   mFactoryList.push_back(new G729Codec::G729Factory());
 #ifndef TARGET_ANDROID
   mFactoryList.push_back(new GsmHrCodec::GsmHrFactory(mSettings.mGsmHrPayloadType));
+#endif
+
+#if !defined(TARGET_ANDROID)
+  for (auto& spec: settings.mEvsSpec)
+  {
+    EVSCodec::StreamParameters evs_params;
+    evs_params.mime = spec.mEncodingType == Settings::EvsSpec::Encoding_MIME;
+    evs_params.bw = (int)spec.mBandwidth;
+    evs_params.ptime = 20;
+    evs_params.ptype = spec.mPayloadType;
+
+    mFactoryList.push_back(new EVSCodec::EVSFactory(evs_params));
+  }
 #endif
 
   EVSCodec::StreamParameters evs_params;
