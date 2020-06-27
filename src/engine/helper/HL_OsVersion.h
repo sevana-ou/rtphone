@@ -41,7 +41,7 @@ int iosVersion();
 #include <sys/select.h>
 #include <termios.h>
 #if defined(TARGET_LINUX)
-# include <stropts.h>
+// # include <stropts.h>
 #endif
 
 extern int _kbhit();
