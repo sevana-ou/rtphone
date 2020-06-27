@@ -648,12 +648,8 @@ void AudioReceiver::initPvqa()
     // Instantiate & open PVQA analyzer
     if (!mPVQA)
     {
-        mPVQA = std::make_shared<MT::SevanaPVQA>();
-#if defined(USE_PVQA_STREAM)
-        mPVQA->open(PVQA_INTERVAL, MT::SevanaPVQA::Model::Stream);
-#else
-        mPVQA->open(PVQA_INTERVAL, MT::SevanaPVQA::Model::Interval);
-#endif
+        mPVQA = std::make_shared<sevana::pvqa>();
+        mPVQA->open(AUDIO_SAMPLERATE, 1, PVQA_INTERVAL);
     }
 }
 
@@ -676,12 +672,8 @@ void AudioReceiver::updatePvqa(const void *data, int size)
             int time4pvqa = (int)(frames * PVQA_INTERVAL * 1000);
             int size4pvqa = (int)fmt.sizeFromTime(time4pvqa);
             ICELogInfo(<< "PVQA buffer has " << time4pvqa << " milliseconds of audio.");
-#if defined(USE_PVQA_STREAM)
-            mPVQA->update(fmt.mRate, fmt.mChannels, mPvqaBuffer->data(), size4pvqa);
+            mPVQA->update(mPvqaBuffer->data(), size4pvqa);
             mPvqaBuffer->erase(size4pvqa);
-#else
-            // Just wait for getResults() to make analysis
-#endif
         }
     }
 }
@@ -690,14 +682,11 @@ float AudioReceiver::calculatePvqaMos(int rate, std::string& report)
 {
     if (mPVQA && mPvqaBuffer)
     {
-        if (mPVQA->getModel() == MT::SevanaPVQA::Model::Interval)
-        {
-            Audio::Format fmt;
-            return mPVQA->process(fmt.mRate, fmt.mChannels, mPvqaBuffer->data(), mPvqaBuffer->filled(),
-                                  report, MT::SevanaPVQA::Codec::None);
+        sevana::pvqa::result result;
+        if (mPVQA->get_result(result)) {
+            report = result.mReport;
+            return result.mMos;
         }
-        else
-            return mPVQA->getResults(report, nullptr, rate, MT::SevanaPVQA::Codec::None);
     }
     return 0.0f;
 }

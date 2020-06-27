@@ -20,6 +20,10 @@
 #include "../audio/Audio_DataWindow.h"
 #include "../audio/Audio_Resampler.h"
 
+#if defined(USE_PVQA_LIBRARY)
+# include "pvqa++.h"
+#endif
+
 #include <map>
 
 // #define DUMP_DECODED
@@ -170,7 +174,7 @@ namespace MT
     void processDecoded(Audio::DataWindow& output, int options);
 
 #if defined(USE_PVQA_LIBRARY) && defined(PVQA_IN_RECEIVER)
-    std::shared_ptr<SevanaPVQA> mPVQA;
+    std::shared_ptr<sevana::pvqa> mPVQA;
     void initPvqa();
     void updatePvqa(const void* data, int size);
     float calculatePvqaMos(int rate, std::string& report);

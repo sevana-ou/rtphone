@@ -10,9 +10,9 @@
 
 #if !defined(TARGET_ANDROID) && !defined(TARGET_OPENWRT) && !defined(TARGET_RPI)
 # include "MT_AmrCodec.h"
+# include "MT_EvsCodec.h"
 #endif
 
-#include "MT_EvsCodec.h"
 #include "helper/HL_String.h"
 
 using namespace MT;
@@ -139,11 +139,6 @@ CodecList::CodecList(const Settings& settings)
     mFactoryList.push_back(new EVSCodec::EVSFactory(evs_params));
   }
 #endif
-
-  EVSCodec::StreamParameters evs_params;
-  evs_params.mime = true;
-  evs_params.bw = WB;
-  mFactoryList.push_back(new EVSCodec::EVSFactory(evs_params));
 }
 
 CodecList::~CodecList()
