@@ -67,69 +67,69 @@ std::string AgentImpl::command(const std::string& command)
         if (cmd == "config")
             processConfig(d, answer);
         else
-            if (cmd == "start")
-                processStart(d, answer);
-            else
-                if (cmd == "stop")
-                    processStop(d, answer);
-                else
-                    if (cmd == "account_create")
-                        processCreateAccount(d, answer);
-                    else
-                        if (cmd == "account_start")
-                            processStartAccount(d, answer);
-                        else
-                            if (cmd == "account_setuserinfo")
-                                processSetUserInfoToAccount(d, answer);
-                            else
-                                if (cmd == "session_create")
-                                    processCreateSession(d, answer);
-                                else
-                                    if (cmd == "session_start")
-                                        processStartSession(d, answer);
-                                    else
-                                        if (cmd == "session_stop")
-                                            processStopSession(d, answer);
-                                        else
-                                            if (cmd == "session_accept")
-                                                processAcceptSession(d, answer);
-                                            else
-                                                if (cmd == "session_destroy")
-                                                    processDestroySession(d, answer);
-                                                else
-                                                    if (cmd == "session_use_stream")
-                                                        processUseStreamForSession(d, answer);
-                                                    else
-                                                        if (cmd == "wait_for_event")
-                                                            processWaitForEvent(d, answer);
-                                                        else
-                                                            if (cmd == "session_get_media_stats")
-                                                                processGetMediaStats(d, answer);
-                                                            else
-                                                                if (cmd == "agent_network_changed")
-                                                                    processNetworkChanged(d, answer);
-                                                                else
-                                                                    if (cmd == "agent_add_root_cert")
-                                                                        processAddRootCert(d, answer);
-                                                                    else
-                                                                        if (cmd == "detach_log")
-                                                                        {
-                                                                            GLogger.closeFile();
-                                                                            answer["status"] = Status_Ok;
-                                                                        }
-                                                                        else
-                                                                            if (cmd == "attach_log")
-                                                                            {
-                                                                                GLogger.openFile();
-                                                                                answer["status"] = Status_Ok;
-                                                                            }
-                                                                            else
-                                                                                if (cmd == "log_message")
-                                                                                    processLogMessage(d, answer);
-                                                                                else
-                                                                                {
-                                                                                    answer["status"] = Status_NoCommand;
-                                                                                }
+        if (cmd == "start")
+            processStart(d, answer);
+        else
+        if (cmd == "stop")
+            processStop(d, answer);
+        else
+        if (cmd == "account_create")
+            processCreateAccount(d, answer);
+        else
+        if (cmd == "account_start")
+            processStartAccount(d, answer);
+        else
+        if (cmd == "account_setuserinfo")
+            processSetUserInfoToAccount(d, answer);
+        else
+        if (cmd == "session_create")
+            processCreateSession(d, answer);
+        else
+        if (cmd == "session_start")
+            processStartSession(d, answer);
+        else
+        if (cmd == "session_stop")
+            processStopSession(d, answer);
+        else
+        if (cmd == "session_accept")
+            processAcceptSession(d, answer);
+        else
+        if (cmd == "session_destroy")
+            processDestroySession(d, answer);
+        else
+        if (cmd == "session_use_stream")
+            processUseStreamForSession(d, answer);
+        else
+        if (cmd == "wait_for_event")
+            processWaitForEvent(d, answer);
+        else
+        if (cmd == "session_get_media_stats")
+            processGetMediaStats(d, answer);
+        else
+        if (cmd == "agent_network_changed")
+            processNetworkChanged(d, answer);
+        else
+        if (cmd == "agent_add_root_cert")
+            processAddRootCert(d, answer);
+        else
+        if (cmd == "detach_log")
+        {
+            GLogger.closeFile();
+            answer["status"] = Status_Ok;
+        }
+        else
+        if (cmd == "attach_log")
+        {
+            GLogger.openFile();
+            answer["status"] = Status_Ok;
+        }
+        else
+        if (cmd == "log_message")
+            processLogMessage(d, answer);
+        else
+        {
+            answer["status"] = Status_NoCommand;
+        }
     }
     catch(std::exception& e)
     {
@@ -332,14 +332,35 @@ void AgentImpl::processStartSession(Json::Value& request, Json::Value& answer)
         audioProvider->setState(audioProvider->state() | static_cast<int>(StreamState::Grabbing) | static_cast<int>(StreamState::Playing));
 
 #if defined(USE_AQUA_LIBRARY)
-        std::string temp_path = request["aqua_temp_path"].asString();
-        std::string config = "-avlp on -smtnrm on -decor off -mprio off -npnt auto -voip off -enorm off -g711 on -spfrcor off -grad off -tmc on -miter 1 -trim a 10 -output json";
+        std::string path_faults = request["path_faults"].asString();
+
+        sevana::aqua::config config = {
+                { "avlp",              "off"   },
+                { "decor",             "off"   },
+                { "mprio",             "off"   },
+                { "miter",             "1"     },
+                { "enorm",             "off"   },
+                { "voip",              "on"    },
+                { "g711",              "on"    },
+                { "spfrcor",           "on"    },
+                { "grad",              "off"   },
+                { "ratem",             "%%m"   },
+                { "trim",              "a 2"   },
+                { "output",            "json"  },
+                { "fau",               path_faults},
+                { "specp",             "32"}
+        };
+
+        // std::string config = "-avlp on -smtnrm on -decor off -mprio off -npnt auto -voip off -enorm off -g711 on -spfrcor off -grad off -tmc on -miter 1 -trim a 10 -output json";
         /*if (temp_path.size())
             config += " -fau " + temp_path; */
 
         auto qc = std::make_shared<sevana::aqua>();
-        //qc->setTempPath(temp_path);
-        qc->configure_with(sevana::aqua::parse(config));
+        if (!qc->is_open())
+        {
+            std::cerr << "Problem when initializing AQuA library" << std::endl;
+        }
+        qc->configure_with(config);
 
         mAquaMap[sessionIter->first] = qc;
         dynamic_cast<AudioProvider*>(audioProvider.get())->configureMediaObserver(this, (void*)qc.get());
@@ -559,6 +580,7 @@ void AgentImpl::processGetMediaStats(Json::Value& request, Json::Value& answer)
             test.mChannels = AUDIO_CHANNELS;            reference.mChannels = AUDIO_CHANNELS;
 
             auto r = sa->compare(reference, test);
+            std::cout << r.mFaultsText << std::endl;
             answer["aqua_mos"] = r.mMos;
             answer["aqua_report"] = r.mFaultsText;
         }
