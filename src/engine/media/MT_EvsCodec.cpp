@@ -202,17 +202,35 @@ int EVSCodec::decode(const void* input, int input_length, void* output, int outp
 
     std::string buffer;
 
-	/*if we have FixedPayload without ToC*/
-    if (FixedPayload_EVSPrimary.find(input_length * 8) != FixedPayload_EVSPrimary.end())
+    // Check if we get payload with CMR
+    auto payload_iter = FixedPayload_EVSPrimary.find((input_length - 2) * 8);
+    if (payload_iter == FixedPayload_EVSPrimary.end())
     {
-        char c = evs::rate2EVSmode(FixedPayload_EVSPrimary.find(input_length * 8)->second);
-        /* Add ToC byte.
-         * WARNING maybe it will be work incorrect with 56bit payload,
-         * see 3GPP TS 26.445 Annex A, A.2.1.3 */
-        buffer += c;
-	}
+        // Check if we get payload with ToC and without CMR
+        payload_iter = FixedPayload_EVSPrimary.find((input_length - 1) * 8);
+        if (payload_iter == FixedPayload_EVSPrimary.end())
+        {
+            // Maybe there is no ToC ?
+            payload_iter = FixedPayload_EVSPrimary.find(input_length * 8);
+            if (payload_iter == FixedPayload_EVSPrimary.end())
+            {
+                // Bad payload size at all
+                return 0;
+            }
+            /* Add ToC byte.
+             * WARNING maybe it will be work incorrect with 56bit payload,
+             * see 3GPP TS 26.445 Annex A, A.2.1.3 */
+            char c = evs::rate2EVSmode(FixedPayload_EVSPrimary.find(input_length * 8)->second);
+            buffer += c;
+            buffer += std::string(reinterpret_cast<const char*>(input), input_length);
+        }
+        else
+            buffer = std::string(reinterpret_cast<const char*>(input), input_length);
+    }
+    else
+        // Skip CMR byte
+        buffer = std::string(reinterpret_cast<const char*>(input) + 1, input_length);
 
-    buffer += std::string(reinterpret_cast<const char*>(input), input_length);
 
     // Output buffer for 48 KHz
 	float data[L_FRAME48k];

@@ -32,7 +32,10 @@ CodecList::Settings::EvsSpec CodecList::Settings::EvsSpec::parse(const std::stri
     auto parts = strx::split(spec, "-/");
     if (parts.size() == 3)
     {
+        // Payload type number
         result.mPayloadType = strx::toInt(strx::trim(parts.front()).c_str(), -1);
+
+        // Encoding
         std::string& encoding_type = parts[1];
         if (encoding_type == "mime")
             result.mEncodingType = Encoding_MIME;
@@ -42,6 +45,7 @@ CodecList::Settings::EvsSpec CodecList::Settings::EvsSpec::parse(const std::stri
         else
             throw std::logic_error("Bad EVS codec encoding type");
 
+        // Bandwidth
         std::string& bandwidth = parts.back();
         if (bandwidth == "nb" || bandwidth == "NB")
             result.mBandwidth = Bandwidth_NB;
