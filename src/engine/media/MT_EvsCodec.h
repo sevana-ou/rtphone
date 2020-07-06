@@ -52,14 +52,14 @@ public:
     EVSCodec(const StreamParameters& sp);
     ~EVSCodec() override;
 
-    const char* name() { return MT_EVS_CODECNAME; };
-    int samplerate();
-    int pcmLength();
-    int frameTime();
-    int rtpLength();
-    int encode(const void* input, int inputBytes, void* output, int outputCapacity);
-    int decode(const void* input, int inputBytes, void* output, int outputCapacity);
-    int plc(int lostFrames, void* output, int outputCapacity) ;
+    const char* name() override { return MT_EVS_CODECNAME; } ;
+    int samplerate() override;
+    int pcmLength() override;
+    int frameTime() override;
+    int rtpLength() override;
+    int encode(const void* input, int inputBytes, void* output, int outputCapacity) override;
+    int decode(const void* input, int inputBytes, void* output, int outputCapacity) override;
+    int plc(int lostFrames, void* output, int outputCapacity) override;
 
 private:
     evs::Decoder_State* st_dec;
