@@ -229,7 +229,7 @@ int EVSCodec::decode(const void* input, int input_length, void* output, int outp
     }
     else
         // Skip CMR byte
-        buffer = std::string(reinterpret_cast<const char*>(input) + 1, input_length);
+        buffer = std::string(reinterpret_cast<const char*>(input) + 1, input_length-1);
 
 
     // Output buffer for 48 KHz
