@@ -65,6 +65,9 @@ void OpenSLEngine::open()
 void OpenSLEngine::close()
 {
   std::unique_lock<std::mutex> l(mMutex);
+  if (mUsageCounter == 0)
+    return;
+
   if (--mUsageCounter == 0)
     internalClose();
 }
@@ -505,6 +508,8 @@ void AndroidOutputDevice::internalOpen(int rateId, int rate, bool voice)
   // Set the player's state to playing
   resultCode = (*mPlayerControl)->SetPlayState(mPlayerControl, SL_PLAYSTATE_PLAYING);
   CHECK_OPENSLES_ERROR;
+
+  ICELogInfo(<< "Android audio output is opened and playing.");
 }
 
 void AndroidOutputDevice::internalClose()
@@ -535,6 +540,8 @@ void AndroidOutputDevice::internalClose()
       // Destroy player object
       (*mPlayer)->Destroy(mPlayer);
 
+      ICELogInfo(<< "Android audio output closed.");
+
       mPlayer = nullptr;
       mPlayerControl = nullptr;
       mBufferQueue = nullptr;
@@ -554,11 +561,12 @@ void AndroidOutputDevice::internalClose()
 void AndroidOutputDevice::handleCallback(SLAndroidSimpleBufferQueueItf bq)
 {
   if (mInShutdown)
-  {
+    return;
+  /*{
     char silence[mBufferSize]; memset(silence, 0, mBufferSize);
     (*mBufferQueue)->Enqueue(mBufferQueue, silence, mBufferSize);
     return;
-  }
+  }*/
 
   // Ask producer about data
   char* buffer = mPlayBuffer.mutableData() + mBufferIndex * mBufferSize;
