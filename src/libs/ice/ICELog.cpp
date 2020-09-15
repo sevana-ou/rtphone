@@ -191,7 +191,7 @@ void Logger::beginLine(LogLevel level, const char* filename, int linenumber, con
     mLine = linenumber;
     mSubsystem = subsystem;
 
-    //*mStream << std::setw(8) << ICETimeHelper::timestamp() << " | " << std::setw(8) << ThreadInfo::currentThread() << " | " << std::setw(30) << filenamestart << " | " << std::setw(4) << linenumber << " | " << std::setw(12) << subsystem << " | ";
+    // mStream << std::setw(8) << ICETimeHelper::timestamp() << " | " << std::setw(8) << ThreadInfo::currentThread() << " | " << std::setw(30) << filenamestart << " | " << std::setw(4) << linenumber << " | " << std::setw(12) << subsystem << " | ";
 }
 
 void
@@ -202,7 +202,14 @@ Logger::endLine()
     mStream->flush();
 
     std::ostringstream result;
-    result << std::setw(8) << ICETimeHelper::timestamp() << " | " << std::setw(8) << ThreadInfo::currentThread() << " | " << std::setw(30) << mFilename.c_str() << " | " << std::setw(4) << mLine << " | " << std::setw(12) << mSubsystem.c_str() << " | " << mStream->str().c_str();
+    std::chrono::milliseconds unix_timestamp_ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch());
+    time_t unix_timestamp = unix_timestamp_ms.count() / 1000;
+    struct tm current_time = *gmtime(&unix_timestamp);
+    char time_buffer[128]; strftime(time_buffer, sizeof(time_buffer), "%H:%M:%S", &current_time);
+
+    result << time_buffer << ":"  << (unix_timestamp_ms.count() % 1000 ) << "\t" << " | " << std::setw(8) << ThreadInfo::currentThread() << " | " << std::setw(30)
+           << mFilename.c_str() << " | " << std::setw(4) << mLine << " | " << std::setw(12) << mSubsystem.c_str() << " | "
+           << mStream->str().c_str();
 
     std::string t = result.str();
     if (mUseDebugWindow)

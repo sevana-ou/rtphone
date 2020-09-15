@@ -72,7 +72,7 @@ OpenSSLInit::OpenSSLInit()
 
 OpenSSLInit::~OpenSSLInit()
 {
-   mInitialized = false;
+    mInitialized = false;
 	ERR_free_strings();// Clean up data allocated during SSL_load_error_strings
 	ERR_remove_state(0);// free thread error queue
 	CRYPTO_cleanup_all_ex_data();
