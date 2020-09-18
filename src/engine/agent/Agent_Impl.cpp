@@ -552,37 +552,45 @@ void AgentImpl::processGetMediaStats(Json::Value& request, Json::Value& answer)
 #if defined(USE_AQUA_LIBRARY)
         if (includeAqua)
         {
+            ICELogInfo(<< "Running AQuA analyzer.");
             ByteBuffer referenceAudio;
             // Read AQuA reference audio from file if available
-            if (!aquaReference.empty())
+            if (aquaReference.empty())
             {
+                ICELogCritical(<< "AQuA reference audio file is not set, skipping analyzing.");
+            }
+            else {
                 Audio::WavFileReader reader;
                 reader.open(StringHelper::makeTstring(aquaReference));
 
-                if (reader.isOpened())
-                {
+                if (reader.isOpened()) {
                     char buffer[1024];
                     int wasRead = 0;
-                    do
-                    {
+                    do {
                         wasRead = reader.read(buffer, 1024);
                         if (wasRead > 0)
                             referenceAudio.appendBuffer(buffer, wasRead);
-                    }
-                    while (wasRead == 1024);
+                    } while (wasRead == 1024);
                 }
+
+                auto sa = mAquaMap[sessionIter->first];
+                sevana::aqua::audio_buffer test(mAquaIncoming.data(), mAquaIncoming.size()),
+                        reference(referenceAudio.data(), referenceAudio.size());
+                test.mRate = AUDIO_SAMPLERATE;
+                reference.mRate = AUDIO_SAMPLERATE;
+                test.mChannels = AUDIO_CHANNELS;
+                reference.mChannels = AUDIO_CHANNELS;
+
+                auto r = sa->compare(reference, test);
+                std::cout << r.mFaultsText << std::endl;
+                answer["aqua_mos"] = r.mMos;
+                answer["aqua_report"] = r.mFaultsText;
+
+                // Remove test audio
+                mAquaIncoming.clear();
             }
-
-            auto sa = mAquaMap[sessionIter->first];
-            sevana::aqua::audio_buffer test(mAquaIncoming.data(), mAquaIncoming.size()),
-                    reference(referenceAudio.data(), referenceAudio.size());
-            test.mRate = AUDIO_SAMPLERATE;              reference.mRate = AUDIO_SAMPLERATE;
-            test.mChannels = AUDIO_CHANNELS;            reference.mChannels = AUDIO_CHANNELS;
-
-            auto r = sa->compare(reference, test);
-            std::cout << r.mFaultsText << std::endl;
-            answer["aqua_mos"] = r.mMos;
-            answer["aqua_report"] = r.mFaultsText;
+        } else {
+            ICELogInfo(<< "AQuA analyzer is not configured to run.");
         }
 #endif
 
