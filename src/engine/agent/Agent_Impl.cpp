@@ -63,7 +63,10 @@ std::string AgentImpl::command(const std::string& command)
             return "";
 
         std::string cmd = d["command"].asString();
-
+        if (cmd != "wait_for_event")
+        {
+            ICELogInfo(<< command);
+        }
         if (cmd == "config")
             processConfig(d, answer);
         else
@@ -580,17 +583,15 @@ void AgentImpl::processGetMediaStats(Json::Value& request, Json::Value& answer)
                 reference.mRate = AUDIO_SAMPLERATE;
                 test.mChannels = AUDIO_CHANNELS;
                 reference.mChannels = AUDIO_CHANNELS;
-
+                ICELogInfo(<< "Comparing test audio " << mAquaIncoming.size() << " bytes with reference audio " << referenceAudio.size() << " bytes.");
                 auto r = sa->compare(reference, test);
-                std::cout << r.mFaultsText << std::endl;
+                ICELogInfo( << "MOS: " << r.mMos << ", faults: " << r.mFaultsText);
                 answer["aqua_mos"] = r.mMos;
                 answer["aqua_report"] = r.mFaultsText;
 
                 // Remove test audio
-                mAquaIncoming.clear();
+                mAquaIncoming.clear(); mAquaOutgoing.clear();
             }
-        } else {
-            ICELogInfo(<< "AQuA analyzer is not configured to run.");
         }
 #endif
 
