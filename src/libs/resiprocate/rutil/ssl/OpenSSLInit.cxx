@@ -67,7 +67,7 @@ OpenSSLInit::OpenSSLInit()
 	SSL_load_error_strings();
 	OpenSSL_add_all_algorithms();
 	assert(EVP_des_ede3_cbc());
-   mInitialized = true;
+    mInitialized = true;
 }
 
 OpenSSLInit::~OpenSSLInit()

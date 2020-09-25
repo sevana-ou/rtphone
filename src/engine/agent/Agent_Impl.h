@@ -44,6 +44,7 @@ protected:
   typedef std::map<int, std::shared_ptr<sevana::aqua>> AquaMap;
   AquaMap mAquaMap;
   ByteBuffer mAquaIncoming, mAquaOutgoing;
+  void closeAqua(int sessionId);
 #endif
 
   std::shared_ptr<std::thread> mThread;
