@@ -554,6 +554,9 @@ void AgentImpl::processGetMediaStats(Json::Value& request, Json::Value& answer)
 #if defined(USE_AQUA_LIBRARY)
         if (includeAqua)
         {
+            // Send recorded audio to upper level
+            answer["incoming_audio"] = mAquaIncoming.hexstring();
+
             ICELogInfo(<< "Running AQuA analyzer.");
             ByteBuffer referenceAudio;
             // Read AQuA reference audio from file if available
@@ -600,9 +603,9 @@ void AgentImpl::processGetMediaStats(Json::Value& request, Json::Value& answer)
                     }
                     closeAqua(sessionIter->first);
                 }
-                // Remove test audio
-                mAquaIncoming.clear(); mAquaOutgoing.clear();
             }
+            // Remove test audio
+            mAquaIncoming.clear(); mAquaOutgoing.clear();
         }
 #endif
 
