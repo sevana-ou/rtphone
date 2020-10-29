@@ -98,6 +98,10 @@ unsigned TimeSource::time()
 #if defined(TARGET_LINUX)
   assert(0);
 #endif
+
+#if defined(TARGET_ANDROID)
+  assert(0);
+#endif
 }
 
 // --- StubTimer ---

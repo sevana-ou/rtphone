@@ -213,22 +213,22 @@ Logger::endLine()
            << mStream->str().c_str();
 
     std::string t = result.str();
-    if (mUseDebugWindow)
+    if (mUseDebugWindow) {
 #ifdef TARGET_WIN
         OutputDebugStringA(t.c_str());
 #elif defined(TARGET_ANDROID)
-        if (t.size() > 512)
-        {
-            std::string cut = t; cut.erase(480); // Erase tail of string
+        if (t.size() > 512) {
+            std::string cut = t;
+            cut.erase(480); // Erase tail of string
             cut += "\r\n... [cut]";
             __android_log_print(ANDROID_LOG_INFO, "VoipAgent", "%s", cut.c_str());
-        }
-        else {
+        } else {
             __android_log_print(ANDROID_LOG_INFO, "VoipAgent", "%s", t.c_str());
         }
 #else
         std::cerr << result.str() << std::endl << std::flush;
 #endif
+    }
     if (mFile)
     {
         fprintf(mFile, "%s", result.str().c_str());

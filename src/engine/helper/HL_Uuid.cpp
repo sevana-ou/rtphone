@@ -71,4 +71,6 @@ bool Uuid::operator < (const Uuid& right) const
 #if defined(TARGET_WIN)
     return memcmp(&mUuid, &right.mUuid, sizeof(mUuid)) < 0;
 #endif
+
+    return false;
 }

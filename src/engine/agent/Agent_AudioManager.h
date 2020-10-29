@@ -38,7 +38,7 @@ class AudioManager: public Audio::Player::EndOfAudioDelegate
 {
 public:
   AudioManager();
-  ~AudioManager();
+  virtual ~AudioManager();
   
   static AudioManager& instance();
   

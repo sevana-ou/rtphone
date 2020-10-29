@@ -41,6 +41,8 @@ long SyncHelper::increment(long *value)
     return OSAtomicIncrement32((int32_t*)value);
 #elif TARGET_LINUX
     return -1;
+#else
+    return -1;
 #endif
 }
 
@@ -66,6 +68,11 @@ uint64_t ThreadHelper::getCurrentId()
     // RPi builds want this!
     return (uint64_t)(pthread_self());
 #endif
+
+#if defined(TARGET_ANDROID)
+    return (uint64_t)(pthread_self());
+#endif
+    return 0;
 }
 // ------------------- TimeHelper ---------------
 using namespace std::chrono;

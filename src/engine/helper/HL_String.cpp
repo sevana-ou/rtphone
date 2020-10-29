@@ -237,8 +237,8 @@ std::pair<std::string, std::string> StringHelper::parseAssignment(const std::str
         result.second = StringHelper::trim(s.substr(p+1));
         if (trimQuotes && result.second.size() >= 2)
         {
-            if (result.second[0] == '"' && result.second[result.second.size()-1] == '"' ||
-                    result.second[0] == '\'' && result.second[result.second.size()-1] == '\'')
+            if ((result.second[0] == '"' && result.second[result.second.size()-1] == '"') ||
+                    (result.second[0] == '\'' && result.second[result.second.size()-1] == '\''))
                 result.second = result.second.substr(1, result.second.size() - 2);
         }
     }

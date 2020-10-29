@@ -21,7 +21,7 @@ namespace MT
   {
   public:
     Terminal(const CodecList::Settings& codecSettings);
-    ~Terminal();
+    virtual ~Terminal();
     
     CodecList& codeclist();  
 
