@@ -141,7 +141,7 @@ void AudioStream::addData(const void* buffer, int bytes)
   if (mMediaObserver)
     mMediaObserver->onMedia(buffer, bytes, MT::Stream::MediaDirection::Outgoing, this, mMediaObserverTag);
 
-  Codec* codec = NULL;
+  Codec* codec = nullptr;
   {
     Lock l(mMutex);
     codec = mTransmittingCodec.get();
@@ -151,7 +151,7 @@ void AudioStream::addData(const void* buffer, int bytes)
 
   // Resample
   unsigned dstlen = unsigned(float(codec->samplerate() / float(AUDIO_SAMPLERATE)) * bytes);
-  Audio::Resampler* r = NULL;
+  Audio::Resampler* r = nullptr;
   switch (codec->samplerate())
   {
   case 8000:   r = &mCaptureResampler8; break;

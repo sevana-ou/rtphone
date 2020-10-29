@@ -18,7 +18,7 @@ namespace MT
   public:
     SingleAudioStream(const CodecList::Settings& codecSettings, Statistics& stat);
     ~SingleAudioStream();
-    void process(std::shared_ptr<jrtplib::RTPPacket> packet);
+    void process(const std::shared_ptr<jrtplib::RTPPacket>& packet);
     void copyPcmTo(Audio::DataWindow& output, int needed);
 
   protected:
