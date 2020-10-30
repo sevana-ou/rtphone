@@ -47,7 +47,9 @@ namespace ice
     void          setComment(std::string comment);
     std::string   comment();
     std::string   hexstring();
-    
+
+    static std::string toHex(const void* bytes, size_t len);
+
     void          reserve(size_t capacity);
     void          insertTurnPrefix(unsigned short prefix);
     void          truncate(size_t newsize);

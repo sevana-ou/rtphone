@@ -127,12 +127,17 @@ std::string ByteBuffer::comment()
 
 std::string ByteBuffer::hexstring()
 {
+    return toHex(mDataPtr, mDataSize);
+}
+
+std::string ByteBuffer::toHex(const void* bytes, size_t len)
+{
     std::string result;
-    result.resize(mDataSize * 2, (char)0xCC);
-    for (std::vector<uint8_t>::size_type index = 0; index < mDataSize; index++)
+    result.resize(len * 2, (char)0xCC);
+    for (std::vector<uint8_t>::size_type index = 0; index < len; index++)
     {
         char value[3];
-        sprintf(value, "%02X", (unsigned char)mDataPtr[index]);
+        sprintf(value, "%02X", (unsigned char)((const unsigned char*)bytes)[index]);
         result[index*2] = value[0];
         result[index*2+1] = value[1];
     }

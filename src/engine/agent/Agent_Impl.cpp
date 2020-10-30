@@ -554,7 +554,6 @@ void AgentImpl::processGetMediaStats(Json::Value& request, Json::Value& answer)
 #if defined(USE_AQUA_LIBRARY)
         if (includeAqua)
         {
-            // Send recorded audio to upper level
             answer["incoming_audio"] = mAquaIncoming.hexstring();
 
             ICELogInfo(<< "Running AQuA analyzer.");

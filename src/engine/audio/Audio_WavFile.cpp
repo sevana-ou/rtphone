@@ -246,7 +246,7 @@ unsigned WavFileReader::size() const
 #define BITS_PER_CHANNEL  16
 
 WavFileWriter::WavFileWriter()
-:mHandle(nullptr), mLengthOffset(0), mRate(AUDIO_SAMPLERATE), mChannels(1)
+:mHandle(nullptr), mLengthOffset(0), mRate(AUDIO_SAMPLERATE), mChannels(1), mWritten(0)
 {
 }
 
