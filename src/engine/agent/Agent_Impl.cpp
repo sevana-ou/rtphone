@@ -309,12 +309,6 @@ void AgentImpl::processStartSession(Json::Value& request, Json::Value& answer)
 {
     std::unique_lock<std::recursive_mutex> l(mAgentMutex);
 
-    // For debugging only
-    /*mIncomingAudioDump = std::make_shared<Audio::WavFileWriter>();
-  mIncomingAudioDump->open("incoming_dump", AUDIO_SAMPLERATE, AUDIO_CHANNELS);
-  mOutgoingAudioDump = std::make_shared<Audio::WavFileWriter>();
-  mOutgoingAudioDump->open("outgoing_dump", AUDIO_SAMPLERATE, AUDIO_CHANNELS);*/
-
     // Start audio manager
     if (!mAudioManager)
     {
