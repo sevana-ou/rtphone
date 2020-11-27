@@ -29,6 +29,8 @@ namespace Audio
     unsigned mDataOffset;
     unsigned mDataLength;
     Resampler mResampler;
+    unsigned mLastError;
+
     std::string readChunk();
   public:
     WavFileReader();
@@ -47,6 +49,8 @@ namespace Audio
     unsigned read(short* buffer, unsigned samples);
     std::tstring filename() const;
     unsigned size() const;
+
+    unsigned lastError() const;
   };
 
   typedef std::shared_ptr<WavFileReader> PWavFileReader;

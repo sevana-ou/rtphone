@@ -578,6 +578,9 @@ void AgentImpl::processGetMediaStats(Json::Value& request, Json::Value& answer)
                                 referenceAudio.appendBuffer(buffer, wasRead);
                         } while (wasRead == 1024);
                     }
+                    else {
+                        ICELogCritical(<< "Failed to read AQuA reference audio, error code: " << reader.lastError());
+                    }
 
                     sevana::aqua::audio_buffer test(mAquaIncoming.data(), mAquaIncoming.size()),
                             reference(referenceAudio.data(), referenceAudio.size());

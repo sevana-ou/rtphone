@@ -39,7 +39,7 @@ using namespace Audio;
 
 // ---------------------- WavFileReader -------------------------
 WavFileReader::WavFileReader()
-:mHandle(nullptr), mRate(0)
+:mHandle(nullptr), mRate(0), mLastError(0)
 {
   mDataOffset = 0;
 }
@@ -84,7 +84,16 @@ bool WavFileReader::open(const std::tstring& filename)
     mHandle = fopen(StringHelper::makeUtf8(filename).c_str(), "rb");
   #endif
     if (NULL == mHandle)
+    {
+#if defined(TARGET_ANDROID) || defined(TARGET_LINUX) || defined(TARGET_OSX)
+      mLastError = errno;
+#endif
+#if defined(TARGET_WIN)
+      mLastError = GetLastError();
+#endif
       return false;
+    }
+    mLastError = 0;
     
     // Read the .WAV header
     char riff[4];
@@ -157,7 +166,8 @@ bool WavFileReader::open(const std::tstring& filename)
   }
   catch(...)
   {
-    fclose(mHandle); mHandle = NULL;
+    fclose(mHandle); mHandle = nullptr;
+    mLastError = static_cast<unsigned>(-1);
   }
   return isOpened();
 }
@@ -240,6 +250,10 @@ unsigned WavFileReader::size() const
   return mDataLength;
 }
 
+unsigned WavFileReader::lastError() const
+{
+  return mLastError;
+}
 // ------------------------- WavFileWriter -------------------------
 #define LOG_SUBSYTEM "WavFileWriter"
 
