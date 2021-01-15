@@ -264,7 +264,7 @@ license you like.
 
 #endif // if !defined(JSON_IS_AMALGAMATION)
 
-namespace Json {
+namespace JsonCpp {
 typedef int Int;
 typedef unsigned int UInt;
 #if defined(JSON_NO_INT64)
@@ -326,7 +326,7 @@ typedef UInt64 LargestUInt;
 #include "config.h"
 #endif // if !defined(JSON_IS_AMALGAMATION)
 
-namespace Json {
+namespace JsonCpp {
 
 // writer.h
 class FastWriter;
@@ -377,7 +377,7 @@ class ValueConstIterator;
 #include "forwards.h"
 #endif // if !defined(JSON_IS_AMALGAMATION)
 
-namespace Json {
+namespace JsonCpp {
 
 /** \brief Configuration passed to reader and writer.
  * This configuration object can be used to force the Reader or Writer
@@ -482,7 +482,7 @@ public:
 
 /** \brief JSON (JavaScript Object Notation).
  */
-namespace Json {
+namespace JsonCpp {
 
 /** Base class for all exceptions we throw.
  *
@@ -616,15 +616,15 @@ public:
   typedef std::vector<JSONCPP_STRING> Members;
   typedef ValueIterator iterator;
   typedef ValueConstIterator const_iterator;
-  typedef Json::UInt UInt;
-  typedef Json::Int Int;
+  typedef JsonCpp::UInt UInt;
+  typedef JsonCpp::Int Int;
 #if defined(JSON_HAS_INT64)
-  typedef Json::UInt64 UInt64;
-  typedef Json::Int64 Int64;
+  typedef JsonCpp::UInt64 UInt64;
+  typedef JsonCpp::Int64 Int64;
 #endif // defined(JSON_HAS_INT64)
-  typedef Json::LargestInt LargestInt;
-  typedef Json::LargestUInt LargestUInt;
-  typedef Json::ArrayIndex ArrayIndex;
+  typedef JsonCpp::LargestInt LargestInt;
+  typedef JsonCpp::LargestUInt LargestUInt;
+  typedef JsonCpp::ArrayIndex ArrayIndex;
 
   static const Value& null;  ///< We regret this reference to a global instance; prefer the simpler Value().
   static const Value& nullRef;  ///< just a kludge for binary-compatibility; same as null
@@ -1294,7 +1294,7 @@ public:
 namespace std {
 /// Specialize std::swap() for Json::Value.
 template<>
-inline void swap(Json::Value& a, Json::Value& b) { a.swap(b); }
+inline void swap(JsonCpp::Value& a, JsonCpp::Value& b) { a.swap(b); }
 }
 
 
@@ -1342,7 +1342,7 @@ inline void swap(Json::Value& a, Json::Value& b) { a.swap(b); }
 #pragma warning(disable : 4251)
 #endif // if defined(JSONCPP_DISABLE_DLL_INTERFACE_WARNING)
 
-namespace Json {
+namespace JsonCpp {
 
 /** \brief Unserialize a <a HREF="http://www.json.org">JSON</a> document into a
  *Value.
@@ -1649,7 +1649,7 @@ public:
     JSON Value.
     \sa setDefaults()
     */
-  Json::Value settings_;
+  JsonCpp::Value settings_;
 
   CharReaderBuilder();
   ~CharReaderBuilder() JSONCPP_OVERRIDE;
@@ -1659,7 +1659,7 @@ public:
   /** \return true if 'settings' are legal and consistent;
    *   otherwise, indicate bad settings via 'invalid'.
    */
-  bool validate(Json::Value* invalid) const;
+  bool validate(JsonCpp::Value* invalid) const;
 
   /** A simple way to update a specific setting.
    */
@@ -1670,13 +1670,13 @@ public:
    * \remark Defaults:
    * \snippet src/lib_json/json_reader.cpp CharReaderBuilderDefaults
    */
-  static void setDefaults(Json::Value* settings);
+  static void setDefaults(JsonCpp::Value* settings);
   /** Same as old Features::strictMode().
    * \pre 'settings' != NULL (but Json::null is fine)
    * \remark Defaults:
    * \snippet src/lib_json/json_reader.cpp CharReaderBuilderStrictMode
    */
-  static void strictMode(Json::Value* settings);
+  static void strictMode(JsonCpp::Value* settings);
 };
 
 /** Consume entire stream and use its begin/end.
@@ -1757,7 +1757,7 @@ JSON_API JSONCPP_ISTREAM& operator>>(JSONCPP_ISTREAM&, Value&);
 #pragma warning(disable : 4251)
 #endif // if defined(JSONCPP_DISABLE_DLL_INTERFACE_WARNING)
 
-namespace Json {
+namespace JsonCpp {
 
 class Value;
 
@@ -1846,7 +1846,7 @@ public:
     JSON Value.
     \sa setDefaults()
     */
-  Json::Value settings_;
+  JsonCpp::Value settings_;
 
   StreamWriterBuilder();
   ~StreamWriterBuilder() JSONCPP_OVERRIDE;
@@ -1859,7 +1859,7 @@ public:
   /** \return true if 'settings' are legal and consistent;
    *   otherwise, indicate bad settings via 'invalid'.
    */
-  bool validate(Json::Value* invalid) const;
+  bool validate(JsonCpp::Value* invalid) const;
   /** A simple way to update a specific setting.
    */
   Value& operator[](JSONCPP_STRING key);
@@ -1869,7 +1869,7 @@ public:
    * \remark Defaults:
    * \snippet src/lib_json/json_writer.cpp StreamWriterBuilderDefaults
    */
-  static void setDefaults(Json::Value* settings);
+  static void setDefaults(JsonCpp::Value* settings);
 };
 
 /** \brief Abstract class for writers.
@@ -2064,7 +2064,7 @@ JSONCPP_STRING JSON_API valueToQuotedString(const char* value);
 /// \see Json::operator>>()
 JSON_API JSONCPP_OSTREAM& operator<<(JSONCPP_OSTREAM&, const Value& root);
 
-} // namespace Json
+} // namespace JsonCpp
 
 #if defined(JSONCPP_DISABLE_DLL_INTERFACE_WARNING)
 #pragma warning(pop)
@@ -2108,12 +2108,12 @@ JSON_API JSONCPP_OSTREAM& operator<<(JSONCPP_OSTREAM&, const Value& root);
 
 // @todo <= add detail about condition in exception
 # define JSON_ASSERT(condition)                                                \
-  {if (!(condition)) {Json::throwLogicError( "assert json failed" );}}
+  {if (!(condition)) {JsonCpp::throwLogicError( "assert json failed" );}}
 
 # define JSON_FAIL_MESSAGE(message)                                            \
   {                                                                            \
     JSONCPP_OSTRINGSTREAM oss; oss << message;                                    \
-    Json::throwLogicError(oss.str());                                          \
+    JsonCpp::throwLogicError(oss.str());                                          \
     abort();                                                                   \
   }
 

@@ -69,11 +69,7 @@ license you like.
 // //////////////////////////////////////////////////////////////////////
 
 
-
-
-
-
-#include "json.h"
+#include "json/json.h"
 
 #ifndef JSON_IS_AMALGAMATION
 #error "Compile with -I PATH_TO_JSON_DIRECTORY"
@@ -108,7 +104,7 @@ license you like.
  * It is an internal header that must not be exposed.
  */
 
-namespace Json {
+namespace JsonCpp {
 static char getDecimalPoint() {
 #ifdef JSONCPP_NO_LOCALE_SUPPORT
   return '\0';
@@ -198,7 +194,7 @@ static inline void fixNumericLocaleInput(char* begin, char* end) {
   }
 }
 
-} // namespace Json {
+} // namespace JsonCpp {
 
 #endif // LIB_JSONCPP_JSON_TOOL_H_INCLUDED
 
@@ -268,12 +264,12 @@ static int const stackLimit_g = 1000;
 static int       stackDepth_g = 0;  // see readValue()
 //#endif
 
-namespace Json {
+namespace JsonCpp {
 
 #if __cplusplus >= 201103L || (defined(_CPPLIB_VER) && _CPPLIB_VER >= 520)
 typedef std::unique_ptr<CharReader> CharReaderPtr;
 #else
-typedef std::unique_ptr<CharReader>   CharReaderPtr;
+typedef std::auto_ptr<CharReader>   CharReaderPtr;
 #endif
 
 // Implementation of class Features
@@ -2173,11 +2169,11 @@ static void getValidReaderKeys(std::set<JSONCPP_STRING>* valid_keys)
   valid_keys->insert("rejectDupKeys");
   valid_keys->insert("allowSpecialFloats");
 }
-bool CharReaderBuilder::validate(Json::Value* invalid) const
+bool CharReaderBuilder::validate(JsonCpp::Value* invalid) const
 {
-  Json::Value my_invalid;
+  JsonCpp::Value my_invalid;
   if (!invalid) invalid = &my_invalid;  // so we do not need to test for NULL
-  Json::Value& inv = *invalid;
+  JsonCpp::Value& inv = *invalid;
   std::set<JSONCPP_STRING> valid_keys;
   getValidReaderKeys(&valid_keys);
   Value::Members keys = settings_.getMemberNames();
@@ -2195,7 +2191,7 @@ Value& CharReaderBuilder::operator[](JSONCPP_STRING key)
   return settings_[key];
 }
 // static
-void CharReaderBuilder::strictMode(Json::Value* settings)
+void CharReaderBuilder::strictMode(JsonCpp::Value* settings)
 {
 //! [CharReaderBuilderStrictMode]
   (*settings)["allowComments"] = false;
@@ -2210,7 +2206,7 @@ void CharReaderBuilder::strictMode(Json::Value* settings)
 //! [CharReaderBuilderStrictMode]
 }
 // static
-void CharReaderBuilder::setDefaults(Json::Value* settings)
+void CharReaderBuilder::setDefaults(JsonCpp::Value* settings)
 {
 //! [CharReaderBuilderDefaults]
   (*settings)["collectComments"] = true;
@@ -2279,7 +2275,7 @@ JSONCPP_ISTREAM& operator>>(JSONCPP_ISTREAM& sin, Value& root) {
 
 // included by json_value.cpp
 
-namespace Json {
+namespace JsonCpp {
 
 // //////////////////////////////////////////////////////////////////
 // //////////////////////////////////////////////////////////////////
@@ -2476,7 +2472,7 @@ ValueIterator& ValueIterator::operator=(const SelfType& other) {
 
 #define JSON_ASSERT_UNREACHABLE assert(false)
 
-namespace Json {
+namespace JsonCpp {
 
 // This is a walkaround to avoid the static initialization of Value::null.
 // kNull must be word-aligned to avoid crashing on ARM.  We use an alignment of
@@ -2528,7 +2524,7 @@ static inline bool InRange(double d, T min, U max) {
   return d >= min && d <= max;
 }
 #else  // if !defined(JSON_USE_INT64_DOUBLE_CONVERSION)
-static inline double integerToDouble(Json::UInt64 value) {
+static inline double integerToDouble(JsonCpp::UInt64 value) {
   return static_cast<double>(Int64(value / 2)) * 2.0 + static_cast<double>(Int64(value & 1));
 }
 
@@ -2560,7 +2556,7 @@ static inline char* duplicateStringValue(const char* value,
   char* newString = static_cast<char*>(malloc(length + 1));
   if (newString == NULL) {
     throwRuntimeError(
-        "in Json::Value::duplicateStringValue(): "
+        "in JsonCpp::Value::duplicateStringValue(): "
         "Failed to allocate string value buffer");
   }
   memcpy(newString, value, length);
@@ -2577,13 +2573,13 @@ static inline char* duplicateAndPrefixStringValue(
   // Avoid an integer overflow in the call to malloc below by limiting length
   // to a sane value.
   JSON_ASSERT_MESSAGE(length <= static_cast<unsigned>(Value::maxInt) - sizeof(unsigned) - 1U,
-                      "in Json::Value::duplicateAndPrefixStringValue(): "
+                      "in JsonCpp::Value::duplicateAndPrefixStringValue(): "
                       "length too big for prefixing");
   unsigned actualLength = length + static_cast<unsigned>(sizeof(unsigned)) + 1U;
   char* newString = static_cast<char*>(malloc(actualLength));
   if (newString == 0) {
     throwRuntimeError(
-        "in Json::Value::duplicateAndPrefixStringValue(): "
+        "in JsonCpp::Value::duplicateAndPrefixStringValue(): "
         "Failed to allocate string value buffer");
   }
   *reinterpret_cast<unsigned*>(newString) = length;
@@ -2643,7 +2639,7 @@ static inline void releaseStringValue(char* value, unsigned) {
 #include "json_valueiterator.inl"
 #endif // if !defined(JSON_IS_AMALGAMATION)
 
-namespace Json {
+namespace JsonCpp {
 
 Exception::Exception(JSONCPP_STRING const& msg)
   : msg_(msg)
@@ -2693,7 +2689,7 @@ void Value::CommentInfo::setComment(const char* text, size_t len) {
   JSON_ASSERT(text != 0);
   JSON_ASSERT_MESSAGE(
       text[0] == '\0' || text[0] == '/',
-      "in Json::Value::setComment(): Comments must start with /");
+      "in JsonCpp::Value::setComment(): Comments must start with /");
   // It seems that /**/ style comments are acceptable as well.
   comment_ = duplicateStringValue(text, len);
 }
@@ -3050,7 +3046,7 @@ bool Value::operator>(const Value& other) const { return other < *this; }
 bool Value::operator==(const Value& other) const {
   // if ( type_ != other.type_ )
   // GCC 2.95.3 says:
-  // attempt to take address of bit-field structure member `Json::Value::type_'
+  // attempt to take address of bit-field structure member `JsonCpp::Value::type_'
   // Beats me, but a temp solves the problem.
   int temp = other.type_;
   if (type_ != temp)
@@ -3096,7 +3092,7 @@ bool Value::operator!=(const Value& other) const { return !(*this == other); }
 
 const char* Value::asCString() const {
   JSON_ASSERT_MESSAGE(type_ == stringValue,
-                      "in Json::Value::asCString(): requires stringValue");
+                      "in JsonCpp::Value::asCString(): requires stringValue");
   if (value_.string_ == 0) return 0;
   unsigned this_len;
   char const* this_str;
@@ -3107,7 +3103,7 @@ const char* Value::asCString() const {
 #if JSONCPP_USING_SECURE_MEMORY
 unsigned Value::getCStringLength() const {
   JSON_ASSERT_MESSAGE(type_ == stringValue,
-	                  "in Json::Value::asCString(): requires stringValue");
+                      "in JsonCpp::Value::asCString(): requires stringValue");
   if (value_.string_ == 0) return 0;
   unsigned this_len;
   char const* this_str;
@@ -3398,7 +3394,7 @@ bool Value::operator!() const { return isNull(); }
 void Value::clear() {
   JSON_ASSERT_MESSAGE(type_ == nullValue || type_ == arrayValue ||
                           type_ == objectValue,
-                      "in Json::Value::clear(): requires complex value");
+                      "in JsonCpp::Value::clear(): requires complex value");
   start_ = 0;
   limit_ = 0;
   switch (type_) {
@@ -3413,7 +3409,7 @@ void Value::clear() {
 
 void Value::resize(ArrayIndex newSize) {
   JSON_ASSERT_MESSAGE(type_ == nullValue || type_ == arrayValue,
-                      "in Json::Value::resize(): requires arrayValue");
+                      "in JsonCpp::Value::resize(): requires arrayValue");
   if (type_ == nullValue)
     *this = Value(arrayValue);
   ArrayIndex oldSize = size();
@@ -3432,7 +3428,7 @@ void Value::resize(ArrayIndex newSize) {
 Value& Value::operator[](ArrayIndex index) {
   JSON_ASSERT_MESSAGE(
       type_ == nullValue || type_ == arrayValue,
-      "in Json::Value::operator[](ArrayIndex): requires arrayValue");
+      "in JsonCpp::Value::operator[](ArrayIndex): requires arrayValue");
   if (type_ == nullValue)
     *this = Value(arrayValue);
   CZString key(index);
@@ -3448,14 +3444,14 @@ Value& Value::operator[](ArrayIndex index) {
 Value& Value::operator[](int index) {
   JSON_ASSERT_MESSAGE(
       index >= 0,
-      "in Json::Value::operator[](int index): index cannot be negative");
+      "in JsonCpp::Value::operator[](int index): index cannot be negative");
   return (*this)[ArrayIndex(index)];
 }
 
 const Value& Value::operator[](ArrayIndex index) const {
   JSON_ASSERT_MESSAGE(
       type_ == nullValue || type_ == arrayValue,
-      "in Json::Value::operator[](ArrayIndex)const: requires arrayValue");
+      "in JsonCpp::Value::operator[](ArrayIndex)const: requires arrayValue");
   if (type_ == nullValue)
     return nullSingleton();
   CZString key(index);
@@ -3468,7 +3464,7 @@ const Value& Value::operator[](ArrayIndex index) const {
 const Value& Value::operator[](int index) const {
   JSON_ASSERT_MESSAGE(
       index >= 0,
-      "in Json::Value::operator[](int index) const: index cannot be negative");
+      "in JsonCpp::Value::operator[](int index) const: index cannot be negative");
   return (*this)[ArrayIndex(index)];
 }
 
@@ -3486,7 +3482,7 @@ void Value::initBasic(ValueType vtype, bool allocated) {
 Value& Value::resolveReference(const char* key) {
   JSON_ASSERT_MESSAGE(
       type_ == nullValue || type_ == objectValue,
-      "in Json::Value::resolveReference(): requires objectValue");
+      "in JsonCpp::Value::resolveReference(): requires objectValue");
   if (type_ == nullValue)
     *this = Value(objectValue);
   CZString actualKey(
@@ -3506,7 +3502,7 @@ Value& Value::resolveReference(char const* key, char const* cend)
 {
   JSON_ASSERT_MESSAGE(
       type_ == nullValue || type_ == objectValue,
-      "in Json::Value::resolveReference(key, end): requires objectValue");
+      "in JsonCpp::Value::resolveReference(key, end): requires objectValue");
   if (type_ == nullValue)
     *this = Value(objectValue);
   CZString actualKey(
@@ -3532,7 +3528,7 @@ Value const* Value::find(char const* key, char const* cend) const
 {
   JSON_ASSERT_MESSAGE(
       type_ == nullValue || type_ == objectValue,
-      "in Json::Value::find(key, end, found): requires objectValue or nullValue");
+      "in JsonCpp::Value::find(key, end, found): requires objectValue or nullValue");
   if (type_ == nullValue) return NULL;
   CZString actualKey(key, static_cast<unsigned>(cend-key), CZString::noDuplication);
   ObjectValues::const_iterator it = value_.map_->find(actualKey);
@@ -3617,7 +3613,7 @@ bool Value::removeMember(JSONCPP_STRING const& key, Value* removed)
 Value Value::removeMember(const char* key)
 {
   JSON_ASSERT_MESSAGE(type_ == nullValue || type_ == objectValue,
-                      "in Json::Value::removeMember(): requires objectValue");
+                      "in JsonCpp::Value::removeMember(): requires objectValue");
   if (type_ == nullValue)
     return nullSingleton();
 
@@ -3683,7 +3679,7 @@ bool Value::isMember(const CppTL::ConstString& key) const {
 Value::Members Value::getMemberNames() const {
   JSON_ASSERT_MESSAGE(
       type_ == nullValue || type_ == objectValue,
-      "in Json::Value::getMemberNames(), value must be objectValue");
+      "in JsonCpp::Value::getMemberNames(), value must be objectValue");
   if (type_ == nullValue)
     return Value::Members();
   Members members;
@@ -4146,12 +4142,12 @@ Value& Path::make(Value& root) const {
 #pragma warning(disable : 4996)
 #endif
 
-namespace Json {
+namespace JsonCpp {
 
 #if __cplusplus >= 201103L || (defined(_CPPLIB_VER) && _CPPLIB_VER >= 520)
 typedef std::unique_ptr<StreamWriter> StreamWriterPtr;
 #else
-typedef std::unique_ptr<StreamWriter>   StreamWriterPtr;
+typedef std::auto_ptr<StreamWriter>   StreamWriterPtr;
 #endif
 
 static bool containsControlCharacter(const char* str) {
@@ -5246,11 +5242,11 @@ static void getValidWriterKeys(std::set<JSONCPP_STRING>* valid_keys)
   valid_keys->insert("useSpecialFloats");
   valid_keys->insert("precision");
 }
-bool StreamWriterBuilder::validate(Json::Value* invalid) const
+bool StreamWriterBuilder::validate(JsonCpp::Value* invalid) const
 {
-  Json::Value my_invalid;
+  JsonCpp::Value my_invalid;
   if (!invalid) invalid = &my_invalid;  // so we do not need to test for NULL
-  Json::Value& inv = *invalid;
+  JsonCpp::Value& inv = *invalid;
   std::set<JSONCPP_STRING> valid_keys;
   getValidWriterKeys(&valid_keys);
   Value::Members keys = settings_.getMemberNames();
@@ -5268,7 +5264,7 @@ Value& StreamWriterBuilder::operator[](JSONCPP_STRING key)
   return settings_[key];
 }
 // static
-void StreamWriterBuilder::setDefaults(Json::Value* settings)
+void StreamWriterBuilder::setDefaults(JsonCpp::Value* settings)
 {
   //! [StreamWriterBuilderDefaults]
   (*settings)["commentStyle"] = "All";
