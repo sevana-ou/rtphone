@@ -1,4 +1,4 @@
-/* Copyright(C) 2007-2020 VoIPobjects (voipobjects.com)
+/* Copyright(C) 2007-2021 VoIPobjects (voipobjects.com)
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -9,8 +9,13 @@
 #include "MT_AudioCodec.h"
 
 #if !defined(TARGET_ANDROID) && !defined(TARGET_OPENWRT) && !defined(TARGET_RPI)
-# include "MT_AmrCodec.h"
-# include "MT_EvsCodec.h"
+# if defined(USE_AMR_CODEC)
+#  include "MT_AmrCodec.h"
+# endif
+
+# if defined(USE_EVS_CODEC)
+#  include "MT_EvsCodec.h"
+# endif
 #endif
 
 #include "helper/HL_String.h"
@@ -91,7 +96,7 @@ CodecList::CodecList(const Settings& settings)
   :mSettings(settings)
 {
   //mFactoryList.push_back(new OpusCodec::OpusFactory(16000, 1));
-#if !defined(TARGET_ANDROID)
+#if !defined(TARGET_ANDROID) && defined(USE_OPUS_CODEC)
   if (settings.mOpusSpec.empty())
   {
     mFactoryList.push_back(new OpusCodec::OpusFactory(48000, 2, MT_OPUS_CODEC_PT));
@@ -106,6 +111,7 @@ CodecList::CodecList(const Settings& settings)
 #endif
 
 #if !defined(TARGET_ANDROID) && !defined(TARGET_OPENWRT) && !defined(TARGET_RPI)
+#if defined(USE_AMR_CODEC)
   for (int pt: mSettings.mAmrWbPayloadType)
     mFactoryList.push_back(new AmrWbCodec::CodecFactory({mSettings.mWrapIuUP, false, pt}));
   for (int pt: mSettings.mAmrWbOctetPayloadType)
@@ -117,6 +123,7 @@ CodecList::CodecList(const Settings& settings)
     mFactoryList.push_back(new AmrNbCodec::CodecFactory({mSettings.mWrapIuUP, true, pt}));
 
   mFactoryList.push_back(new GsmEfrCodec::GsmEfrFactory(mSettings.mWrapIuUP, mSettings.mGsmEfrPayloadType));
+#endif
 #endif
 
   //mFactoryList.push_back(new IsacCodec::IsacFactory16K(mSettings.mIsac16KPayloadType));
@@ -131,7 +138,7 @@ CodecList::CodecList(const Settings& settings)
   mFactoryList.push_back(new GsmHrCodec::GsmHrFactory(mSettings.mGsmHrPayloadType));
 #endif
 
-#if !defined(TARGET_ANDROID)
+#if !defined(TARGET_ANDROID) && defined(USE_EVS_CODEC)
   for (auto& spec: settings.mEvsSpec)
   {
     EVSCodec::StreamParameters evs_params;

@@ -59,6 +59,7 @@ set (rtphone_engine engine)
 
 option (USE_AMR_CODEC       "Use AMR codec. Requires libraries."    OFF)
 option (USE_EVS_CODEC       "Use EVS codec."                        OFF)
+option (USE_OPUS_CODEC      "Use Opus codec."                       OFF)
 option (USE_SEVANA_LIB      "Build with Sevana libraries"           OFF)
 
 # PIC code by default
@@ -103,7 +104,6 @@ set (RTPHONE_SOURCES
     ${rtphone_engine}/media/MT_AudioStream.cpp
     ${rtphone_engine}/media/MT_AudioReceiver.cpp
     ${rtphone_engine}/media/MT_AudioCodec.cpp
-    ${rtphone_engine}/media/MT_AmrCodec.cpp
     ${rtphone_engine}/media/MT_EvsCodec.cpp
     ${rtphone_engine}/media/MT_CngHelper.cpp
     ${rtphone_engine}/agent/Agent_Impl.cpp
@@ -115,9 +115,7 @@ set (RTPHONE_SOURCES
     ${rtphone_engine}/endpoint/EP_NetworkQueue.cpp
     ${rtphone_engine}/endpoint/EP_Observer.cpp
     ${rtphone_engine}/endpoint/EP_Session.cpp
-    )
 
-set (RTPHONE_HEADERS
     ${rtphone_engine}/media/MT_Statistics.h
     ${rtphone_engine}/media/MT_WebRtc.h
     ${rtphone_engine}/media/MT_Stream.h
@@ -131,7 +129,7 @@ set (RTPHONE_HEADERS
     ${rtphone_engine}/media/MT_AudioStream.h
     ${rtphone_engine}/media/MT_AudioReceiver.h
     ${rtphone_engine}/media/MT_AudioCodec.h
-    ${rtphone_engine}/media/MT_AmrCodec.h
+
     ${rtphone_engine}/media/MT_EvsCodec.h
     ${rtphone_engine}/media/MT_CngHelper.h
     ${rtphone_engine}/agent/Agent_Impl.h
@@ -145,13 +143,31 @@ set (RTPHONE_HEADERS
     ${rtphone_engine}/endpoint/EP_Session.h
     )
 
-add_library (rtphone STATIC ${RTPHONE_SOURCES} ${RTPHONE_HEADERS})
+if (USE_AMR_CODEC)
+    add_definitions(-DUSE_AMR_CODEC)
+    set(RTPHONE_SOURCES ${RTPHONE_SOURCES} ${rtphone_engine}/media/MT_AmrCodec.cpp ${rtphone_engine}/media/MT_AmrCodec.h)
+endif()
+
+if (USE_EVS_CODEC)
+    add_definitions(-DUSE_EVS_CODEC)
+    set(RTPHONE_SOURCES ${RTPHONE_SOURCES} ${rtphone_engine}/media/MT_EvsCodec.cpp ${rtphone_engine}/media/MT_EvsCodec.h)
+endif()
+
+if (USE_OPUS_CODEC)
+    add_definitions(-DUSE_OPUS_CODEC)
+endif()
+
+add_library (rtphone STATIC ${RTPHONE_SOURCES})
 
 add_subdirectory(${rtphone_libs}/resiprocate)
 add_subdirectory(${rtphone_libs}/ice)
 add_subdirectory(${rtphone_libs}/jrtplib/src)
 add_subdirectory(${rtphone_libs}/libg729)
-add_subdirectory(${rtphone_libs}/libevs)
+
+if (USE_EVS_CODEC)
+    add_subdirectory(${rtphone_libs}/libevs)
+endif()
+
 add_subdirectory(${rtphone_libs}/libgsm)
 add_subdirectory(${rtphone_libs}/gsmhr)
 add_subdirectory(${rtphone_libs}/g722)
@@ -176,10 +192,6 @@ if (USE_AMR_CODEC)
     set (LIBS ${LIBS})
 endif (USE_AMR_CODEC)
 
-if (USE_EVS_CODEC)
-    add_definitions(-DUSE_EVS_CODEC)
-endif()
-
 target_link_libraries(rtphone
     ice_stack jrtplib g729_codec gsm_codec
     gsmhr_codec g722_codec srtp resiprocate
@@ -187,7 +199,6 @@ target_link_libraries(rtphone
     audio_lib
     webrtc
     speexdsp
-    # opus
     uuid
     ${OPENSSL_SSL}
     ${OPENSSL_CRYPTO}
