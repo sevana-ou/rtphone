@@ -30,7 +30,7 @@ protected:
   std::recursive_mutex mAgentMutex;
   std::mutex mEventListMutex;
   std::condition_variable mEventListChangeCondVar;
-  std::vector<Json::Value> mEventList;
+  std::vector<JsonCpp::Value> mEventList;
   bool mUseNativeAudio = false;
 
   typedef std::map<int, PAccount> AccountMap;
@@ -54,24 +54,24 @@ protected:
   //Audio::PWavFileWriter mIncomingAudioDump, mOutgoingAudioDump;
 
   void run();
-  void addEvent(const Json::Value& v);
-  void processConfig(Json::Value& request, Json::Value& answer);
-  void processStart(Json::Value& request, Json::Value& answer);
-  void processStop(Json::Value& request, Json::Value& answer);
-  void processCreateAccount(Json::Value& request, Json::Value& answer);
-  void processStartAccount(Json::Value& request, Json::Value& answer);
-  void processSetUserInfoToAccount(Json::Value& request, Json::Value& answer);
-  void processCreateSession(Json::Value& request, Json::Value& answer);
-  void processStartSession(Json::Value& request, Json::Value& answer);
-  void processStopSession(Json::Value& request, Json::Value& answer);
-  void processAcceptSession(Json::Value& request, Json::Value& answer);
-  void processDestroySession(Json::Value& request, Json::Value& answer);
-  void processWaitForEvent(Json::Value& request, Json::Value& answer);
-  void processGetMediaStats(Json::Value& request, Json::Value& answer);
-  void processUseStreamForSession(Json::Value& request, Json::Value& answer);
-  void processNetworkChanged(Json::Value& request, Json::Value& answer);
-  void processAddRootCert(Json::Value& request, Json::Value& answer);
-  void processLogMessage(Json::Value& request, Json::Value& answer);
+  void addEvent(const JsonCpp::Value& v);
+  void processConfig(JsonCpp::Value& request, JsonCpp::Value& answer);
+  void processStart(JsonCpp::Value& request, JsonCpp::Value& answer);
+  void processStop(JsonCpp::Value& request, JsonCpp::Value& answer);
+  void processCreateAccount(JsonCpp::Value& request, JsonCpp::Value& answer);
+  void processStartAccount(JsonCpp::Value& request, JsonCpp::Value& answer);
+  void processSetUserInfoToAccount(JsonCpp::Value& request, JsonCpp::Value& answer);
+  void processCreateSession(JsonCpp::Value& request, JsonCpp::Value& answer);
+  void processStartSession(JsonCpp::Value& request, JsonCpp::Value& answer);
+  void processStopSession(JsonCpp::Value& request, JsonCpp::Value& answer);
+  void processAcceptSession(JsonCpp::Value& request, JsonCpp::Value& answer);
+  void processDestroySession(JsonCpp::Value& request, JsonCpp::Value& answer);
+  void processWaitForEvent(JsonCpp::Value& request, JsonCpp::Value& answer);
+  void processGetMediaStats(JsonCpp::Value& request, JsonCpp::Value& answer);
+  void processUseStreamForSession(JsonCpp::Value& request, JsonCpp::Value& answer);
+  void processNetworkChanged(JsonCpp::Value& request, JsonCpp::Value& answer);
+  void processAddRootCert(JsonCpp::Value& request, JsonCpp::Value& answer);
+  void processLogMessage(JsonCpp::Value& request, JsonCpp::Value& answer);
   void stopAgentAndThread();
 
 public:

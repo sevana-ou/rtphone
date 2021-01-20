@@ -55,10 +55,10 @@ std::string AgentImpl::command(const std::string& command)
     if (command.empty())
         return "";
 
-    Json::Value d, answer;
+    JsonCpp::Value d, answer;
     try
     {
-        Json::Reader r;
+        JsonCpp::Reader r;
         if (!r.parse(command, d))
             return "";
 
@@ -151,7 +151,7 @@ std::string AgentImpl::read()
     return "";
 }
 
-void AgentImpl::processConfig(Json::Value &d, Json::Value &answer)
+void AgentImpl::processConfig(JsonCpp::Value &d, JsonCpp::Value &answer)
 {
     std::unique_lock<std::recursive_mutex> l(mAgentMutex);
 
@@ -188,7 +188,7 @@ void AgentImpl::processConfig(Json::Value &d, Json::Value &answer)
     answer["status"] = Status_Ok;
 }
 
-void AgentImpl::processStart(Json::Value& /*request*/, Json::Value &answer)
+void AgentImpl::processStart(JsonCpp::Value& /*request*/, JsonCpp::Value &answer)
 {
     std::unique_lock<std::recursive_mutex> l(mAgentMutex);
     if (mThread)
@@ -230,13 +230,13 @@ void AgentImpl::processStart(Json::Value& /*request*/, Json::Value &answer)
     answer["status"] = Status_Ok;
 }
 
-void AgentImpl::processStop(Json::Value& /*request*/, Json::Value& answer)
+void AgentImpl::processStop(JsonCpp::Value& /*request*/, JsonCpp::Value& answer)
 {
     stopAgentAndThread();
     answer["status"] = Status_Ok;
 }
 
-void AgentImpl::processCreateAccount(Json::Value &d, Json::Value& answer)
+void AgentImpl::processCreateAccount(JsonCpp::Value &d, JsonCpp::Value& answer)
 {
     std::unique_lock<std::recursive_mutex> l(mAgentMutex);
     PVariantMap c = std::make_shared<VariantMap>();
@@ -256,7 +256,7 @@ void AgentImpl::processCreateAccount(Json::Value &d, Json::Value& answer)
     answer["status"] = Status_Ok;
 }
 
-void AgentImpl::processStartAccount(Json::Value& request, Json::Value& answer)
+void AgentImpl::processStartAccount(JsonCpp::Value& request, JsonCpp::Value& answer)
 {
     std::unique_lock<std::recursive_mutex> l(mAgentMutex);
     // Locate account in map
@@ -270,7 +270,7 @@ void AgentImpl::processStartAccount(Json::Value& request, Json::Value& answer)
         answer["status"] = Status_AccountNotFound;
 }
 
-void AgentImpl::processSetUserInfoToAccount(Json::Value &request, Json::Value &answer)
+void AgentImpl::processSetUserInfoToAccount(JsonCpp::Value &request, JsonCpp::Value &answer)
 {
     std::unique_lock<std::recursive_mutex> l(mAgentMutex);
     // Locate account in map
@@ -278,7 +278,7 @@ void AgentImpl::processSetUserInfoToAccount(Json::Value &request, Json::Value &a
     if (accountIter != mAccountMap.end())
     {
         Account::UserInfo info;
-        Json::Value& arg = request["userinfo"];
+        JsonCpp::Value& arg = request["userinfo"];
         std::vector<std::string> keys = arg.getMemberNames();
         for (const std::string& k: keys)
             info[k] = arg[k].asString();
@@ -290,7 +290,7 @@ void AgentImpl::processSetUserInfoToAccount(Json::Value &request, Json::Value &a
         answer["status"] = Status_AccountNotFound;
 }
 
-void AgentImpl::processCreateSession(Json::Value &request, Json::Value &answer)
+void AgentImpl::processCreateSession(JsonCpp::Value &request, JsonCpp::Value &answer)
 {
     std::unique_lock<std::recursive_mutex> l(mAgentMutex);
     auto accountIter = mAccountMap.find(request["account_id"].asInt());
@@ -305,7 +305,7 @@ void AgentImpl::processCreateSession(Json::Value &request, Json::Value &answer)
         answer["status"] = Status_AccountNotFound;
 }
 
-void AgentImpl::processStartSession(Json::Value& request, Json::Value& answer)
+void AgentImpl::processStartSession(JsonCpp::Value& request, JsonCpp::Value& answer)
 {
     std::unique_lock<std::recursive_mutex> l(mAgentMutex);
 
@@ -368,7 +368,7 @@ void AgentImpl::processStartSession(Json::Value& request, Json::Value& answer)
 
         // Get user headers
         Session::UserHeaders info;
-        Json::Value& arg = request["userinfo"];
+        JsonCpp::Value& arg = request["userinfo"];
         std::vector<std::string> keys = arg.getMemberNames();
         for (const std::string& k: keys)
             info[k] = arg[k].asString();
@@ -384,7 +384,7 @@ void AgentImpl::processStartSession(Json::Value& request, Json::Value& answer)
     }
 }
 
-void AgentImpl::processStopSession(Json::Value& request, Json::Value& answer)
+void AgentImpl::processStopSession(JsonCpp::Value& request, JsonCpp::Value& answer)
 {
     std::unique_lock<std::recursive_mutex> l(mAgentMutex);
 
@@ -399,7 +399,7 @@ void AgentImpl::processStopSession(Json::Value& request, Json::Value& answer)
         answer["status"] = Status_SessionNotFound;
 }
 
-void AgentImpl::processAcceptSession(Json::Value& request, Json::Value& answer)
+void AgentImpl::processAcceptSession(JsonCpp::Value& request, JsonCpp::Value& answer)
 {
     std::unique_lock<std::recursive_mutex> l(mAgentMutex);
     auto sessionIter = mSessionMap.find(request["session_id"].asInt());
@@ -413,7 +413,7 @@ void AgentImpl::processAcceptSession(Json::Value& request, Json::Value& answer)
 
         // Get user headers
         Session::UserHeaders info;
-        Json::Value& arg = request["userinfo"];
+        JsonCpp::Value& arg = request["userinfo"];
         std::vector<std::string> keys = arg.getMemberNames();
         for (const std::string& k: keys)
             info[k] = arg[k].asString();
@@ -429,7 +429,7 @@ void AgentImpl::processAcceptSession(Json::Value& request, Json::Value& answer)
 
 }
 
-void AgentImpl::processDestroySession(Json::Value& request, Json::Value& answer)
+void AgentImpl::processDestroySession(JsonCpp::Value& request, JsonCpp::Value& answer)
 {
     std::unique_lock<std::recursive_mutex> l(mAgentMutex);
 
@@ -443,7 +443,7 @@ void AgentImpl::processDestroySession(Json::Value& request, Json::Value& answer)
     answer["status"] = Status_Ok;
 }
 
-void AgentImpl::processWaitForEvent(Json::Value &request, Json::Value &answer)
+void AgentImpl::processWaitForEvent(JsonCpp::Value &request, JsonCpp::Value &answer)
 {
     std::unique_lock<std::recursive_mutex> l(mAgentMutex);
 
@@ -464,15 +464,15 @@ void AgentImpl::processWaitForEvent(Json::Value &request, Json::Value &answer)
 }
 
 #if defined(USE_PVQA_LIBRARY)
-static Json::Value CsvReportToJson(const std::string& report)
+static JsonCpp::Value CsvReportToJson(const std::string& report)
 {
-    Json::Value detectorValues;
+    JsonCpp::Value detectorValues;
     std::istringstream iss(report);
     CsvReader reader(iss);
     std::vector<std::string> cells;
     if (reader.readLine(cells))
     {
-        Json::Value detectorNames;
+        JsonCpp::Value detectorNames;
         for (size_t nameIndex = 0; nameIndex < cells.size(); nameIndex++)
             detectorNames[static_cast<int>(nameIndex)] = StringHelper::trim(cells[nameIndex]);
         // Put first line name of columns
@@ -482,7 +482,7 @@ static Json::Value CsvReportToJson(const std::string& report)
         while (reader.readLine(cells))
         {
             // Skip last column for now
-            Json::Value row;
+            JsonCpp::Value row;
             for (size_t valueIndex = 0; valueIndex < cells.size(); valueIndex++)
             {
                 bool isFloat = true;
@@ -499,7 +499,7 @@ static Json::Value CsvReportToJson(const std::string& report)
 }
 #endif
 
-void AgentImpl::processGetMediaStats(Json::Value& request, Json::Value& answer)
+void AgentImpl::processGetMediaStats(JsonCpp::Value& request, JsonCpp::Value& answer)
 {
     std::unique_lock<std::recursive_mutex> l(mAgentMutex);
     int sessionId = request["session_id"].asInt();
@@ -611,7 +611,7 @@ void AgentImpl::processGetMediaStats(Json::Value& request, Json::Value& answer)
         answer["status"] = Status_SessionNotFound;
 }
 
-void AgentImpl::processNetworkChanged(Json::Value& /*request*/, Json::Value& /*answer*/)
+void AgentImpl::processNetworkChanged(JsonCpp::Value& /*request*/, JsonCpp::Value& /*answer*/)
 {
     std::unique_lock<std::recursive_mutex> l(mAgentMutex);
 }
@@ -619,7 +619,7 @@ void AgentImpl::processNetworkChanged(Json::Value& /*request*/, Json::Value& /*a
 const std::string BeginCertificate = "-----BEGIN CERTIFICATE-----";
 const std::string EndCertificate = "-----END CERTIFICATE-----";
 
-void AgentImpl::processAddRootCert(Json::Value& request, Json::Value& answer)
+void AgentImpl::processAddRootCert(JsonCpp::Value& request, JsonCpp::Value& answer)
 {
     std::unique_lock<std::recursive_mutex> l(mAgentMutex);
     std::string pem = request["cert"].asString();
@@ -642,7 +642,7 @@ void AgentImpl::processAddRootCert(Json::Value& request, Json::Value& answer)
     answer["status"] = Status_Ok;
 }
 
-void AgentImpl::processLogMessage(Json::Value &request, Json::Value &answer)
+void AgentImpl::processLogMessage(JsonCpp::Value &request, JsonCpp::Value &answer)
 {
     int level = request["level"].asInt();
     std::string message = request["message"].asString();
@@ -692,7 +692,7 @@ void AgentImpl::stopAgentAndThread()
     SocketHeap::instance().stop();
 }
 
-void AgentImpl::processUseStreamForSession(Json::Value& request, Json::Value& answer)
+void AgentImpl::processUseStreamForSession(JsonCpp::Value& request, JsonCpp::Value& answer)
 {
     std::unique_lock<std::recursive_mutex> l(mAgentMutex);
     SessionMap::iterator sessionIter = mSessionMap.find(request["session_id"].asInt());
@@ -790,7 +790,7 @@ void AgentImpl::onMedia(const void* data, int length, MT::Stream::MediaDirection
 
 
 // Called on new incoming session; providers shoukld
-#define EVENT_WITH_NAME(X) Json::Value v; v["event_name"] = X;
+#define EVENT_WITH_NAME(X) JsonCpp::Value v; v["event_name"] = X;
 
 PDataProvider AgentImpl::onProviderNeeded(const std::string& name)
 {
@@ -935,7 +935,7 @@ void AgentImpl::onSipConnectionFailed()
     addEvent(v);
 }
 
-void AgentImpl::addEvent(const Json::Value& v)
+void AgentImpl::addEvent(const JsonCpp::Value& v)
 {
     std::unique_lock<std::mutex> lock(mEventListMutex);
     mEventList.push_back(v);
