@@ -7,8 +7,58 @@ set (CMAKE_CXX_STANDARD_REQUIRED ON)
 # Produce PIC code always
 set (CMAKE_POSITION_INDEPENDENT_CODE ON)
 
-#set (USE_RESIP_INTEGRATION CACHE BOOL OFF "Integrate with resip structures")
-file(GLOB MEDIA_LIB_SOURCES "*.cpp" "*.h")
+# Set of variables to control references to codecs
+set (USE_AMR_CODEC       OFF CACHE BOOL "Use AMR codec. Requires libraries."    OFF)
+set (USE_EVS_CODEC       OFF CACHE BOOL "Use EVS codec."                        OFF)
+set (USE_OPUS_CODEC      OFF CACHE BOOL "Use Opus codec."                       OFF)
+set (USE_SEVANA_LIB      OFF CACHE BOOL "Build with Sevana libraries"           OFF)
+
+set (SOURCES
+    MT_Statistics.cpp
+    MT_WebRtc.cpp
+    MT_Stream.cpp
+    MT_SrtpHelper.cpp
+    MT_SingleAudioStream.cpp
+    MT_NativeRtpSender.cpp
+    MT_Dtmf.cpp
+    MT_CodecList.cpp
+    MT_Codec.cpp
+    MT_Box.cpp
+    MT_AudioStream.cpp
+    MT_AudioReceiver.cpp
+    MT_AudioCodec.cpp
+    MT_CngHelper.cpp
+
+    MT_Statistics.h
+    MT_WebRtc.h
+    MT_Stream.h
+    MT_SrtpHelper.h
+    MT_SingleAudioStream.h
+    MT_NativeRtpSender.h
+    MT_Dtmf.h
+    MT_CodecList.h
+    MT_Codec.h
+    MT_Box.h
+    MT_AudioStream.h
+    MT_AudioReceiver.h
+    MT_AudioCodec.h
+    MT_CngHelper.h
+    )
+
+if (USE_AMR_CODEC)
+    add_definitions(-DUSE_AMR_CODEC)
+    set(SOURCES ${SOURCES} MT_AmrCodec.cpp MT_AmrCodec.h)
+endif()
+
+if (USE_EVS_CODEC)
+    add_definitions (-DUSE_EVS_CODEC)
+    set (SOURCES ${SOURCES} MT_EvsCodec.cpp MT_EvsCodec.h)
+endif()
+
+if (USE_OPUS_CODEC)
+    add_definitions(-DUSE_OPUS_CODEC)
+endif()
+
 
 if(CMAKE_SYSTEM MATCHES "Linux*")
     add_definitions(-DHAVE_NETINET_IN_H)
@@ -25,7 +75,7 @@ if (CMAKE_SYSTEM MATCHES "Windows*")
         -D_SILENCE_STDEXT_HASH_DEPRECATION_WARNINGS -DUNICODE -D_UNICODE )
 endif()
 
-add_library(media_lib ${MEDIA_LIB_SOURCES})
+add_library(media_lib ${SOURCES})
 
 target_include_directories(media_lib
     PUBLIC  ${CMAKE_CURRENT_SOURCE_DIR}/../../libs/

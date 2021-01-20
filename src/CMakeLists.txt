@@ -57,10 +57,10 @@ set (CMAKE_CXX_STANDARD_REQUIRED ON)
 set (rtphone_libs libs)
 set (rtphone_engine engine)
 
-option (USE_AMR_CODEC       "Use AMR codec. Requires libraries."    OFF)
-option (USE_EVS_CODEC       "Use EVS codec."                        OFF)
-option (USE_OPUS_CODEC      "Use Opus codec."                       OFF)
-option (USE_SEVANA_LIB      "Build with Sevana libraries"           OFF)
+set (USE_AMR_CODEC       OFF CACHE BOOL "Use AMR codec. Requires libraries."    OFF)
+set (USE_EVS_CODEC       OFF CACHE BOOL "Use EVS codec."                        OFF)
+set (USE_OPUS_CODEC      OFF CACHE BOOL "Use Opus codec."                       OFF)
+set (USE_SEVANA_LIB      OFF CACHE BOOL "Build with Sevana libraries"           OFF)
 
 # PIC code by default
 set (CMAKE_POSITION_INDEPENDENT_CODE ON)
@@ -104,7 +104,6 @@ set (RTPHONE_SOURCES
     ${rtphone_engine}/media/MT_AudioStream.cpp
     ${rtphone_engine}/media/MT_AudioReceiver.cpp
     ${rtphone_engine}/media/MT_AudioCodec.cpp
-    ${rtphone_engine}/media/MT_EvsCodec.cpp
     ${rtphone_engine}/media/MT_CngHelper.cpp
     ${rtphone_engine}/agent/Agent_Impl.cpp
     ${rtphone_engine}/agent/Agent_AudioManager.cpp
@@ -130,7 +129,6 @@ set (RTPHONE_SOURCES
     ${rtphone_engine}/media/MT_AudioReceiver.h
     ${rtphone_engine}/media/MT_AudioCodec.h
 
-    ${rtphone_engine}/media/MT_EvsCodec.h
     ${rtphone_engine}/media/MT_CngHelper.h
     ${rtphone_engine}/agent/Agent_Impl.h
     ${rtphone_engine}/agent/Agent_AudioManager.h
