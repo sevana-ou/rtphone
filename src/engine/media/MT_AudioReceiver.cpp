@@ -1,4 +1,4 @@
-/* Copyright(C) 2007-2018 VoIPobjects (voipobjects.com)
+/* Copyright(C) 2007-2021 VoIPobjects (voipobjects.com)
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -13,7 +13,7 @@
 #include "../audio/Audio_Interface.h"
 #include "../audio/Audio_Resampler.h"
 
-#if !defined(TARGET_ANDROID) && !defined(TARGET_OPENWRT) && !defined(TARGET_WIN) && !defined(TARGET_RPI)
+#if !defined(TARGET_ANDROID) && !defined(TARGET_OPENWRT) && !defined(TARGET_WIN) && !defined(TARGET_RPI) && defined(USE_AMR_CODEC)
 # include "MT_AmrCodec.h"
 #endif
 
@@ -49,8 +49,8 @@ int RtpBuffer::Packet::rate() const
 // ------------ RtpBuffer ----------------
 RtpBuffer::RtpBuffer(Statistics& stat)
     :mStat(stat), mSsrc(0), mHigh(RTP_BUFFER_HIGH), mLow(RTP_BUFFER_LOW), mPrebuffer(RTP_BUFFER_PREBUFFER),
-      mFirstPacketWillGo(true),
-      mReturnedCounter(0), mAddCounter(0), mFetchedPacket(std::shared_ptr<RTPPacket>(), 0, 0)
+      mFirstPacketWillGo(true), mReturnedCounter(0), mAddCounter(0),
+      mFetchedPacket(std::shared_ptr<RTPPacket>(), 0, 0)
 {
 }
 
@@ -694,7 +694,7 @@ float AudioReceiver::calculatePvqaMos(int rate, std::string& report)
 
 void AudioReceiver::processStatisticsWithAmrCodec(Codec* c)
 {
-#if !defined(TARGET_ANDROID) && !defined(TARGET_OPENWRT) && !defined(TARGET_WIN) && !defined(TARGET_RPI)
+#if !defined(TARGET_ANDROID) && !defined(TARGET_OPENWRT) && !defined(TARGET_WIN) && !defined(TARGET_RPI) && defined(USE_AMR_CODEC)
     AmrNbCodec* nb = dynamic_cast<AmrNbCodec*>(c);
     AmrWbCodec* wb = dynamic_cast<AmrWbCodec*>(c);
 

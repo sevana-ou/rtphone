@@ -8,10 +8,10 @@ set (CMAKE_CXX_STANDARD_REQUIRED ON)
 set (CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 # Set of variables to control references to codecs
-set (USE_AMR_CODEC       OFF CACHE BOOL "Use AMR codec. Requires libraries."    OFF)
-set (USE_EVS_CODEC       OFF CACHE BOOL "Use EVS codec."                        OFF)
-set (USE_OPUS_CODEC      OFF CACHE BOOL "Use Opus codec."                       OFF)
-set (USE_SEVANA_LIB      OFF CACHE BOOL "Build with Sevana libraries"           OFF)
+set (USE_AMR_CODEC       OFF CACHE BOOL "Use AMR codec. Requires libraries.")
+set (USE_EVS_CODEC       OFF CACHE BOOL "Use EVS codec."                    )
+set (USE_OPUS_CODEC      OFF CACHE BOOL "Use Opus codec."                   )
+set (USE_SEVANA_LIB      OFF CACHE BOOL "Build with Sevana libraries"       )
 
 set (SOURCES
     MT_Statistics.cpp
@@ -46,16 +46,19 @@ set (SOURCES
     )
 
 if (USE_AMR_CODEC)
+    message("AMR NB and WB codecs will be included.")
     add_definitions(-DUSE_AMR_CODEC)
     set(SOURCES ${SOURCES} MT_AmrCodec.cpp MT_AmrCodec.h)
 endif()
 
 if (USE_EVS_CODEC)
+    message("EVS codec will be included.")
     add_definitions (-DUSE_EVS_CODEC)
     set (SOURCES ${SOURCES} MT_EvsCodec.cpp MT_EvsCodec.h)
 endif()
 
 if (USE_OPUS_CODEC)
+    message("Opus codec will be included.")
     add_definitions(-DUSE_OPUS_CODEC)
 endif()
 
