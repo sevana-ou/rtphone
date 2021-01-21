@@ -57,10 +57,10 @@ set (CMAKE_CXX_STANDARD_REQUIRED ON)
 set (rtphone_libs libs)
 set (rtphone_engine engine)
 
-set (USE_AMR_CODEC       FALSE CACHED BOOL "Use AMR codec. Requires libraries.")
-set (USE_EVS_CODEC       FALSE CACHED BOOL "Use EVS codec."                    )
-set (USE_OPUS_CODEC      FALSE CACHED BOOL "Use Opus codec."                   )
-set (USE_SEVANA_LIB      FALSE CACHED BOOL "Build with Sevana libraries"       )
+set (USE_AMR_CODEC       OFF CACHE BOOL "Use AMR codec. Requires libraries.")
+set (USE_EVS_CODEC       OFF CACHE BOOL "Use EVS codec."                    )
+set (USE_OPUS_CODEC      OFF CACHE BOOL "Use Opus codec."                   )
+set (USE_SEVANA_LIB      OFF CACHE BOOL "Build with Sevana libraries"       )
 
 # PIC code by default
 set (CMAKE_POSITION_INDEPENDENT_CODE ON)
