@@ -39,10 +39,11 @@ Uuid Uuid::parse(const std::string &s)
 
 std::string Uuid::toString() const
 {
-    char buf[64];
 #if defined(USE_NULL_UUID)
     return "UUID_disabled";
 #else
+    char buf[64];
+
 #if defined(TARGET_LINUX) || defined(TARGET_OSX)
     uuid_unparse_lower(mUuid, buf);
 #endif
