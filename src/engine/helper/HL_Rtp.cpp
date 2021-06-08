@@ -245,3 +245,8 @@ std::string MediaStreamId::getFinishDescription() const
     return oss.str();
 }
 
+std::ostream& operator << (std::ostream& output, const MediaStreamId& id)
+{
+    return (output << id.toString());
+}
+

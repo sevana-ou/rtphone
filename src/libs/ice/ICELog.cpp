@@ -41,6 +41,9 @@ LogLevel LogLevelHelper::parse(const std::string& t)
     else
     if (t == "special")
         return LL_SPECIAL;
+    else
+    if (t == "media")
+        return LL_MEDIA;
 
     throw std::runtime_error("Bad log param string value.");
 }

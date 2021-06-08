@@ -60,7 +60,8 @@ set (rtphone_engine engine)
 set (USE_AMR_CODEC       OFF CACHE BOOL "Use AMR codec. Requires libraries.")
 set (USE_EVS_CODEC       OFF CACHE BOOL "Use EVS codec."                    )
 set (USE_OPUS_CODEC      OFF CACHE BOOL "Use Opus codec."                   )
-set (USE_SEVANA_LIB      OFF CACHE BOOL "Build with Sevana libraries"       )
+set (USE_PVQA_LIB        OFF CACHE BOOL "Build with Sevana PVQA library"    )
+set (USE_AQUA_LIB        OFF CACHE BOOL "Build with Sevana AQuA library"    )
 
 # PIC code by default
 set (CMAKE_POSITION_INDEPENDENT_CODE ON)
@@ -85,9 +86,15 @@ if (CMAKE_SYSTEM MATCHES "Darwin*")
     add_definitions (-DTARGET_OSX)
 endif()
 
-if (USE_SEVANA_LIB)
-    message("Use Sevana libraries")
-    add_definitions( -DUSE_AQUA_LIBRARY -DUSE_PVQA_LIBRARY)
+if (USE_AQUA_LIB)
+    message("Use AQuA library")
+    add_definitions( -DUSE_AQUA_LIBRARY )
+    include_directories(${CMAKE_CURRENT_SOURCE_DIR}/libs/pvqa/include)
+endif()
+
+if (USE_PVQA_LIBRARY)
+    message("Use PVQA libraries")
+    add_definitions( -DUSE_PVQA_LIBRARY )
     include_directories(${CMAKE_CURRENT_SOURCE_DIR}/libs/pvqa/include)
 endif()
 

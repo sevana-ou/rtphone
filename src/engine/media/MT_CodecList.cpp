@@ -96,7 +96,7 @@ CodecList::CodecList(const Settings& settings)
   :mSettings(settings)
 {
   //mFactoryList.push_back(new OpusCodec::OpusFactory(16000, 1));
-#if !defined(TARGET_ANDROID) && defined(USE_OPUS_CODEC)
+#if defined(USE_OPUS_CODEC)
   if (settings.mOpusSpec.empty())
   {
     mFactoryList.push_back(new OpusCodec::OpusFactory(48000, 2, MT_OPUS_CODEC_PT));

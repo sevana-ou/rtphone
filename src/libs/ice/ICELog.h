@@ -164,12 +164,14 @@ extern Logger GLogger;
 #define ICELogError(args_) ICELog(LL_ERROR, LOG_SUBSYSTEM, args_)
 #define ICELogSpecial(args_) ICELog(LL_SPECIAL, LOG_SUBSYSTEM, args_)
 
+/*
 #define ICELogCritical2(args_) ICELog(LogLevel_Critical, LogSubsystem.c_str(), args_)
 #define ICELogInfo2(args_) ICELog(LogLevel_Info, LogSubsystem.c_str(), args_)
 #define ICELogDebug2(args_) ICELog(LogLevel_Debug, LogSubsystem.c_str(), args_)
 #define ICELogMedia2(args_) ICELog(LogLevel_Media, LogSubsystem.c_str(), args_)
 #define ICELogError2(args_) ICELog(LogLevel_Error, LogSubsystem.c_str(), args_)
 #define ICELogSpecial2(args_) ICELog(LogLevel_Special, LogSubsystem.c_str(), args_)
+*/
 
 #define DEFINE_LOGGING(subsystem) \
     static std::string LogSubsystem = subsystem; \
