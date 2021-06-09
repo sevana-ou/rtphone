@@ -208,10 +208,13 @@ void AgentImpl::processStart(JsonCpp::Value& /*request*/, JsonCpp::Value &answer
     PVariantMap priorityConfig = std::make_shared<VariantMap>();
     MT::CodecList& cl = mTerminal->codeclist();
     for (int i=0; i<cl.count(); i++)
-        if (cl.codecAt(i).payloadType() < 96)
+        priorityConfig->at(i) = i;
+
+    // Disable dynamic payload codec types - commented for now
+        /*if (cl.codecAt(i).payloadType() < 96)
             priorityConfig->at(i) = i;
         else
-            priorityConfig->at(i) = -1;
+            priorityConfig->at(i) = -1;*/
 
     config()[CONFIG_CODEC_PRIORITY] = priorityConfig;
 

@@ -110,6 +110,7 @@ void AudioStream::setDestination(const RtpPair<InternetAddress>& dest)
 void AudioStream::setTransmittingCodec(Codec::Factory& factory, int payloadType)  
 {
   ICELogInfo(<< "Selected codec " << factory.name() << "/" << factory.samplerate() << " for transmitting");
+
   Lock l(mMutex);
   mTransmittingCodec = factory.create();
   mTransmittingPayloadType = payloadType;
@@ -145,8 +146,10 @@ void AudioStream::addData(const void* buffer, int bytes)
   {
     Lock l(mMutex);
     codec = mTransmittingCodec.get();
-    if (!codec)
+    if (nullptr == codec) {
+      ICELogDebug(<< "No transmitting codec selected.");
       return;
+    }
   }
 
   // Resample
@@ -202,7 +205,7 @@ void AudioStream::addData(const void* buffer, int bytes)
   int packetTime = mPacketTime ? mPacketTime : codec->frameTime();
 
   // Make stereo version if required
-  for (int i=0; i<mCapturedAudio.filled() / mTransmittingCodec->pcmLength(); i++)
+  for (int i=0; i<mCapturedAudio.filled() / codec->pcmLength(); i++)
   {
     if (mSendingDump)
       mSendingDump->write((const char*)mCapturedAudio.data() + codec->pcmLength() * i, codec->pcmLength());
@@ -230,7 +233,8 @@ void AudioStream::addData(const void* buffer, int bytes)
       }
     }
   }
-  mCapturedAudio.erase(processed);
+  if (processed > 0)
+    mCapturedAudio.erase(processed);
 }
 
 void AudioStream::copyDataTo(Audio::Mixer& mixer, int needed)

@@ -128,12 +128,12 @@ CodecList::CodecList(const Settings& settings)
 
   //mFactoryList.push_back(new IsacCodec::IsacFactory16K(mSettings.mIsac16KPayloadType));
   //mFactoryList.push_back(new IlbcCodec::IlbcFactory(mSettings.mIlbc20PayloadType, mSettings.mIlbc30PayloadType));
-  mFactoryList.push_back(new G711Codec::AlawFactory());
-  mFactoryList.push_back(new G711Codec::UlawFactory());
+  // mFactoryList.push_back(new G711Codec::AlawFactory());
+  // mFactoryList.push_back(new G711Codec::UlawFactory());
 
-  mFactoryList.push_back(new GsmCodec::GsmFactory(mSettings.mGsmFrPayloadLength == 32 ? GsmCodec::Type::Bytes_32 : GsmCodec::Type::Bytes_33, mSettings.mGsmFrPayloadType));
-  mFactoryList.push_back(new G722Codec::G722Factory());
-  mFactoryList.push_back(new G729Codec::G729Factory());
+  // mFactoryList.push_back(new GsmCodec::GsmFactory(mSettings.mGsmFrPayloadLength == 32 ? GsmCodec::Type::Bytes_32 : GsmCodec::Type::Bytes_33, mSettings.mGsmFrPayloadType));
+  // mFactoryList.push_back(new G722Codec::G722Factory());
+  // mFactoryList.push_back(new G729Codec::G729Factory());
 #ifndef TARGET_ANDROID
   mFactoryList.push_back(new GsmHrCodec::GsmHrFactory(mSettings.mGsmHrPayloadType));
 #endif
@@ -231,7 +231,7 @@ void CodecListPriority::setupFrom(PVariantMap vmap)
     {
       Item item;
       item.mCodecIndex = i;
-      item.mPriority = vmap->exists(i) ? vmap->at(i).asInt() : -1;
+      item.mPriority = vmap->exists(i) ? vmap->at(i).asInt() : 1000; // Non listed codecs will get lower priority
       mPriorityList.push_back(item);
     }
 

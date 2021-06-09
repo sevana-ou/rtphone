@@ -84,7 +84,7 @@
 
 // OPUS codec defines
 // #define USE_OPUS_CODEC
-#define MT_OPUS_CODEC_PT -1
+#define MT_OPUS_CODEC_PT 106
 
 // ILBC codec defines
 #define MT_ILBC20_PAYLOADTYPE -1

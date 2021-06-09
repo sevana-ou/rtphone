@@ -64,8 +64,9 @@ public:
   // Returns true if description is processed succesfully. Otherwise method returns false.
   // myAnswer sets if the answer will be sent after.
   bool          processSdpOffer(const resip::SdpContents::Session::Medium& media, SdpDirection sdpDirection);
-  
-  void          setState(unsigned state);
+
+
+  void          setState(unsigned state) override;
   unsigned      state();
   MT::Statistics  getStatistics();
   MT::PStream   activeStream();
@@ -112,6 +113,10 @@ protected:
   std::string createCryptoAttribute(SrtpSuite suite);
   SrtpSuite processCryptoAttribute(const resip::Data& value, ByteBuffer& key);
   void findRfc2833(const resip::SdpContents::Session::Medium::CodecContainer& codecs);
+
+  // Implements setState() logic. This allows to be called from constructor (it is not virtual function)
+  void setStateImpl(unsigned state);
+
 };
 
 #endif

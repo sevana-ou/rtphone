@@ -64,7 +64,7 @@ namespace MT
     Audio::DataWindow mStereoCapturedAudio;
     char mIncomingPcmBuffer[AUDIO_MIC_BUFFER_SIZE]; // Temporary buffer to allow reading from file
     char mResampleBuffer[AUDIO_MIC_BUFFER_SIZE*8];  // Temporary buffer to hold data
-    char mStereoBuffer[AUDIO_MIC_BUFFER_SIZE*8];    // Temporary buffer to hold data converted to stereo
+    char mStereoBuffer[AUDIO_MIC_BUFFER_SIZE*16];   // Temporary buffer to hold data converted to stereo
     PCodec mTransmittingCodec;                      // Current encoding codec
     int mTransmittingPayloadType;                   // Payload type to mark outgoing packets
     int mPacketTime;                                // Required packet time

@@ -726,7 +726,7 @@ void Session::buildSdp(resip::SdpContents &sdp, SdpDirection sdpDirection)
         if (mUserAgent->mConfig[CONFIG_MULTIPLEXING].asBool())
             media.addAttribute("rtcp-mux");
 
-        // Ask provider about specific information
+        // Ask provider about specific information - codecs are filled here
         provider.updateSdpOffer(media, sdpDirection);
 
         // Add ICE information

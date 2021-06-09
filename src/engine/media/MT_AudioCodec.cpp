@@ -402,6 +402,7 @@ PCodec OpusCodec::OpusFactory::create()
   result->applyParams(mParams);
   PCodec c(result);
   mCodecList.push_back(c);
+
   return c;
 }
 
