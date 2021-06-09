@@ -147,7 +147,7 @@ void AudioStream::addData(const void* buffer, int bytes)
     Lock l(mMutex);
     codec = mTransmittingCodec.get();
     if (nullptr == codec) {
-      ICELogDebug(<< "No transmitting codec selected.");
+      // ICELogDebug(<< "No transmitting codec selected.");
       return;
     }
   }

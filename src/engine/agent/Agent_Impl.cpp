@@ -335,17 +335,20 @@ void AgentImpl::processStartSession(JsonCpp::Value& request, JsonCpp::Value& ans
         std::string path_faults = request["path_faults"].asString();
 
         sevana::aqua::config config = {
-                { "avlp",              "off"   },
-                { "decor",             "off"   },
-                { "mprio",             "off"   },
-                { "miter",             "1"     },
-                { "enorm",             "off"   },
+                {"avlp",   "off"},
+                {"smtnrm", "on"},
+                {"decor",  "off"},
+                {"mprio",  "off"},
+                //{"acr",    "auto"},
+                {"miter",              "1"},
+                { "npnt",              "auto"},
+                { "enorm",             "rms"   },
                 { "voip",              "on"    },
-                { "g711",              "on"    },
+                { "g711",              "off"    },
                 { "spfrcor",           "on"    },
                 { "grad",              "off"   },
-                { "ratem",             "%%m"   },
-                { "trim",              "a 2"   },
+                { "ratem",             "%m"   },
+                { "trim",              "r 10"   },
                 { "output",            "json"  },
                 { "fau",               path_faults},
                 { "specp",             "32"}
