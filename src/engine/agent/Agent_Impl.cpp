@@ -4,6 +4,7 @@
 #include "helper/HL_StreamState.h"
 #include "helper/HL_VariantMap.h"
 #include "helper/HL_CsvReader.h"
+#include "helper/HL_Base64.h"
 #include <fstream>
 
 #if defined(USE_PVQA_LIBRARY)
@@ -555,6 +556,8 @@ void AgentImpl::processGetMediaStats(JsonCpp::Value& request, JsonCpp::Value& an
         if (includeAqua)
         {
             answer["incoming_audio"] = mAquaIncoming.hexstring();
+            answer["incoming_audio_samplerate"] = AUDIO_SAMPLERATE;
+            answer["incoming_audio_channels"] = AUDIO_CHANNELS;
 
             ICELogInfo(<< "Running AQuA analyzer.");
             ByteBuffer referenceAudio;
@@ -599,6 +602,12 @@ void AgentImpl::processGetMediaStats(JsonCpp::Value& request, JsonCpp::Value& an
                     }
                     answer["aqua_mos"] = r.mMos;
                     answer["aqua_report"] = r.mFaultsText;
+                    /*std::string aqua_audio_text;
+                    if (Base64::Encode(std::string(reinterpret_cast<const char*>(mAquaIncoming.data()), mAquaIncoming.size()), &aqua_audio_text))
+                    {
+                        answer["aqua_audio"] = aqua_audio_text;
+                    }*/
+
                     if (r.mErrorCode) {
                         answer["aqua_error_code"] = r.mErrorCode;
                         answer["aqua_error_message"] = r.mErrorMessage;
