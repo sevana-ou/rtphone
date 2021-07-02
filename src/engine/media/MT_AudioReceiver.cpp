@@ -26,7 +26,7 @@
 using namespace MT;
 
 // ----------------- RtpBuffer::Packet --------------
-RtpBuffer::Packet::Packet(std::shared_ptr<RTPPacket> packet, int timelength, int rate)
+RtpBuffer::Packet::Packet(const std::shared_ptr<RTPPacket>& packet, int timelength, int rate)
     :mRtp(packet), mTimelength(timelength), mRate(rate)
 {
 }
@@ -120,9 +120,8 @@ bool RtpBuffer::add(std::shared_ptr<jrtplib::RTPPacket> packet, int timelength, 
     // New sequence number
     unsigned newSeqno = packet->GetExtendedSequenceNumber();
 
-    for (PacketList::iterator iter = mPacketList.begin(); iter != mPacketList.end(); iter++)
+    for (Packet& p: mPacketList)
     {
-        Packet& p = *iter;
         unsigned seqno = p.rtp()->GetExtendedSequenceNumber();
 
         if (seqno == newSeqno)
@@ -138,6 +137,7 @@ bool RtpBuffer::add(std::shared_ptr<jrtplib::RTPPacket> packet, int timelength, 
             minno = seqno;
     }
 
+    // Get amount of available audio (in milliseconds) in jitter buffer
     int available = findTimelength();
 
     if (newSeqno > minno || (available < mHigh))
@@ -188,6 +188,9 @@ RtpBuffer::FetchResult RtpBuffer::fetch(ResultList& rl)
 
         // Erase from packet list
         mPacketList.erase(mPacketList.begin());
+
+        // Increase number in statistics
+        mStat.mPacketDropped++;
     }
 
     if (total < mLow)
@@ -351,7 +354,7 @@ AudioReceiver::~AudioReceiver()
 }
 
 
-bool AudioReceiver::add(std::shared_ptr<jrtplib::RTPPacket> p, Codec** codec)
+bool AudioReceiver::add(const std::shared_ptr<jrtplib::RTPPacket>& p, Codec** codec)
 {
     // Increase codec counter
     mStat.mCodecCount[p->GetPayloadType()]++;
@@ -373,20 +376,20 @@ bool AudioReceiver::add(std::shared_ptr<jrtplib::RTPPacket> p, Codec** codec)
                 codecIter->second = mCodecList.codecAt(codecIndex).create();
     }
 
-    // Return pointer to codec if needed
+    // Return pointer to codec if needed.get()
     if (codec)
         *codec = codecIter->second.get();
 
     if (mStat.mCodecName.empty())
-        mStat.mCodecName = codecIter->second.get()->name();
+        mStat.mCodecName = codecIter->second->name();
 
     // Estimate time length
-    int timelen = 0, payloadLength = p->GetPayloadLength(), ptype = p->GetPayloadType();
+    int time_length = 0, payloadLength = p->GetPayloadLength(), ptype = p->GetPayloadType();
 
     if (!codecIter->second->rtpLength())
-        timelen = codecIter->second->frameTime();
+        time_length = codecIter->second->frameTime();
     else
-        timelen = int(double(payloadLength) / codecIter->second->rtpLength() * codecIter->second->frameTime() + 0.5);
+        time_length = lround(double(payloadLength) / codecIter->second->rtpLength() * codecIter->second->frameTime());
 
     // Process jitter
     mJitterStats.process(p.get(), codecIter->second->samplerate());
@@ -394,19 +397,19 @@ bool AudioReceiver::add(std::shared_ptr<jrtplib::RTPPacket> p, Codec** codec)
 
     // Check if packet is CNG
     if (payloadLength >= 1 && payloadLength <= 6 && (ptype == 0 || ptype == 8))
-        timelen = mLastPacketTimeLength ? mLastPacketTimeLength : 20;
+        time_length = mLastPacketTimeLength ? mLastPacketTimeLength : 20;
     else
         // Check if packet is too short from time length side
-        if (timelen < 2)
+        if (time_length < 2)
         {
             // It will cause statistics to report about bad RTP packet
             // I have to replay last packet payload here to avoid report about lost packet
-            mBuffer.add(p, timelen, codecIter->second->samplerate());
+            mBuffer.add(p, time_length, codecIter->second->samplerate());
             return false;
         }
 
     // Queue packet to buffer
-    return mBuffer.add(p, timelen, codecIter->second->samplerate());
+    return mBuffer.add(p, time_length, codecIter->second->samplerate());
 }
 
 void AudioReceiver::processDecoded(Audio::DataWindow& output, int options)

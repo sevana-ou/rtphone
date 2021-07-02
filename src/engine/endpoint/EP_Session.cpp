@@ -478,6 +478,7 @@ void Session::getSessionInfo(Session::InfoOptions options, VariantMap& info)
     info[SessionInfo_ReceivedRtp] = static_cast<int>(stat.mReceivedRtp);
     info[SessionInfo_ReceivedRtcp] = static_cast<int>(stat.mReceivedRtcp);
     info[SessionInfo_LostRtp] = static_cast<int>(stat.mPacketLoss);
+    info[SessionInfo_DroppedRtp] = static_cast<int>(stat.mPacketDropped);
     info[SessionInfo_SentRtp] = static_cast<int>(stat.mSentRtp);
     info[SessionInfo_SentRtcp] = static_cast<int>(stat.mSentRtcp);
     if (stat.mFirstRtpTime)

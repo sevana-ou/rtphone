@@ -45,7 +45,7 @@ namespace MT
     class Packet
     {
     public:
-      Packet(std::shared_ptr<RTPPacket> packet, int timelen, int rate);
+      Packet(const std::shared_ptr<RTPPacket>& packet, int timelen, int rate);
       std::shared_ptr<RTPPacket> rtp() const;
       int timelength() const;
       int rate() const;
@@ -109,7 +109,7 @@ namespace MT
     
     // Returns false when packet is rejected as illegal. codec parameter will show codec which will be used for decoding.
     // Lifetime of pointer to codec is limited by lifetime of AudioReceiver (it is container).
-    bool add(std::shared_ptr<jrtplib::RTPPacket> p, Codec** codec = nullptr);
+    bool add(const std::shared_ptr<jrtplib::RTPPacket>& p, Codec** codec = nullptr);
 
     // Returns false when there is no rtp data from jitter
     enum DecodeOptions
@@ -178,6 +178,7 @@ namespace MT
     void initPvqa();
     void updatePvqa(const void* data, int size);
     float calculatePvqaMos(int rate, std::string& report);
+
     std::shared_ptr<Audio::DataWindow> mPvqaBuffer;
 #endif
 

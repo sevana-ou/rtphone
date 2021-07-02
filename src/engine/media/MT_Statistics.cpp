@@ -40,7 +40,7 @@ void JitterStatistics::process(jrtplib::RTPPacket* packet, int rate)
         int64_t delta = receiveDelta - timestampDelta;
 
         // Update max delta in milliseconds
-        double delta_in_seconds = fabs(double(delta) / rate);
+        float delta_in_seconds = float(fabs(double(delta) / rate));
         if (delta_in_seconds > mMaxDelta)
             mMaxDelta = delta_in_seconds;
 
@@ -56,7 +56,7 @@ void JitterStatistics::process(jrtplib::RTPPacket* packet, int rate)
         mReceiveTimestamp = timestamp;
 
         // And mJitter are in seconds again
-        mJitter.process(mLastJitter.value() / rate);
+        mJitter.process(mLastJitter.value() / float(rate));
     }
 }
 
@@ -67,7 +67,7 @@ void JitterStatistics::process(jrtplib::RTPPacket* packet, int rate)
 Statistics::Statistics()
     :mReceived(0), mSent(0), mReceivedRtp(0), mSentRtp(0),
       mReceivedRtcp(0), mSentRtcp(0), mDuplicatedRtp(0), mOldRtp(0), mIllegalRtp(0),
-      mPacketLoss(0), mJitter(0.0), mAudioTime(0), mSsrc(0)
+      mPacketLoss(0), mJitter(0.0), mAudioTime(0), mSsrc(0), mPacketDropped(0)
 {
     mBitrateSwitchCounter = 0;
     memset(mLoss, 0, sizeof mLoss);
@@ -94,63 +94,10 @@ void Statistics::reset()
     mIllegalRtp = 0;
     mJitter = 0.0;
     mAudioTime = 0;
+    mPacketDropped = 0;
+
     memset(mLoss, 0, sizeof mLoss);
 }
-
-/*
-double calculate_mos_g711(double ppl, double burstr, int version) {
-double r;
-double bpl = 8.47627; //mos = -4.23836 + 0.29873 * r - 0.00416744 * r * r + 0.0000209855 * r * r * r;
-double mos;
-
-if(ppl == 0 or burstr == 0) {
-return 4.5;
-}
-
-if(ppl > 0.5) {
-return 1;
-}
-
-switch(version) {
-case 1:
-case 2:
-default:
-// this mos is calculated for G.711 and PLC
-bpl = 17.2647;
-r = 93.2062077233 - 95.0 * (ppl*100/(ppl*100/burstr + bpl));
-mos = 2.06405 + 0.031738 * r - 0.000356641 * r * r + 2.93143 * pow(10,-6) * r * r * r;
-if(mos < 1)
-return 1;
-if(mos > 4.5)
-return 4.5;
-}
-
-return mos;
-}
-
-
-double calculate_mos(double ppl, double burstr, int codec, unsigned int received) {
-if(codec == PAYLOAD_G729) {
-if(opt_mos_g729) {
-if(received < 100) {
-return 3.92;
-}
-return (double)mos_g729((long double)ppl, (long double)burstr);
-} else {
-if(received < 100) {
-return 4.5;
-}
-return calculate_mos_g711(ppl, burstr, 2);
-}
-} else {
-if(received < 100) {
-return 4.5;
-}
-return calculate_mos_g711(ppl, burstr, 2);
-}
-}
-
-*/
 
 void Statistics::calculateBurstr(double* burstr, double* lossr) const
 {
@@ -230,7 +177,9 @@ Statistics& Statistics::operator += (const Statistics& src)
     mDuplicatedRtp += src.mDuplicatedRtp;
     mOldRtp += src.mOldRtp;
     mPacketLoss += src.mPacketLoss;
+    mPacketDropped += src.mPacketDropped;
     mAudioTime += src.mAudioTime;
+
 
     for (auto codecStat: src.mCodecCount)
     {
@@ -277,6 +226,8 @@ Statistics& Statistics::operator -= (const Statistics& src)
     mDuplicatedRtp -= src.mDuplicatedRtp;
     mOldRtp -= src.mOldRtp;
     mPacketLoss -= src.mPacketLoss;
+    mPacketDropped -= src.mPacketDropped;
+
     mAudioTime -= src.mAudioTime;
     for (auto codecStat: src.mCodecCount)
     {
@@ -291,9 +242,10 @@ Statistics& Statistics::operator -= (const Statistics& src)
 std::string Statistics::toShortString() const
 {
     std::ostringstream oss;
-    oss << "Received: " << mReceivedRtp
-        << ", lost: " << mPacketLoss
-        << ", sent: " << mSentRtp;
+    oss << "Received: "     << mReceivedRtp
+        << ", lost: "       << mPacketLoss
+        << ", dropped: "    << mPacketDropped
+        << ", sent: "       << mSentRtp;
 
     return oss.str();
 }

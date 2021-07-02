@@ -43,32 +43,32 @@ public:
   void          sendData(PDatagramSocket s, InternetAddress& destination, const void* dataBuffer, unsigned int datasize);
 
   // Updates SDP offer
-  void          updateSdpOffer(resip::SdpContents::Session::Medium& sdp, SdpDirection direction);
+  void          updateSdpOffer(resip::SdpContents::Session::Medium& sdp, SdpDirection direction) override;
 
   // Called by user agent when session is deleted.
-  void          sessionDeleted();
+  void          sessionDeleted() override;
 
   // Called by user agent when session is terminated.
-  void          sessionTerminated();
+  void          sessionTerminated() override;
 
   // Called by user agent when session is started.
-  void          sessionEstablished(int conntype);
+  void          sessionEstablished(int conntype) override;
 
   // Called by user agent to save media socket for this provider
-  void          setSocket(const RtpPair<PDatagramSocket>& p4, const RtpPair<PDatagramSocket>& p6);
+  void          setSocket(const RtpPair<PDatagramSocket>& p4, const RtpPair<PDatagramSocket>& p6) override;
   
   // Called by user agent to get media socket for this provider
-  RtpPair<PDatagramSocket>& socket(int family);
+  RtpPair<PDatagramSocket>& socket(int family) override;
 
   // Called by user agent to process media stream description from remote peer.
   // Returns true if description is processed succesfully. Otherwise method returns false.
   // myAnswer sets if the answer will be sent after.
-  bool          processSdpOffer(const resip::SdpContents::Session::Medium& media, SdpDirection sdpDirection);
+  bool          processSdpOffer(const resip::SdpContents::Session::Medium& media, SdpDirection sdpDirection) override;
 
 
   void          setState(unsigned state) override;
-  unsigned      state();
-  MT::Statistics  getStatistics();
+  unsigned      state() override;
+  MT::Statistics  getStatistics() override;
   MT::PStream   activeStream();
 
   void readFile(const Audio::PWavFileReader& stream, MT::Stream::MediaDirection direction);

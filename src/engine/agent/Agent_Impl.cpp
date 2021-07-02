@@ -535,6 +535,9 @@ void AgentImpl::processGetMediaStats(JsonCpp::Value& request, JsonCpp::Value& an
 #endif
         if (result.exists(SessionInfo_PacketLoss))
             answer["rtp_lost"] = result[SessionInfo_LostRtp].asInt();
+        if (result.exists(SessionInfo_DroppedRtp))
+            answer["rtp_dropped"] = result[SessionInfo_DroppedRtp].asInt();
+
         if (result.exists(SessionInfo_SentRtp))
             answer["rtp_sent"] = result[SessionInfo_SentRtp].asInt();
         if (result.exists(SessionInfo_ReceivedRtp))
