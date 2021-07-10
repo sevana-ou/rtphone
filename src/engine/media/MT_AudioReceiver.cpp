@@ -12,6 +12,7 @@
 #include "../helper/HL_Log.h"
 #include "../audio/Audio_Interface.h"
 #include "../audio/Audio_Resampler.h"
+#include <cmath>
 
 #if !defined(TARGET_ANDROID) && !defined(TARGET_OPENWRT) && !defined(TARGET_WIN) && !defined(TARGET_RPI) && defined(USE_AMR_CODEC)
 # include "MT_AmrCodec.h"
