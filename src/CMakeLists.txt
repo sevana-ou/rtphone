@@ -1,7 +1,7 @@
 project(rtphone)
 
 cmake_minimum_required(VERSION 3.0)
-
+ 
 macro(configure_msvc_runtime)
     if(MSVC)
         # Default to statically-linked runtime.
