@@ -86,6 +86,10 @@ if (CMAKE_SYSTEM MATCHES "Darwin*")
     add_definitions (-DTARGET_OSX)
 endif()
 
+if (CMAKE_SYSTEM MATCHES "Android")
+    find_package (oboe REQUIRED CONFIG)
+endif()
+
 if (USE_AQUA_LIB)
     message("Use AQuA library")
     add_definitions( -DUSE_AQUA_LIBRARY )
@@ -208,7 +212,7 @@ target_link_libraries(rtphone
     uuid
     ${OPENSSL_SSL}
     ${OPENSSL_CRYPTO}
-    ${LIBS})
+    ${LIBS} oboe::oboe)
 
 
 target_include_directories(rtphone
