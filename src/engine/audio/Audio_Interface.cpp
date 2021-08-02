@@ -146,7 +146,8 @@ OsEngine* OsEngine::instance()
 #endif
 
 #ifdef TARGET_ANDROID
-    return &OpenSLEngine::instance();
+    return nullptr; // As we use Oboe library for now
+    //return &OpenSLEngine::instance();
 #endif
 
     return nullptr;

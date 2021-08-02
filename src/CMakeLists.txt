@@ -87,7 +87,10 @@ if (CMAKE_SYSTEM MATCHES "Darwin*")
 endif()
 
 if (CMAKE_SYSTEM MATCHES "Android")
-    find_package (oboe REQUIRED CONFIG)
+    message("Adding the Oboe library")
+    set (OBOE_DIR libs/oboe)
+    add_subdirectory (${OBOE_DIR} ./oboe)
+    include_directories (${OBOE_DIR}/include)
 endif()
 
 if (USE_AQUA_LIB)
@@ -212,7 +215,7 @@ target_link_libraries(rtphone
     uuid
     ${OPENSSL_SSL}
     ${OPENSSL_CRYPTO}
-    ${LIBS} oboe::oboe)
+    ${LIBS} oboe)
 
 
 target_include_directories(rtphone
