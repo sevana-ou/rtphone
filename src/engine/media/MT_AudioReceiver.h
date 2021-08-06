@@ -60,16 +60,22 @@ namespace MT
 
     unsigned ssrc();
     void setSsrc(unsigned ssrc);
+
     void setHigh(int milliseconds);
     int high();
+
     void setLow(int milliseconds);
     int low();
+
     void setPrebuffer(int milliseconds);
     int prebuffer();
+
     int getNumberOfReturnedPackets() const;
     int getNumberOfAddPackets() const;
+
     int findTimelength();
     int getCount() const;
+
     // Returns false if packet was not add - maybe too old or too new or duplicate
     bool add(std::shared_ptr<RTPPacket> packet, int timelength, int rate);
 
@@ -89,6 +95,9 @@ namespace MT
     bool mFirstPacketWillGo;
     jrtplib::RTPSourceStats mRtpStats;
     Packet mFetchedPacket;
+
+    // To calculate average interval between packet add. It is close to jitter but more useful in debugging.
+    float mLastAddTime = 0.0;
   };
 
   class Receiver
@@ -166,6 +175,11 @@ namespace MT
                       mResampler32, mResampler48;
 
     Audio::PWavFileWriter mDecodedDump;
+
+    float mLastDecodeTime = 0.0; // Time last call happened to codec->decode()
+
+    float mIntervalSum = 0.0;
+    int mIntervalCount = 0;
 
     // Zero rate will make audio mono but resampling will be skipped
     void makeMonoAndResample(int rate, int channels);

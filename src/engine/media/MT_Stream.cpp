@@ -21,7 +21,7 @@ Stream::Stream()
 
 Stream::~Stream()
 {
-
+  ICELogInfo(<< mStat.toString());
 }
 
 void Stream::setDestination(const RtpPair<InternetAddress>& dest)

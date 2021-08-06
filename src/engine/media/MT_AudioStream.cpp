@@ -97,7 +97,7 @@ AudioStream::~AudioStream()
   if (mFinalStatistics)
     *mFinalStatistics = mStat;
 
-  ICELogInfo(<< mStat.toShortString());
+  ICELogInfo(<< mStat.toString());
 }
 
 void AudioStream::setDestination(const RtpPair<InternetAddress>& dest)

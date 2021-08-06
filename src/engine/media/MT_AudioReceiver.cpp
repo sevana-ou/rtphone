@@ -10,6 +10,7 @@
 #include "MT_AudioCodec.h"
 #include "MT_CngHelper.h"
 #include "../helper/HL_Log.h"
+#include "../helper/HL_Time.h"
 #include "../audio/Audio_Interface.h"
 #include "../audio/Audio_Resampler.h"
 #include <cmath>
@@ -108,7 +109,16 @@ bool RtpBuffer::add(std::shared_ptr<jrtplib::RTPPacket> packet, int timelength, 
 
     Lock l(mGuard);
 
+
     // Update statistics
+    if (mLastAddTime == 0.0)
+        mLastAddTime = now_ms();
+    else
+    {
+        float t = now_ms();
+        mStat.mPacketInterval.process(t - mLastAddTime);
+        mLastAddTime = t;
+    }
     mStat.mSsrc = static_cast<uint16_t>(packet->GetSSRC());
 
     // Update jitter
@@ -357,6 +367,7 @@ AudioReceiver::~AudioReceiver()
 
 bool AudioReceiver::add(const std::shared_ptr<jrtplib::RTPPacket>& p, Codec** codec)
 {
+    // ICELogInfo(<< "Adding packet No " << p->GetSequenceNumber());
     // Increase codec counter
     mStat.mCodecCount[p->GetPayloadType()]++;
 
@@ -435,7 +446,7 @@ void AudioReceiver::processDecoded(Audio::DataWindow& output, int options)
 
 bool AudioReceiver::getAudio(Audio::DataWindow& output, int options, int* rate)
 {
-    bool result = false;
+    bool result = false, had_cng = false, had_decode = false;
 
     // Get next packet from buffer
     RtpBuffer::ResultList rl;
@@ -443,7 +454,7 @@ bool AudioReceiver::getAudio(Audio::DataWindow& output, int options, int* rate)
     switch (fr)
     {
     case RtpBuffer::FetchResult::Gap:
-        ICELogInfo(<< "Gap detected.");
+        ICELogDebug(<< "Gap detected.");
 
         mDecodedLength = mResampledLength = 0;
         if (mCngPacket && mCodec)
@@ -571,9 +582,13 @@ bool AudioReceiver::getAudio(Audio::DataWindow& output, int options, int* rate)
                                 mDecodedLength = 0;
                             else
                             {
+                                // Trigger the statistics
+                                had_decode = true;
+
                                 // Decode frame by frame
-                                mDecodedLength = mCodec->decode(p->GetPayloadData() + i*mCodec->rtpLength(),
+                                mDecodedLength = mCodec->decode(p->GetPayloadData() + i * mCodec->rtpLength(),
                                                                 frameLength, mDecodedFrame, sizeof mDecodedFrame);
+                                // mDecodedLength = 3840; // Opus 20 ms stereo
                                 if (mDecodedLength)
                                     processDecoded(output, options);
                             }
@@ -594,6 +609,18 @@ bool AudioReceiver::getAudio(Audio::DataWindow& output, int options, int* rate)
         assert(0);
     }
 
+    if (had_decode)
+    {
+        // mStat.mDecodeRequested++;
+        if (mLastDecodeTime == 0.0)
+            mLastDecodeTime = now_ms();
+        else
+        {
+            float t = now_ms();
+            mStat.mDecodingInterval.process(t - mLastDecodeTime);
+            mLastDecodeTime = t;
+        }
+    }
     return result;
 }
 
@@ -670,12 +697,12 @@ void AudioReceiver::updatePvqa(const void *data, int size)
             mPvqaBuffer->addZero(size);
 
         Audio::Format fmt;
-        int frames = (int)fmt.timeFromSize(mPvqaBuffer->filled()) / (PVQA_INTERVAL * 1000);
+        int frames = static_cast<int>(fmt.timeFromSize(mPvqaBuffer->filled())) / (PVQA_INTERVAL * 1000);
         if (frames > 0)
         {
             int time4pvqa = (int)(frames * PVQA_INTERVAL * 1000);
             int size4pvqa = (int)fmt.sizeFromTime(time4pvqa);
-            ICELogInfo(<< "PVQA buffer has " << time4pvqa << " milliseconds of audio.");
+            ICELogDebug(<< "PVQA buffer has " << time4pvqa << " milliseconds of audio.");
             mPVQA->update(mPvqaBuffer->data(), size4pvqa);
             mPvqaBuffer->erase(size4pvqa);
         }

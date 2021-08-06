@@ -216,48 +216,52 @@ void Mixer::mix()
 			channelList[activeCounter++] = &mChannelList[i];
 	
   // No active channels - nothing to mix - exit
-	if (!activeCounter)
+  if (!activeCounter)
   {
-    //ICELogDebug(<< "No active channel");
+    // ICELogDebug(<< "No active channel");
     return;
   }
 	
 	// Optimized versions for 1&  2  active channels
   if (activeCounter == 1)
-	{
-		// Copy much samples as we have
+  {
+    // Copy much samples as we have
     Stream& audio = *channelList[0];
-		mOutput.add(audio.data().data(), audio.data().filled());
-		audio.data().erase(audio.data().filled());
+
+    // Copy the decoded data
+    mOutput.add(audio.data().data(), audio.data().filled());
+
+	// Erase copied audio samples
+	audio.data().erase(audio.data().filled());
     //ICELogSpecial(<<"Length of mixer stream " << audio.data().filled());
-	}
+  }
   else	
-	if (activeCounter == 2)
-	{
+  if (activeCounter == 2)
+  {
     Stream& audio1 = *channelList[0];
-		Stream& audio2 = *channelList[1];
-		int filled1 = audio1.data().filled() / 2, filled2 = audio2.data().filled() / 2;
+	Stream& audio2 = *channelList[1];
+	int filled1 = audio1.data().filled() / 2, filled2 = audio2.data().filled() / 2;
     int available = filled1 > filled2 ? filled1 : filled2;
 		
-		// Find how much samples can be mixed
-		int filled = mOutput.filled() / 2;
+	// Find how much samples can be mixed
+	int filled = mOutput.filled() / 2;
 		
     int maxsize = mOutput.capacity() / 2;
-		if (maxsize - filled < available)
-			available = maxsize - filled;
+	if (maxsize - filled < available)
+      available = maxsize - filled;
 		
-		short sample = 0;
-		for (int i=0; i<available; i++)
-		{
+	short sample = 0;
+	for (int i=0; i<available; i++)
+	{
       short sample1 = filled1 > i ? audio1.data().shortAt(i) : 0;
       short sample2 = filled2 > i ? audio2.data().shortAt(i) : 0;
       sample = (abs(sample1) > abs(sample2)) ? sample1 : sample2;
 
       mOutput.add(sample);
-		}
-		audio1.data().erase(available*2);
-		audio2.data().erase(available*2);
 	}
+    audio1.data().erase(available*2);
+	audio2.data().erase(available*2);
+  }
   else
   {
     do

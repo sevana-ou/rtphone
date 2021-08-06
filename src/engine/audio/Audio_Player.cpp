@@ -1,14 +1,18 @@
-/* Copyright(C) 2007-2014 VoIP objects (voipobjects.com)
+/* Copyright(C) 2007-2021 VoIP objects (voipobjects.com)
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 #include "Audio_Player.h"
 
+#include "../helper/HL_Log.h"
+
+#define LOG_SUBSYSTEM "Player"
+
 using namespace Audio;
 // -------------- Player -----------
 Player::Player()
-:mDelegate(NULL), mPlayedTime(0)
+:mDelegate(nullptr), mPlayedTime(0)
 {
 }
 
@@ -47,7 +51,7 @@ void Player::onMicData(const Format& f, const void* buffer, int length)
 void Player::onSpkData(const Format& f, void* buffer, int length)
 {
   Lock l(mGuard);
-  
+
   // Fill buffer by zero if player owns dedicated device
   if (mOutput)
     memset(buffer, 0, length);
@@ -99,7 +103,7 @@ void Player::onFilePlayed()
 void Player::obtain(int usage)
 {
   Lock l(mGuard);
-  UsageMap::iterator usageIter = mUsage.find(usage);
+  auto usageIter = mUsage.find(usage);
   if (usageIter == mUsage.end())
     mUsage[usage] = 1;
   else
@@ -132,7 +136,7 @@ int Player::releasePlayed()
 {
   Lock l(mGuard);
   int result = mFinishedUsages.size();
-  while (mFinishedUsages.size())
+  while (!mFinishedUsages.empty())
   {
     release(mFinishedUsages.front());
     mFinishedUsages.erase(mFinishedUsages.begin());

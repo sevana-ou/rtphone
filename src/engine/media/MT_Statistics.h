@@ -6,6 +6,8 @@
 
 #include "audio/Audio_DataWindow.h"
 #include "helper/HL_Optional.hpp"
+#include "helper/HL_Statistics.h"
+
 #include "jrtplib/src/rtptimeutilities.h"
 #include "jrtplib/src/rtppacket.h"
 
@@ -13,78 +15,6 @@ using std::experimental::optional;
 
 namespace MT
 {
-template<typename T>
-struct Average
-{
-    int mCount = 0;
-    T mSum = 0;
-    T average() const
-    {
-        if (!mCount)
-            return 0;
-        return mSum / mCount;
-    }
-
-    T value() const
-    {
-        return average();
-    }
-
-    void process(T value)
-    {
-        mCount++;
-        mSum += value;
-    }
-};
-
-template<typename T, int minimum = 100000, int maximum = 0, int default_value = 0>
-struct TestResult
-{
-    T mMin = minimum;
-    T mMax = maximum;
-    Average<T> mAverage;
-    T mCurrent = default_value;
-
-    void process(T value)
-    {
-        if (mMin > value)
-            mMin = value;
-        if (mMax < value)
-            mMax = value;
-        mCurrent = value;
-        mAverage.process(value);
-    }
-
-    bool is_initialized() const
-    {
-        return mAverage.mCount > 0;
-    }
-
-    T current() const
-    {
-        if (is_initialized())
-            return mCurrent;
-        else
-            return 0;
-    }
-
-    T value() const
-    {
-        return current();
-    }
-
-    TestResult<T>& operator = (T value)
-    {
-        process(value);
-        return *this;
-    }
-
-    operator T()
-    {
-        return mCurrent;
-    }
-};
-
 
 template<typename T>
 struct StreamStats
@@ -130,8 +60,12 @@ public:
                 mDuplicatedRtp,   // Number of received duplicated rtp packets
                 mOldRtp,          // Number of late rtp packets
                 mPacketLoss,      // Number of lost packets
-                mPacketDropped,   // Number of dropped packets (due to time unsync when playing)
+                mPacketDropped,   // Number of dropped packets (due to time unsync when playing)б
                 mIllegalRtp;      // Number of rtp packets with bad payload type
+
+    TestResult<float> mDecodingInterval, // Average interval on call to packet decode
+                      mDecodeRequested,  // Average amount of requested audio frames to play
+                      mPacketInterval;   // Average interval between packet adding to jitter buffer
 
     int         mLoss[128];       // Every item is number of loss of corresping length
     size_t      mAudioTime;       // Decoded/found time in milliseconds
@@ -169,7 +103,7 @@ public:
     std::string mPvqaReport;
 #endif
 
-    std::string toShortString() const;
+    std::string toString() const;
 };
 
 } // end of namespace MT

@@ -56,17 +56,25 @@ void DataWindow::add(const void* data, int length)
   
   if (length > mCapacity)
   {
+    // Use latest bytes from data buffer in this case.
     data = (char*)data + length - mCapacity;
     length = mCapacity;
   }
 
+  // Check how much free space we have
   int avail = mCapacity - mFilled;
-  
+
   if (avail < length)
   {
-    memmove(mData, mData + length - avail, mFilled - (length - avail));
-    mFilled -= length - avail;
+    // Find the portion of data to move & save
+    int delta = length - avail;
+
+    // Move the data
+    if (mFilled - delta > 0)
+      memmove(mData, mData + delta, mFilled - delta);
+    mFilled -= delta;
   }
+
   memcpy(mData + mFilled, data, length);
   mFilled += length;
 }
