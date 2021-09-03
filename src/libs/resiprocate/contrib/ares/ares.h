@@ -215,7 +215,7 @@ extern 	const char *ares_strerror(int code);
 extern 	void ares_free_errmem(char *mem);
 
 
-#if defined(WIN32) || defined (__CYGWIN__) || defined(__ANDROID_API__)
+#if defined(WIN32) || defined (__CYGWIN__) //|| defined(__ANDROID_API__)
 
 #define T_A             1               /* host address */
 #define T_NS            2               /* authoritative server */
@@ -257,11 +257,21 @@ extern 	void ares_free_errmem(char *mem);
 #define T_MAILA         254             /* transfer mail agent records */
 #define T_ANY           255             /* wildcard match */
 
+#ifndef C_IN
+# define C_IN 1
+#endif
 
-#define C_IN 1
-#define C_CHAOS 3
-#define C_HS 4
-#define C_ANY 255
+#ifndef C_CHAOS
+# define C_CHAOS 3
+#endif
+
+#ifndef C_HS
+# define C_HS 4
+#endif
+
+#ifndef C_ANY
+# define C_ANY 255
+#endif
 
 #define INDIR_MASK 0xc0
 #define HFIXEDSZ 12

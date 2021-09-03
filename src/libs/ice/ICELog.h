@@ -150,7 +150,7 @@ extern Logger GLogger;
 {\
     if (GLogger.level() >= level_)\
 {\
-    LogLock l(GLogger.mutex());\
+    LogLock log_lock(GLogger.mutex());\
     GLogger.beginLine(level_, __FILE__, __LINE__, subsystem_);\
     GLogger args_;\
     GLogger.endLine();\

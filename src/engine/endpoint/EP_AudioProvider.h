@@ -28,19 +28,19 @@ public:
   virtual ~AudioProvider();
   
   // Returns provider RTP name
-  std::string   streamName();
+  std::string   streamName() override;
   
   // Returns provider RTP profile name
-  std::string   streamProfile();
+  std::string   streamProfile() override;
   
   // Sets destination IP address
-  void          setDestinationAddress(const RtpPair<InternetAddress>& addr);
+  void          setDestinationAddress(const RtpPair<InternetAddress>& addr) override;
 
   // Processes incoming data
-  void          processData(PDatagramSocket s, const void* dataBuffer, int dataSize, InternetAddress& source);
+  void          processData(PDatagramSocket s, const void* dataBuffer, int dataSize, InternetAddress& source) override;
 
   // This method is called by user agent to send ICE packet from mediasocket
-  void          sendData(PDatagramSocket s, InternetAddress& destination, const void* dataBuffer, unsigned int datasize);
+  void          sendData(PDatagramSocket s, InternetAddress& destination, const void* dataBuffer, unsigned int datasize) override;
 
   // Updates SDP offer
   void          updateSdpOffer(resip::SdpContents::Session::Medium& sdp, SdpDirection direction) override;
