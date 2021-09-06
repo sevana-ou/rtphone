@@ -1081,6 +1081,10 @@ inline bool operator!=(const char* lhs, const Data& rhs) { return !(rhs == lhs);
 inline bool operator>(const char* lhs, const Data& rhs) { return rhs < lhs; }
 inline bool operator<=(const char* lhs, const Data& rhs) { return !(rhs < lhs); }
 inline bool operator>=(const char* lhs, const Data& rhs) { return !(lhs < rhs); }
+
+extern bool operator==(const Data& lhs, const Data& rhs);
+extern bool operator<(const Data& lhs, const Data& rhs);
+
 #ifndef  RESIP_USE_STL_STREAMS
 EncodeStream& operator<<(EncodeStream& strm, const Data& d);
 #endif

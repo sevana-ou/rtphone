@@ -77,13 +77,13 @@ StreamList::~StreamList()
   clear();
 }
 
-void StreamList::add(PStream s)
+void StreamList::add(const PStream& s)
 {
   Lock l(mMutex);
   mStreamVector.push_back(s);
 }
 
-void StreamList::remove(PStream s)
+void StreamList::remove(const PStream& s)
 {
   Lock l(mMutex);
 
@@ -98,7 +98,7 @@ void StreamList::clear()
   mStreamVector.clear();
 }
 
-bool StreamList::has(PStream s)
+bool StreamList::has(const PStream& s)
 {
   Lock l(mMutex);
   return std::find(mStreamVector.begin(), mStreamVector.end(), s) != mStreamVector.end();

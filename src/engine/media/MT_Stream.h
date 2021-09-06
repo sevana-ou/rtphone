@@ -88,10 +88,10 @@ namespace MT
     StreamList();
     ~StreamList();
 
-    void add(PStream s);
-    void remove(PStream s);
+    void add(const PStream& s);
+    void remove(const PStream& s);
     void clear();
-    bool has(PStream s);
+    bool has(const PStream& s);
     
     int size();
     PStream streamAt(int index);

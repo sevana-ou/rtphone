@@ -47,12 +47,17 @@ namespace MT
     public:
       Packet(const std::shared_ptr<RTPPacket>& packet, int timelen, int rate);
       std::shared_ptr<RTPPacket> rtp() const;
+
       int timelength() const;
       int rate() const;
+
+      const std::vector<short>& pcm() const;
+      std::vector<short>& pcm();
 
     protected:
       std::shared_ptr<RTPPacket> mRtp;
       int mTimelength = 0, mRate = 0;
+      std::vector<short> mPcm;
     };
 
     RtpBuffer(Statistics& stat);
@@ -77,24 +82,28 @@ namespace MT
     int getCount() const;
 
     // Returns false if packet was not add - maybe too old or too new or duplicate
-    bool add(std::shared_ptr<RTPPacket> packet, int timelength, int rate);
+    std::shared_ptr<Packet> add(std::shared_ptr<RTPPacket> packet, int timelength, int rate);
 
-    typedef std::vector<std::shared_ptr<RTPPacket>> ResultList;
+    typedef std::vector<std::shared_ptr<Packet>> ResultList;
     typedef std::shared_ptr<ResultList> PResultList;
 
     FetchResult fetch(ResultList& rl);
     
   protected:
-    unsigned mSsrc;
-    int mHigh, mLow, mPrebuffer;
-    int mReturnedCounter, mAddCounter;
+    unsigned mSsrc = 0;
+    int mHigh = RTP_BUFFER_HIGH,
+        mLow = RTP_BUFFER_LOW,
+        mPrebuffer = RTP_BUFFER_PREBUFFER;
+    int mReturnedCounter = 0,
+        mAddCounter = 0;
+
     mutable Mutex mGuard;
-    typedef std::vector<Packet> PacketList;
+    typedef std::vector<std::shared_ptr<Packet>> PacketList;
     PacketList mPacketList;
     Statistics& mStat;
-    bool mFirstPacketWillGo;
+    bool mFirstPacketWillGo = true;
     jrtplib::RTPSourceStats mRtpStats;
-    Packet mFetchedPacket;
+    std::shared_ptr<Packet> mFetchedPacket;
 
     // To calculate average interval between packet add. It is close to jitter but more useful in debugging.
     float mLastAddTime = 0.0;
@@ -155,6 +164,9 @@ namespace MT
     std::shared_ptr<jrtplib::RTPPacket> mCngPacket;
     CngDecoder mCngDecoder;
 
+    // Decode RTP early, do not wait for speaker callback
+    bool mEarlyDecode = false;
+
     // Buffer to hold decoded data
     char mDecodedFrame[65536];
     int mDecodedLength = 0;
@@ -170,7 +182,7 @@ namespace MT
     // Last packet time length
     int mLastPacketTimeLength = 0;
 
-    int mFailedCount;
+    int mFailedCount = 0;
     Audio::Resampler  mResampler8, mResampler16,
                       mResampler32, mResampler48;
 

@@ -34,7 +34,7 @@ Terminal::~Terminal()
   mAudioPair.reset();
 }
 
-PStream Terminal::createStream(int type, VariantMap& config)
+PStream Terminal::createStream(int type, VariantMap& /*config*/)
 {
   PStream result;
   switch (type)
@@ -52,7 +52,7 @@ PStream Terminal::createStream(int type, VariantMap& config)
   return result;
 }
 
-void Terminal::freeStream(PStream stream)
+void Terminal::freeStream(const PStream& stream)
 {
   if (AudioStream* audio = dynamic_cast<AudioStream*>(stream.get()))
   {
