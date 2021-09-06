@@ -216,7 +216,7 @@ RtpBuffer::FetchResult RtpBuffer::fetch(ResultList& rl)
         result = FetchResult::NoPacket;
     else
     {
-        if (mFetchedPacket->rtp())
+        if (mFetchedPacket)
         {
             if (mPacketList.empty())
             {

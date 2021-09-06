@@ -202,7 +202,7 @@ void AndroidOutputDevice::close()
 
 Format AndroidOutputDevice::getFormat()
 {
-  return Format(mDeviceRate, 1);
+  return {mDeviceRate, 1};
 }
 
 bool AndroidOutputDevice::fakeMode()
