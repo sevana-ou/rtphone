@@ -111,12 +111,17 @@ public:
     static void setupAndroidEnvironment(void* environment, void* appcontext);
 #endif
 
+    // Verbose run - dump debugging info to console
+    static void set_verbose(bool verbose = true);
+
     // Path to config file can be empty
     // In this case library will be considered initialized (but will produce zero MOS)
     static bool initialize(const std::string& pathToLicenseFile, const std::string& pathToConfigFile);
     static bool initialize(const void* license_buffer, size_t license_len,
             const void* config_buffer, size_t config_len);
     static bool is_initialized();
+
+    static std::string get_copyright_string();
 
     static int library_error();
     static void release();
@@ -145,6 +150,7 @@ public:
     bool is_open() const;
 
     // Update/Get model. pcm_length is bytes.
+    // Please - pcm_length must be a multiple of interval time!
     bool update(const void* pcm_buffer, size_t pcm_length);
     int error() const;
 
@@ -153,7 +159,7 @@ public:
     {
         float mMos = 0.0f;
         std::string mReport;
-        size_t mIntervals = 0, mPoorIntervals = 0;
+        size_t mIntervals = 0, mPoorIntervals = 0, mUncertainIntervals = 0;
     };
 
     bool get_result(result& r, size_t last_milliseconds = 0);
@@ -171,6 +177,7 @@ public:
 
     // Combines update & get_result calls
     bool singleshot(result& r, const void* pcm_buffer, size_t pcm_length);
+    bool singleshot_file(result& r, const std::string& path);
 };
 
 } // end of namespace

@@ -102,7 +102,8 @@ endif()
 if (USE_PVQA_LIBRARY)
     message("Use PVQA libraries")
     add_definitions( -DUSE_PVQA_LIBRARY )
-    include_directories(${CMAKE_CURRENT_SOURCE_DIR}/libs/pvqa/include)
+    include_directories(${CMAKE_CURRENT_SOURCE_DIR}/libs/pvqa/include
+                        ${CMAKE_CURRENT_SOURCE_DIR}/libs/pvqa++/include)
 endif()
 
 set (RTPHONE_SOURCES
@@ -201,6 +202,10 @@ else ()
     set (LIBS ${LIBS} dl uuid)
 endif ()
 
+if (CMAKE_SYSTEM MATCHES "Android")
+    set (LIBS ${LIBS} oboe)
+endif()
+
 if (USE_AMR_CODEC)
     set (LIBS ${LIBS})
 endif (USE_AMR_CODEC)
@@ -215,7 +220,7 @@ target_link_libraries(rtphone
     uuid
     ${OPENSSL_SSL}
     ${OPENSSL_CRYPTO}
-    ${LIBS} oboe)
+    ${LIBS} )
 
 
 target_include_directories(rtphone
