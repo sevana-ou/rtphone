@@ -216,7 +216,11 @@ RtpBuffer::FetchResult RtpBuffer::fetch(ResultList& rl)
         result = FetchResult::NoPacket;
     else
     {
-        if (mFetchedPacket)
+        bool is_fetched_packet = mFetchedPacket.get() != nullptr;
+        if (is_fetched_packet)
+            is_fetched_packet &= mFetchedPacket->rtp().get() != nullptr;
+
+        if (is_fetched_packet)
         {
             if (mPacketList.empty())
             {
