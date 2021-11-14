@@ -62,6 +62,7 @@ set (USE_EVS_CODEC       OFF CACHE BOOL "Use EVS codec."                    )
 set (USE_OPUS_CODEC      OFF CACHE BOOL "Use Opus codec."                   )
 set (USE_PVQA_LIB        OFF CACHE BOOL "Build with Sevana PVQA library"    )
 set (USE_AQUA_LIB        OFF CACHE BOOL "Build with Sevana AQuA library"    )
+set (USE_MUSL            OFF CACHE BOOL "Build with MUSL library"           )
 
 # PIC code by default
 set (CMAKE_POSITION_INDEPENDENT_CODE ON)
@@ -82,10 +83,12 @@ if (CMAKE_SYSTEM MATCHES "Linux*")
     add_definitions (-DTARGET_LINUX)
 endif()
 
+
 if (CMAKE_SYSTEM MATCHES "Darwin*")
     add_definitions (-DTARGET_OSX)
 endif()
 
+<<<<<<< ours
 if (CMAKE_SYSTEM MATCHES "Android")
     message("Adding the Oboe library")
     set (OBOE_DIR libs/oboe)
@@ -93,6 +96,13 @@ if (CMAKE_SYSTEM MATCHES "Android")
     include_directories (${OBOE_DIR}/include)
 endif()
 
+=======
+if (USE_MUSL)
+    add_definitions(-DTARGET_MUSL)
+endif()
+
+
+>>>>>>> theirs
 if (USE_AQUA_LIB)
     message("Use AQuA library")
     add_definitions( -DUSE_AQUA_LIBRARY )

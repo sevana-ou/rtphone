@@ -34,6 +34,10 @@ set (ICE_STACK_SOURCES ICEAddress.cpp
     ICETime.cpp
     ICETransactionList.cpp)
 
+if (TARGET_MUSL)
+    add_definitions(-DTARGET_MUSL)
+endif()
+
 add_definitions(-DUSE_NATIVE_SMARTPTR -D_WINSOCK_DEPRECATED_NO_WARNINGS)
 
 add_library(ice_stack ${ICE_STACK_SOURCES})
