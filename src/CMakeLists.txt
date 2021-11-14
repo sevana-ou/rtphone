@@ -88,7 +88,6 @@ if (CMAKE_SYSTEM MATCHES "Darwin*")
     add_definitions (-DTARGET_OSX)
 endif()
 
-<<<<<<< ours
 if (CMAKE_SYSTEM MATCHES "Android")
     message("Adding the Oboe library")
     set (OBOE_DIR libs/oboe)
@@ -96,13 +95,10 @@ if (CMAKE_SYSTEM MATCHES "Android")
     include_directories (${OBOE_DIR}/include)
 endif()
 
-=======
 if (USE_MUSL)
     add_definitions(-DTARGET_MUSL)
 endif()
 
-
->>>>>>> theirs
 if (USE_AQUA_LIB)
     message("Use AQuA library")
     add_definitions( -DUSE_AQUA_LIBRARY )
