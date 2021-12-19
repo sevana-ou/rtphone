@@ -175,6 +175,9 @@ void AgentImpl::processConfig(JsonCpp::Value &d, JsonCpp::Value &answer)
     config()[CONFIG_IPV4] = d["ipv4"].asBool();
     config()[CONFIG_IPV6] = d["ipv6"].asBool();
 
+    if (transport == "tls")
+        config()[CONFIG_SIPS] = true;
+
     // Log file
     std::string logfile = d["logfile"].asString();
     ice::Logger& logger = ice::GLogger;

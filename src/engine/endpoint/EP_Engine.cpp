@@ -93,7 +93,7 @@ void UserAgent::start()
   }
   
   // Initialize resip loggег
-  resip::Log::initialize(resip::Log::OnlyExternal, resip::Log::Info, "Client", *this);
+  resip::Log::initialize(resip::Log::OnlyExternal, resip::Log::Debug, "Client", *this);
 
   // Build list of nameservers if specified
   resip::DnsStub::NameserverList nslist;
