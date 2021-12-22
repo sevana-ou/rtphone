@@ -171,7 +171,7 @@ void AgentImpl::processConfig(JsonCpp::Value &d, JsonCpp::Value &answer)
 #endif
 
     std::string transport = d["transport"].asString();
-    config()[CONFIG_TRANSPORT] = (transport == "any") ? 0 : (transport == "udp" ? 1 : (transport == "tcp" ? 2 : 3));
+    config()[CONFIG_TRANSPORT] = (transport == "any") ? TransportType_Any : (transport == "udp" ? TransportType_Udp : (transport == "tcp" ? TransportType_Tcp : TransportType_Tls));
     config()[CONFIG_IPV4] = d["ipv4"].asBool();
     config()[CONFIG_IPV6] = d["ipv6"].asBool();
 
@@ -189,10 +189,12 @@ void AgentImpl::processConfig(JsonCpp::Value &d, JsonCpp::Value &answer)
 
     mUseNativeAudio = d["nativeaudio"].asBool();
     config()[CONFIG_OWN_DNS] = d["dns_servers"].asString();
+    config()[CONFIG_SIPS] = d["secure"].asBool();
+
     answer["status"] = Status_Ok;
 }
 
-void AgentImpl::processStart(JsonCpp::Value& /*request*/, JsonCpp::Value &answer)
+void AgentImpl::processStart(JsonCpp::Value& request, JsonCpp::Value &answer)
 {
     std::unique_lock<std::recursive_mutex> l(mAgentMutex);
     if (mThread)
@@ -200,6 +202,9 @@ void AgentImpl::processStart(JsonCpp::Value& /*request*/, JsonCpp::Value &answer
         answer["status"] = Status_Ok;
         return; // Started already
     }
+
+    // Process config (can be sent via start command as well)
+    // processConfig(request, answer);
 
     // Start socket thread
     SocketHeap::instance().start();

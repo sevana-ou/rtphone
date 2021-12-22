@@ -206,7 +206,7 @@ void DevicePair::onSpkData(const Format& f, void* buffer, int length)
     }
   }
 
-  assert(mOutputNativeData.filled() >= length);
+  // assert(mOutputNativeData.filled() >= length);
 #ifdef DUMP_NATIVEOUTPUT
   if (mNativeOutputDump)
     mNativeOutputDump->write(mOutputNativeData.data(), length);

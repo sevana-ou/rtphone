@@ -62,6 +62,14 @@
 using namespace std;
 enum
 {
+    TransportType_Any,
+    TransportType_Udp,
+    TransportType_Tcp,
+    TransportType_Tls
+};
+
+enum
+{
   CONFIG_IPV4 = 0,            // Use IP4
   CONFIG_IPV6,                // Use IP6.
   CONFIG_USERNAME,            // Username. String value.
