@@ -30,6 +30,9 @@ class TransactionState : public DnsHandler
 {
    public:
       RESIP_HeapCount(TransactionState);
+
+      static UInt64 DnsGreylistDurationMs;  // The amount of time to greylist a DNS entry for after receiving a transport error
+
       static void process(TransactionController& controller,
                            TransactionMessage* message); 
       static void processTimer(TransactionController& controller,
@@ -59,6 +62,12 @@ class TransactionState : public DnsHandler
          Bogus
       } State;
 
+      typedef enum
+      {
+         None,
+         Dns
+      } PendingOperation;
+
       TransactionState(TransactionController& controller, 
                        Machine m, 
                        State s, 
@@ -79,6 +88,7 @@ class TransactionState : public DnsHandler
       void processClientStale(TransactionMessage* msg);
       void processServerStale(TransactionMessage* msg);
       void processTransportFailure(TransactionMessage* failure);
+      void processTcpConnectState(TransactionMessage* msg);
       void processNoDnsResults();
       void processReliability(TransportType type);
       
@@ -94,6 +104,7 @@ class TransactionState : public DnsHandler
       bool isFromTU(TransactionMessage* msg) const;
       bool isFromWire(TransactionMessage* msg) const;
       bool isTransportError(TransactionMessage* msg) const;
+      bool isTcpConnectState(TransactionMessage* msg) const;
       bool isSentReliable(TransactionMessage* msg) const;
       bool isSentUnreliable(TransactionMessage* msg) const;
       bool isReliabilityIndication(TransactionMessage* msg) const;
@@ -103,6 +114,7 @@ class TransactionState : public DnsHandler
       void sendToTU(TransactionMessage* msg);
       static void sendToTU(TransactionUser* tu, TransactionController& controller, TransactionMessage* msg);
       void sendCurrentToWire();
+      void onSendSuccess();
       SipMessage* make100(SipMessage* request) const;
       void terminateClientTransaction(const Data& tid); 
       void terminateServerTransaction(const Data& tid); 
@@ -139,6 +151,8 @@ class TransactionState : public DnsHandler
       Machine mMachine;
       State mState;
       bool mIsAbandoned; // TU doesn't care about this transaction anymore.
+      Tokens* mPendingCancelReasons; // Using a pointer to keep storage to a minimum when not needed
+      void setPendingCancelReasons(const Tokens* reasons);
       
       // Indicates that the message has been sent with a reliable protocol. Set
       // by the TransportSelector
@@ -161,9 +175,9 @@ class TransactionState : public DnsHandler
       Tuple mResponseTarget; // used to reply to requests
 
       // used when the DnsResult moves to another transport on failure. Only
-      // used for outgoing stateful, so unique_ptr for space efficiency.
-      std::unique_ptr<NameAddr> mOriginalContact;
-      std::unique_ptr<Via> mOriginalVia;
+      // used for outgoing stateful, so auto_ptr for space efficiency.
+      std::auto_ptr<NameAddr> mOriginalContact;
+      std::auto_ptr<Via> mOriginalVia;
 
       const Data mId;
       const MethodTypes mMethod;
@@ -174,12 +188,13 @@ class TransactionState : public DnsHandler
       unsigned int mCurrentResponseCode;
 
       bool mAckIsValid;
-      bool mWaitingForDnsResult;
+      PendingOperation mPendingOperation;
       TransactionUser* mTransactionUser;
       TransportFailure::FailureReason mFailureReason;      
       int mFailureSubCode;
+      bool mTcpConnectTimerStarted;
 
-      static unsigned long StatelessIdCounter;
+      static UInt32 StatelessIdCounter;
       
       friend EncodeStream& operator<<(EncodeStream& strm, const TransactionState& state);
       friend class TransactionController;

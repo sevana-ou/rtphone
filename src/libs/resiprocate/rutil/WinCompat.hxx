@@ -48,6 +48,8 @@ class WinCompat
       static std::list<std::pair<Data,Data> > getInterfaces(const Data& matching);
       static void destroyInstance();
 
+      static bool windowsEventLog(WORD type, WORD numStrings, LPCTSTR* strings);
+
    private:
       static WinCompat* instance();
       static WinCompat* mInstance;

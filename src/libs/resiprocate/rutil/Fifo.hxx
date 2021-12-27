@@ -1,7 +1,7 @@
 #if !defined(RESIP_FIFO_HXX)
 #define RESIP_FIFO_HXX 
 
-#include <cassert>
+#include "rutil/ResipAssert.h"
 #include "rutil/AbstractFifo.hxx"
 #include "rutil/SelectInterruptor.hxx"
 
@@ -94,7 +94,7 @@ Fifo<Msg>::clear()
       delete mFifo.front();
       mFifo.pop_front();
    }
-   assert(mFifo.empty());
+   resip_assert(mFifo.empty());
 }
 
 template <class Msg>
@@ -116,7 +116,7 @@ Fifo<Msg>::addMultiple(Messages& msgs)
 {
    size_t inSize = msgs.size();
    size_t size = AbstractFifo<Msg*>::addMultiple(msgs);
-   if(size==inSize && mInterruptor)
+   if(size==inSize && inSize != 0 && mInterruptor)
    {
       // Only do this when the queue goes from empty to not empty.
       mInterruptor->handleProcessNotification();

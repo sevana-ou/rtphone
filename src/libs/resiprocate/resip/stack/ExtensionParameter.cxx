@@ -5,7 +5,7 @@
 #include "ExtensionParameter.hxx"
 #include "ParameterTypeEnums.hxx"
 
-#include <cassert>
+#include "rutil/ResipAssert.h"
 #include <string.h>
 
 using namespace resip;
@@ -13,13 +13,27 @@ using namespace resip;
 ExtensionParameter::ExtensionParameter(const Data& name)
    : mName(name)
 {
-   assert(!mName.empty());
+   if (mName.empty())
+   {
+      resip_assert(false);
+      throw Exception("Empty extension parameter",__FILE__,__LINE__);
+   }
 }
 
 const Data& 
 ExtensionParameter::getName() const
 {
    return mName;
+}
+
+ExtensionParameter::Exception::Exception(const Data& msg, const Data& file, const int line)
+   : BaseException(msg, file, line) 
+{}
+
+const char* 
+ExtensionParameter::Exception::name() const
+{
+ return "ExtensionParameter::Exception"; 
 }
 
 /* ====================================================================

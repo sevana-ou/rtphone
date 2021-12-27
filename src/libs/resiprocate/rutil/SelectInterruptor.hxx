@@ -5,14 +5,6 @@
 #include "rutil/FdPoll.hxx"
 #include "rutil/Socket.hxx"
 
-#if 0
-#if defined(WIN32)
-#include <Ws2tcpip.h>
-#else
-#include <netinet/in.h>
-#endif
-#endif
-
 namespace resip
 {
 
@@ -32,7 +24,7 @@ class SelectInterruptor : public AsyncProcessHandler, public FdPollItemIf
       virtual void handleProcessNotification();
 
       /**
-//          cause the 'artificial' fd to signal
+          cause the 'artificial' fd to signal
       */
       void interrupt();
 
@@ -54,7 +46,7 @@ class SelectInterruptor : public AsyncProcessHandler, public FdPollItemIf
        * Declared as Socket for easier cross-platform even though pipe fd
        * under linux.
        */
-      Socket getReadSocket() const { return INVALID_SOCKET;/*mReadThing;*/ }
+      Socket getReadSocket() const { return mReadThing; }
 
    protected:
 

@@ -9,7 +9,8 @@
 #include "resip/stack/Transport.hxx"
 #include "resip/stack/MsgHeaderScanner.hxx"
 #include "resip/stack/SendData.hxx"
-#include "resip/stack/InternalTransport.hxx"
+#include "resip/stack/WsFrameExtractor.hxx"
+#include "resip/stack/Cookie.hxx"
 
 namespace osc
 {
@@ -48,9 +49,11 @@ class ConnectionBase
       Tuple& who() { return mWho; }
       const UInt64& whenLastUsed() { return mLastUsed; }
       void resetLastUsed() { mLastUsed = Timer::getTimeMs(); }
-      void setTransportLogger(InternalTransport::TransportLogger* logger);
 
-      enum { ChunkSize = 2048 }; // !jf! what is the optimal size here?
+      enum { ChunkSize = 8192 }; // !jf! what is the optimal size here?
+         // !dp! 8192 seems to be consistent with a multiple of a page size and
+         //      also good for the larger SDP coming in with ICE attributes,
+         //      multiple media streams, etc
 
    protected:
       enum ConnState
@@ -59,6 +62,7 @@ class ConnectionBase
          ReadingHeaders,
          PartialBody,
          SigComp, // This indicates that incoming bytes are compressed.
+         WebSocket,
          MAX
       };
 
@@ -66,15 +70,20 @@ class ConnectionBase
       {
          Unknown,
          Uncompressed,
-         Compressed
+         Compressed,
+         WebSocketHandshake,
+         WebSocketData,
       } TransmissionFormat;
 
       ConnState getCurrentState() const { return mConnState; }
       bool preparseNewBytes(int bytesRead);
+      bool wsProcessHandshake(int bytesRead, bool &dropConnection);
+      bool wsProcessData(int bytesRead);
+      void wsParseCookies(CookieList& cookieList, const SipMessage* message);
       void decompressNewBytes(int bytesRead);
       std::pair<char*, size_t> getWriteBuffer();
       std::pair<char*, size_t> getCurrentWriteBuffer();
-      char* getWriteBufferForExtraBytes(int extraBytes);
+      char* getWriteBufferForExtraBytes(int currentPos, int extraBytes);
       
       // for avoiding copies in external transports--not used in core resip
       void setBuffer(char* bytes, int count);
@@ -90,11 +99,13 @@ class ConnectionBase
       ConnectionBase();
       ConnectionBase(const Connection&);
       ConnectionBase& operator=(const Connection&);
+      bool scanMsgHeader(int bytesRead);
+      std::auto_ptr<Data> makeWsHandshakeResponse();
+      bool isUsingSecWebSocketKey();
+      bool isUsingDeprecatedSecWebSocketKeys();
    protected:
       virtual void onDoubleCRLF(){}
       virtual void onSingleCRLF(){}
-      void putMessageToTransportLogger(SipMessage* msg);
-
       Transport* mTransport;
       Tuple mWho;
       TransportFailure::FailureReason mFailureReason;      
@@ -104,18 +115,24 @@ class ConnectionBase
       osc::TcpStream *mSigcompFramer;
       TransmissionFormat mSendingTransmissionFormat;
       TransmissionFormat mReceivingTransmissionFormat;
-      InternalTransport::TransportLogger* mTransportLogger;
 
    private:
       SipMessage* mMessage;
       char* mBuffer;
       size_t mBufferPos;
       size_t mBufferSize;
+      WsFrameExtractor mWsFrameExtractor;
 
       static char connectionStates[MAX][32];
       UInt64 mLastUsed;
       ConnState mConnState;
       MsgHeaderScanner mMsgHeaderScanner;
+
+      static size_t messageSizeMax;
+
+   public:
+      static void setMessageSizeMax(size_t max)
+         { messageSizeMax = max; };
 };
 
 EncodeStream& 

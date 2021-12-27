@@ -76,7 +76,6 @@ Rlmi::encodeParsed(EncodeStream& str) const
 void 
 Rlmi::parse(ParseBuffer& pb)
 {
-   
    const char* anchor = pb.position();
    pb.skipToEnd();
    pb.data(mText, anchor);

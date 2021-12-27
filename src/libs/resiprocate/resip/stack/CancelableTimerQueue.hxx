@@ -54,8 +54,9 @@ class CancelableTimerQueue
          //cerr << "mIdToTimer: " << Inserter(mIdToTimer) << endl;
          //cerr << "Searching for ID: " << id << endl;
          //cerr << "TimerMap state: " << Inserter(mTimerMap) << endl;
-         assert(mIdToTimer.size() == mTimerMap.size());
-         assert(0);
+         resip_assert(mIdToTimer.size() == mTimerMap.size());
+         resip_assert(0);
+         return false;
       }
 
       //get the number of milliseconds until the next event, returns -1 if no
@@ -68,13 +69,14 @@ class CancelableTimerQueue
          }
          else
          {
-            if (mTimerMap.begin()->first - resip::Timer::getTimeMs() < 0)
+            int timeout = (int)(mTimerMap.begin()->first - resip::Timer::getTimeMs());
+            if (timeout < 0)
             {
                return 0;
             }
             else
             {
-               return mTimerMap.begin()->first - resip::Timer::getTimeMs();
+               return timeout;
             }
          }
       }
@@ -87,9 +89,9 @@ class CancelableTimerQueue
 
       T getNext()
       {
-         assert(mIdToTimer.size() == mTimerMap.size());
+         resip_assert(mIdToTimer.size() == mTimerMap.size());
 
-         assert(available());
+         resip_assert(available());
 
          typename TimerMap::iterator it = mTimerMap.begin();
          mIdToTimer.erase(it->second.second);
@@ -97,7 +99,7 @@ class CancelableTimerQueue
          T msg = it->second.first;
          mTimerMap.erase(it);
 
-         assert(mIdToTimer.size() == mTimerMap.size());
+         resip_assert(mIdToTimer.size() == mTimerMap.size());
          
          return msg;
       }
@@ -125,7 +127,7 @@ class CancelableTimerQueue
          Id id = getNextId();
          mTimerMap.insert(std::make_pair(expiry, std::make_pair(msg, id)));
          mIdToTimer[id] = expiry;
-         assert(mIdToTimer.size() == mTimerMap.size());
+         resip_assert(mIdToTimer.size() == mTimerMap.size());
          return id;
       }
 

@@ -56,7 +56,7 @@ DnsUtil::lookupARecords(const Data& host)
    struct hostent hostbuf; 
    char buffer[8192];
    ret = gethostbyname_r( host.c_str(), &hostbuf, buffer, sizeof(buffer), &result, &herrno);
-   assert (ret != ERANGE);
+   resip_assert (ret != ERANGE);
 #elif defined(__QNX__) || defined(__SUNPRO_CC)
    struct hostent hostbuf; 
    char buffer[8192];
@@ -67,7 +67,7 @@ DnsUtil::lookupARecords(const Data& host)
    result = gethostbyname( host.c_str() );
    ret = (result == 0);
 #else
-   assert(0);
+   resip_assert(0);
    return names;
 #endif
    
@@ -96,8 +96,8 @@ DnsUtil::lookupARecords(const Data& host)
    }
    else
    {
-      assert(result);
-      assert(result->h_length == 4);
+      resip_assert(result);
+      resip_assert(result->h_length == 4);
       char str[256];
       for (char** pptr = result->h_addr_list; *pptr != 0; pptr++)
       {
@@ -113,58 +113,74 @@ DnsUtil::lookupARecords(const Data& host)
    }
 }
 
-
-Data
+// The following statics ensure we can initialize the static storage of
+// localHostName at runtime, instead of at global static initialization time.
+// Under windows, when building a DLL you cannot call initNetwork and 
+// other socket API's reliably from DLLMain, so we need to delay this call.
+// We use the gate bool to ensure we don't need to do a mutex check everytime
+// and we use a Mutex to ensure that multiple threads can invokve getLocalHostName
+// for the first time, at the same time.
+static Mutex getLocalHostNameInitializerMutex;
+static bool  getLocalHostNameInitializerGate = false;
+static Data localHostName;
+const Data&
 DnsUtil::getLocalHostName()
 {
-   char buffer[MAXHOSTNAMELEN];
-   initNetwork();
-   buffer[0] = '\0';
-   if (gethostname(buffer,sizeof(buffer)) == -1)
+   if(!getLocalHostNameInitializerGate)
    {
-      int err = getErrno();
-      switch (err)
+      Lock lock(getLocalHostNameInitializerMutex);
+      char buffer[MAXHOSTNAMELEN + 1];
+      initNetwork();
+      // can't assume the name is NUL terminated when truncation occurs,
+      // so insert trailing NUL here
+      buffer[0] = buffer[MAXHOSTNAMELEN] = '\0';
+      if (gethostname(buffer,sizeof(buffer)-1) == -1)
       {
+         int err = getErrno();
+         switch (err)
+         {
 // !RjS! This makes no sense for non-windows. The
 //       current hack (see the #define in .hxx) needs
 //       to be reworked.
-         case WSANOTINITIALISED:
-            CritLog( << "could not find local hostname because network not initialized:" << strerror(err) );
-            break;
-         default:
-            CritLog( << "could not find local hostname:" << strerror(err) );
-            break;
+            case WSANOTINITIALISED:
+               CritLog( << "could not find local hostname because network not initialized:" << strerror(err) );
+               break;
+            default:
+               CritLog( << "could not find local hostname:" << strerror(err) );
+               break;
+         }
+         throw Exception("could not find local hostname",__FILE__,__LINE__);
       }
-      throw Exception("could not find local hostname",__FILE__,__LINE__);
-   }
 
-   struct addrinfo* result=0;
-   struct addrinfo hints;
-   memset(&hints, 0, sizeof(hints));
-   hints.ai_flags |= AI_CANONNAME;
-   hints.ai_family |= AF_UNSPEC;
-   int res = getaddrinfo(buffer, 0, &hints, &result);
-   if (!res) 
-   {
-      // !jf! this should really use the Data class 
-      if (strchr(result->ai_canonname, '.') != 0) 
+      struct addrinfo* result=0;
+      struct addrinfo hints;
+      memset(&hints, 0, sizeof(hints));
+      hints.ai_flags |= AI_CANONNAME;
+      hints.ai_family |= AF_UNSPEC;
+      int res = getaddrinfo(buffer, 0, &hints, &result);
+      if (!res) 
       {
-         strncpy(buffer, result->ai_canonname, sizeof(buffer));
+         // !jf! this should really use the Data class 
+         if (strchr(result->ai_canonname, '.') != 0) 
+         {
+            strncpy(buffer, result->ai_canonname, sizeof(buffer));
+         }
+         else 
+         {
+            InfoLog( << "local hostname does not contain a domain part " << buffer);
+         }
+         freeaddrinfo(result);
       }
-      else 
+      else
       {
-         InfoLog( << "local hostname does not contain a domain part " << buffer);
+         InfoLog (<< "Couldn't determine local hostname. Error was: " << gai_strerror(res) << ". Returning empty string");
       }
-      freeaddrinfo(result);
-   }
-   else
-   {
-      InfoLog (<< "Couldn't determine local hostname. Error was: " << gai_strerror(res) << ". Returning empty string");
-   }
    
-   return Data(buffer);
+      localHostName = buffer;
+      getLocalHostNameInitializerGate = true;
+   }
+   return localHostName;
 }
-
 
 Data
 DnsUtil::getLocalDomainName()
@@ -177,12 +193,15 @@ DnsUtil::getLocalDomainName()
    }
    else
    {
-#if defined( __APPLE__ ) || defined( WIN32 ) || defined(__SUNPRO_CC) || defined(__sun__) || defined(__ANDROID_API__)
+#if defined( __APPLE__ ) || defined( WIN32 ) || defined(__SUNPRO_CC) || defined(__sun__) || defined( __ANDROID__ )
       throw Exception("Could not find domainname in local hostname",__FILE__,__LINE__);
 #else
       DebugLog( << "No domain portion in hostname <" << lhn << ">, so using getdomainname");
-      char buffer[MAXHOSTNAMELEN];
-      if (int e = getdomainname(buffer,sizeof(buffer)) == -1)
+      char buffer[MAXHOSTNAMELEN + 1];
+      // can't assume the name is NUL terminated when truncation occurs,
+      // so insert trailing NUL here
+      buffer[0] = buffer[MAXHOSTNAMELEN] = '\0';
+      if (int e = getdomainname(buffer,sizeof(buffer)-1) == -1)
       {
          if ( e != 0 )
          {
@@ -281,7 +300,7 @@ DnsUtil::isIpV4Address(const Data& ipAddress)
 
       // .bwc. I have tried using std::bitset instead of the 0 <= *last <= 9
       // check, but it is slower.
-      while(*last >= '0' && *last <= '9' && last - first <= 3 && last != end)
+      while(last != end && *last >= '0' && *last <= '9' && last - first <= 3)
       {
          // Skip at most 3 decimals, without going past the end of the buffer.
          ++last;
@@ -330,7 +349,7 @@ DnsUtil::isIpV4Address(const Data& ipAddress)
 
       if(octets < 4)
       {
-         if(*last == '.')
+         if(last != end && *last == '.')
          {
             // Skip over the '.'
             ++last;
@@ -446,7 +465,7 @@ DnsUtil::getInterfaces(const Data& matching)
    struct ifconf ifc;
 
    int s = socket( AF_INET, SOCK_DGRAM, 0 );
-   assert( s != INVALID_SOCKET );	// can run out of file descs
+   resip_assert( s != INVALID_SOCKET );	// can run out of file descs
    const int len = 100 * sizeof(struct ifreq);
    int maxRet = 40;
 
@@ -538,10 +557,14 @@ DnsUtil::getInterfaces(const Data& matching)
          continue;
       }
       
-      if (  (name[0]<'A') || (name[0]>'z') ) // should never happen
+      if ( ( (name[0]<'A') || (name[0]>'z') )
+#if defined(__MACH__) && defined(__GNU__)   // for GNU HURD
+            && (name[0] != '/')
+#endif
+         ) // should never happen
       {  
          DebugLog (<< "  ignore because: name looks bogus");
-         assert(0);
+         resip_assert(0);
          continue;
       }
 
@@ -565,7 +588,7 @@ DnsUtil::getInterfaces(const Data& matching)
       return results;
    }
 #else
-   assert(0);
+   resip_assert(0);
 #endif
 #endif
 

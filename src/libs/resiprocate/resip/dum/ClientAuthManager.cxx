@@ -1,4 +1,4 @@
-#include <cassert>
+#include "rutil/ResipAssert.h"
 
 #include "resip/stack/Helper.hxx"
 #include "resip/stack/SipMessage.hxx"
@@ -100,18 +100,18 @@ private:
     Data mNonceCountString;
 };
 
+
 ClientAuthManager::ClientAuthManager() 
 {
 }
-
 
 bool 
 ClientAuthManager::handle(UserProfile& userProfile, SipMessage& origRequest, const SipMessage& response)
 {
    try
    {
-      assert( response.isResponse() );
-      assert( origRequest.isRequest() );
+      resip_assert( response.isResponse() );
+      resip_assert( origRequest.isRequest() );
       
       DialogSetId id(origRequest);
 
@@ -133,6 +133,7 @@ ClientAuthManager::handle(UserProfile& userProfile, SipMessage& origRequest, con
          return false;
       }   
 
+      // 401 or 407...
       if (!(response.exists(h_WWWAuthenticates) || response.exists(h_ProxyAuthenticates)))
       {
          DebugLog (<< "Invalid challenge for " << id  << ", nothing to respond to; fail");         
@@ -145,7 +146,7 @@ ClientAuthManager::handle(UserProfile& userProfile, SipMessage& origRequest, con
       // AuthState associated with this DialogSet if the algorithm is supported
       if (authState.handleChallenge(userProfile, response))
       {
-         assert(origRequest.header(h_Vias).size() == 1);
+         resip_assert(origRequest.header(h_Vias).size() == 1);
          origRequest.header(h_CSeq).sequence()++;
          DebugLog (<< "Produced response to digest challenge for " << userProfile );
          return true;
@@ -157,7 +158,7 @@ ClientAuthManager::handle(UserProfile& userProfile, SipMessage& origRequest, con
    }
    catch(BaseException& e)
    {
-      assert(0);
+      resip_assert(0);
       ErrLog(<< "Unexpected exception in ClientAuthManager::handle " << e);
       return false;
    }      
@@ -176,14 +177,25 @@ ClientAuthManager::addAuthentication(SipMessage& request)
 void 
 ClientAuthManager::clearAuthenticationState(const DialogSetId& dsId)
 {
-   dialogSetDestroyed(dsId);
+   AttemptedAuthMap::iterator it = mAttemptedAuths.find(dsId);
+   if (it != mAttemptedAuths.end())
+   {
+      mAttemptedAuths.erase(it);
+   }
+}
+
+void 
+ClientAuthManager::dialogSetDestroyed(const DialogSetId& id)
+{
+   clearAuthenticationState(id);
 }
 
 ClientAuthManager::AuthState::AuthState() :
-   mFailed(false)
+   mFailed(false),
+   mCacheUseLimit(0),
+   mCacheUseCount(0)
 {
 }
-
 
 bool 
 ClientAuthManager::AuthState::handleChallenge(UserProfile& userProfile, const SipMessage& challenge)
@@ -192,11 +204,11 @@ ClientAuthManager::AuthState::handleChallenge(UserProfile& userProfile, const Si
    {
       return false;
    }   
-   bool handled = true;   
+   bool handled = true;
    if (challenge.exists(h_WWWAuthenticates))
    {
       for (Auths::const_iterator i = challenge.header(h_WWWAuthenticates).begin();  
-           i != challenge.header(h_WWWAuthenticates).end(); ++i)                    
+         i != challenge.header(h_WWWAuthenticates).end(); ++i)                    
       {    
          if (i->exists(p_realm))
          {
@@ -214,8 +226,8 @@ ClientAuthManager::AuthState::handleChallenge(UserProfile& userProfile, const Si
    }
    if (challenge.exists(h_ProxyAuthenticates))
    {
-      for (Auths::const_iterator i = challenge.header(h_ProxyAuthenticates).begin();  
-           i != challenge.header(h_ProxyAuthenticates).end(); ++i)                    
+      for(Auths::const_iterator i = challenge.header(h_ProxyAuthenticates).begin();  
+          i != challenge.header(h_ProxyAuthenticates).end(); ++i)                    
       {    
          if (i->exists(p_realm))
          {
@@ -225,15 +237,19 @@ ClientAuthManager::AuthState::handleChallenge(UserProfile& userProfile, const Si
                break;
             }
          }
-      else
-      {
-         return false;
+         else
+         {
+            return false;
+         }
       }
-      }
-      if(!handled)
-      {
-         InfoLog( << "ClientAuthManager::AuthState::handleChallenge failed for: " << challenge);
-      }
+   }
+   if(!handled)
+   {
+      InfoLog( << "ClientAuthManager::AuthState::handleChallenge failed for: " << challenge);
+   }
+   else
+   {
+      mCacheUseLimit = userProfile.getDigestCacheUseLimit();
    }
    return handled;
 }
@@ -244,6 +260,13 @@ ClientAuthManager::AuthState::authSucceeded()
    for(RealmStates::iterator i = mRealms.begin(); i!=mRealms.end(); i++)
    {
       i->second.authSucceeded();
+   }
+   mCacheUseCount++;
+   if(mCacheUseLimit != 0 && mCacheUseCount >= mCacheUseLimit)
+   {
+      // Cache use limit reached - clear auth state
+      mRealms.clear();
+      mCacheUseCount = 0;
    }
 }
 
@@ -265,8 +288,7 @@ ClientAuthManager::AuthState::addAuthentication(SipMessage& request)
 ClientAuthManager::RealmState::RealmState() :
    mIsProxyCredential(false),
    mState(Invalid),
-   mNonceCount(0),
-   mAuthPtr(NULL)
+   mNonceCount(0)
 {
 }
 
@@ -298,7 +320,7 @@ ClientAuthManager::RealmState::authSucceeded()
    switch(mState)
    {
       case Invalid:
-         assert(0);
+         resip_assert(0);
          break;
       case Current:
       case Cached:
@@ -306,7 +328,7 @@ ClientAuthManager::RealmState::authSucceeded()
          transition(Cached);
          break;
       case Failed:
-         assert(0);
+         resip_assert(0);
          break;         
    };
 }
@@ -388,11 +410,11 @@ ClientAuthManager::RealmState::findCredential(UserProfile& userProfile, const Au
    const Data& realm = auth.param(p_realm);                   
    //!dcm! -- icky, expose static empty soon...ptr instead of reference?
    mCredential = userProfile.getDigestCredential(realm);
-   if ( mCredential.realm.empty() )                       
+   if (mCredential.realm.empty())                       
    {                                        
       DebugLog( << "Got a 401 or 407 but could not find credentials for realm: " << realm);
-//      DebugLog (<< auth);
-//      DebugLog (<< response);
+      // DebugLog (<< auth);
+      // DebugLog (<< response);
       return false;
    }                     
    return true;   
@@ -401,7 +423,7 @@ ClientAuthManager::RealmState::findCredential(UserProfile& userProfile, const Au
 void 
 ClientAuthManager::RealmState::addAuthentication(SipMessage& request)
 {
-   assert(mState != Failed);
+   resip_assert(mState != Failed);
    if (mState == Failed) return;
 
    Data nonceCountString;
@@ -413,16 +435,8 @@ ClientAuthManager::RealmState::addAuthentication(SipMessage& request)
    
    // Add client auth decorator so that we ensure any body hashes are calcuated after user defined outbound decorators that
    // may be modifying the message body
-   std::unique_ptr<MessageDecorator> clientAuthDecorator(new ClientAuthDecorator(mIsProxyCredential, mAuth, mCredential, authQop, nonceCountString));
-   request.addOutboundDecorator(std::move(clientAuthDecorator));
-}
-
-void ClientAuthManager::dialogSetDestroyed(const DialogSetId& id)
-{
-   if ( mAttemptedAuths.find(id) != mAttemptedAuths.end())
-   {
-      mAttemptedAuths.erase(id);
-   }
+   std::auto_ptr<MessageDecorator> clientAuthDecorator(new ClientAuthDecorator(mIsProxyCredential, mAuth, mCredential, authQop, nonceCountString));
+   request.addOutboundDecorator(clientAuthDecorator);
 }
 
 // bool
@@ -441,7 +455,6 @@ void ClientAuthManager::dialogSetDestroyed(const DialogSetId& id)
 //       return lhs.param(p_username) < rhs.param(p_username);
 //    }
 // }
-
 
 
 /* ====================================================================

@@ -53,7 +53,7 @@ TuSelector::process()
             remove(msg->getTransactionUser());
             break;
          default:
-            assert(0);
+            resip_assert(0);
             break;
       }
       delete msg;
@@ -67,7 +67,7 @@ TuSelector::add(Message* msg, TimeLimitFifo<Message>::DepthUsage usage)
    {
       if (exists(msg->getTransactionUser()))
       {
-         DebugLog (<< "Send to TU: " << *(msg->getTransactionUser()) << " " << std::endl << std::endl << *msg);
+         DebugLog (<< "Send to " << *(msg->getTransactionUser()) << " " << std::endl << std::endl << *msg);
          msg->getTransactionUser()->postToTransactionUser(msg, usage);
       }
       else
@@ -163,10 +163,17 @@ TuSelector::size() const
 }
 
 void 
-TuSelector::registerTransactionUser(TransactionUser& tu)
+TuSelector::registerTransactionUser(TransactionUser& tu, const bool front)
 {
    mTuSelectorMode = true;
-   mTuList.push_back(Item(&tu));
+   if(front)
+   {
+      mTuList.insert(mTuList.begin(), Item(&tu));
+   }
+   else
+   {
+      mTuList.push_back(Item(&tu));
+   }
 }
 
 void
@@ -186,6 +193,7 @@ TuSelector::unregisterTransactionUser(TransactionUser& tu)
 TransactionUser* 
 TuSelector::selectTransactionUser(const SipMessage& msg)
 {
+   DebugLog(<< "TuSelector::selectTransactionUser: Checking which TU message belongs to:" << std::endl << std::endl << msg);
    for(TuList::iterator it = mTuList.begin(); it != mTuList.end(); it++)
    {
       if (it->tu->isForMe(msg))
@@ -207,7 +215,7 @@ TuSelector::markShuttingDown(TransactionUser* tu)
          return;
       }
    }
-   assert(0);
+   resip_assert(0);
 }
 
 void
@@ -223,7 +231,7 @@ TuSelector::remove(TransactionUser* tu)
          return;
       }
    }
-   assert(0);
+   resip_assert(0);
 }
 
 bool
@@ -299,7 +307,7 @@ TuSelector::getRejectionBehavior(TransactionUser* tu) const
    return mCongestionManager->getRejectionBehavior(&mFallBackFifo);
 }
 
-unsigned int
+UInt32 
 TuSelector::getExpectedWait(TransactionUser* tu) const
 {
    if(tu)

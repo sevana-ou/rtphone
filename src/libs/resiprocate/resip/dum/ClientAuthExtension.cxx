@@ -2,12 +2,12 @@
 
 using namespace resip;
 
-std::unique_ptr<ClientAuthExtension> ClientAuthExtension::mInstance = std::unique_ptr<ClientAuthExtension>(new ClientAuthExtension());
+std::auto_ptr<ClientAuthExtension> ClientAuthExtension::mInstance = std::auto_ptr<ClientAuthExtension>(new ClientAuthExtension());
 
 void 
-ClientAuthExtension::setInstance(std::unique_ptr<ClientAuthExtension> ext)
+ClientAuthExtension::setInstance(std::auto_ptr<ClientAuthExtension> ext)
 {
-   mInstance = std::move(ext);
+   mInstance = ext;
 }
 
 
@@ -21,7 +21,7 @@ ClientAuthExtension::makeChallengeResponseAuth(const SipMessage& request,
                                                const Data& nonceCountString,
                                                Auth& auth)
 {
-   assert(0);
+   resip_assert(0);
 }
 
 void 
@@ -34,7 +34,7 @@ ClientAuthExtension::makeChallengeResponseAuthWithA1(const SipMessage& request,
                                                      const Data& nonceCountString,
                                                      Auth& auth)
 {
-   assert(0);
+   resip_assert(0);
 }
 
       

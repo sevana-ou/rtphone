@@ -22,8 +22,6 @@ class SdpContents;
 class InviteSession : public DialogUsage
 {
    public:
-      bool canProvideOffer();
-
       /** Called to set the offer that will be used in the next message that
           sends an offer. If possible, this will synchronously send the
           appropriate request or response. In some cases, the UAS might have to
@@ -72,19 +70,22 @@ class InviteSession : public DialogUsage
       virtual void reject(int statusCode, WarningCategory *warning = 0);
 
       /** will send a reINVITE (current offerAnswer) or UPDATE with new Contact header */
+      /** currently only supported when in the Connected state, UAC_Early states are allowed by RFC but not yet supported */
       virtual void targetRefresh(const NameAddr& localUri);
 
       // Following methods are for sending requests within a dialog
 
       /** sends a refer request */
       virtual void refer(const NameAddr& referTo, bool referSub = true);
-      virtual void refer(const NameAddr& referTo, std::unique_ptr<resip::Contents> contents, bool referSub = true);
+      virtual void refer(const NameAddr& referTo, const NameAddr& referredBy, bool referSub = true);
+      virtual void refer(const NameAddr& referTo, std::auto_ptr<resip::Contents> contents, bool referSub = true);
+      virtual void refer(const NameAddr& referTo, const NameAddr& referredBy, std::auto_ptr<resip::Contents> contents, bool referSub = true);
 
       /** sends a refer request with a replaces header */
       virtual void refer(const NameAddr& referTo, InviteSessionHandle sessionToReplace, bool referSub = true);
-      virtual void refer(const NameAddr& referTo, InviteSessionHandle sessionToReplace, std::unique_ptr<resip::Contents> contents, bool referSub = true);
+      virtual void refer(const NameAddr& referTo, InviteSessionHandle sessionToReplace, std::auto_ptr<resip::Contents> contents, bool referSub = true);
       virtual void refer(const NameAddr& referTo, const CallId& replaces, bool referSub = true);
-      virtual void refer(const NameAddr& referTo, const CallId& replaces, std::unique_ptr<resip::Contents> contents, bool referSub = true);
+      virtual void refer(const NameAddr& referTo, const CallId& replaces, std::auto_ptr<resip::Contents> contents, bool referSub = true);
 
       /** sends an info request */
       virtual void info(const Contents& contents);
@@ -221,17 +222,23 @@ class InviteSession : public DialogUsage
          UAS_WaitingToRequestOffer, 
 
          UAS_AcceptedWaitingAnswer, 
-         UAS_ReceivedOfferReliable,
+         UAS_OfferReliable,
+         UAS_OfferReliableProvidedAnswer,
          UAS_NoOfferReliable,
+         UAS_ProvidedOfferReliable,
          UAS_FirstSentOfferReliable,
          UAS_FirstSentAnswerReliable,
+         UAS_NoAnswerReliableWaitingPrack,
          UAS_NegotiatedReliable,
+         UAS_NoAnswerReliable,
          UAS_SentUpdate,
          UAS_SentUpdateAccepted,
+         UAS_SentUpdateGlare,
          UAS_ReceivedUpdate,
          UAS_ReceivedUpdateWaitingAnswer,
-         UAS_WaitingToTerminate,
          UAS_WaitingToHangup
+         // !!!!WARNING!!!! when adding new UAS state - make sure you check if they 
+         //                 need to be added to the isAccepted method
       } State;
 
       typedef enum
@@ -279,7 +286,6 @@ class InviteSession : public DialogUsage
 
       InviteSession(DialogUsageManager& dum, Dialog& dialog);
       virtual ~InviteSession();
-      virtual void dialogDestroyed(const SipMessage& msg);
       virtual void onReadyToSend(SipMessage& msg);
       virtual void flowTerminated();
 
@@ -320,10 +326,10 @@ class InviteSession : public DialogUsage
       static Data toData(State state);
       void transition(State target);
 
-      std::unique_ptr<Contents> getOfferAnswer(const SipMessage& msg);
-      bool isReliable(const SipMessage& msg);
-      static std::unique_ptr<Contents> makeOfferAnswer(const Contents& offerAnswer);
-      static std::unique_ptr<Contents> makeOfferAnswer(const Contents& offerAnswer, const Contents* alternative);
+      std::auto_ptr<Contents> getOfferAnswer(const SipMessage& msg);
+      bool isReliable(const SipMessage& msg) const;
+      static std::auto_ptr<Contents> makeOfferAnswer(const Contents& offerAnswer);
+      static std::auto_ptr<Contents> makeOfferAnswer(const Contents& offerAnswer, const Contents* alternative);
       static void setOfferAnswer(SipMessage& msg, const Contents& offerAnswer, const Contents* alternative = 0);
       static void setOfferAnswer(SipMessage& msg, const Contents* offerAnswer);
       void provideProposedOffer();
@@ -355,17 +361,16 @@ class InviteSession : public DialogUsage
       NitState mNitState;
       NitState mServerNitState;
 
-      std::unique_ptr<Contents> mCurrentLocalOfferAnswer;
-      std::unique_ptr<Contents> mProposedLocalOfferAnswer;
+      std::auto_ptr<Contents> mCurrentLocalOfferAnswer;    // This gets set with mProposedLocalOfferAnswer after we receive an SDP answer from the remote end or when we send and SDP answer to the remote end
+      std::auto_ptr<Contents> mProposedLocalOfferAnswer;   // This get set when we send an offer to the remote end
 
-      std::unique_ptr<Contents> mCurrentRemoteOfferAnswer;
-      std::unique_ptr<Contents> mProposedRemoteOfferAnswer;
+      std::auto_ptr<Contents> mCurrentRemoteOfferAnswer;   // This gets set with mProposedRemoteOfferAnswer after we send an SDP answer, or when we receive an SDP answer from the remote end
+      std::auto_ptr<Contents> mProposedRemoteOfferAnswer;  // This gets set when we receive an offer from the remote end
 
-      SharedPtr<SipMessage> mLastLocalSessionModification; // last UPDATE or reINVITE sent
+      SharedPtr<SipMessage> mLastLocalSessionModification;  // last UPDATE or reINVITE sent
       SharedPtr<SipMessage> mLastRemoteSessionModification; // last UPDATE or reINVITE received
-      SharedPtr<SipMessage> mInvite200;               // 200 OK for reINVITE for retransmissions
-      SharedPtr<SipMessage> mLastNitResponse;         // 
-                                                      //?dcm? -- ptr, delete when not needed?
+      SharedPtr<SipMessage> mInvite200;                     // 200 OK for reINVITE for retransmissions
+      SharedPtr<SipMessage> mLastNitResponse;
 
       SipMessage  mLastReferNoSubRequest;
       
@@ -396,7 +401,7 @@ class InviteSession : public DialogUsage
       SharedPtr<SipMessage> mLastSentNITRequest;
 
       DialogUsageManager::EncryptionLevel mCurrentEncryptionLevel;
-      DialogUsageManager::EncryptionLevel mProposedEncryptionLevel; // UPDATE or RE-INVITE
+      DialogUsageManager::EncryptionLevel mProposedEncryptionLevel; // UPDATE or RE-INVITE or PRACK
 
       EndReason mEndReason;
 
@@ -406,7 +411,7 @@ class InviteSession : public DialogUsage
       // Used to respond to 2xx retransmissions.
       typedef HashMap<Data, SharedPtr<SipMessage> > AckMap;
       AckMap mAcks;
-
+      
    private:
       friend class Dialog;
       friend class DialogUsageManager;

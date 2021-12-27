@@ -1,4 +1,4 @@
-#include <cassert>
+#include "rutil/ResipAssert.h"
 
 #include "resip/stack/Helper.hxx"
 #include "resip/stack/SipMessage.hxx"
@@ -24,8 +24,10 @@ ClientPublication::ClientPublication(DialogUsageManager& dum,
                                      DialogSet& dialogSet,
                                      SharedPtr<SipMessage> req)
    : NonDialogUsage(dum, dialogSet),
+     mPublished(false),
      mWaitingForResponse(false),
      mPendingPublish(false),
+     mPendingEnd(false),
      mPublish(req),
      mEventType(req->header(h_Event).value()),
      mTimerSeq(0),
@@ -50,14 +52,28 @@ ClientPublication::end()
 void
 ClientPublication::end(bool immediate)
 {
-   InfoLog (<< "End client publication to " << mPublish->header(h_RequestLine).uri());
-   if(!immediate)
+   if (immediate)
    {
+      InfoLog(<< "End client publication immediately to " << mPublish->header(h_RequestLine).uri());
+      delete this;
+      return;
+   }
+   if (mWaitingForResponse)
+   {
+      InfoLog(<< "Waiting for response, pending End of client publication to " << mPublish->header(h_RequestLine).uri());
+      mPendingEnd = true;
+      return;
+   }
+   if (mPublished)
+   {
+      InfoLog(<< "End client publication to " << mPublish->header(h_RequestLine).uri());
       mPublish->header(h_Expires).value() = 0;
+      mPublish->releaseContents();
       send(mPublish);
    }
    else
    {
+      InfoLog(<< "End client publication immediately (not published) to " << mPublish->header(h_RequestLine).uri());
       delete this;
    }
 }
@@ -65,15 +81,17 @@ ClientPublication::end(bool immediate)
 class ClientPublicationEndCommand : public DumCommandAdapter
 {
 public:
-   ClientPublicationEndCommand(ClientPublication& clientPublication, bool immediate)
-      : mClientPublication(clientPublication), mImmediate(immediate)
+   ClientPublicationEndCommand(const ClientPublicationHandle& clientPublicationHandle, bool immediate)
+      : mClientPublicationHandle(clientPublicationHandle), mImmediate(immediate)
    {
-
    }
 
    virtual void executeCommand()
    {
-      mClientPublication.end(mImmediate);
+      if(mClientPublicationHandle.isValid())
+      {
+         mClientPublicationHandle->end(mImmediate);
+      }
    }
 
    virtual EncodeStream& encodeBrief(EncodeStream& strm) const
@@ -81,21 +99,21 @@ public:
       return strm << "ClientPublicationEndCommand";
    }
 private:
-   ClientPublication& mClientPublication;
+   ClientPublicationHandle mClientPublicationHandle;
    bool mImmediate;
 };
 
 void
 ClientPublication::endCommand(bool immediate)
 {
-   mDum.post(new ClientPublicationEndCommand(*this, immediate));
+   mDum.post(new ClientPublicationEndCommand(getHandle(), immediate));
 }
 
 void 
 ClientPublication::dispatch(const SipMessage& msg)
 {
    ClientPublicationHandler* handler = mDum.getClientPublicationHandler(mEventType);
-   assert(handler);   
+   resip_assert(handler);   
 
    if (msg.isRequest())
    {
@@ -109,11 +127,12 @@ ClientPublication::dispatch(const SipMessage& msg)
          return;
       }
 
-      assert(code >= 200);
+      resip_assert(code >= 200);
       mWaitingForResponse = false;
 
       if (code < 300)
       {
+         mPublished = true;
          if (mPublish->exists(h_Expires) && mPublish->header(h_Expires).value() == 0)
          {
             handler->onRemove(getHandle(), msg);
@@ -125,7 +144,7 @@ ClientPublication::dispatch(const SipMessage& msg)
             mPublish->header(h_SIPIfMatch) = msg.header(h_SIPETag);
             if(!mPendingPublish)
             {
-               mPublish->releaseContents();           
+               mPublish->releaseContents();
             }
             mDum.addTimer(DumTimeout::Publication, 
                           Helper::aBitSmallerThan(msg.header(h_Expires).value()), 
@@ -167,7 +186,7 @@ ClientPublication::dispatch(const SipMessage& msg)
             }
          }
          else if (code == 408 ||
-                  (code == 503 && msg.getReceivedTransport() == 0) ||
+                  (code == 503 && !msg.isFromWire()) ||
                   ((code == 404 ||
                     code == 413 ||
                     code == 480 ||
@@ -208,7 +227,6 @@ ClientPublication::dispatch(const SipMessage& msg)
                              getBaseHandle(),
                              ++mTimerSeq);       
                return;
-               
             }
          }
          else
@@ -217,10 +235,26 @@ ClientPublication::dispatch(const SipMessage& msg)
             delete this;
             return;
          }
-
       }
 
-      if (mPendingPublish)
+      if (mPendingEnd)
+      {
+         mPendingEnd = false;
+         if (mPublished)
+         {
+            mPublish->header(h_Expires).value() = 0;
+            mPublish->releaseContents();
+            InfoLog(<< "Sending pending end PUBLISH: " << mPublish->brief());
+            send(mPublish);
+         }
+         else
+         {
+             InfoLog(<< "Pending end PUBLISH, but not published, so ending immediately: " << mPublish->brief());
+             delete this;
+             return;
+         }
+      }
+      else if (mPendingPublish)
       {
          InfoLog (<< "Sending pending PUBLISH: " << mPublish->brief());
          send(mPublish);
@@ -240,9 +274,9 @@ ClientPublication::dispatch(const DumTimeout& timer)
 void
 ClientPublication::refresh(unsigned int expiration)
 {
-   if (expiration == 0 && mPublish->exists(h_Expires))
+   if (expiration != 0)
    {
-      expiration = mPublish->header(h_Expires).value();
+       mPublish->header(h_Expires).value() = expiration;
    }
    send(mPublish);
 }
@@ -250,16 +284,18 @@ ClientPublication::refresh(unsigned int expiration)
 class ClientPublicationRefreshCommand : public DumCommandAdapter
 {
 public:
-   ClientPublicationRefreshCommand(ClientPublication& clientPublication, unsigned int expiration)
-      : mClientPublication(clientPublication),
+   ClientPublicationRefreshCommand(const ClientPublicationHandle& clientPublicationHandle, unsigned int expiration)
+      : mClientPublicationHandle(clientPublicationHandle),
         mExpiration(expiration)
    {
-
    }
 
    virtual void executeCommand()
    {
-      mClientPublication.refresh(mExpiration);
+      if(mClientPublicationHandle.isValid())
+      {
+         mClientPublicationHandle->refresh(mExpiration);
+      }
    }
 
    virtual EncodeStream& encodeBrief(EncodeStream& strm) const
@@ -268,14 +304,14 @@ public:
    }
 
 private:
-   ClientPublication& mClientPublication;
+   ClientPublicationHandle mClientPublicationHandle;
    unsigned int mExpiration;
 };
 
 void
 ClientPublication::refreshCommand(unsigned int expiration)
 {
-   mDum.post(new ClientPublicationRefreshCommand(*this, expiration));
+   mDum.post(new ClientPublicationRefreshCommand(getHandle(), expiration));
 }
 
 void
@@ -303,16 +339,18 @@ ClientPublication::update(const Contents* body)
 class ClientPublicationUpdateCommand : public DumCommandAdapter
 {
 public:
-   ClientPublicationUpdateCommand(ClientPublication& clientPublication, const Contents* body)
-      : mClientPublication(clientPublication),
+   ClientPublicationUpdateCommand(const ClientPublicationHandle& clientPublicationHandle, const Contents* body)
+      : mClientPublicationHandle(clientPublicationHandle),
       mBody(body?body->clone():0)
    {
-
    }
 
    virtual void executeCommand()
    {
-      mClientPublication.update(mBody.get());
+      if(mClientPublicationHandle.isValid())
+      {
+         mClientPublicationHandle->update(mBody.get());
+      }
    }
 
    virtual EncodeStream& encodeBrief(EncodeStream& strm) const
@@ -321,14 +359,14 @@ public:
    }
 
 private:
-   ClientPublication& mClientPublication;
-   std::unique_ptr<Contents> mBody;
+   ClientPublicationHandle mClientPublicationHandle;
+   std::auto_ptr<Contents> mBody;
 };
 
 void
 ClientPublication::updateCommand(const Contents* body)
 {
-   mDum.post(new ClientPublicationUpdateCommand(*this, body));
+   mDum.post(new ClientPublicationUpdateCommand(getHandle(), body));
 }
 
 void 

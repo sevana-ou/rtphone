@@ -11,14 +11,11 @@ namespace resip
 
 class SipMessage;
 class BaseCreator;
-class AtomicCounter;
 
 //!dcm! -- shutdown/deletion API -- end?
 class ClientRegistration: public NonDialogUsage
 {
    public:
-      static AtomicCounter InstanceCounter;
-
       //ClientRegistration(DialogUsageManager& dum, DialogSet& dialog,
       //SipMessage& req);
       ClientRegistration(DialogUsageManager& dum, DialogSet& dialog, SharedPtr<SipMessage> req);
@@ -42,7 +39,6 @@ class ClientRegistration: public NonDialogUsage
           when complete */
       void removeMyBindings(bool stopRegisteringWhenDone=false);
 
-
       /** Request a manual refresh of the registration.  If 0 then default to using original 
           expires value (to remove use removeXXX() instead) */
       void requestRefresh(UInt32 expires = 0);  
@@ -56,11 +52,14 @@ class ClientRegistration: public NonDialogUsage
       /** returns a list of all contacts for this AOR - may include those added by other UA's */
       const NameAddrs& allContacts();
 
-      /** returns the number of seconds until the registration expires - relative */
+      /** returns the number of seconds until the registration expires - relative, returns 0 if already expired */
       UInt32 whenExpires() const; 
       
       /** Calls removeMyBindings and ends usage when complete */
       virtual void end();
+
+      /** Returns true if a REGISTER request is currently pending and we are waiting for the SIP Response */
+      bool isRequestPending() { return mState != Registered && mState != RetryAdding && mState != RetryRefreshing; }
 
       /**
        * Provide asynchronous method access by using command
@@ -73,8 +72,6 @@ class ClientRegistration: public NonDialogUsage
       virtual void dispatch(const DumTimeout& timer);
    
       virtual EncodeStream& dump(EncodeStream& strm) const;
-      void setCustomHeader(const resip::Data& name, const resip::Data& value);
-      void unsetCustomHeader();
 
       static void tagContact(NameAddr& contact, DialogUsageManager& dum, SharedPtr<UserProfile>& userProfile);
 
@@ -102,7 +99,6 @@ class ClientRegistration: public NonDialogUsage
       bool contactIsMine(const NameAddr& contact) const;
       bool rinstanceIsMine(const Data& rinstance) const;
       bool searchByUri(const Uri& cUri) const;
-      void updateWithCustomHeader(SharedPtr<SipMessage> msg);
 
       friend class DialogSet;
       void flowTerminated();
@@ -114,16 +110,17 @@ class ClientRegistration: public NonDialogUsage
       unsigned int mTimerSeq; // expected timer seq (all < are stale)
 
       State mState;
+      bool mEnding;
       bool mEndWhenDone;
       bool mUserRefresh;
       UInt32 mRegistrationTime;
       UInt64 mExpires;
+      UInt64 mRefreshTime;
       State mQueuedState;
       SharedPtr<SipMessage> mQueuedRequest;
-      resip::Data mCustomHeaderName, mCustomHeaderValue;
-      bool mCustomHeader;
-      NetworkAssociation mNetworkAssociation;
 
+      NetworkAssociation mNetworkAssociation;
+      
       // disabled
       ClientRegistration(const ClientRegistration&);
       ClientRegistration& operator=(const ClientRegistration&);

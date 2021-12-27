@@ -31,17 +31,17 @@ DialogEventInfo::DialogEventInfo(const DialogEventInfo& rhs)
 {
    if (rhs.mReplacesId.get())
    {
-      mReplacesId = std::unique_ptr<DialogId>(new DialogId(rhs.mReplacesId->getCallId(),
+      mReplacesId = std::auto_ptr<DialogId>(new DialogId(rhs.mReplacesId->getCallId(),
                                                          rhs.mReplacesId->getLocalTag(),
                                                          rhs.mReplacesId->getRemoteTag()));
    }
    if (rhs.mLocalOfferAnswer.get())
    {
-      mLocalOfferAnswer = std::unique_ptr<Contents>(rhs.mLocalOfferAnswer->clone());
+      mLocalOfferAnswer = std::auto_ptr<Contents>(rhs.mLocalOfferAnswer->clone());
    }
    if (rhs.mRemoteOfferAnswer.get())
    {
-      mRemoteOfferAnswer = std::unique_ptr<Contents>(rhs.mRemoteOfferAnswer->clone());
+      mRemoteOfferAnswer = std::auto_ptr<Contents>(rhs.mRemoteOfferAnswer->clone());
    }
 }
 
@@ -217,7 +217,7 @@ DialogEventInfo::getLocalOfferAnswer() const
          return mInviteSession->getLocalOfferAnswer();
       }
    }
-   assert(mLocalOfferAnswer.get() != NULL);
+   resip_assert(mLocalOfferAnswer.get() != NULL);
    return *mLocalOfferAnswer;
 }
 
@@ -231,7 +231,7 @@ DialogEventInfo::getRemoteOfferAnswer() const
          return mInviteSession->getRemoteOfferAnswer();
       }
    }
-   assert(mRemoteOfferAnswer.get() != NULL);
+   resip_assert(mRemoteOfferAnswer.get() != NULL);
    return *mRemoteOfferAnswer;
 }
 

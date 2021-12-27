@@ -113,10 +113,9 @@ ClientPagerMessage::getMessageRequest()
 }
 
 void
-ClientPagerMessage::page(std::unique_ptr<Contents> contents,
-                         DialogUsageManager::EncryptionLevel level)
+ClientPagerMessage::page(std::auto_ptr<Contents> contents, DialogUsageManager::EncryptionLevel level)
 {
-    assert(contents.get() != 0);
+    resip_assert(contents.get() != 0);
     bool do_page = mMsgQueue.empty();
     Item item;
     item.contents = contents.release();
@@ -124,89 +123,129 @@ ClientPagerMessage::page(std::unique_ptr<Contents> contents,
     mMsgQueue.push_back(item);
     if(do_page)
     {
-       this->pageFirstMsgQueued();
+       pageFirstMsgQueued();
     }
 }
 
 class ClientPagerMessagePageCommand : public DumCommandAdapter
 {
 public:
-   ClientPagerMessagePageCommand(ClientPagerMessage& clientPagerMessage, 
-      std::unique_ptr<Contents> contents,
+   ClientPagerMessagePageCommand(const ClientPagerMessageHandle& clientPagerMessageHandle, 
+      std::auto_ptr<Contents> contents,
       DialogUsageManager::EncryptionLevel level)
-      : mClientPagerMessage(clientPagerMessage),
-        mContents(std::move(contents)),
-        mLevel(level)
-   {
-
+      : mClientPagerMessageHandle(clientPagerMessageHandle),
+        mContents(contents),
+        mLevel(level) 
+   { 
    }
 
    virtual void executeCommand()
    {
-      mClientPagerMessage.page(std::move(mContents), mLevel);
+      if(mClientPagerMessageHandle.isValid())
+      {
+         mClientPagerMessageHandle->page(mContents, mLevel);
+      }
    }
 
    virtual EncodeStream& encodeBrief(EncodeStream& strm) const
    {
       return strm << "ClientPagerMessagePageCommand";
    }
+
 private:
-   ClientPagerMessage& mClientPagerMessage;
-   std::unique_ptr<Contents> mContents;
+   ClientPagerMessageHandle mClientPagerMessageHandle;
+   std::auto_ptr<Contents> mContents;
    DialogUsageManager::EncryptionLevel mLevel;
 };
 
 void
-ClientPagerMessage::pageCommand(std::unique_ptr<Contents> contents,
+ClientPagerMessage::pageCommand(std::auto_ptr<Contents> contents,
                                 DialogUsageManager::EncryptionLevel level)
 {
-   mDum.post(new ClientPagerMessagePageCommand(*this, std::move(contents), level));
+   mDum.post(new ClientPagerMessagePageCommand(getHandle(), contents, level));
+}
+
+// Use this API if the application has ongoing pending messages and it is using
+// getMessageRequest to modify the target routing information for messsages (ie:
+// requestUri or Route headers).  This will cause the current pending message to
+// be re-sent immediately using the new information that the application just set.
+// Any onSuccess or onFailure callbacks that might result from the active pending
+// message at the time this is called will be supressed.  Any messages queued 
+// behind that message will be dispatched sequentially to the new target.
+void 
+ClientPagerMessage::newTargetInfoSet()
+{
+    if (mMsgQueue.empty() == false)
+    {
+        // Note:  calling this will cause mRequest->header(h_CSeq) to get a new value
+        //        and the responses to the currently pending MESSAGE will be ignored
+        pageFirstMsgQueued();
+    }
 }
 
 void
 ClientPagerMessage::dispatch(const SipMessage& msg)
 {
-   assert(msg.isResponse());
+   resip_assert(msg.isResponse());
 
    ClientPagerMessageHandler* handler = mDum.mClientPagerMessageHandler;
-   assert(handler);
+   resip_assert(handler);
 
    int code = msg.header(h_StatusLine).statusCode();
 
-   DebugLog ( << "ClientPagerMessageReq::dispatch(msg)" << msg.brief() );
+   DebugLog ( << "ClientPagerMessageReq::dispatch(msg)" << msg.brief());
    {
-      assert(mMsgQueue.empty() == false);
       if (code < 200)
       {
          DebugLog ( << "ClientPagerMessageReq::dispatch - encountered provisional response" << msg.brief() );
       }
       else if (code < 300)
       {
-         if(mMsgQueue.empty() == false)
-         {
-            delete mMsgQueue.front().contents;
-            mMsgQueue.pop_front();
-            if(mMsgQueue.empty() == false)
-            {
-               this->pageFirstMsgQueued();
-            }
-
-            handler->onSuccess(getHandle(), msg);
-         }
+          // if cseq doesn't match last message paged then someone must have called newTargetInfoSet
+          // we want to supress the onSuccess callback and logic, since we re-sent this first queued 
+          // item to a new target
+          if (msg.header(h_CSeq).sequence() == mRequest->header(h_CSeq).sequence())
+          {
+              if (mMsgQueue.empty() == false)
+              {
+                  delete mMsgQueue.front().contents;
+                  mMsgQueue.pop_front();
+                  if (mMsgQueue.empty() == false)
+                  {
+                      this->pageFirstMsgQueued();
+                  }
+              }
+              handler->onSuccess(getHandle(), msg);
+          }
       }
       else
       {
-         SipMessage errResponse;
-         MsgQueue::iterator contents;
-         for(contents = mMsgQueue.begin(); contents != mMsgQueue.end(); ++contents)
-         {
-            Contents* p = contents->contents;
-            WarningLog ( << "Paging failed " << *p );
-            Helper::makeResponse(errResponse, *mRequest, code);
-            handler->onFailure(getHandle(), errResponse, std::unique_ptr<Contents>(p));
-            contents->contents = 0;
-         }
-         mMsgQueue.clear();
+          // if cseq doesn't match last message paged then someone must have called newTargetInfoSet
+          // we want to supress the onFailure callback and logic, since we re-sent this first queued 
+          // item to a new target
+          if (msg.header(h_CSeq).sequence() == mRequest->header(h_CSeq).sequence())
+          {
+              if (!mMsgQueue.empty())
+              {
+                  // if cseq doesn't match first queued element - someone must have called newTargetInfoSet
+                  // we want to supress the onFailure callback and logic, since we re-sent this first queued item to a new target
+                  SipMessage errResponse;
+                  MsgQueue::iterator contents;
+                  for (contents = mMsgQueue.begin(); contents != mMsgQueue.end(); ++contents)
+                  {
+                      Contents* p = contents->contents;
+                      WarningLog(<< "Paging failed " << *p);
+                      Helper::makeResponse(errResponse, *mRequest, code);
+                      handler->onFailure(getHandle(), errResponse, std::auto_ptr<Contents>(p));
+                      contents->contents = 0;
+                  }
+                  mMsgQueue.clear();
+              }
+              else
+              {
+                  handler->onFailure(getHandle(), msg, std::auto_ptr<Contents>(mRequest->releaseContents()));
+              }
+          }
       }
    }
 }
@@ -254,15 +293,15 @@ ClientPagerMessage::endCommand()
 }
 
 size_t
-ClientPagerMessage::msgQueued () const
+ClientPagerMessage::msgQueued() const
 {
    return  mMsgQueue.size();
 }
 
 void
-ClientPagerMessage::pageFirstMsgQueued ()
+ClientPagerMessage::pageFirstMsgQueued()
 {
-   assert(mMsgQueue.empty() == false);
+   resip_assert(mMsgQueue.empty() == false);
    mRequest->header(h_CSeq).sequence()++;
    mRequest->setContents(mMsgQueue.front().contents);
    DumHelper::setOutgoingEncryptionLevel(*mRequest, mMsgQueue.front().encryptionLevel);
@@ -271,7 +310,7 @@ ClientPagerMessage::pageFirstMsgQueued ()
 }
 
 void
-ClientPagerMessage::clearMsgQueued ()
+ClientPagerMessage::clearMsgQueued()
 {
    MsgQueue::iterator   contents;
    for(contents = mMsgQueue.begin(); contents != mMsgQueue.end(); ++contents)

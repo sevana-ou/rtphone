@@ -1,11 +1,10 @@
-#if defined(TARGET_WIN)
-
 #ifdef HAVE_CONFIG_H
 #include "config.h"
 #endif
 
 #include <Winsock2.h>
 #include <Iphlpapi.h>
+#include <tchar.h>
 
 #include "rutil/GenericIPAddress.hxx"
 #include "rutil/WinCompat.hxx"
@@ -16,10 +15,6 @@
 
 #define RESIPROCATE_SUBSYSTEM Subsystem::TRANSPORT
 
-#if defined(TARGET_WIN) && defined(_MSC_VER)
-FILE _iob[] = { *stdin, *stdout, *stderr };
-extern "C" FILE * __cdecl __iob_func(void) { return _iob; }
-#endif
 
 static char* ConvertLPWSTRToLPSTR(LPWSTR lpwszStrIn)
 {
@@ -176,11 +171,11 @@ WinCompat::WinCompat() :
       return;
    }
 
-   getBestInterfaceEx = (GetBestInterfaceExProc) GetProcAddress(hLib, "GetBestInterfaceEx");
-   getAdaptersAddresses = (GetAdaptersAddressesProc) GetProcAddress(hLib, "GetAdaptersAddresses");
-   getAdaptersInfo = (GetAdaptersInfoProc) GetProcAddress(hLib, "GetAdaptersInfo");
-   getBestRoute = (GetBestRouteProc) GetProcAddress(hLib, "GetBestRoute");
-   getIpAddrTable = (GetIpAddrTableProc) GetProcAddress(hLib, "GetIpAddrTable");
+   getBestInterfaceEx = (GetBestInterfaceExProc) GetProcAddress(hLib, TEXT("GetBestInterfaceEx"));
+   getAdaptersAddresses = (GetAdaptersAddressesProc) GetProcAddress(hLib, TEXT("GetAdaptersAddresses"));
+   getAdaptersInfo = (GetAdaptersInfoProc) GetProcAddress(hLib, TEXT("GetAdaptersInfo"));
+   getBestRoute = (GetBestRouteProc) GetProcAddress(hLib, TEXT("GetBestRoute"));
+   getIpAddrTable = (GetIpAddrTableProc) GetProcAddress(hLib, TEXT("GetIpAddrTable"));
    if (getAdaptersAddresses == NULL || getBestInterfaceEx == NULL)
    {   
       loadLibraryWithIPv6Failed = true;
@@ -200,6 +195,34 @@ void WinCompat::destroyInstance()
 {
     delete mInstance;
     mInstance = 0;
+}
+
+bool WinCompat::windowsEventLog(WORD type, WORD numStrings, LPCTSTR* strings)
+{
+    // type can be:
+    // EVENTLOG_SUCCESS (0x0000) Information event
+    // EVENTLOG_AUDIT_FAILURE (0x0010) Failure Audit event
+    // EVENTLOG_AUDIT_SUCCESS (0x0008) Success Audit event
+    // EVENTLOG_ERROR_TYPE (0x0001) Error event
+    // EVENTLOG_INFORMATION_TYPE (0x0004) Information event
+    // EVENTLOG_WARNING_TYPE (0x0002) Warning event
+
+    HKEY key;
+    long errorCode =
+        ::RegCreateKeyEx(HKEY_LOCAL_MACHINE, _T("System\\CurrentControlSet\\Services\\EventLog\\Application\\reSIProcate"),
+                         0, NULL, REG_OPTION_NON_VOLATILE, KEY_READ, NULL, &key, NULL);
+    if (ERROR_SUCCESS == errorCode)
+    {
+        ::RegCloseKey(key);
+        HANDLE eventLogHandle = ::RegisterEventSource(NULL, _T("reSIProcate"));
+        if (eventLogHandle != NULL)
+        {
+            BOOL retVal = ::ReportEvent(eventLogHandle, type, 0, 0, NULL, numStrings, 0, strings, NULL);
+            ::DeregisterEventSource(eventLogHandle);
+            return (retVal != FALSE);
+        }
+    }
+    return false;
 }
 
 WinCompat::~WinCompat()
@@ -252,15 +275,11 @@ WinCompat::determineSourceInterfaceWithIPv6(const GenericIPAddress& destination)
    int i;
    for (i = 0, AI = pAdapterAddresses; AI != NULL; AI = AI->Next, i++) 
    {
-      PIP_ADAPTER_UNICAST_ADDRESS defaultAdaptorAddress = 0;
       for (PIP_ADAPTER_UNICAST_ADDRESS unicast = AI->FirstUnicastAddress;
            unicast; unicast = unicast->Next)
       {
          if (unicast->Address.lpSockaddr->sa_family != family)
             continue;
-
-         // Store first address of matching family as the Adaptors default address
-         if(!defaultAdaptorAddress) defaultAdaptorAddress = unicast;
 
          if (family == AF_INET && 
              reinterpret_cast<const struct sockaddr_in*>(unicast->Address.lpSockaddr)->sin_addr.S_un.S_addr == 
@@ -269,9 +288,18 @@ WinCompat::determineSourceInterfaceWithIPv6(const GenericIPAddress& destination)
             // Return default address for NIC.  Note:  We could also just return the destination, 
             // however returning the default address for NIC is beneficial in cases where the
             // co-located registrar supports redundancy via a Virtual IP address.
-            GenericIPAddress ipaddress(*defaultAdaptorAddress->Address.lpSockaddr);
-            LocalFree(pAdapterAddresses);
-            return(ipaddress);
+            for (PIP_ADAPTER_UNICAST_ADDRESS unicastRet = AI->FirstUnicastAddress;
+                 unicastRet; unicastRet = unicastRet->Next)
+            {
+#if defined(AVOID_TRANSIENT_SOURCE_ADDRESSES)
+               if (unicastRet->Flags & IP_ADAPTER_ADDRESS_TRANSIENT)
+                  continue;
+#endif
+
+               GenericIPAddress ipaddress(*unicastRet->Address.lpSockaddr);
+               LocalFree(pAdapterAddresses);
+               return(ipaddress);
+            }
          }
 #ifdef USE_IPV6
          else if (family == AF_INET6 && 
@@ -279,16 +307,25 @@ WinCompat::determineSourceInterfaceWithIPv6(const GenericIPAddress& destination)
                          &(reinterpret_cast<const struct sockaddr_in6*>(&destination.address)->sin6_addr), 
                          sizeof(IN6_ADDR)) == 0)
          {
-            // explicitly cast to sockaddr_in6, to use that version of GenericIPAddress' ctor. If we don't, then compiler
-            // defaults to ctor for sockaddr_in (at least under Win32), which will truncate the lower-bits of the IPv6 address.
-            const struct sockaddr_in6* psa = reinterpret_cast<const struct sockaddr_in6*>(defaultAdaptorAddress->Address.lpSockaddr);
+            for (PIP_ADAPTER_UNICAST_ADDRESS unicastRet = AI->FirstUnicastAddress;
+                 unicastRet; unicastRet = unicastRet->Next)
+            {
+#if defined(AVOID_TRANSIENT_SOURCE_ADDRESSES)
+               if (unicastRet->Flags & IP_ADAPTER_ADDRESS_TRANSIENT)
+                  continue;
+#endif
 
-            // Return default address for NIC.  Note:  We could also just return the destination, 
-            // however returning the default address for NIC is beneficial in cases where the
-            // co-located registrar supports redundancy via a Virtual IP address.
-            GenericIPAddress ipaddress(*psa);
-            LocalFree(pAdapterAddresses);
-            return(ipaddress);
+               // explicitly cast to sockaddr_in6, to use that version of GenericIPAddress' ctor. If we don't, then compiler
+               // defaults to ctor for sockaddr_in (at least under Win32), which will truncate the lower-bits of the IPv6 address.
+               const struct sockaddr_in6* psa = reinterpret_cast<const struct sockaddr_in6*>(unicastRet->Address.lpSockaddr);
+
+               // Return default address for NIC.  Note:  We could also just return the destination, 
+               // however returning the default address for NIC is beneficial in cases where the
+               // co-located registrar supports redundancy via a Virtual IP address.
+               GenericIPAddress ipaddress(*psa);
+               LocalFree(pAdapterAddresses);
+               return(ipaddress);
+            }
          }
 #endif
       } 
@@ -310,6 +347,12 @@ WinCompat::determineSourceInterfaceWithIPv6(const GenericIPAddress& destination)
        {
           if (unicast->Address.lpSockaddr->sa_family != saddr->sa_family)
              continue;
+
+#if defined(AVOID_TRANSIENT_SOURCE_ADDRESSES)
+         if (unicast->Flags & IP_ADAPTER_ADDRESS_TRANSIENT)
+            continue;
+#endif
+
           if (saddr->sa_family == AF_INET && AI->IfIndex == dwBestIfIndex)
           {
              GenericIPAddress ipaddress(*unicast->Address.lpSockaddr);
@@ -365,14 +408,14 @@ WinCompat::determineSourceInterfaceWithoutIPv6(const GenericIPAddress& destinati
    } 
    else 
    {
-      throw Exception("Can't find source address for destination (GetIpAddrTable to get buffer space failed), ret=" + Data(ret), __FILE__,__LINE__);
+      throw Exception("Can't find source address for destination (GetIpAddrTable to get buffer space failed), ret=" + Data((UInt32)ret), __FILE__,__LINE__);
    }
      
    ret = instance()->getIpAddrTable(pIpAddrTable, &addrSize, FALSE);
    if (NO_ERROR != ret) 
    {
       delete [] (char *) pIpAddrTable;
-      throw Exception("Can't find source address for destination (GetIpAddrTable failed), addrSize=" + Data(addrSize) + ", ret=" + Data(ret), __FILE__,__LINE__);
+      throw Exception("Can't find source address for destination (GetIpAddrTable failed), addrSize=" + Data((UInt32)addrSize) + ", ret=" + Data((UInt32)ret), __FILE__,__LINE__);
    }
 
    // Check if address is local or not
@@ -390,6 +433,11 @@ WinCompat::determineSourceInterfaceWithoutIPv6(const GenericIPAddress& destinati
          DWORD dwNicIndex = pIpAddrTable->table[i].dwIndex;
          for(DWORD j = 0; j <pIpAddrTable->dwNumEntries; j++)
          {
+#if defined(AVOID_TRANSIENT_SOURCE_ADDRESSES)
+            if (pIpAddrTable->table[j].wType & MIB_IPADDR_TRANSIENT)
+               continue;
+#endif
+
             if(pIpAddrTable->table[j].dwIndex == dwNicIndex)  // Default address is first address found for NIC
             {
                DebugLog(<< "Routing to a local address - returning default address for NIC");
@@ -409,7 +457,7 @@ WinCompat::determineSourceInterfaceWithoutIPv6(const GenericIPAddress& destinati
    if (NO_ERROR != ret) 
    {
       delete [] (char *) pIpAddrTable;
-      throw Exception("Can't find source address for destination, ret=" + Data(ret), __FILE__,__LINE__);
+      throw Exception("Can't find source address for destination, ret=" + Data((UInt32)ret), __FILE__,__LINE__);
    }
       
    // look through the local ip address to find one that match the best route.
@@ -423,6 +471,12 @@ WinCompat::determineSourceInterfaceWithoutIPv6(const GenericIPAddress& destinati
       
       ULONG addr = pIpAddrTable->table[i].dwAddr;
       ULONG gw = bestRoute.dwForwardNextHop;
+
+#if defined(AVOID_TRANSIENT_SOURCE_ADDRESSES)
+      if (entry.wType & MIB_IPADDR_TRANSIENT)
+         continue;
+#endif
+
       if(entry.dwIndex == bestRoute.dwForwardIfIndex)    // Note: there MAY be > 1 entry with the same index, see AddIPAddress.
       {
          if( (entry.dwAddr & entry.dwMask) == (bestRoute.dwForwardNextHop & entry.dwMask) )
@@ -466,11 +520,16 @@ WinCompat::determineSourceInterfaceWithoutIPv6(const GenericIPAddress& destinati
          nicMask.s_addr = entry.dwMask;
          DebugLog(<<"IP Table entry " <<i+1 <<'/' <<pIpAddrTable->dwNumEntries <<" if-index=" <<entry.dwIndex
                   <<" NIC IP=" <<DnsUtil::inet_ntop(nicIP)
+                  << (entry.wType & MIB_IPADDR_TRANSIENT ? " (Transient)" : "")
                   <<" NIC Mask=" <<DnsUtil::inet_ntop(nicMask) );
       }
    }
    
    delete [] (char *) pIpAddrTable;
+   if(sourceIP.sin_addr.s_addr == 0)
+   {
+      throw Exception("Can't find source address for destination", __FILE__,__LINE__);
+   }
    return GenericIPAddress(sourceIP);
 }
 #endif // !defined(NO_IPHLPAPI)
@@ -495,7 +554,7 @@ WinCompat::determineSourceInterface(const GenericIPAddress& destination)
    }  
 
 #else
-   assert(0);
+   resip_assert(0);
 #endif
    return GenericIPAddress();
 }
@@ -610,7 +669,6 @@ WinCompat::getInterfaces(const Data& matching)
 }
 
 
-#endif // of TARGET_WIN
 /* ====================================================================
  * The Vovida Software License, Version 1.0 
  * 

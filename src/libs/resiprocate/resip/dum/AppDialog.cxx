@@ -1,5 +1,5 @@
-#include "resip/dum/Dialog.hxx"
 #include "resip/dum/AppDialog.hxx"
+#include "resip/dum/Dialog.hxx"
 
 using namespace resip;
 using namespace std;

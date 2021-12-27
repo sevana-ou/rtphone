@@ -26,11 +26,11 @@ DialogEventStateManager::onTryingUas(Dialog& dialog, const SipMessage& invite)
    eventInfo->mDirection = DialogEventInfo::Recipient;
    eventInfo->mCreationTimeSeconds = Timer::getTimeSecs();
    eventInfo->mInviteSession = InviteSessionHandle::NotValid();
-   eventInfo->mRemoteOfferAnswer = (invite.getContents() != NULL ? std::unique_ptr<Contents>(invite.getContents()->clone()) : std::unique_ptr<Contents>());
+   eventInfo->mRemoteOfferAnswer = (invite.getContents() != NULL ? std::auto_ptr<Contents>(invite.getContents()->clone()) : std::auto_ptr<Contents>());
    eventInfo->mLocalIdentity = dialog.getLocalNameAddr();
    eventInfo->mLocalTarget = dialog.getLocalContact().uri();  // !slg! TODO - fix me - the Dialog stored local contact has an empty hostname so that the stack will fill it in
    eventInfo->mRemoteIdentity = dialog.getRemoteNameAddr();
-   eventInfo->mRemoteTarget = std::unique_ptr<Uri>(new Uri(dialog.getRemoteTarget().uri()));
+   eventInfo->mRemoteTarget = std::auto_ptr<Uri>(new Uri(dialog.getRemoteTarget().uri()));
    eventInfo->mRouteSet = dialog.getRouteSet();
    eventInfo->mState = DialogEventInfo::Trying;
 
@@ -40,20 +40,25 @@ DialogEventStateManager::onTryingUas(Dialog& dialog, const SipMessage& invite)
       Data replacesToTag = invite.header(h_Replaces).exists(p_toTag) ? invite.header(h_Replaces).param(p_toTag) : Data::Empty;
       Data replacesFromTag = invite.header(h_Replaces).exists(p_fromTag) ? invite.header(h_Replaces).param(p_fromTag) : Data::Empty;
 
-      eventInfo->mReplacesId = std::unique_ptr<DialogId>(new DialogId(invite.header(h_Replaces).value(), 
+      eventInfo->mReplacesId = std::auto_ptr<DialogId>(new DialogId(invite.header(h_Replaces).value(), 
          replacesToTag,
          replacesFromTag));
 
       std::map<DialogId, DialogEventInfo*, DialogIdComparator>::iterator it = mDialogIdToEventInfo.find(*(eventInfo->mReplacesId));
       if (it != mDialogIdToEventInfo.end())
       {
-         it->second->mReplaced = true;
+         // If the call to be replaced is early and it is a recipient, then it cannot get replaced (according to RFC3891)
+         // so we don't want to set the flag in this case.  Using inverted logic statement.
+         if (it->second->getState() != DialogEventInfo::Early || it->second->getDirection() != DialogEventInfo::Recipient)
+         {
+            it->second->mReplaced = true;
+         }
       }
    }
    if (invite.exists(h_ReferredBy) && 
          invite.header(h_ReferredBy).isWellFormed())
    {
-      eventInfo->mReferredBy = std::unique_ptr<NameAddr>(new NameAddr(invite.header(h_ReferredBy)));
+      eventInfo->mReferredBy = std::auto_ptr<NameAddr>(new NameAddr(invite.header(h_ReferredBy)));
    }
 
    mDialogIdToEventInfo[dialog.getId()] = eventInfo;
@@ -94,17 +99,17 @@ DialogEventStateManager::onTryingUac(DialogSet& dialogSet, const SipMessage& inv
    // ?bwc? Has something already checked for well-formedness here? 
    // Maybe DialogSet? We need to be absolutely certain that this exists and is
    // well-formed. Assert for now.
-   assert(!invite.empty(h_Contacts));
-   assert(invite.header(h_Contacts).front().isWellFormed());
+   resip_assert(!invite.empty(h_Contacts));
+   resip_assert(invite.header(h_Contacts).front().isWellFormed());
    eventInfo->mLocalTarget = invite.header(h_Contacts).front().uri();
    eventInfo->mRemoteIdentity = invite.header(h_To);
-   eventInfo->mLocalOfferAnswer = (invite.getContents() != NULL ? std::unique_ptr<Contents>(invite.getContents()->clone()) : std::unique_ptr<Contents>());
+   eventInfo->mLocalOfferAnswer = (invite.getContents() != NULL ? std::auto_ptr<Contents>(invite.getContents()->clone()) : std::auto_ptr<Contents>());
    eventInfo->mState = DialogEventInfo::Trying;
 
    if (invite.exists(h_ReferredBy) &&
          invite.header(h_ReferredBy).isWellFormed())
    {
-      eventInfo->mReferredBy = std::unique_ptr<NameAddr>(new NameAddr(invite.header(h_ReferredBy)));
+      eventInfo->mReferredBy = std::auto_ptr<NameAddr>(new NameAddr(invite.header(h_ReferredBy)));
    }
 
    mDialogIdToEventInfo[eventInfo->mDialogId] = eventInfo;
@@ -131,8 +136,8 @@ DialogEventStateManager::onProceedingUac(const DialogSet& dialogSet, const SipMe
          {
             // ?bwc? Has something already checked for well-formedness here? 
             // Maybe DialogSet? Assert for now.
-            assert(response.header(h_Contacts).front().isWellFormed());
-            eventInfo->mRemoteTarget = std::unique_ptr<Uri>(new Uri(response.header(h_Contacts).front().uri()));
+            resip_assert(response.header(h_Contacts).front().isWellFormed());
+            eventInfo->mRemoteTarget = std::auto_ptr<Uri>(new Uri(response.header(h_Contacts).front().uri()));
          }
          ProceedingDialogEvent evt(*eventInfo);
          mDialogEventHandler->onProceeding(evt);
@@ -162,7 +167,7 @@ DialogEventStateManager::onEarly(const Dialog& dialog, InviteSessionHandle is)
 
       // local or remote target might change due to an UPDATE or re-INVITE
       eventInfo->mLocalTarget = dialog.getLocalContact().uri();   // !slg! TODO - fix me - the Dialog stored local contact has an empty hostname so that the stack will fill it in
-      eventInfo->mRemoteTarget = std::unique_ptr<Uri>(new Uri(dialog.getRemoteTarget().uri()));
+      eventInfo->mRemoteTarget = std::auto_ptr<Uri>(new Uri(dialog.getRemoteTarget().uri()));
 
       EarlyDialogEvent evt(*eventInfo);
       mDialogEventHandler->onEarly(evt);
@@ -183,7 +188,11 @@ DialogEventStateManager::onConfirmed(const Dialog& dialog, InviteSessionHandle i
 
       // local or remote target might change due to an UPDATE or re-INVITE
       eventInfo->mLocalTarget = dialog.getLocalContact().uri();   // !slg! TODO - fix me - the Dialog stored local contact has an empty hostname so that the stack will fill it in
-      eventInfo->mRemoteTarget = std::unique_ptr<Uri>(new Uri(dialog.getRemoteTarget().uri()));
+      eventInfo->mRemoteTarget = std::auto_ptr<Uri>(new Uri(dialog.getRemoteTarget().uri()));
+
+      // Set the latest sdp
+      eventInfo->mLocalOfferAnswer = (is->hasLocalOfferAnswer() ? std::auto_ptr<Contents>(is->getLocalOfferAnswer().clone()) : std::auto_ptr<Contents>());
+      eventInfo->mRemoteOfferAnswer = (is->hasRemoteOfferAnswer() ? std::auto_ptr<Contents>(is->getRemoteOfferAnswer().clone()) : std::auto_ptr<Contents>());
 
       // for the dialog that got the 200 OK
       SharedPtr<ConfirmedDialogEvent> confirmedEvt(new ConfirmedDialogEvent(*eventInfo));
@@ -239,7 +248,7 @@ DialogEventStateManager::onTerminated(const Dialog& dialog, const SipMessage& ms
       {
          // .jjg. we're killing a *specific* dialog *after* the successful completion of the initial INVITE transaction;
          // so just elminate this dialog, not the entire dialogset
-         std::unique_ptr<TerminatedDialogEvent> evt(onDialogTerminatedImpl(it->second, reason, getResponseCode(msg), getFrontContact(msg)));
+         std::auto_ptr<TerminatedDialogEvent> evt(onDialogTerminatedImpl(it->second, reason, getResponseCode(msg), getFrontContact(msg)));
          mDialogEventHandler->onTerminated(*evt);
          delete it->second;
          mDialogIdToEventInfo.erase(it++);
@@ -283,7 +292,7 @@ DialogEventStateManager::onDialogSetTerminatedImpl(const DialogSetId& dialogSetI
           it->first.getDialogSetId() == dialogSetId)
    {
       eventInfo = it->second;
-      std::unique_ptr<TerminatedDialogEvent> evt(onDialogTerminatedImpl(eventInfo, reason, getResponseCode(msg), getFrontContact(msg)));
+      std::auto_ptr<TerminatedDialogEvent> evt(onDialogTerminatedImpl(eventInfo, reason, getResponseCode(msg), getFrontContact(msg)));
       mDialogEventHandler->onTerminated(*evt);
       delete it->second;
       mDialogIdToEventInfo.erase(it++);
@@ -311,7 +320,7 @@ DialogEventStateManager::onDialogTerminatedImpl(DialogEventInfo* eventInfo,
 
    if (remoteTarget)
    {
-      eventInfo->mRemoteTarget = std::unique_ptr<Uri>(remoteTarget);
+      eventInfo->mRemoteTarget = std::auto_ptr<Uri>(remoteTarget);
    }
 
    TerminatedDialogEvent* evt = new TerminatedDialogEvent(*eventInfo, actualReason, responseCode);
@@ -340,7 +349,7 @@ DialogEventStateManager::getFrontContact(const SipMessage& msg)
       {
          // ?bwc? Has something already checked for well-formedness here? 
          // Maybe DialogSet? Assert for now.
-         assert(msg.header(h_Contacts).front().isWellFormed());
+         resip_assert(msg.header(h_Contacts).front().isWellFormed());
          pContact = new Uri(msg.header(h_Contacts).front().uri());
       }
    }
@@ -355,6 +364,34 @@ DialogEventStateManager::getDialogEventInfo() const
    for (; it != mDialogIdToEventInfo.end(); it++)
    {
       infos.push_back(*(it->second));
+   }
+   return infos;
+}
+
+DialogEventStateManager::DialogEventInfos 
+DialogEventStateManager::getDialogEventInfo(const Uri& entityUri, bool bMatchRemoteIdentityOnly) const
+{
+   DialogEventStateManager::DialogEventInfos infos;
+   std::map<DialogId, DialogEventInfo*, DialogIdComparator>::const_iterator it = mDialogIdToEventInfo.begin();
+   for (; it != mDialogIdToEventInfo.end(); it++)
+   {
+      if (!bMatchRemoteIdentityOnly)
+      {
+         // Return all calls to or from the requested entity
+         if (it->second->getLocalIdentity().uri().getAOR(false) == entityUri.getAOR(false) ||
+            it->second->getRemoteIdentity().uri().getAOR(false) == entityUri.getAOR(false))
+         {
+            infos.push_back(*(it->second));
+         }
+      }
+      else
+      {
+         // Return only those dialogs whose remote identity matches the requested entity
+         if (it->second->getRemoteIdentity().uri().getAOR(false) == entityUri.getAOR(false))
+         {
+            infos.push_back(*(it->second));
+         }
+      }
    }
    return infos;
 }
@@ -403,7 +440,7 @@ DialogEventStateManager::findOrCreateDialogInfo(const Dialog& dialog)
                newForkInfo->mCreationTimeSeconds = Timer::getTimeSecs();
             newForkInfo->mDialogId = dialog.getId();
             newForkInfo->mRemoteIdentity = dialog.getRemoteNameAddr();
-            newForkInfo->mRemoteTarget = std::unique_ptr<Uri>(new Uri(dialog.getRemoteTarget().uri()));
+            newForkInfo->mRemoteTarget = std::auto_ptr<Uri>(new Uri(dialog.getRemoteTarget().uri()));
             newForkInfo->mRouteSet = dialog.getRouteSet();
             eventInfo = newForkInfo;
          }

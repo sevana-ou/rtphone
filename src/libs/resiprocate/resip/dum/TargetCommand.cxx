@@ -7,21 +7,21 @@ using namespace std;
 
 
 TargetCommand::TargetCommand(Target& target,
-                             unique_ptr<Message> message)
+                             auto_ptr<Message> message)
    : mTarget(target),
-     mMessage(std::move(message))
+     mMessage(message)
 {
 }
 
 TargetCommand::TargetCommand(const TargetCommand& from)
    : mTarget(from.mTarget),
-     mMessage(std::move(from.mMessage))
+     mMessage(from.mMessage)
 {
 }
 
 void TargetCommand::executeCommand()
 {
-   mTarget.post(std::move(mMessage));
+   mTarget.post(mMessage);
 }
 
 Message* TargetCommand::clone() const

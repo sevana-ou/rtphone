@@ -29,20 +29,7 @@ class FdPollGrp;
 */
 class InternalTransport : public Transport
 {
-friend class ConnectionBase;
-public:
-  class TransportLogger
-  {
-  public:
-    enum
-    {
-      Flow_Received,
-      Flow_Sent
-    };
-    virtual void onSipMessage(int flow, const char* msg, unsigned int length, const sockaddr* addr, unsigned int addrlen) = 0;
-  };
-
-public:
+   public:
       // sendHost what to put in the Via:sent-by
       // portNum is the port to receive and/or send on
       InternalTransport(Fifo<TransactionMessage>& rxFifo,
@@ -51,7 +38,8 @@ public:
                         const Data& interfaceObj,
                         AfterSocketCreationFuncPtr socketFunc = 0,
                         Compression &compression = Compression::Disabled,
-                        unsigned transportFlags = 0);
+                        unsigned transportFlags = 0,
+                        const Data& netNs = Data::Empty);
 
       virtual ~InternalTransport();
 
@@ -70,12 +58,12 @@ public:
       static Socket socket(TransportType type, IpVersion ipVer);
       void bind();
 
-      //used for epoll
+      //used for event loop
       virtual void setPollGrp(FdPollGrp *grp);
 
       // used for statistics
       virtual unsigned int getFifoSize() const;
-      virtual void send(std::unique_ptr<SendData> data);
+      virtual void send(std::auto_ptr<SendData> data);
       virtual void poke();
       
       // .bwc. This needs to be overridden if this transport runs in its own
@@ -92,7 +80,9 @@ public:
             mCongestionManager->registerFifo(&mTxFifo);
          }
       }
-      void setTransportLogger(TransportLogger* logger);
+
+      virtual void invokeAfterSocketCreationFunc() const;
+
    protected:
       friend class SipStack;
 
@@ -110,7 +100,6 @@ public:
       FdPollGrp *mPollGrp;      // not owned by transport, just used
       // FdPollItemIf *mPollItem;	// owned by the transport
       FdPollItemHandle mPollItemHandle; // owned by the transport
-      TransportLogger* mTransportLogger;
 };
 
 

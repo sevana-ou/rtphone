@@ -2,7 +2,7 @@
 #include "config.h"
 #endif
 
-#include <cassert>
+#include "rutil/ResipAssert.h"
 #include <stdlib.h>
 
 #ifdef WIN32
@@ -37,7 +37,10 @@
 #endif
 
 #if ( USE_OPENSSL == 1 )
+#  include <openssl/opensslv.h>
+#if !defined(LIBRESSL_VERSION_NUMBER)
 #  include <openssl/e_os2.h>
+#endif
 #  include <openssl/rand.h>
 #  include <openssl/err.h>
 #endif
@@ -268,7 +271,7 @@ Random::getRandom()
       // rand() returns [0,RAND_MAX], which on Windows is 15 bits and positive
       // code below gets 30bits of randomness; with bit31 and bit15
       // always zero; result is always positive
-      assert( RAND_MAX == 0x7fff );
+      resip_assert( RAND_MAX == 0x7fff );
       // WATCHOUT: on Linux, rand() returns 31bits, and assert above will fail
       int r1 = rand();
       int r2 = rand();
@@ -324,7 +327,7 @@ Random::getCryptoRandom()
       ERR_error_string_n(err,buf,sizeof(buf));
       
       ErrLog( << buf );
-      assert(0);
+      resip_assert(0);
    }
    return ret;
 #else
@@ -336,7 +339,7 @@ Data
 Random::getRandom(unsigned int len)
 {
    initialize();
-   assert(len < Random::maxLength+1);
+   resip_assert(len < Random::maxLength+1);
    
    union 
    {
@@ -443,7 +446,7 @@ Random::getVersion4UuidUrn()
 void 
 Random::getCryptoRandom(unsigned char* buf, unsigned int numBytes)
 {
-   assert(numBytes < Random::maxLength+1);
+   resip_assert(numBytes < Random::maxLength+1);
 
 #if USE_OPENSSL
    initialize();
@@ -457,7 +460,7 @@ Random::getCryptoRandom(unsigned char* buf, unsigned int numBytes)
       ERR_error_string_n(err,buf,sizeof(buf));
       
       ErrLog( << buf );
-      assert(0);
+      resip_assert(0);
    }
 #else
    // !bwc! Should optimize this.
@@ -469,7 +472,7 @@ Random::getCryptoRandom(unsigned char* buf, unsigned int numBytes)
 #ifdef WIN32
 Random::Initializer::Initializer()  : mThreadStorage(::TlsAlloc())
 { 
-   assert(mThreadStorage != TLS_OUT_OF_INDEXES);
+   resip_assert(mThreadStorage != TLS_OUT_OF_INDEXES);
 }
 
 Random::Initializer::~Initializer() 

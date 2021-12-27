@@ -20,6 +20,8 @@ typedef enum
    SCTP,
    DCCP,
    DTLS,
+   WS,
+   WSS,
    MAX_TRANSPORT
 } TransportType;
 
@@ -54,6 +56,12 @@ const resip::Data& toDataLower(const TransportType typeEnum);
 
 /// Returns true if passed in transport type is a reliable transport protocol
 bool isReliable(TransportType type);
+
+/// Returns true if passed in transport type is a secure transport protocol
+bool isSecure(TransportType type);
+
+/// Returns true if passed in transport type is a WebSocket transport protocol
+bool isWebSocket(TransportType type);
 
 // Indicate whether or not to run a stun server on a Transport
 typedef enum

@@ -4,25 +4,12 @@
 #include "resip/dum/Dialog.hxx"
 #include "resip/dum/DialogSet.hxx"
 #include "resip/dum/DialogUsageManager.hxx"
-#include "resip/stack/ExtensionHeader.hxx"
-#include "resip/stack/ExtensionParameter.hxx"
+#include "rutil/ResipAssert.h"
 #include "rutil/Logger.hxx"
-
 
 #define RESIPROCATE_SUBSYSTEM Subsystem::DUM
 
 using namespace resip;
-
-static void putUserHeaders(const std::map<std::string, std::string>& hdr, SipMessage& msg)
-{
-   for (std::map<std::string, std::string>::const_iterator iter = hdr.begin(); iter != hdr.end(); iter++)
-   {
-      const std::string& name = iter->first;
-      const std::string& value = iter->second;
-
-      msg.header(ExtensionHeader(name.c_str())).push_back(StringCategory(value.c_str()));
-   }
-}
 
 DialogUsage::Exception::Exception(const Data& msg,const Data& file,int line)
    : BaseException(msg, file, line)
@@ -49,6 +36,11 @@ DialogUsage::~DialogUsage()
 AppDialogSetHandle 
 DialogUsage::getAppDialogSet()
 {
+   if (mDialog.mDialogSet.mAppDialogSet == 0)
+   {
+      ErrLog(<< "mDialog.mDialogSet.mAppDialogSet is NULL!!!");
+      return AppDialogSetHandle();
+   }
    return mDialog.mDialogSet.mAppDialogSet->getHandle();
 }
 
@@ -76,6 +68,12 @@ DialogUsage::remoteTarget() const
    return mDialog.mRemoteTarget;
 }
 
+const NameAddrs&
+DialogUsage::getRouteSet() const
+{
+    return mDialog.mRouteSet;
+}
+
 const DialogId& 
 DialogUsage::getDialogId() const
 {
@@ -99,9 +97,6 @@ DialogUsage::send(SharedPtr<SipMessage> msg)
 {
    // give app an chance to adorn the message.
    onReadyToSend(*msg);
-
-   putUserHeaders(mUserHeaders, *msg);
-
    mDialog.send(msg);
 }
 
@@ -111,17 +106,12 @@ DialogUsage::sendCommand(SharedPtr<SipMessage> message)
    mDum.post(new DialogUsageSendCommand(*this, message));
 }
 
-void
-DialogUsage::setUserHeaders(const std::map<std::string, std::string> &headers)
-{
-   mUserHeaders = headers;
-}
 
 /*
 void 
 DialogUsage::send(SipMessage& msg)
 {
-   assert(msg.isResponse() || msg.header(h_RequestLine).method() == ACK);
+   resip_assert(msg.isResponse() || msg.header(h_RequestLine).method() == ACK);
    mDialog.send(msg);
 }
 */

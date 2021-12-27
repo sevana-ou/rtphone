@@ -31,33 +31,14 @@ TlsTransport::TlsTransport(Fifo<TransactionMessage>& fifo,
                            Compression &compression,
                            unsigned transportFlags,
                            SecurityTypes::TlsClientVerificationMode cvm,
-                           bool useEmailAsSIP):
-   TcpBaseTransport(fifo, portNum, version, interfaceObj, socketFunc, compression, transportFlags),
-   mSecurity(&security),
-   mSslType(sslType),
-   mDomainCtx(0),
-   mClientVerificationMode(cvm),
-   mUseEmailAsSIP(useEmailAsSIP)
+                           bool useEmailAsSIP,
+                           const Data& certificateFilename, 
+                           const Data& privateKeyFilename,
+                           const Data& privateKeyPassPhrase):
+   TlsBaseTransport(fifo, portNum, version, interfaceObj, security, sipDomain, sslType, TLS, socketFunc, 
+                    compression, transportFlags, cvm, useEmailAsSIP, certificateFilename, privateKeyFilename,
+                    privateKeyPassPhrase)
 {
-   setTlsDomain(sipDomain);   
-   mTuple.setType(transport());
-
-   init();
-
-   // If we have specified a sipDomain, then we need to create a new context for this domain,
-   // otherwise we will use the SSL Ctx or TLS Ctx created in the Security class
-   if(!sipDomain.empty())
-   {
-      if (sslType == SecurityTypes::SSLv23)
-      {
-         mDomainCtx = mSecurity->createDomainCtx(SSLv23_method(), sipDomain);
-      }
-      else
-      {
-         mDomainCtx = mSecurity->createDomainCtx(TLSv1_method(), sipDomain);
-      }
-   }
-
    InfoLog (<< "Creating TLS transport for domain " 
             << sipDomain << " interface=" << interfaceObj 
             << " port=" << mTuple.getPort());
@@ -68,34 +49,6 @@ TlsTransport::TlsTransport(Fifo<TransactionMessage>& fifo,
 
 TlsTransport::~TlsTransport()
 {
-   if (mDomainCtx)
-   {
-      SSL_CTX_free(mDomainCtx);mDomainCtx=0;
-   }
-}
-
-SSL_CTX* 
-TlsTransport::getCtx() const 
-{ 
-   if(mDomainCtx)
-   {
-      return mDomainCtx;
-   }
-   else if(mSslType == SecurityTypes::SSLv23)
-   {
-      return mSecurity->getSslCtx();
-   }
-   return mSecurity->getTlsCtx();
-}
-
-Connection* 
-TlsTransport::createConnection(const Tuple& who, Socket fd, bool server)
-{
-   assert(this);
-   Connection* conn = new TlsConnection(this,who, fd, mSecurity, server,
-                                        tlsDomain(), mSslType, mCompression );
-   conn->setTransportLogger(mTransportLogger);
-   return conn;
 }
 
 #endif /* USE_SSL */

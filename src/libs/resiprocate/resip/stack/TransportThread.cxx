@@ -30,8 +30,7 @@ TransportThread::thread()
       try
       {
          mTransport.process();
-         if (mPollGrp.get())
-            mPollGrp->waitAndProcess(25);
+         mPollGrp->waitAndProcess(25);
       }
       catch(BaseException& e)
       {

@@ -54,6 +54,10 @@ class DNSResult
          {
             for (typename std::vector<T>::const_iterator i=records.begin(); i != records.end(); ++i)
             {
+               if (i != records.begin())
+               {
+                  strm << ", ";
+               }
                i->dump(strm);
             }
          }
@@ -111,7 +115,14 @@ class DnsStub : public ExternalDnsHandler
       typedef std::vector<GenericIPAddress> NameserverList;
 
       static NameserverList EmptyNameserverList;
-            
+
+      class Command
+      {
+         public:
+            virtual ~Command() {}
+            virtual void execute() = 0;
+      };
+
       class ResultTransform
       {
          public:
@@ -147,15 +158,28 @@ class DnsStub : public ExternalDnsHandler
 
       void setResultTransform(ResultTransform*);
       void removeResultTransform();
+
+      /*!
+         @param enumSuffixes If the uri is enum searchable, this is the list of
+                  enum suffixes (for example "e164.arpa") that will be used in
+                  the attempt to resolve this uri.
+      */
       void setEnumSuffixes(const std::vector<Data>& suffixes);
       const std::vector<Data>& getEnumSuffixes() const;
+
+      /*!
+         @param enumDomains The ENUM possibility is only considered if
+                the URI domain part is one of these domains
+      */
       void setEnumDomains(const std::map<Data,Data>& domains);
       const std::map<Data,Data>& getEnumDomains() const;
+
       void clearDnsCache();
       void logDnsCache();
       void getDnsCacheDump(std::pair<unsigned long, unsigned long> key, GetDnsCacheDumpHandler* handler);
       void setDnsCacheTTL(int ttl);
       void setDnsCacheSize(int size);
+      void reloadDnsServers();
       bool checkDnsChange();
       bool supportedType(int);
 
@@ -168,16 +192,13 @@ class DnsStub : public ExternalDnsHandler
       // reserved for internal use, so do not use 0. If you'd like to blacklist
       // for different types of protocols, just pass in any integer other than
       // those used for pre-defined protocols.
-      //
+      // ?slg? Should we offer a non-queuing version of this - currently all resip lookup
+      //       requests are from the DnsThread context anyway, so there is no need to queue
+      //       the request to the fifo.
       template<class QueryType> void lookup(const Data& target, int protocol, DnsResultSink* sink)
       {
          QueryCommand<QueryType>* command = new QueryCommand<QueryType>(target, protocol, sink, *this);
-         mCommandFifo.add(command);
-
-         if (mAsyncProcessHandler)
-         {
-            mAsyncProcessHandler->handleProcessNotification();
-         }
+         queueCommand(command);
       }
 
       virtual void handleDnsRaw(ExternalDnsRawResult);
@@ -186,8 +207,10 @@ class DnsStub : public ExternalDnsHandler
       virtual unsigned int getTimeTillNextProcessMS();
       virtual void buildFdSet(FdSet& fdset);
       void setPollGrp(FdPollGrp* pollGrp);
-
       void processTimers();
+
+      virtual void queueCommand(Command* command);
+
   private:
       void processFifo();
 
@@ -218,7 +241,7 @@ class DnsStub : public ExternalDnsHandler
                                     const DnsResourceRecordsByPtr& src,
                                     DnsResultSink* sink)
             {
-               assert(sink);
+               resip_assert(sink);
                DNSResult<typename QueryType::Type>  result;
                for (unsigned int i = 0; i < src.size(); ++i)
                {
@@ -279,14 +302,6 @@ class DnsStub : public ExternalDnsHandler
       }
       
    private:
-
-      class Command
-      {
-         public:
-            virtual ~Command() {}
-            virtual void execute() = 0;
-      };
-
 
       template<class QueryType>
       class QueryCommand : public Command
@@ -411,6 +426,24 @@ class DnsStub : public ExternalDnsHandler
             DnsStub& mStub;
             std::pair<unsigned long, unsigned long> mKey;
             GetDnsCacheDumpHandler* mHandler;
+      };
+
+      void doReloadDnsServers();
+
+      class ReloadDnsServersCommand : public Command
+      {
+      public:
+          ReloadDnsServersCommand(DnsStub& stub)
+              : mStub(stub)
+          {}
+          ~ReloadDnsServersCommand() {}
+          void execute()
+          {
+              mStub.doReloadDnsServers();
+          }
+
+      private:
+          DnsStub& mStub;
       };
 
       SelectInterruptor mSelectInterruptor;

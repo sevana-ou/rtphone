@@ -17,7 +17,7 @@ struct attr *RADIUSDigestAuthenticator::attrs = NULL;
 struct val *RADIUSDigestAuthenticator::vals = NULL;
 rc_handle *RADIUSDigestAuthenticator::rh = NULL;
 
-inline void init_av(rc_handle *rh, struct attr *at, struct val *vl, char *fn)
+inline void init_av(rc_handle *rh, struct attr *at, struct val *vl, const char *fn)
 {
    int i;
    DICT_ATTR *da;
@@ -56,7 +56,10 @@ RADIUSDigestAuthListener::~RADIUSDigestAuthListener() {
 void RADIUSDigestAuthenticator::init(const char *radiusConfigFile)
 {
    if(attrs != NULL)
-      throw; // may only be called once
+   {
+      WarningLog(<<"invoked more than once, ignoring");
+      return;
+   }
 
    if((attrs = (struct attr *)malloc(sizeof(struct attr) * A_MAX)) == NULL)
    {
@@ -92,7 +95,12 @@ void RADIUSDigestAuthenticator::init(const char *radiusConfigFile)
 
    const char *myRADIUSConfigFile = RADIUS_CONFIG;
    if(radiusConfigFile != NULL)
-   myRADIUSConfigFile = radiusConfigFile;
+   {
+      myRADIUSConfigFile = radiusConfigFile;
+   }
+   // FIXME: this should not use a cast, freeradius-client.h to be fixed
+   // pull request submitted via github
+   // https://github.com/FreeRADIUS/freeradius-client/pull/8
    if((rh = rc_read_config((char *)myRADIUSConfigFile)) == NULL)
    {
       ErrLog(<< "radius: Error opening configuration file \n");
@@ -238,13 +246,18 @@ void RADIUSDigestAuthenticator::thread()
    }
    else
    {
-      DebugLog(<<"rc_auth failure for " << username.c_str());
+      DebugLog(<<"rc_auth failure for " << username.c_str()
+               <<", code = " << i);
       rc_avpair_free(vp_s_start);
       rc_avpair_free(vp_r_start);
-      if(i == BADRESP_RC)
-      listener->onAccessDenied();
+      if(i == REJECT_RC)
+      {
+         listener->onAccessDenied();
+      }
       else
-      listener->onError();
+      {
+         listener->onError();
+      }
    }
    delete listener;
    DebugLog(<<"RADIUSDigestAuthenticator::thread() exiting");
@@ -350,9 +363,13 @@ void TestRADIUSDigestAuthListener::onSuccess(const resip::Data& rpid)
 {
    DebugLog(<<"TestRADIUSDigestAuthListener::onSuccess");
    if(!rpid.empty())
-   DebugLog(<<"TestRADIUSDigestAuthListener::onSuccess rpid = " << rpid);
+   {
+      DebugLog(<<"TestRADIUSDigestAuthListener::onSuccess rpid = " << rpid);
+   }
    else
-   DebugLog(<<"TestRADIUSDigestAuthListener::onSuccess, no rpid");
+   {
+      DebugLog(<<"TestRADIUSDigestAuthListener::onSuccess, no rpid");
+   }
 }
 
 void TestRADIUSDigestAuthListener::onAccessDenied()

@@ -18,11 +18,18 @@ class FdPollGrp;
  */
 class ConnectionManager
 {
-      friend class Connection;
+   friend class Connection;
+
    public:
       /** connection must have no inbound traffic for greater than this 
           time (in ms) before it is garbage collected */
       static UInt64 MinimumGcAge;
+      /** If the difference between the number of permitted FDs
+          (reported by periodic calls to getrlimit()) and the number
+          of active stream connections falls below this threshold,
+          the garbage collector will overlook MinimumGcAge and
+          more aggressively close connections */
+      static UInt64 MinimumGcHeadroom;
       /** Enable Agressive Connection Garbage Collection to have resip
           perform garbage collection on every new connection.  If disabled
           then garbage collection is only performed if we run out of Fd's */
@@ -40,6 +47,8 @@ class ConnectionManager
       void buildFdSet(FdSet& fdset);
       void process(FdSet& fdset);
 
+      virtual void invokeAfterSocketCreationFunc() const;
+
    private:
       void addToWritable(Connection* conn); // add the specified conn to end
       void removeFromWritable(Connection* conn); // remove the current mWriteMark
@@ -53,7 +62,8 @@ class ConnectionManager
 
       /// release excessively old connections (free up file descriptors)
       /// set maxToRemove to 0 for no-max
-      void gc(UInt64 threshold, unsigned int maxToRemove);
+      unsigned int gc(UInt64 threshold, unsigned int maxToRemove);
+      unsigned int gcWithTarget(unsigned int target);
 
       /// move to youngest 
       void touch(Connection* connection);

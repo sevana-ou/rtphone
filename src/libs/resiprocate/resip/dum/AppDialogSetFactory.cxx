@@ -1,5 +1,5 @@
-#include "resip/dum/DialogUsageManager.hxx"
 #include "resip/dum/AppDialogSetFactory.hxx"
+#include "resip/dum/DialogUsageManager.hxx"
 #include "resip/stack/SipMessage.hxx"
 #include "resip/dum/AppDialogSet.hxx"
 #include "rutil/WinLeakCheck.hxx"

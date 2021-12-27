@@ -9,6 +9,7 @@
 
 #include "rutil/dns/AresDns.hxx"
 #include "rutil/GenericIPAddress.hxx"
+#include "rutil/Timer.hxx"
 
 #include "AresCompat.hxx"
 #if !defined(USE_CARES)
@@ -45,31 +46,37 @@ namespace resip
 class AresDnsPollItem : public FdPollItemBase
 {
   public:
-   AresDnsPollItem(FdPollGrp *grp, int fd, AresDns& aresObj,
+   AresDnsPollItem(FdPollGrp *grp, int fd, int using_tcp, AresDns& aresObj,
      ares_channel chan, int server_idx)
      : FdPollItemBase(grp, fd, FPEM_Read), mAres(aresObj),
-       mChannel(chan), mFd(fd), mServerIdx(server_idx)
+       mChannel(chan), mFd(fd), mUsingTcp(using_tcp), mServerIdx(server_idx)
    {
    }
 
    virtual void	processPollEvent(FdPollEventMask mask);
    void resetPollGrp(FdPollGrp *grp)
    {
-      if (mPollGrp)
+      if(mPollGrp)
+      {
          mPollGrp->delPollItem(mPollHandle);
+      }
+      mPollHandle = 0;
       mPollGrp = grp;
-      if (mPollGrp)
-        mPollHandle = mPollGrp->addPollItem(mFd, FPEM_Read, this);
+      if(mPollGrp)
+      {
+         mPollHandle = mPollGrp->addPollItem(mFd, FPEM_Read, this);
+      }
    }
 
    AresDns&	mAres;
    ares_channel	mChannel;
    int mFd;
+   int mUsingTcp;
    int mServerIdx;
 
    static void socket_poll_cb(void *cb_data,
                               ares_channel channel, int server_idx,
-	                      int fd, ares_poll_action_t act);
+	                           int fd, int using_tcp, ares_poll_action_t act);
 };
 
 };
@@ -77,7 +84,7 @@ class AresDnsPollItem : public FdPollItemBase
 void
 AresDnsPollItem::processPollEvent(FdPollEventMask mask)
 {
-   assert( (mask&(FPEM_Read|FPEM_Write))!= 0 );
+   resip_assert( (mask&(FPEM_Read|FPEM_Write))!= 0 );
 
    time_t nowSecs;
    time(&nowSecs);	/// maybe nice if this was passed into us?
@@ -95,40 +102,55 @@ AresDnsPollItem::processPollEvent(FdPollEventMask mask)
 void
 AresDnsPollItem::socket_poll_cb(void *cb_data,
   	ares_channel channel, int server_idx,
-  	int fd, ares_poll_action_t act)
+  	int fd, int using_tcp, ares_poll_action_t act)
 {
    AresDns *ares = static_cast<AresDns*>(cb_data);
    //assert( ares );
    FdPollGrp *grp = ares->mPollGrp;
    //assert( grp );
-   AresDnsPollItem *olditem = ares->mPollItems.at(server_idx);
+   AresDnsPollItem *olditem = using_tcp == 0 ? ares->mPollItems.at(server_idx).first : ares->mPollItems.at(server_idx).second;
    if ( olditem )
    {
-      assert( olditem->mChannel==channel );
-      assert( olditem->mServerIdx==server_idx );
+      resip_assert( olditem->mChannel==channel );
+      resip_assert( olditem->mServerIdx==server_idx );
+      resip_assert( olditem->mUsingTcp==using_tcp );
    }
    switch ( act )
    {
    case ARES_POLLACTION_OPEN:
-      assert( olditem==NULL );
-      assert( fd!=INVALID_SOCKET );
-      ares->mPollItems[server_idx] = new AresDnsPollItem( grp, fd, *ares, channel, server_idx);
+      resip_assert( !olditem );
+      resip_assert( fd!=INVALID_SOCKET );
+      if (using_tcp == 0)
+      {
+         ares->mPollItems[server_idx].first = new AresDnsPollItem(grp, fd, using_tcp, *ares, channel, server_idx);
+      }
+      else
+      {
+         ares->mPollItems[server_idx].second = new AresDnsPollItem(grp, fd, using_tcp, *ares, channel, server_idx);
+      }
       break;
    case ARES_POLLACTION_CLOSE:
-      assert( olditem );
-      ares->mPollItems[server_idx] = NULL;
+      resip_assert( olditem );
+      if (using_tcp == 0)
+      {
+         ares->mPollItems[server_idx].first = NULL;
+      }
+      else
+      {
+         ares->mPollItems[server_idx].second = NULL;
+      }
       delete olditem;	// destructor removes from poll
       break;
    case ARES_POLLACTION_WRITEON:
-      assert( olditem );
+      resip_assert( olditem );
       grp->modPollItem(olditem->mPollHandle, FPEM_Read|FPEM_Write);
       break;
    case ARES_POLLACTION_WRITEOFF:
-      assert( olditem );
+      resip_assert( olditem );
       grp->modPollItem(olditem->mPollHandle, FPEM_Read);
       break;
    default:
-      assert( 0 );
+      resip_assert( 0 );
    }
 }
 
@@ -156,12 +178,15 @@ AresDns::setPollGrp(FdPollGrp *grp)
       mPollGrp->registerFdSetIOObserver(*this);
    }
 #else
-   for(std::vector<AresDnsPollItem*>::iterator i=mPollItems.begin();
-         i!=mPollItems.end(); ++i)
+   for (PollItems::iterator i = mPollItems.begin(); i!=mPollItems.end(); ++i)
    {
-      if(*i)
+      if(i->first)
       {
-         (*i)->resetPollGrp(grp);
+         i->first->resetPollGrp(grp);
+      }
+      if (i->second)
+      {
+         i->second->resetPollGrp(grp);
       }
    }
    mPollGrp = grp;
@@ -176,37 +201,57 @@ AresDns::init(const std::vector<GenericIPAddress>& additionalNameservers,
               unsigned int features)
 {
    mAdditionalNameservers = additionalNameservers;
-   mFeatures = features;
+   mSocketFunc = socketfunc;
 
-   int ret = internalInit(additionalNameservers,
-                          socketfunc,
-                          features,
-                          &mChannel,
-                          timeout,
-                          tries);
+   return init(timeout, tries, features);
+}
 
-   if (ret != Success)
-      return ret;
+int 
+AresDns::init(int dnsTimeout, int dnsTries, unsigned int features)
+{
+    mFeatures = features;
 
-#ifdef WIN32
-      // For windows OSs it is uncommon to run a local DNS server.  Therefor if there
-      // are no defined DNS servers in windows networking and ARES just returned the
-      // loopback address (ie. default localhost server / named)
-      // then put resip DNS resolution into hostfile lookup only mode
-      if(mChannel->nservers == 1 &&
-         mChannel->servers[0].default_localhost_server)
-      {
-         // enable hostfile only lookup mode
-         mHostFileLookupOnlyMode = true;
-      }
-      else
-      {
-         // disable hostfile only lookup mode
-         mHostFileLookupOnlyMode = false;
-      }
+    int ret = internalInit(mAdditionalNameservers,
+        mSocketFunc,
+        features,
+        &mChannel,
+        dnsTimeout,
+        dnsTries);
+
+    if (ret != Success)
+        return ret;
+
+#ifndef USE_CARES
+    if (mPollGrp)
+    {
+        // Ensure vector starts empty, since init may be called more than once
+        mPollItems.clear();
+        // expand vector to hold {nservers} and init to NULLAr
+        mPollItems.insert(mPollItems.end(), mChannel->nservers, std::make_pair((AresDnsPollItem*)0, (AresDnsPollItem*)0));
+        // tell ares to let us know when things change
+        ares_process_set_poll_cb(mChannel, AresDnsPollItem::socket_poll_cb, this);
+    }
 #endif
 
-   return Success;
+#ifdef WIN32
+    // For windows OSs it is uncommon to run a local DNS server.  Therefor if there
+    // are no defined DNS servers in windows networking and ARES just returned the
+    // loopback address (ie. default localhost server / named)
+    // then put resip DNS resolution into hostfile lookup only mode
+    if (mChannel->nservers == 1 &&
+        mChannel->servers[0].default_localhost_server)
+    {
+        // enable hostfile only lookup mode
+        mHostFileLookupOnlyMode = true;
+    }
+    else
+    {
+        // disable hostfile only lookup mode
+        mHostFileLookupOnlyMode = false;
+    }
+#endif
+
+    return Success;
 }
 
 int
@@ -215,13 +260,13 @@ AresDns::internalInit(const std::vector<GenericIPAddress>& additionalNameservers
                       unsigned int features,
                       ares_channeldata** channel,
                       int timeout,
-                      int tries
-)
+                      int tries)
 {
    if(*channel)
    {
 #if defined(USE_ARES)
-      ares_destroy_suppress_callbacks(*channel);
+      // Sends ARES_EDESTRUCTION to callbacks so that all requests in progress fail
+      ares_destroy(*channel);
 #elif defined(USE_CARES)
       // Callbacks will be supressed by looking for the ARES_EDESTRUCTION
       // sentinel status
@@ -353,10 +398,10 @@ AresDns::internalInit(const std::vector<GenericIPAddress>& additionalNameservers
       for (int i = 0; i < (*channel)->nservers; ++i)
       {
 #ifdef USE_IPV6
-         if((*channel)->servers[i].family == AF_INET6) 
+         if((*channel)->servers[i].family == AF_INET6)
          {
             InfoLog(<< " name server: " << DnsUtil::inet_ntop((*channel)->servers[i].addr6));
-         } 
+         }
          else
 #endif
          {
@@ -367,23 +412,13 @@ AresDns::internalInit(const std::vector<GenericIPAddress>& additionalNameservers
       // In ares, we must manipulate these directly
       if (timeout > 0)
       {
-         mChannel->timeout = timeout;
+         (*channel)->timeout = timeout;
       }
 
       if (tries > 0)
       {
-         mChannel->tries = tries;
+         (*channel)->tries = tries;
       }
-
-#ifndef USE_CARES
-      if ( mPollGrp )
-      {
-         // expand vector to hold {nservers} and init to NULL
-         mPollItems.insert( mPollItems.end(), (*channel)->nservers, (AresDnsPollItem*)0);
-         // tell ares to let us know when things change
-         ares_process_set_poll_cb(mChannel, AresDnsPollItem::socket_poll_cb, this);
-      }
-#endif
 
 #elif defined(USE_CARES)
       {
@@ -441,11 +476,23 @@ bool AresDns::checkDnsChange()
          // Compare them one-by-one
          for (int i = 0; i < mChannel->nservers; ++i)
          {
-            if (mChannel->servers[i].addr.s_addr
-                != channel->servers[i].addr.s_addr)
+#ifdef USE_IPV6
+            if(channel->servers[i].family == AF_INET6)
             {
-               bRet = true;
-               break;
+               if(memcmp(&mChannel->servers[i].addr6, &channel->servers[i].addr6, sizeof(mChannel->servers[i].addr6)) != 0)
+               {
+                  bRet = true;
+                  break;
+               }
+            }
+            else
+#endif
+            {
+               if (mChannel->servers[i].addr.s_addr != channel->servers[i].addr.s_addr)
+               {
+                  bRet = true;
+                  break;
+               }
             }
          }
       }
@@ -525,7 +572,7 @@ AresDns::~AresDns()
 
 bool AresDns::hostFileLookup(const char* target, in_addr &addr)
 {
-   assert(target);
+   resip_assert(target);
 
    hostent *hostdata = 0;
 
@@ -585,7 +632,9 @@ unsigned int
 AresDns::getTimeTillNextProcessMS()
 {
    struct timeval tv;
-   tv.tv_sec = 1; tv.tv_usec = 0;
+   unsigned maxSystemTime = resip::Timer::getMaxSystemTimeWaitMs();
+   tv.tv_sec = maxSystemTime / 1000;
+   tv.tv_usec = 1000 * (maxSystemTime % 1000);
    ares_timeout(mChannel, NULL, &tv);
    return tv.tv_sec*1000 + tv.tv_usec / 1000;
 }
@@ -604,16 +653,16 @@ void
 AresDns::processTimers()
 {
 #ifdef USE_CARES
-   return;
+   ares_process(mChannel, NULL, NULL);
 #else
-   assert( mPollGrp!=0 );
+   resip_assert( mPollGrp!=0 );
    time_t timeSecs;
    time(&timeSecs);
    ares_process_poll(mChannel, /*server*/-1, /*rd*/-1, /*wr*/-1, timeSecs);
 #endif
 }
 
-void 
+void
 AresDns::process(FdSet& fdset)
 {
    process(fdset.read, fdset.write);

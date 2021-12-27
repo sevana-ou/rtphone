@@ -6,8 +6,11 @@
 #include "resip/stack/ApplicationMessage.hxx"
 #include "resip/stack/CancelClientInviteTransaction.hxx"
 #include "resip/stack/Helper.hxx"
+#include "resip/stack/AddTransport.hxx"
+#include "resip/stack/RemoveTransport.hxx"
 #include "resip/stack/TerminateFlow.hxx"
 #include "resip/stack/EnableFlowTimer.hxx"
+#include "resip/stack/InvokeAfterSocketCreationFunc.hxx"
 #include "resip/stack/ZeroOutStatistics.hxx"
 #include "resip/stack/PollStatistics.hxx"
 #include "resip/stack/ShutdownMessage.hxx"
@@ -35,7 +38,8 @@ unsigned int TransactionController::MaxTUFifoSize = 0;
 unsigned int TransactionController::MaxTUFifoTimeDepthSecs = 0;
 
 TransactionController::TransactionController(SipStack& stack, 
-                                                AsyncProcessHandler* handler) :
+                                             AsyncProcessHandler* handler,
+                                             bool useDnsVip) :
    mStack(stack),
    mDiscardStrayResponses(true),
    mFixBadDialogIdentifiers(true),
@@ -47,7 +51,8 @@ TransactionController::TransactionController(SipStack& stack,
    mTransportSelector(mStateMacFifo,
                       stack.getSecurity(),
                       stack.getDnsStub(),
-                      stack.getCompression()),
+                      stack.getCompression(),
+                      useDnsVip),
    mTimers(mTimerFifo),
    mShuttingDown(false),
    mStatsManager(stack.mStatsManager),
@@ -109,6 +114,13 @@ TransactionController::process(int timeout)
       {
          // *sigh*
          timeout=-1;
+      }
+
+      // Check if Statistics Manager needs to be polled - note:  all statistic manager polls should happen from the 
+      // TransactionController thread / process loop
+      if(mStack.mStatisticsManagerEnabled)
+      {
+         mStatsManager.process();
       }
 
       // If non-zero is passed for timeout, we understand that the caller is ok
@@ -248,9 +260,21 @@ TransactionController::abandonServerTransaction(const Data& tid)
 }
 
 void 
-TransactionController::cancelClientInviteTransaction(const Data& tid)
+TransactionController::cancelClientInviteTransaction(const Data& tid, const resip::Tokens* reasons)
 {
-   mStateMacFifo.add(new CancelClientInviteTransaction(tid));
+   mStateMacFifo.add(new CancelClientInviteTransaction(tid, reasons));
+}
+
+void 
+TransactionController::addTransport(std::auto_ptr<Transport> transport)
+{
+   mStateMacFifo.add(new AddTransport(transport));
+}
+
+void 
+TransactionController::removeTransport(unsigned int transportKey)
+{
+   mStateMacFifo.add(new RemoveTransport(transportKey));
 }
 
 void
@@ -269,6 +293,12 @@ void
 TransactionController::setInterruptor(AsyncProcessHandler* handler)
 {
    mStateMacFifo.setInterruptor(handler);
+}
+
+void
+TransactionController::invokeAfterSocketCreationFunc(TransportType type)
+{
+    mStateMacFifo.add(new InvokeAfterSocketCreationFunc(type));
 }
 
 /* ====================================================================

@@ -17,12 +17,15 @@
 #include "resip/stack/Tuple.hxx"
 #include "resip/stack/Uri.hxx"
 #include "resip/stack/MessageDecorator.hxx"
+#include "resip/stack/Cookie.hxx"
+#include "resip/stack/WsCookieContext.hxx"
 #include "rutil/BaseException.hxx"
 #include "rutil/Data.hxx"
 #include "rutil/DinkyPool.hxx"
 #include "rutil/StlPoolAllocator.hxx"
 #include "rutil/Timer.hxx"
 #include "rutil/HeapInstanceCounter.hxx"
+#include "rutil/SharedPtr.hxx"
 
 namespace resip
 {
@@ -30,7 +33,6 @@ namespace resip
 class Contents;
 class ExtensionHeader;
 class SecurityAttributes;
-class Transport;
 
 /**
    @ingroup resip_crit
@@ -159,7 +161,7 @@ class SipMessage : public TransactionMessage
       typedef std::list< std::pair<Data, HeaderFieldValueList*> > UnknownHeaders;
 #endif
 
-      explicit SipMessage(const Transport* fromWire = 0);
+      explicit SipMessage(const Tuple *receivedTransport = 0);
       /// @todo .dlb. public, allows pass by value to compile.
       SipMessage(const SipMessage& message);
 
@@ -225,13 +227,31 @@ class SipMessage : public TransactionMessage
          mIsExternal = true;
       }
       
-      /** @brief Check if SipMessage came off the wire.
-      
-      @return true if the message came from an IP interface, false otherwise.
+      /** 
+         @brief Check if SipMessage is to be treated as it came off the wire.
+
+         @return true if the message came from an IP interface or if it was 
+                 an internally generated response to an internally generated 
+                 request (ie: 408), false otherwise.
       */
       inline bool isExternal() const
       {
          return mIsExternal;
+      }
+
+      /** 
+         @brief Check if SipMessage came off the wire.
+      
+         @note differs from isExternal(), since isExternal() also returns true 
+               for internally generated responses to internally generate requests 
+               (ie: 408, etc.).  isFromWire only ever returns true if the message
+               actually came off the wire.
+
+         @return true if the message came from an IP interface, false otherwise.
+      */
+      inline bool isFromWire() const
+      {
+         return mReceivedTransportTuple.getType() != UNKNOWN_TRANSPORT;
       }
       
       /// @brief Check if SipMessage is a client transaction
@@ -386,6 +406,13 @@ class SipMessage : public TransactionMessage
 
       defineHeader(ContentTransferEncoding, "Content-Transfer-Encoding", StringCategory, "RFC 1521");
       defineHeader(Organization, "Organization", StringCategory, "RFC 3261");
+      defineHeader(SecWebSocketKey, "Sec-WebSocket-Key", StringCategory, "RFC 6455");
+      defineHeader(SecWebSocketKey1, "Sec-WebSocket-Key1", StringCategory, "draft-hixie- thewebsocketprotocol-76");
+      defineHeader(SecWebSocketKey2, "Sec-WebSocket-Key2", StringCategory, "draft-hixie- thewebsocketprotocol-76");
+      defineHeader(Origin, "Origin", StringCategory, "draft-hixie- thewebsocketprotocol-76");
+      defineHeader(Host, "Host", StringCategory, "draft-hixie- thewebsocketprotocol-76");
+      defineHeader(SecWebSocketAccept, "Sec-WebSocket-Accept", StringCategory, "RFC 6455");
+      defineMultiHeader(Cookie, "Cookie", StringCategory, "RFC 6265");
       defineHeader(Server, "Server", StringCategory, "RFC 3261");
       defineHeader(Subject, "Subject", StringCategory, "RFC 3261");
       defineHeader(UserAgent, "User-Agent", StringCategory, "RFC 3261");
@@ -421,6 +448,13 @@ class SipMessage : public TransactionMessage
       defineMultiHeader(Warning, "Warning", WarningCategory, "RFC 3261");
       defineMultiHeader(Via, "Via", Via, "RFC 3261");
       defineHeader(RAck, "RAck", RAckCategory, "RFC 3262");
+
+      defineMultiHeader(PAccessNetworkInfo, "P-Access-Network-Info", Token, "RFC 7315"); // section 5.4.
+      defineHeader(PChargingVector, "P-Charging-Vector", Token, "RFC 3455");
+      defineHeader(PChargingFunctionAddresses, "P-Charging-Function-Addresses", Token, "RFC 3455");
+      defineMultiHeader(PVisitedNetworkID, "P-Visited-Network-ID", TokenOrQuotedStringCategory, "RFC 3455");
+
+      defineMultiHeader(UserToUser, "User-to-User", TokenOrQuotedStringCategory, "draft-ietf-cuss-sip-uui-17");
 
       /// unknown header interface
       const StringCategories& header(const ExtensionHeader& symbol) const;
@@ -461,14 +495,14 @@ class SipMessage : public TransactionMessage
         **/
       Contents* getContents() const;
       /// Removes the contents from the message
-      std::unique_ptr<Contents> releaseContents();
+      std::auto_ptr<Contents> releaseContents();
 
       /// @brief Set the contents of the message
       /// @param contents to store in the message
       void setContents(const Contents* contents);
       /// @brief Set the contents of the message
       /// @param contents to store in the message
-      void setContents(std::unique_ptr<Contents> contents);
+      void setContents(std::auto_ptr<Contents> contents);
 
       /// @internal transport interface
       void setStartLine(const char* start, int len); 
@@ -480,10 +514,14 @@ class SipMessage : public TransactionMessage
                      const char* headerName, int headerLen, 
                      const char* start, int len);
 
-      /// @brief Interface used to determine which Transport was used to receive a
-      /// particular SipMessage. If the SipMessage was not received from the
-      /// wire, getReceivedTransport() returns 0. Set in constructor
-      const Transport* getReceivedTransport() const { return mTransport; }
+      // Returns the source tuple for the transport that the message was received from
+      // only makes sense for messages received from the wire.  Differs from Source
+      // since it contains the transport bind address instead of the actual source 
+      // address.
+      const Tuple& getReceivedTransportTuple() const { return mReceivedTransportTuple; }
+
+      /// Set Tuple for transport from whence this message came
+      void setReceivedTransportTuple(const Tuple& transportTuple) { mReceivedTransportTuple = transportTuple;}
 
       // Returns the source tuple that the message was received from
       // only makes sense for messages received from the wire
@@ -498,7 +536,7 @@ class SipMessage : public TransactionMessage
 
       void addBuffer(char* buf);
 
-      UInt64 getCreatedTimeMicroSec() {return mCreatedTime;}
+      UInt64 getCreatedTimeMicroSec() const {return mCreatedTime;}
 
       /// deal with a notion of an "out-of-band" forced target for SIP routing
       void setForceTarget(const Uri& uri);
@@ -512,16 +550,22 @@ class SipMessage : public TransactionMessage
       const std::list<Data>& getTlsPeerNames() const { return mTlsPeerNames; }
       void setTlsPeerNames(const std::list<Data>& tlsPeerNames) { mTlsPeerNames = tlsPeerNames; }
 
+      const CookieList& getWsCookies() const { return mWsCookies; }
+      void setWsCookies(const CookieList& wsCookies) { mWsCookies = wsCookies; }
+
+      SharedPtr<WsCookieContext> getWsCookieContext() const { return mWsCookieContext; }
+      void setWsCookieContext(SharedPtr<WsCookieContext> wsCookieContext) { mWsCookieContext = wsCookieContext; }
+
       Data getCanonicalIdentityString() const;
       
       SipMessage& mergeUri(const Uri& source);      
 
-      void setSecurityAttributes(std::unique_ptr<SecurityAttributes>);
+      void setSecurityAttributes(std::auto_ptr<SecurityAttributes>);
       const SecurityAttributes* getSecurityAttributes() const { return mSecurityAttributes.get(); }
 
       /// @brief Call a MessageDecorator to process the message before it is
       /// sent to the transport
-      void addOutboundDecorator(std::unique_ptr<MessageDecorator> md){mOutboundDecorators.push_back(md.release());}
+      void addOutboundDecorator(std::auto_ptr<MessageDecorator> md){mOutboundDecorators.push_back(md.release());}
       void clearOutboundDecorators();
       void callOutboundDecorators(const Tuple &src, 
                                     const Tuple &dest,
@@ -539,6 +583,8 @@ class SipMessage : public TransactionMessage
       void clear(bool leaveResponseStuff=false);
       // !bwc! Frees all heap-allocated memory owned.
       void freeMem(bool leaveResponseStuff=false);
+      // Clears mHeaders and cleans up memory
+      void clearHeaders();
       
       // !bwc! Initializes members. Will not free heap-allocated memory.
       // Will begin by calling clear().
@@ -612,12 +658,16 @@ class SipMessage : public TransactionMessage
          return new (ptr) ParserContainer<T>(hfvs, type, mPool);
       }
 
-      // indicates this message came from the wire, set by the Transport
+      // indicates this message came from the wire or we want it to look like it 
+      // came from the wire (ie. internally generated responses to an internally 
+      // generated request), set by the Transport and setFromTu and setFromExternal APIs
       bool mIsExternal;
 
-      // !bwc! Would be nice to tweak this to automatically make SipMessage 4KB,
-      // but I don't know how ugly it would be.
-      DinkyPool<2968> mPool;
+      // Sizing so that average SipMessages don't need to allocate heap memory
+      // To profile current sizing, enable DINKYPOOL_PROFILING in SipMessage.cxx 
+      // and look for DebugLog message in SipMessage destructor to know when heap
+      // allocations are occuring and how much of the pool is used.
+      DinkyPool<3732> mPool;
 
       typedef std::vector<HeaderFieldValueList*, 
                            StlPoolAllocator<HeaderFieldValueList*, 
@@ -630,9 +680,10 @@ class SipMessage : public TransactionMessage
 
       // raw text corresponding to each unknown header
       UnknownHeaders mUnknownHeaders;
-  
-      // !jf!
-      const Transport* mTransport;
+
+      // For messages received from the wire, this indicates information about 
+      // the transport the message was received on
+      Tuple mReceivedTransportTuple;
 
       // For messages received from the wire, this indicates where it came
       // from. Can be used to get to the Transport and/or reliable Connection
@@ -675,9 +726,15 @@ class SipMessage : public TransactionMessage
       Data mTlsDomain;
 
       // peers domain associate with this message (MTLS)
-      std::list<Data> mTlsPeerNames; 
+      std::list<Data> mTlsPeerNames;
 
-      std::unique_ptr<SecurityAttributes> mSecurityAttributes;
+      // cookies associated with this message from the WebSocket Upgrade request
+      CookieList mWsCookies;
+
+      // parsed cookie authentication elements associated with this message from the WebSocket Upgrade request
+      SharedPtr<WsCookieContext> mWsCookieContext;
+
+      std::auto_ptr<SecurityAttributes> mSecurityAttributes;
 
       std::vector<MessageDecorator*> mOutboundDecorators;
 

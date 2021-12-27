@@ -31,7 +31,7 @@
 
 /* Add _BIG_ENDIAN for Solaris */
 /* Add _BIG_ENDIAN__ for MAC OSX */
-#if defined(WORDS_BIGENDIAN) || defined(_BIG_ENDIAN) || defined( __BIG_ENDIAN__ )
+#if defined(WORDS_BIGENDIAN) || defined(_BIG_ENDIAN) || defined( __BIG_ENDIAN__ ) || (defined(__BYTE_ORDER__) && (__BYTE_ORDER__ == __ORDER_BIG_ENDIAN__)) || defined(RESIP_BIG_ENDIAN)
 void
 resip::byteSwap(u_int32_t *buf, unsigned words)
 {
@@ -167,7 +167,7 @@ resip::MD5Final(md5byte digest[16], struct MD5Context *ctx)
 void
 resip::MD5Transform(u_int32_t buf[4], u_int32_t const in[16])
 {
-   register u_int32_t a, b, c, d;
+   u_int32_t a, b, c, d;
 
    a = buf[0];
    b = buf[1];

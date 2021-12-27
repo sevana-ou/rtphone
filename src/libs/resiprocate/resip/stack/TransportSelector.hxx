@@ -7,6 +7,7 @@
 
 #include <map>
 #include <vector>
+#include <list>
 
 #include "rutil/Data.hxx"
 #include "rutil/Fifo.hxx"
@@ -48,21 +49,27 @@ Transport in the FdSet processing loop.  If the Transport returns false for
 shareStackProcessAndSelect(), TransportSelector will call startOwnProcessing
 on Transport add.
 
+Thread Safey Notes - the majority of the access to this class is expected to be from
+the TransactionController Thread.  The TransportSelectorThread itself is used 
+to provide cycles to the actual transports for sending data in their Fifo's and
+receiving data from the wire.  The mSharedProcessTransports list is one member that
+is expected to be accessed from TransportSelector processing loop only , all other 
+members are accessed from the TransactionController processing loop.
 */
 class TransportSelector
 {
    public:
-      TransportSelector(Fifo<TransactionMessage>& fifo, Security* security, DnsStub& dnsStub, Compression &compression);
+      TransportSelector(Fifo<TransactionMessage>& fifo, Security* security, DnsStub& dnsStub, Compression &compression, bool useDnsVip);
       virtual ~TransportSelector();
-      /**
-	    @retval true	Some transport in the transport list has data to send
-	    @retval false	No transport in the transport list has data to send
-	  */
-      bool hasDataToSend() const;
 
       /**
-		Shuts down all transports.
-	  */
+        @retval true	Some transport in the transport list has data to send
+        @retval false	No transport in the transport list has data to send
+        Should only be called from TransportSelector processing loop.
+      */
+      bool hasDataToSend() const;
+
+      /// Shuts down all transports.
       void shutdown();
 
       /// Returns true if all Transports have their buffers cleared, false otherwise.
@@ -88,18 +95,26 @@ class TransportSelector
       /// Causes transport process loops to be interrupted if there is stuff in
       /// their transmit fifos.
       void poke();
-      void addTransport( std::unique_ptr<Transport> transport, bool immediate);
 
+      /// Add/Remove a transport
+      void addTransport(std::auto_ptr<Transport> transport, bool isStackRunning);
+      void removeTransport(unsigned int transportKey);
+
+      /// DNS Resolution
       DnsResult* createDnsResult(DnsHandler* handler);
-
       void dnsResolve(DnsResult* result, SipMessage* msg);
 
       /**
-       Results in msg->resolve() being called to either
+       transmit results in msg->resolve() being called to either
        kick off dns resolution or to pick the next tuple and will cause the
        message to be encoded and via updated
-	  */
-      bool transmit( SipMessage* msg, Tuple& target, SendData* sendData=0 );
+      */
+      typedef enum
+      {
+         Unsent,
+         Sent
+      } TransmitState;
+      TransmitState transmit( SipMessage* msg, Tuple& target, SendData* sendData=0 );
 
       /// Resend to the same transport as last time
       void retransmit(const SendData& msg);
@@ -119,32 +134,75 @@ class TransportSelector
       void terminateFlow(const resip::Tuple& flow);
       void enableFlowTimer(const resip::Tuple& flow);
 
+      bool setUdpOnlyOnNumeric(bool value)
+      {
+         return mDns.setUdpOnlyOnNumeric(value);
+      }
+
+      bool getUdpOnlyOnNumeric() const
+      {
+         return mDns.getUdpOnlyOnNumeric();
+      }
+
       void setCongestionManager(CongestionManager* manager)
       {
-         for(TransportList::iterator i=mSharedProcessTransports.begin();
-               i!=mSharedProcessTransports.end();++i)
+         for(TransportKeyMap::iterator i=mTransports.begin();
+               i!=mTransports.end();++i)
          {
-            (*i)->setCongestionManager(manager);
-         }
-
-         for(TransportList::iterator i=mHasOwnProcessTransports.begin();
-               i!=mHasOwnProcessTransports.end();++i)
-         {
-            (*i)->setCongestionManager(manager);
+            i->second->setCongestionManager(manager);
          }
       }
 
+      void invokeAfterSocketCreationFunc(TransportType type);
+
+      /**
+         @internal - public only for stream operator access
+      */
+      class TlsTransportKey
+      {
+         public:
+            TlsTransportKey(const resip::Tuple& tuple) : mTuple(tuple) {}
+            TlsTransportKey(const resip::Data& domainName, resip::TransportType type, resip::IpVersion version) :
+               mTuple(Data::Empty, 0, version, type, domainName) {}
+            TlsTransportKey(const TlsTransportKey& orig) { mTuple = orig.mTuple; }
+            ~TlsTransportKey(){}
+
+            bool operator<(const TlsTransportKey& rhs) const
+            {
+               if(mTuple.getTargetDomain() < rhs.mTuple.getTargetDomain())
+               {
+                  return true;
+               }
+               else if(mTuple.getTargetDomain() == rhs.mTuple.getTargetDomain())
+               {
+                  if(mTuple.getType() < rhs.mTuple.getType())
+                  {
+                     return true;
+                  }
+                  else if(mTuple.getType() == rhs.mTuple.getType())
+                  {
+                     return mTuple.ipVersion() < rhs.mTuple.ipVersion();
+                  }
+               }
+               return false;
+            }
+
+            resip::Tuple mTuple;
+
+         private:
+            TlsTransportKey();
+      };
+
    private:
-      void addTransportInternal( std::unique_ptr<Transport> transport);
-      void checkTransportAddQueue();
+      void checkTransportAddRemoveQueue();
       Connection* findConnection(const Tuple& dest) const;
       Transport* findTransportBySource(Tuple& src, const SipMessage* msg) const;
       Transport* findLoopbackTransportBySource(bool ignorePort, Tuple& src) const;
       Transport* findTransportByDest(const Tuple& dest);
-      Transport* findTransportByVia(SipMessage* msg, const Tuple& dest,
-        Tuple& src) const;
+      Transport* findTransportByVia(SipMessage* msg, const Tuple& dest, Tuple& src) const;
       Transport* findTlsTransport(const Data& domain,TransportType type,IpVersion ipv) const;
       Tuple determineSourceInterface(SipMessage* msg, const Tuple& dest) const;
+      void rebuildAnyPortTransportMaps(void);
 
       DnsInterface mDns;
       Fifo<TransactionMessage>& mStateMacFifo;
@@ -166,70 +224,22 @@ class TransportSelector
       typedef std::map<Tuple, Transport*, Tuple::AnyPortAnyInterfaceCompare> AnyPortAnyInterfaceTupleMap;
       AnyPortAnyInterfaceTupleMap mAnyPortAnyInterfaceTransports;
 
-      std::vector<Transport*> mTransports; // owns all Transports
+      typedef std::map<unsigned int, Transport*> TransportKeyMap;
+      TransportKeyMap mTransports; // owns all Transports
 
-      /**
-         @internal
-      */
-      class TlsTransportKey
-      {
-         public:
-            TlsTransportKey(const resip::Data& domain, resip::TransportType type, resip::IpVersion version)
-               :mDomain(domain),
-               mType(type),
-               mVersion(version)
-            {}
-
-            TlsTransportKey(const TlsTransportKey& orig)
-            {
-               mDomain=orig.mDomain;
-               mType=orig.mType;
-               mVersion=orig.mVersion;
-            }
-
-            ~TlsTransportKey(){}
-            bool operator<(const TlsTransportKey& rhs) const
-            {
-               if(mDomain < rhs.mDomain)
-               {
-                  return true;
-               }
-               else if(mDomain == rhs.mDomain)
-               {
-                  if(mType < rhs.mType)
-                  {
-                     return true;
-                  }
-                  else if(mType == rhs.mType)
-                  {
-                     return mVersion < rhs.mVersion;
-                  }
-               }
-               return false;
-            }
-
-            resip::Data mDomain;
-            resip::TransportType mType;
-            resip::IpVersion mVersion;
-
-         private:
-            TlsTransportKey();
-      };
-      
       typedef std::map<TlsTransportKey, Transport*> TlsTransportMap ;
-      
       TlsTransportMap mTlsTransports;
 
-      typedef std::vector<Transport*> TransportList;
-      TransportList mSharedProcessTransports;
+      typedef std::list<Transport*> TransportList;
+      TransportList mSharedProcessTransports;  // Warning - only access this from the TransportSelector process loop / thread
       TransportList mHasOwnProcessTransports;
 
       typedef std::multimap<Tuple, Transport*, Tuple::AnyPortAnyInterfaceCompare> TypeToTransportMap;
       TypeToTransportMap mTypeToTransportMap;
 
-      // fake socket for connect() and route table lookups
-      mutable Socket mSocket;
-      mutable Socket mSocket6;
+      // fake socket(s) one for each netns, for connect() and route table lookups
+      mutable HashMap<Data, Socket> mSockets;
+      mutable HashMap<Data, Socket> mSocket6s;
 
       // An AF_UNSPEC addr_in for rapid unconnect
       GenericIPAddress mUnspecified;
@@ -243,13 +253,16 @@ class TransportSelector
       FdPollGrp* mPollGrp;
 
       int mAvgBufferSize;
-      Fifo<Transport> mTransportsToAdd;
-      std::unique_ptr<SelectInterruptor> mSelectInterruptor;
+      Fifo<Transport> mTransportsToAddRemove;
+      std::auto_ptr<SelectInterruptor> mSelectInterruptor;
       FdPollItemHandle mInterruptorHandle;
 
       friend class TestTransportSelector;
       friend class SipStack; // for debug only
 };
+
+EncodeStream&
+operator<<(EncodeStream& ostrm, const TransportSelector::TlsTransportKey& tlsTransportKey);
 
 }
 
@@ -303,5 +316,6 @@ class TransportSelector
  * Inc.  For more information on Vovida Networks, Inc., please see
  * <http://www.vovida.org/>.
  *
- * vi: set shiftwidth=3 expandtab:
  */
+
+// vim: softtabstop=3:shiftwidth=3:expandtab

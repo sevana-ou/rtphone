@@ -35,8 +35,7 @@ class TransportSelectorThread : public ThreadIf
             try
             {
                mSelector.process();
-               if (mPollGrp.get())
-                  mPollGrp->waitAndProcess(25);
+               mPollGrp->waitAndProcess(25);
             }
             catch(BaseException& e)
             {
@@ -47,7 +46,7 @@ class TransportSelectorThread : public ThreadIf
 
    protected:
       TransportSelector& mSelector;
-      std::unique_ptr<FdPollGrp> mPollGrp;
+      std::auto_ptr<FdPollGrp> mPollGrp;
 
 }; // class TransportSelectorThread
 

@@ -10,6 +10,12 @@
 #include <iostream>
 #include "rutil/Time.hxx"
 
+/// !slg!  TODO - a large portion of the code in this file belongs in the resip/stack as
+/// opposed to rutil.  Candidates for move are:
+/// 1.  All SIP Specific timer logic in Timer class
+/// 2.  Transaction Timer
+/// 3.  TimerWithPayload
+
 namespace resip
 {
 
@@ -44,7 +50,8 @@ class Timer
          TimerStaleServer,
          TimerStateless,
          TimerCleanUp,
-         ApplicationTimer // .dlb. Fifo, so no thread issues
+         ApplicationTimer, // .dlb. Fifo, so no thread issues
+         TcpConnectTimer
       } Type;
       
       static Data toData(Type timer);
@@ -115,7 +122,9 @@ class Timer
       static unsigned long TH; // default 64*T1
       
       static unsigned long TD;
-      static unsigned long TS;       
+      static unsigned long TS;
+
+      static unsigned long TcpConnectTimeout;
 };
 
 // !bwc! There is some duplicated code between TransactionTimer and 
@@ -177,11 +186,10 @@ class TimerWithPayload
       RESIP_HeapCount(TimerWithPayload);
 
       TimerWithPayload(unsigned long ms, Message* message);
-
-      ~TimerWithPayload(){}
+      ~TimerWithPayload() {}
 
       // return the message to queue, possibly null
-      Message* getMessage() const { return mMessage;}
+      Message* getMessage() const { return mMessage; }
 
       UInt64 getWhen() const {return mWhen;}
 #ifndef RESIP_USE_STL_STREAMS

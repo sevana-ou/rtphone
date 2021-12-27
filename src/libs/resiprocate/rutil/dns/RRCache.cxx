@@ -27,7 +27,7 @@
 #include <vector>
 #include <list>
 #include <map>
-#include <cassert>
+#include "rutil/ResipAssert.h"
 #include "rutil/BaseException.hxx"
 #include "rutil/Data.hxx"
 #include "rutil/Timer.hxx"
@@ -96,7 +96,7 @@ RRCache::updateCache(const Data& target,
 {
    Data domain = (*begin).domain();
    FactoryMap::iterator it = mFactoryMap.find(rrType);
-   assert(it != mFactoryMap.end());
+   resip_assert(it != mFactoryMap.end());
    RRList* key = new RRList(domain, rrType);         
    RRSet::iterator lb = mRRSet.lower_bound(key);
    if (lb != mRRSet.end() &&
@@ -153,7 +153,7 @@ RRCache::lookup(const Data& target,
                 Result& records, 
                 int& status)
 {
-   records.empty();
+   records.clear();
    status = 0;
    RRList* key = new RRList(target, type);
    RRSet::iterator it = mRRSet.find(key);
@@ -212,11 +212,11 @@ RRCache::getTTL(const RROverlay& overlay)
    char* name = 0;
    long len = 0;
    int status = ares_expand_name(overlay.data(), overlay.msg(), overlay.msgLength(), &name, &len);
-   assert( status == ARES_SUCCESS );
+   resip_assert( status == ARES_SUCCESS );
    const unsigned char* pPos = overlay.data() + len;
    free(name); name = 0;
    status = ares_expand_name(pPos, overlay.msg(), overlay.msgLength(), &name, &len);
-   assert( status == ARES_SUCCESS );
+   resip_assert( status == ARES_SUCCESS );
    free(name);
    pPos += len;
    pPos += 16; // skip four 32 bit entities.
@@ -229,7 +229,7 @@ RRCache::purge()
    if (mRRSet.size() < mSize) return;
    RRList* lst = *(mLruHead->begin());
    RRSet::iterator it = mRRSet.find(lst);
-   assert(it != mRRSet.end());
+   resip_assert(it != mRRSet.end());
    lst->remove();
    delete *it;
    mRRSet.erase(it);
@@ -238,19 +238,39 @@ RRCache::purge()
 void 
 RRCache::logCache()
 {
-   for (std::set<RRList*, CompareT>::iterator it = mRRSet.begin(); it != mRRSet.end(); it++)
+   UInt64 now = Timer::getTimeSecs();
+   for (std::set<RRList*, CompareT>::iterator it = mRRSet.begin(); it != mRRSet.end(); )
    {
-      (*it)->log();
+      if (now >= (*it)->absoluteExpiry())
+      {
+         delete *it;
+         mRRSet.erase(it++);
+      }
+      else
+      {
+         (*it)->log();
+         ++it;
+      }
    }
 }
 
 void 
 RRCache::getCacheDump(Data& dnsCacheDump)
 {
+   UInt64 now = Timer::getTimeSecs();
    DataStream strm(dnsCacheDump);
-   for (std::set<RRList*, CompareT>::iterator it = mRRSet.begin(); it != mRRSet.end(); it++)
+   for (std::set<RRList*, CompareT>::iterator it = mRRSet.begin(); it != mRRSet.end(); )
    {
-      (*it)->encodeRRList(strm);
+      if (now >= (*it)->absoluteExpiry())
+      {
+         delete *it;
+         mRRSet.erase(it++);
+      }
+      else
+      {
+         (*it)->encodeRRList(strm);
+         ++it;
+      }
    }
    strm.flush();
 }

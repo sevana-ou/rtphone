@@ -58,7 +58,6 @@ set (STACK_SOURCES
     resip/stack/DeprecatedDialog.cxx
     resip/stack/GenericUri.cxx
     resip/stack/GenericContents.cxx
-    resip/stack/FloatParameter.cxx
     resip/stack/ExternalBodyContents.cxx
     resip/stack/ExtensionParameter.cxx
     resip/stack/ExtensionHeader.cxx
@@ -68,13 +67,13 @@ set (STACK_SOURCES
     resip/stack/EventStackThread.cxx
     resip/stack/Embedded.cxx
     resip/stack/DtlsMessage.cxx
-    resip/stack/HeaderHash.cxx
+#    resip/stack/HeaderHash.cxx
     resip/stack/HeaderFieldValueList.cxx
     resip/stack/HeaderFieldValue.cxx
     resip/stack/MsgHeaderScanner.cxx
     resip/stack/Mime.cxx
     resip/stack/MethodTypes.cxx
-    resip/stack/MethodHash.cxx
+#    resip/stack/MethodHash.cxx
     resip/stack/MessageWaitingContents.cxx
     resip/stack/MessageFilterRule.cxx
     resip/stack/Message.cxx
@@ -89,7 +88,7 @@ set (STACK_SOURCES
     resip/stack/Helper.cxx
     resip/stack/HeaderTypes.cxx
     resip/stack/Headers.cxx
-    resip/stack/ParameterHash.cxx
+#    resip/stack/ParameterHash.cxx
     resip/stack/Parameter.cxx
     resip/stack/OctetContents.cxx
     resip/stack/NonceHelper.cxx
@@ -305,7 +304,6 @@ SET (RUTIL_SOURCES
     rutil/KeyValueStore.cxx
     rutil/HeapInstanceCounter.cxx
     rutil/GeneralCongestionManager.cxx
-    rutil/AtomicCounter.cxx
     rutil/WinCompat.cxx
     )
 

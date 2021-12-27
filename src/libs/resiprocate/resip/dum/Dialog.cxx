@@ -15,8 +15,10 @@
 #include "resip/dum/ServerSubscription.hxx"
 #include "resip/dum/SubscriptionHandler.hxx"
 #include "resip/dum/UsageUseException.hxx"
+#include "rutil/ResipAssert.h"
 #include "rutil/Logger.hxx"
 #include "rutil/Inserter.hxx"
+#include "rutil/TransportType.hxx"
 #include "rutil/WinLeakCheck.hxx"
 
 #define RESIPROCATE_SUBSYSTEM Subsystem::DUM
@@ -40,16 +42,15 @@ Dialog::Dialog(DialogUsageManager& dum, const SipMessage& msg, DialogSet& ds)
      mLocalNameAddr(),
      mRemoteNameAddr(),
      mCallId(msg.header(h_CallID)),
-     mDefaultSubExpiration(0),
      mAppDialog(0),
      mDestroying(false),
      mReUseDialogSet(false)
 {
-   assert(msg.isExternal());
+   resip_assert(msg.isExternal());
 
-   assert(msg.header(h_CSeq).method() != MESSAGE);
-   assert(msg.header(h_CSeq).method() != REGISTER);
-   assert(msg.header(h_CSeq).method() != PUBLISH);
+   resip_assert(msg.header(h_CSeq).method() != MESSAGE);
+   resip_assert(msg.header(h_CSeq).method() != REGISTER);
+   resip_assert(msg.header(h_CSeq).method() != PUBLISH);
 
    mNetworkAssociation.setDum(&dum);
 
@@ -239,7 +240,7 @@ Dialog::Dialog(DialogUsageManager& dum, const SipMessage& msg, DialogSet& ds)
                         InfoLog(<< response);
                         throw Exception("lastRequest does not contain a valid contact.", __FILE__, __LINE__);
                      }
-                     mLocalContact = creator->getLastRequest()->header(h_Contacts).front();
+                     mLocalContact = lastRequest->header(h_Contacts).front();
                      mRemoteTarget = contact;
                   }
                   else
@@ -337,9 +338,9 @@ Dialog::getRouteSet() const
 void
 Dialog::cancel()
 {
-   assert(mType == Invitation);
+   resip_assert(mType == Invitation);
    ClientInviteSession* uac = dynamic_cast<ClientInviteSession*>(mInviteSession);
-   assert (uac);
+   resip_assert (uac);
    uac->cancel();
 }
 
@@ -378,6 +379,8 @@ Dialog::handleTargetRefresh(const SipMessage& msg)
    {
       case INVITE:
       case UPDATE:
+      case SUBSCRIBE: // RFC6665 - Note: target refreshes via NOTIFY requests are handled via 
+                      //           ClientSubscription usage after NOTIFY ordering is confirmed
          if (msg.isRequest() || (msg.isResponse() && msg.header(h_StatusLine).statusCode()/100 == 2))
          {
             //?dcm? modify local target; 12.2.2 of 3261 implies that the remote
@@ -403,13 +406,12 @@ Dialog::dispatch(const SipMessage& msg)
 
    DebugLog ( << "Dialog::dispatch: " << msg.brief());
 
-   if(msg.isExternal())
+   if(msg.isFromWire())
    {
-      const Data& receivedTransport = msg.header(h_Vias).front().transport();
+      TransportType receivedTransport = toTransportType(
+         msg.header(h_Vias).front().transport());
       int keepAliveTime = 0;
-      if(receivedTransport == Symbols::TCP ||
-         receivedTransport == Symbols::TLS ||
-         receivedTransport == Symbols::SCTP)
+      if(isReliable(receivedTransport))
       {
          keepAliveTime = mDialogSet.mUserProfile->getKeepAliveTimeForStream();
       }
@@ -476,6 +478,17 @@ Dialog::dispatch(const SipMessage& msg)
             if (mInviteSession == 0)
             {
                InfoLog ( << "Spurious MESSAGE" );
+               return;
+            }
+            else
+            {
+               mInviteSession->dispatch(request);
+            }
+            break;
+         case PRACK:
+            if (mInviteSession == 0)
+            {
+               InfoLog ( << "Spurious PRACK" );
                return;
             }
             else
@@ -552,7 +565,7 @@ Dialog::dispatch(const SipMessage& msg)
                      (request.exists(h_Requires) &&
                      request.header(h_Requires).find(Token("norefersub"))))
                {
-                  assert(mInviteSession);
+                  resip_assert(mInviteSession);
                   mInviteSession->referNoSub(msg);
                }
                else
@@ -622,7 +635,7 @@ Dialog::dispatch(const SipMessage& msg)
             }
             break;
         default:
-           assert(0);
+           resip_assert(0);
            return;
       }
    }
@@ -642,7 +655,7 @@ Dialog::dispatch(const SipMessage& msg)
             {
                InfoLog( << "about to re-send request with digest credentials" << r->second->brief());
 
-               assert (r->second->isRequest());
+               resip_assert (r->second->isRequest());
 
                mLocalCSeq++;
                send(r->second);
@@ -665,8 +678,21 @@ Dialog::dispatch(const SipMessage& msg)
          }
          else
          {
-            // Ensure that if the route-set in the 200 is empty, then we overwrite any existing route-sets
-            mRouteSet.clear();
+            // Note:  This is code to facilitate Dialog recovery, and works in conjunction with the 
+            //        makeInviteSession API that takes a DialogSetId parameter.
+            // If our original outbound request contained a to tag, then we are attempting to restore a previously
+            // existing (outside this process) dialog.  Some clients will send the routeset to use as Record-Routes 
+            // in the response, in which case the code above will store them.  However clients are not mandated to 
+            // do so, so if our outbound INVITE had routes on it, then store these as the routeset for the dialog.
+            if (creator->getLastRequest()->header(h_To).exists(p_tag) && creator->getLastRequest()->exists(h_Routes))
+            {
+                mRouteSet = creator->getLastRequest()->header(h_Routes);
+            }
+            else
+            {
+               // Ensure that if the route-set in the 200 is empty, then we overwrite any existing route-sets
+               mRouteSet.clear();
+            }
          }
       }
 
@@ -700,6 +726,7 @@ Dialog::dispatch(const SipMessage& msg)
          case INFO:
          case MESSAGE:
          case UPDATE:
+         case PRACK:
             if (mInviteSession)
             {
                mInviteSession->dispatch(response);
@@ -707,7 +734,7 @@ Dialog::dispatch(const SipMessage& msg)
             // else drop on the floor
             break;       
 
-		 case REFER:
+         case REFER:
             if(mInviteSession)
             {
                if (code >= 300)
@@ -733,38 +760,10 @@ Dialog::dispatch(const SipMessage& msg)
 
          case SUBSCRIBE:
          {
-            int code = response.header(h_StatusLine).statusCode();
             ClientSubscription* client = findMatchingClientSub(response);
             if (client)
             {
                client->dispatch(response);
-            }
-            else if (code < 300)
-            {
-               /*
-                  we're capturing the  value from the expires header off
-                  the 2xx because the ClientSubscription is only created
-                  after receiving the NOTIFY that comes (usually) after
-                  this 2xx.  We really should be creating the
-                  ClientSubscription at either the 2xx or the NOTIFY
-                  whichever arrives first. .mjf.
-                  Note: we're capturing a duration here (not the
-                  absolute time because all the inputs to
-                  ClientSubscription desling with the expiration are expecting
-                  duration type values from the headers. .mjf.
-                */
-               if(response.exists(h_Expires))
-               {
-                  mDefaultSubExpiration = response.header(h_Expires).value();
-               }
-               else
-               {
-                  //?dcm? defaults to 3600 in ClientSubscription if no expires value
-                  //is provided anywhere...should we assume the value from the
-                  //sub in the basecreator if it exists?
-                  mDefaultSubExpiration = 0;
-               }               
-               return;
             }
             else
             {
@@ -792,9 +791,8 @@ Dialog::dispatch(const SipMessage& msg)
          break;
          case NOTIFY:
          {
-            //2xx responses are treated as retransmission quenchers(handled by
-            //the stack). Failures are dispatched to all ServerSubsscriptions,
-            //which may not be correct.
+            //Failures are dispatched to all ServerSubsscriptions,
+            //which may not be correct as per RFC 5057.
 
             int code = msg.header(h_StatusLine).statusCode();
             if (code >= 300)
@@ -811,49 +809,20 @@ Dialog::dispatch(const SipMessage& msg)
                mDestroying = false;
                possiblyDie();
             }
-//             ServerSubscription* server = findMatchingServerSub(response);
-//             if (server)
-//             {
-//                server->dispatch(response);
-//             }
+            else if (code >= 200)
+            {
+               ServerSubscription* server = findMatchingServerSub(response);
+               if (server)
+               {
+                  server->dispatch(response);
+               }
+            }
          }
          break;
          default:
-            assert(0);
+            resip_assert(0);
             return;
       }
-
-#if 0     // merged from head back to teltel-branch
-      if (msg.header(h_StatusLine).statusCode() >= 400
-          && Helper::determineFailureMessageEffect(msg) == Helper::DialogTermination)
-      {
-         //kill all usages
-         mDestroying = true;
-
-         for (list<ServerSubscription*>::iterator it = mServerSubscriptions.begin();
-              it != mServerSubscriptions.end(); )
-         {
-            ServerSubscription* s = *it;
-            it++;
-            s->dialogDestroyed(msg);
-         }
-
-         for (list<ClientSubscription*>::iterator it = mClientSubscriptions.begin();
-              it != mClientSubscriptions.end(); )
-         {
-            ClientSubscription* s = *it;
-            it++;
-            s->dialogDestroyed(msg);
-         }
-         if (mInviteSession)
-         {
-            mInviteSession->dialogDestroyed(msg);
-         }
-         mDestroying = false;
-         possiblyDie(); //should aways result in destruction of this
-         return;
-      }
-#endif
    }
 }
 
@@ -978,7 +947,7 @@ Dialog::redirected(const SipMessage& msg)
 }
 
 void
-Dialog::makeRequest(SipMessage& request, MethodTypes method)
+Dialog::makeRequest(SipMessage& request, MethodTypes method, bool incrementCSeq)
 {
    RequestLine rLine(method);
 
@@ -1012,13 +981,16 @@ Dialog::makeRequest(SipMessage& request, MethodTypes method)
    }
    else
    {
-      assert(request.exists(h_Vias));
+      resip_assert(request.exists(h_Vias));
    }
 
    //don't increment CSeq for ACK or CANCEL
    if (method != ACK && method != CANCEL)
    {
-      request.header(h_CSeq).sequence() = ++mLocalCSeq;
+      if(incrementCSeq)
+      {
+         setRequestNextCSeq(request);
+      }
    }
    else
    {
@@ -1036,31 +1008,28 @@ Dialog::makeRequest(SipMessage& request, MethodTypes method)
    // If method is INVITE then advertise required headers
    if(method == INVITE || method == UPDATE)
    {
-      if(mDialogSet.mUserProfile->isAdvertisedCapability(Headers::Allow)) request.header(h_Allows) = mDum.getMasterProfile()->getAllowedMethods();
-      if(mDialogSet.mUserProfile->isAdvertisedCapability(Headers::AcceptEncoding)) request.header(h_AcceptEncodings) = mDum.getMasterProfile()->getSupportedEncodings();
-      if(mDialogSet.mUserProfile->isAdvertisedCapability(Headers::AcceptLanguage)) request.header(h_AcceptLanguages) = mDum.getMasterProfile()->getSupportedLanguages();
-      if(mDialogSet.mUserProfile->isAdvertisedCapability(Headers::AllowEvents)) request.header(h_AllowEvents) = mDum.getMasterProfile()->getAllowedEvents();
-      if(mDialogSet.mUserProfile->isAdvertisedCapability(Headers::Supported)) request.header(h_Supporteds) = mDum.getMasterProfile()->getSupportedOptionTags();
+      // Add Advertised Capabilities
+      mDum.setAdvertisedCapabilities(request, mDialogSet.mUserProfile);
    }
 
    if (mDialogSet.mUserProfile->isAnonymous())
    {
+      request.remove(h_Privacys);
       request.header(h_Privacys).push_back(PrivacyCategory(Symbols::id));
    }
 
    DebugLog ( << "Dialog::makeRequest: " << std::endl << std::endl << request );
 }
 
-
 void
 Dialog::makeResponse(SipMessage& response, const SipMessage& request, int code)
 {
-   assert( code >= 100 );
+   resip_assert( code >= 100 );
    response.remove(h_Contacts);
    if (code < 300 && code > 100)
    {
-      assert(request.isRequest());
-      assert(request.header(h_RequestLine).getMethod() == INVITE ||
+      resip_assert(request.isRequest());
+      resip_assert(request.header(h_RequestLine).getMethod() == INVITE ||
              request.header(h_RequestLine).getMethod() == SUBSCRIBE ||
              request.header(h_RequestLine).getMethod() == BYE ||
              request.header(h_RequestLine).getMethod() == CANCEL ||
@@ -1069,6 +1038,7 @@ Dialog::makeResponse(SipMessage& response, const SipMessage& request, int code)
              request.header(h_RequestLine).getMethod() == NOTIFY ||
              request.header(h_RequestLine).getMethod() == INFO ||
              request.header(h_RequestLine).getMethod() == OPTIONS ||
+             request.header(h_RequestLine).getMethod() == PRACK ||
              request.header(h_RequestLine).getMethod() == UPDATE
              );
 
@@ -1079,30 +1049,12 @@ Dialog::makeResponse(SipMessage& response, const SipMessage& request, int code)
       response.header(h_To).param(p_tag) = mId.getLocalTag();
 
       if((request.header(h_RequestLine).getMethod() == INVITE ||
+          request.header(h_RequestLine).getMethod() == PRACK ||
           request.header(h_RequestLine).getMethod() == UPDATE)
          && code >= 200 && code < 300)
       {
-         // Check if we should add our capabilites to the invite success response
-         if(mDialogSet.mUserProfile->isAdvertisedCapability(Headers::Allow)) 
-         {
-            response.header(h_Allows) = mDum.getMasterProfile()->getAllowedMethods();
-         }
-         if(mDialogSet.mUserProfile->isAdvertisedCapability(Headers::AcceptEncoding)) 
-         {
-            response.header(h_AcceptEncodings) = mDum.getMasterProfile()->getSupportedEncodings();
-         }
-         if(mDialogSet.mUserProfile->isAdvertisedCapability(Headers::AcceptLanguage)) 
-         {
-            response.header(h_AcceptLanguages) = mDum.getMasterProfile()->getSupportedLanguages();
-         }
-         if(mDialogSet.mUserProfile->isAdvertisedCapability(Headers::AllowEvents)) 
-         {
-            response.header(h_AllowEvents) = mDum.getMasterProfile()->getAllowedEvents();
-         }
-         if(mDialogSet.mUserProfile->isAdvertisedCapability(Headers::Supported)) 
-         {
-            response.header(h_Supporteds) = mDum.getMasterProfile()->getSupportedOptionTags();
-         }
+         // Add Advertised Capabilities
+         mDum.setAdvertisedCapabilities(response, mDialogSet.mUserProfile);
       }
    }
    else
@@ -1114,6 +1066,12 @@ Dialog::makeResponse(SipMessage& response, const SipMessage& request, int code)
    DebugLog ( << "Dialog::makeResponse: " << std::endl << std::endl << response);
 }
 
+void 
+Dialog::setRequestNextCSeq(SipMessage& request)
+{
+   resip_assert(request.isRequest() && request.method() != ACK && request.method() != CANCEL);
+   request.header(h_CSeq).sequence() = ++mLocalCSeq;
+}
 
 ClientInviteSession*
 Dialog::makeClientInviteSession(const SipMessage& response)
@@ -1121,7 +1079,7 @@ Dialog::makeClientInviteSession(const SipMessage& response)
    InviteSessionCreator* creator = dynamic_cast<InviteSessionCreator*>(mDialogSet.getCreator());
    if (!creator)
    {
-      assert(0); // !jf! this maybe can assert by evil UAS
+      resip_assert(0); // !jf! this maybe can assert by evil UAS
       return 0;
    }
    //return mDum.createAppClientInviteSession(*this, *creator);
@@ -1129,14 +1087,11 @@ Dialog::makeClientInviteSession(const SipMessage& response)
                                   creator->getInitialOffer(), creator->getEncryptionLevel(), creator->getServerSubscription());
 }
 
-
-
 ClientSubscription*
 Dialog::makeClientSubscription(const SipMessage& request)
 {
-   return new ClientSubscription(mDum, *this, request, mDefaultSubExpiration);
+   return new ClientSubscription(mDum, *this, request);
 }
-
 
 ServerInviteSession*
 Dialog::makeServerInviteSession(const SipMessage& request)

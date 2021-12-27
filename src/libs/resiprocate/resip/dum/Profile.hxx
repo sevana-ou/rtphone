@@ -104,7 +104,12 @@ class Profile
       /// The amount of time that can pass before dum will resubmit an unreliable provisional response
       virtual void set1xxRetransmissionTime(int secs);
       virtual int get1xxRetransmissionTime() const;
-      virtual void unset1xxRetransmissionTime();   
+      virtual void unset1xxRetransmissionTime();
+
+      /// The amount of time that can pass before dum will resubmit a reliable provisional response
+      virtual void set1xxRelResubmitTime(int secs);
+      virtual int get1xxRelResubmitTime() const;
+      virtual void unset1xxRelResubmitTime();
 
       ///overrides the value used to populate the contact
       ///?dcm? -- also change via entries? Also, dum currently uses(as a uas)
@@ -119,7 +124,7 @@ class Profile
       ///enable/disable sending of Allow/Supported/Accept-Language/Accept-Encoding headers 
       ///on initial outbound requests (ie. Initial INVITE, REGISTER, etc.) and Invite 200 responses
       ///Note:  Default is to advertise Headers::Allow and Headers::Supported, use clearAdvertisedCapabilities to remove these
-      ///       Currently implemented header values are: Headers::Allow, 
+      ///       Currently implemented header values are: Headers::Allow, Headers::AllowEvents
       ///       Headers::AcceptEncoding, Headers::AcceptLanguage, Headers::Supported
       virtual void addAdvertisedCapability(const Headers::Type header);
       virtual bool isAdvertisedCapability(const Headers::Type header) const;
@@ -261,6 +266,9 @@ class Profile
 
       bool mHas1xxRetransmissionTime;
       int m1xxRetransmissionTime;
+
+      bool mHas1xxRelResubmitTime;
+      int m1xxRelResubmitTime;
 
       bool mHasOutboundProxy;
       NameAddr mOutboundProxy;

@@ -27,24 +27,26 @@ using namespace std;
 
 bool SipMessage::checkContentLength=true;
 
-SipMessage::SipMessage(const Transport* fromWire)
+SipMessage::SipMessage(const Tuple *receivedTransportTuple)
    : mIsDecorated(false),
      mIsBadAck200(false),     
-     mIsExternal(fromWire != 0),
+     mIsExternal(receivedTransportTuple != 0),  // may be modified later by setFromTU or setFromExternal
      mHeaders(StlPoolAllocator<HeaderFieldValueList*, PoolBase >(&mPool)),
 #ifndef __SUNPRO_CC
      mUnknownHeaders(StlPoolAllocator<std::pair<Data, HeaderFieldValueList*>, PoolBase >(&mPool)),
 #else
      mUnknownHeaders(),
 #endif
-     mTransport(fromWire),
-     mRFC2543TransactionId(),
      mRequest(false),
      mResponse(false),
      mInvalid(false),
      mCreatedTime(Timer::getTimeMicroSec()),
      mTlsDomain(Data::Empty)
 {
+   if(receivedTransportTuple)
+   {
+       mReceivedTransportTuple = *receivedTransportTuple;
+   }
    // !bwc! TODO make this tunable
    mHeaders.reserve(16);
    clear();
@@ -81,6 +83,19 @@ SipMessage::operator=(const SipMessage& rhs)
 
 SipMessage::~SipMessage()
 {
+//#define DINKYPOOL_PROFILING
+#ifdef DINKYPOOL_PROFILING
+   if (mPool.getHeapBytes() > 0)
+   {
+       InfoLog(<< "SipMessage mPool filled up and used " << mPool.getHeapBytes() << " bytes on the heap, consider increasing the mPool size (sizeof SipMessage is " << sizeof(SipMessage) << " bytes): msg="
+           << std::endl << *this);
+   }
+   else
+   {
+       InfoLog(<< "SipMessage mPool used " << mPool.getPoolBytes() << " bytes of a total " << mPool.getPoolSizeBytes() << " bytes (sizeof SipMessage is " << sizeof(SipMessage) << " bytes): msg="
+           << std::endl << *this);
+   }
+#endif
    freeMem();
 }
 
@@ -90,7 +105,7 @@ SipMessage::clear(bool leaveResponseStuff)
    if(!leaveResponseStuff)
    {
       memset(mHeaderIndices,0,sizeof(mHeaderIndices));
-      mHeaders.clear();
+      clearHeaders();
       
       // !bwc! The "invalid" 0 index.
       mHeaders.push_back(getEmptyHfvl());
@@ -114,7 +129,7 @@ SipMessage::init(const SipMessage& rhs)
    mIsDecorated = rhs.mIsDecorated;
    mIsBadAck200 = rhs.mIsBadAck200;
    mIsExternal = rhs.mIsExternal;
-   mTransport = rhs.mTransport;
+   mReceivedTransportTuple = rhs.mReceivedTransportTuple;
    mSource = rhs.mSource;
    mDestination = rhs.mDestination;
    mRFC2543TransactionId = rhs.mRFC2543TransactionId;
@@ -134,7 +149,7 @@ SipMessage::init(const SipMessage& rhs)
    memcpy(&mHeaderIndices,&rhs.mHeaderIndices,sizeof(mHeaderIndices));
 
    // .bwc. Clear out the pesky invalid 0 index.
-   mHeaders.clear();
+   clearHeaders();
    mHeaders.reserve(rhs.mHeaders.size());
    for (TypedHeaders::const_iterator i = rhs.mHeaders.begin();
         i != rhs.mHeaders.end(); i++)
@@ -215,12 +230,7 @@ SipMessage::freeMem(bool leaveResponseStuff)
 
    if(!leaveResponseStuff)
    {
-      for (TypedHeaders::iterator i = mHeaders.begin();
-           i != mHeaders.end(); i++)
-      {
-         freeHfvl(*i);
-      }
-      mHeaders.clear();
+      clearHeaders();
 
       for (vector<char*>::iterator i = mBufferList.begin();
            i != mBufferList.end(); i++)
@@ -246,11 +256,22 @@ SipMessage::freeMem(bool leaveResponseStuff)
    }
 }
 
-SipMessage*
-SipMessage::make(const Data& data,  bool isExternal)
+void
+SipMessage::clearHeaders()
 {
-   Transport* external = (Transport*)(0xFFFF);
-   SipMessage* msg = new SipMessage(isExternal ? external : 0);
+    for (TypedHeaders::iterator i = mHeaders.begin(); i != mHeaders.end(); i++)
+    {
+        freeHfvl(*i);
+    }
+    mHeaders.clear();
+}
+
+SipMessage*
+SipMessage::make(const Data& data, bool isExternal)
+{
+   Tuple fakeWireTuple;
+   fakeWireTuple.setType(UDP);
+   SipMessage* msg = new SipMessage(isExternal ? &fakeWireTuple : 0);
 
    size_t len = data.size();
    char *buffer = new char[len + 5];
@@ -326,7 +347,7 @@ SipMessage::parseAllHeaders()
       scs->parseAll();
    }
    
-   assert(mStartLine);
+   resip_assert(mStartLine);
 
    mStartLine->checkParsed();
    
@@ -342,7 +363,7 @@ SipMessage::getTransactionId() const
       throw Exception("No Via in message", __FILE__,__LINE__);
    }
    
-   assert(exists(h_Vias) && !header(h_Vias).empty());
+   resip_assert(exists(h_Vias) && !header(h_Vias).empty());
    if( exists(h_Vias) && header(h_Vias).front().exists(p_branch) 
        && header(h_Vias).front().param(p_branch).hasMagicCookie() 
        && (!header(h_Vias).front().param(p_branch).getTransactionId().empty())
@@ -363,7 +384,7 @@ SipMessage::getTransactionId() const
 void
 SipMessage::compute2543TransactionHash() const
 {
-   assert (mRFC2543TransactionId.empty());
+   resip_assert (mRFC2543TransactionId.empty());
    
    /*  From rfc3261, 17.2.3
        The INVITE request matches a transaction if the Request-URI, To tag,
@@ -561,7 +582,7 @@ SipMessage::method() const
       }
       else
       {
-         assert(0);
+         resip_assert(0);
       }
    }
    catch(resip::ParseException&)
@@ -592,7 +613,7 @@ SipMessage::methodStr() const
          }
          else
          {
-            assert(0);
+            resip_assert(0);
          }
       }
       catch(resip::ParseException&)
@@ -642,7 +663,7 @@ SipMessage::encodeBrief(EncodeStream& str) const
       {
          str << getTransactionId();
       }
-      catch(SipMessage::Exception&)
+      catch(BaseException&)  // Could be SipMessage::Exception or ParseException
       {
          str << "BAD-VIA";
       }
@@ -682,7 +703,7 @@ SipMessage::encodeBrief(EncodeStream& str) const
 bool
 SipMessage::isClientTransaction() const
 {
-   assert(mRequest || mResponse);
+   resip_assert(mRequest || mResponse);
    return ((mIsExternal && mResponse) || (!mIsExternal && mRequest));
 }
 
@@ -970,7 +991,7 @@ SipMessage::setRawBody(const HeaderFieldValue& body)
 
 
 void
-SipMessage::setContents(unique_ptr<Contents> contents)
+SipMessage::setContents(auto_ptr<Contents> contents)
 {
    Contents* contentsP = contents.release();
 
@@ -1006,8 +1027,8 @@ SipMessage::setContents(unique_ptr<Contents> contents)
    if (mContents->exists(h_ContentType))
    {
       header(h_ContentType) = mContents->header(h_ContentType);
-      assert( header(h_ContentType).type() == mContents->getType().type() );
-      assert( header(h_ContentType).subType() == mContents->getType().subType() );
+      resip_assert( header(h_ContentType).type() == mContents->getType().type() );
+      resip_assert( header(h_ContentType).subType() == mContents->getType().subType() );
    }
    else
    {
@@ -1020,24 +1041,24 @@ SipMessage::setContents(const Contents* contents)
 { 
    if (contents)
    {
-      setContents(unique_ptr<Contents>(contents->clone()));
+      setContents(auto_ptr<Contents>(contents->clone()));
    }
    else
    {
-      setContents(unique_ptr<Contents>(nullptr));
+      setContents(auto_ptr<Contents>(0));
    }
 }
 
 Contents*
 SipMessage::getContents() const
 {
-   if (mContents == nullptr && mContentsHfv.getBuffer() != nullptr)
+   if (mContents == 0 && mContentsHfv.getBuffer() != 0)
    {
       if (empty(h_ContentType) ||
             !const_header(h_ContentType).isWellFormed())
       {
          StackLog(<< "SipMessage::getContents: ContentType header does not exist - implies no contents");
-         return nullptr;
+         return 0;
       }
       DebugLog(<< "SipMessage::getContents: " 
                << const_header(h_ContentType).type()
@@ -1058,7 +1079,7 @@ SipMessage::getContents() const
       {
          mContents = ContentsFactoryBase::getFactoryMap()[const_header(h_ContentType)]->create(mContentsHfv, const_header(h_ContentType));
       }
-      assert( mContents );
+      resip_assert( mContents );
       
       // copy contents headers into the contents
       if (!empty(h_ContentDisposition))
@@ -1082,17 +1103,17 @@ SipMessage::getContents() const
    return mContents;
 }
 
-unique_ptr<Contents>
+auto_ptr<Contents>
 SipMessage::releaseContents()
 {
    Contents* c=getContents();
-   // .bwc. unique_ptr owns the Contents. No other references allowed!
-   unique_ptr<Contents> ret(c ? c->clone() : nullptr);
-   setContents(std::unique_ptr<Contents>(nullptr));
+   // .bwc. auto_ptr owns the Contents. No other references allowed!
+   auto_ptr<Contents> ret(c ? c->clone() : 0);
+   setContents(std::auto_ptr<Contents>(0));
 
    if (ret.get() != 0 && !ret->isWellFormed())
    {
-      ret.reset(nullptr);
+      ret.reset(0);
    }
 
    return ret;
@@ -1108,7 +1129,7 @@ SipMessage::header(const ExtensionHeader& headerName) const
       if (isEqualNoCase(i->first, headerName.getName()))
       {
          HeaderFieldValueList* hfvs = i->second;
-         if (hfvs->getParserContainer() == nullptr)
+         if (hfvs->getParserContainer() == 0)
          {
             SipMessage* nc_this(const_cast<SipMessage*>(this));
             hfvs->setParserContainer(nc_this->makeParserContainer<StringCategory>(hfvs, Headers::RESIP_DO_NOT_USE));
@@ -1117,7 +1138,7 @@ SipMessage::header(const ExtensionHeader& headerName) const
       }
    }
    // missing extension header
-   assert(false);
+   resip_assert(false);
 
    return *(StringCategories*)0;
 }
@@ -1181,6 +1202,7 @@ SipMessage::addHeader(Headers::Type header, const char* headerName, int headerLe
 {
    if (header != Headers::UNKNOWN)
    {
+      resip_assert(header >= Headers::UNKNOWN && header < Headers::MAX_HEADERS);
       HeaderFieldValueList* hfvl=0;
       if (mHeaderIndices[header] == 0)
       {
@@ -1231,7 +1253,7 @@ SipMessage::addHeader(Headers::Type header, const char* headerName, int headerLe
    }
    else
    {
-      assert(headerLen >= 0);
+      resip_assert(headerLen >= 0);
       for (UnknownHeaders::iterator i = mUnknownHeaders.begin();
            i != mUnknownHeaders.end(); i++)
       {
@@ -1261,7 +1283,7 @@ SipMessage::addHeader(Headers::Type header, const char* headerName, int headerLe
 RequestLine& 
 SipMessage::header(const RequestLineType& l)
 {
-   assert (!isResponse());
+   resip_assert (!isResponse());
    if (mStartLine == 0 )
    { 
       mStartLine = new (mStartLineMem) RequestLine;
@@ -1273,11 +1295,11 @@ SipMessage::header(const RequestLineType& l)
 const RequestLine& 
 SipMessage::header(const RequestLineType& l) const
 {
-   assert (!isResponse());
+   resip_assert (!isResponse());
    if (mStartLine == 0 )
    { 
       // request line missing
-      assert(false);
+      resip_assert(false);
    }
    return *static_cast<RequestLine*>(mStartLine);
 }
@@ -1285,7 +1307,7 @@ SipMessage::header(const RequestLineType& l) const
 StatusLine& 
 SipMessage::header(const StatusLineType& l)
 {
-   assert (!isRequest());
+   resip_assert (!isRequest());
    if (mStartLine == 0 )
    { 
       mStartLine = new (mStartLineMem) StatusLine;
@@ -1297,11 +1319,11 @@ SipMessage::header(const StatusLineType& l)
 const StatusLine& 
 SipMessage::header(const StatusLineType& l) const
 {
-   assert (!isRequest());
+   resip_assert (!isRequest());
    if (mStartLine == 0 )
    { 
       // status line missing
-      assert(false);
+      resip_assert(false);
    }
    return *static_cast<StatusLine*>(mStartLine);
 }
@@ -1506,6 +1528,13 @@ defineMultiHeader(ServiceRoute, "Service-Route", NameAddr, "RFC 3608");
 
 defineHeader(ContentTransferEncoding, "Content-Transfer-Encoding", StringCategory, "RFC ?");
 defineHeader(Organization, "Organization", StringCategory, "RFC 3261");
+defineHeader(SecWebSocketKey, "Sec-WebSocket-Key", StringCategory, "RFC 6455");
+defineHeader(SecWebSocketKey1, "Sec-WebSocket-Key1", StringCategory, "draft-hixie- thewebsocketprotocol-76");
+defineHeader(SecWebSocketKey2, "Sec-WebSocket-Key2", StringCategory, "draft-hixie- thewebsocketprotocol-76");
+defineHeader(Origin, "Origin", StringCategory, "draft-hixie- thewebsocketprotocol-76");
+defineHeader(Host, "Host", StringCategory, "draft-hixie- thewebsocketprotocol-76");
+defineHeader(SecWebSocketAccept, "Sec-WebSocket-Accept", StringCategory, "RFC 6455");
+defineMultiHeader(Cookie, "Cookie", StringCategory, "RFC 6265");
 defineHeader(Server, "Server", StringCategory, "RFC 3261");
 defineHeader(Subject, "Subject", StringCategory, "RFC 3261");
 defineHeader(UserAgent, "User-Agent", StringCategory, "RFC 3261");
@@ -1543,6 +1572,13 @@ defineMultiHeader(Via, "Via", Via, "RFC 3261");
 defineHeader(RAck, "RAck", RAckCategory, "RFC 3262");
 defineMultiHeader(RemotePartyId, "Remote-Party-ID", NameAddr, "draft-ietf-sip-privacy-04"); // ?bwc? Not in 3323, should we keep?
 defineMultiHeader(HistoryInfo, "History-Info", NameAddr, "RFC 4244");
+
+defineMultiHeader(PAccessNetworkInfo, "P-Access-Network-Info", Token, "RFC 7315"); // section 5.4.
+defineHeader(PChargingVector, "P-Charging-Vector", Token, "RFC 3455");
+defineHeader(PChargingFunctionAddresses, "P-Charging-Function-Addresses", Token, "RFC 3455");
+defineMultiHeader(PVisitedNetworkID, "P-Visited-Network-ID", TokenOrQuotedStringCategory, "RFC 3455");
+
+defineMultiHeader(UserToUser, "User-to-User", TokenOrQuotedStringCategory, "draft-ietf-cuss-sip-uui-17");
 
 #endif
 
@@ -1608,7 +1644,7 @@ SipMessage::clearForceTarget()
 const Uri&
 SipMessage::getForceTarget() const
 {
-   assert(mForceTarget);
+   resip_assert(mForceTarget);
    return *mForceTarget;
 }
 
@@ -1692,9 +1728,9 @@ SipMessage::mergeUri(const Uri& source)
 }
 
 void 
-SipMessage::setSecurityAttributes(unique_ptr<SecurityAttributes> sec)
+SipMessage::setSecurityAttributes(auto_ptr<SecurityAttributes> sec)
 {
-   mSecurityAttributes = std::move(sec);
+   mSecurityAttributes = sec;
 }
 
 void
@@ -1746,7 +1782,7 @@ SipMessage::copyOutboundDecoratorsToStackCancel(SipMessage& cancel)
   {
      if((*i)->copyToStackCancels())
      {
-        cancel.addOutboundDecorator(std::move(*(new unique_ptr<MessageDecorator>((*i)->clone()))));
+        cancel.addOutboundDecorator(std::auto_ptr<MessageDecorator>((*i)->clone()));
      }    
   }
 }
@@ -1760,7 +1796,7 @@ SipMessage::copyOutboundDecoratorsToStackFailureAck(SipMessage& ack)
   {
      if((*i)->copyToStackFailureAcks())
      {
-        ack.addOutboundDecorator(std::move(*(new unique_ptr<MessageDecorator>((*i)->clone()))));
+        ack.addOutboundDecorator(std::auto_ptr<MessageDecorator>((*i)->clone()));
      }    
   }
 }

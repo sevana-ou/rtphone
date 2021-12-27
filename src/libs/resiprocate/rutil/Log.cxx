@@ -1,6 +1,6 @@
 #include "rutil/Socket.hxx"
 
-#include <cassert>
+#include "rutil/ResipAssert.h"
 #include <iostream>
 #include <fstream>
 #include <stdio.h>
@@ -28,8 +28,14 @@ const Data Log::delim(" | ");
 Log::ThreadData Log::mDefaultLoggerData(0, Log::Cout, Log::Info, NULL, NULL);
 Data Log::mAppName;
 Data Log::mHostname;
+#ifndef WIN32
+int Log::mSyslogFacility = LOG_DAEMON;
+#else
+int Log::mSyslogFacility = -1;
+#endif
 unsigned int Log::MaxLineCount = 0; // no limit by default
 unsigned int Log::MaxByteCount = 0; // no limit by default
+bool Log::KeepAllLogFiles = false;  // do not keep all log files by default
 
 #ifdef WIN32
 int Log::mPid=0;
@@ -106,31 +112,130 @@ LogStaticInitializer::~LogStaticInitializer()
 }
 
 void
-Log::initialize(const char* typed, const char* leveld, const char* appName, const char *logFileName, ExternalLogger* externalLogger)
+Log::initialize(const char* typed, const char* leveld, const char* appName, const char *logFileName, ExternalLogger* externalLogger, const char* syslogFacilityName)
 {
-   Log::initialize(Data(typed), Data(leveld), Data(appName), logFileName, externalLogger);
+   Log::initialize(Data(typed), Data(leveld), Data(appName), logFileName, externalLogger, syslogFacilityName);
 }
 
 void
 Log::initialize(const Data& typed, const Data& leveld, const Data& appName, 
-                const char *logFileName, ExternalLogger* externalLogger)
+                const char *logFileName, ExternalLogger* externalLogger,
+                const Data& syslogFacilityName)
 {
    Type type = Log::Cout;
    if (isEqualNoCase(typed, "cout")) type = Log::Cout;
    else if (isEqualNoCase(typed, "cerr")) type = Log::Cerr;
    else if (isEqualNoCase(typed, "file")) type = Log::File;
+#ifndef WIN32
    else type = Log::Syslog;
+#endif
    
    Level level = Log::Info;
    level = toLevel(leveld);
 
-   Log::initialize(type, level, appName, logFileName, externalLogger);
+   Log::initialize(type, level, appName, logFileName, externalLogger, syslogFacilityName);
+}
+
+int
+Log::parseSyslogFacilityName(const Data& facilityName)
+{
+#ifndef WIN32
+   /* In theory, some platforms may not have all the log facilities
+      defined in syslog.h.  Only LOG_USER and LOG_LOCAL[0-7] are considered
+      mandatory.
+      If the compile fails with errors in this method, then the unsupported
+      facility names could be wrapped in conditional logic.
+   */
+   if(facilityName == "LOG_AUTH")
+   {
+      return LOG_AUTH;
+   }
+   else if(facilityName == "LOG_AUTHPRIV")
+   {
+      return LOG_AUTHPRIV;
+   }
+   else if(facilityName == "LOG_CRON")
+   {
+      return LOG_CRON;
+   }
+   else if(facilityName == "LOG_DAEMON")
+   {
+      return LOG_DAEMON;
+   }
+   else if(facilityName == "LOG_FTP")
+   {
+      return LOG_FTP;
+   }
+   else if(facilityName == "LOG_KERN")
+   {
+      return LOG_KERN;
+   }
+   else if(facilityName == "LOG_LOCAL0")
+   {
+      return LOG_LOCAL0;
+   }
+   else if(facilityName == "LOG_LOCAL1")
+   {
+      return LOG_LOCAL1;
+   }
+   else if(facilityName == "LOG_LOCAL2")
+   {
+      return LOG_LOCAL2;
+   }
+   else if(facilityName == "LOG_LOCAL3")
+   {
+      return LOG_LOCAL3;
+   }
+   else if(facilityName == "LOG_LOCAL4")
+   {
+      return LOG_LOCAL4;
+   }
+   else if(facilityName == "LOG_LOCAL5")
+   {
+      return LOG_LOCAL5;
+   }
+   else if(facilityName == "LOG_LOCAL6")
+   {
+      return LOG_LOCAL6;
+   }
+   else if(facilityName == "LOG_LOCAL7")
+   {
+      return LOG_LOCAL7;
+   }
+   else if(facilityName == "LOG_LPR")
+   {
+      return LOG_LPR;
+   }
+   else if(facilityName == "LOG_MAIL")
+   {
+      return LOG_MAIL;
+   }
+   else if(facilityName == "LOG_NEWS")
+   {
+      return LOG_NEWS;
+   }
+   else if(facilityName == "LOG_SYSLOG")
+   {
+      return LOG_SYSLOG;
+   }
+   else if(facilityName == "LOG_USER")
+   {
+      return LOG_USER;
+   }
+   else if(facilityName == "LOG_UUCP")
+   {
+      return LOG_UUCP;
+   }
+#endif
+   // Nothing matched or syslog not supported on this platform
+   return -1;
 }
 
 void 
 Log::initialize(Type type, Level level, const Data& appName, 
                 const char * logFileName,
-                ExternalLogger* externalLogger)
+                ExternalLogger* externalLogger,
+                const Data& syslogFacilityName)
 {
    Lock lock(_mutex);
    mDefaultLoggerData.reset();   
@@ -145,7 +250,28 @@ Log::initialize(Type type, Level level, const Data& appName,
    pb.skipBackToChar('/');
 #endif
    mAppName = pb.position();
- 
+
+#ifndef WIN32
+   if (!syslogFacilityName.empty())
+   {
+      mSyslogFacility = parseSyslogFacilityName(syslogFacilityName);
+      if(mSyslogFacility == -1)
+      {
+         mSyslogFacility = LOG_DAEMON;
+         if(type == Log::Syslog)
+         {
+            syslog(LOG_DAEMON | LOG_ERR, "invalid syslog facility name specified (%s), falling back to LOG_DAEMON", syslogFacilityName.c_str());
+         }
+      }
+   }
+#else
+   if (type == Syslog)
+   {
+       std::cerr << "syslog not supported on windows, using cout!" << std::endl;
+       type = Cout;
+   }
+#endif
+
    char buffer[1024];  
    gethostname(buffer, sizeof(buffer));
    mHostname = buffer;
@@ -160,9 +286,10 @@ void
 Log::initialize(Type type,
                 Level level,
                 const Data& appName,
-                ExternalLogger& logger)
+                ExternalLogger& logger,
+                const Data& syslogFacilityName)
 {
-   initialize(type, level, appName, 0, &logger);
+   initialize(type, level, appName, 0, &logger, syslogFacilityName);
 }
 
 void
@@ -284,6 +411,36 @@ Log::setMaxByteCount(unsigned int maxByteCount, Log::LocalLoggerId loggerId)
    }
 }
 
+void
+Log::setKeepAllLogFiles(bool keepAllLogFiles)
+{
+    Lock lock(_mutex);
+    getLoggerData().setKeepAllLogFiles(keepAllLogFiles);
+}
+
+void
+Log::setKeepAllLogFiles(bool keepAllLogFiles, Log::LocalLoggerId loggerId)
+{
+    if (loggerId)
+    {
+        ThreadData *pData = mLocalLoggerMap.getData(loggerId);
+        if (pData)
+        {
+            // Local logger found. Set logging level.
+            pData->setKeepAllLogFiles(keepAllLogFiles);
+
+            // We don't need local logger instance anymore.
+            mLocalLoggerMap.decreaseUseCount(loggerId);
+            pData = NULL;
+        }
+    }
+    else
+    {
+        Lock lock(_mutex);
+        mDefaultLoggerData.setKeepAllLogFiles(keepAllLogFiles);
+    }
+}
+
 const static Data log_("LOG_");
 
 Data
@@ -300,7 +457,7 @@ Log::toLevel(const Data& l)
    int i=0;
    while (strlen(mDescriptions[i]))
    {
-      if (strcmp(pri.c_str(), mDescriptions[i]) == 0)
+      if (isEqualNoCase(pri, Data(mDescriptions[i])))
       {
          return Level(i-1);
       }
@@ -366,14 +523,26 @@ Log::tags(Log::Level level,
         << GetCurrentThreadId() << Log::delim
         << file << ":" << line;
 #else // #if defined( WIN32 ) || defined( __APPLE__ )
-   strm << mDescriptions[level+1] << Log::delim
-        << timestamp(ts) << Log::delim  
-//        << mHostname << Log::delim  
-        << mAppName << Log::delim
-        << subsystem << Log::delim 
-//        << mPid << Log::delim
-        << pthread_self() << Log::delim
-        << pfile << ":" << line;
+   if(resip::Log::getLoggerData().type() == Syslog)
+   {
+      strm // << mDescriptions[level+1] << Log::delim
+   //        << timestamp(ts) << Log::delim
+   //        << mHostname << Log::delim
+   //        << mAppName << Log::delim
+           << subsystem << Log::delim
+   //        << mPid << Log::delim
+           << pthread_self() << Log::delim
+           << pfile << ":" << line;
+   }
+   else
+      strm << mDescriptions[level+1] << Log::delim
+           << timestamp(ts) << Log::delim  
+   //        << mHostname << Log::delim  
+           << mAppName << Log::delim
+           << subsystem << Log::delim 
+   //        << mPid << Log::delim
+           << pthread_self() << Log::delim
+           << pfile << ":" << line;
 #endif
    return strm;
 }
@@ -424,20 +593,25 @@ Log::timestamp(Data& res)
                 "%Y%m%d-%H%M%S", /* guaranteed to fit in 256 chars,
                                     hence don't check return code */
 #ifdef WIN32
-                localtime(&timeInSeconds));
+                localtime (&timeInSeconds));  // Thread safe call on Windows
 #else
-                localtime_r(&timeInSeconds, &localTimeResult));
+                localtime_r (&timeInSeconds, &localTimeResult));  // Thread safe version of localtime on linux
 #endif
    }
    
    char msbuf[5];
    /* Dividing (without remainder) by 1000 rounds the microseconds
       measure to the nearest millisecond. */
-   sprintf(msbuf, ".%3.3ld", long(tv.tv_usec / 1000));
+   snprintf(msbuf, 5, ".%3.3ld", long(tv.tv_usec / 1000));
 
    int datebufCharsRemaining = datebufSize - (int)strlen(datebuf);
+#if defined(WIN32) && defined(_M_ARM)
+   // There is a bug under ARM with strncat - we use strcat instead - buffer is plenty large accomdate our timestamp, no
+   // real need to be safe here anyway.
+   strcat(datebuf, msbuf);
+#else
    strncat (datebuf, msbuf, datebufCharsRemaining - 1);
-
+#endif
    datebuf[datebufSize - 1] = '\0'; /* Just in case strncat truncated msbuf,
                                        thereby leaving its last character at
                                        the end, instead of a null terminator */
@@ -478,7 +652,7 @@ Log::getThreadSetting()
       Lock lock(_mutex);
       ThreadIf::Id thread = ThreadIf::selfId();
       HashMap<ThreadIf::Id, pair<ThreadSetting, bool> >::iterator res = Log::mThreadToLevel.find(thread);
-      assert(res != Log::mThreadToLevel.end());
+      resip_assert(res != Log::mThreadToLevel.end());
       if (res->second.second)
       {
          setting->mLevel = res->second.first.mLevel;
@@ -509,7 +683,7 @@ void
 Log::setThreadSetting(ThreadSetting info)
 {
 #ifndef LOG_ENABLE_THREAD_SETTING
-   assert(0);
+   resip_assert(0);
 #else
    //cerr << "Log::setThreadSetting: " << "service: " << info.service << " level " << toString(info.level) << " for " << pthread_self() << endl;
    ThreadIf::Id thread = ThreadIf::selfId();
@@ -535,7 +709,7 @@ Log::setServiceLevel(int service, Level l)
    Lock lock(_mutex);
    Log::mServiceToLevel[service] = l;
 #ifndef LOG_ENABLE_THREAD_SETTING
-   assert(0);
+   resip_assert(0);
 #else
    set<ThreadIf::Id>& threads = Log::mServiceToThreads[service];
    for (set<ThreadIf::Id>::iterator i = threads.begin(); i != threads.end(); i++)
@@ -599,6 +773,14 @@ Log::reset()
 {
    getLoggerData().reset();
 }
+
+#ifndef WIN32
+void
+Log::droppingPrivileges(uid_t uid, pid_t pid)
+{
+   getLoggerData().droppingPrivileges(uid, pid);
+}
+#endif
 
 bool
 Log::isLogging(Log::Level level, const resip::Subsystem& sub)
@@ -702,7 +884,7 @@ void Log::LocalLoggerMap::decreaseUseCount(Log::LocalLoggerId loggerId)
    if (it != mLoggerInstancesMap.end())
    {
       it->second.second--;
-      assert(it->second.second >= 0);
+      resip_assert(it->second.second >= 0);
    }
 }
 
@@ -772,7 +954,12 @@ Log::Guard::~Guard()
    else 
    {
       // endl is magic in syslog -- so put it here
-      Instance((int)mData.size()+2) << mData << std::endl;  
+      std::ostream& _instance = Instance((int)mData.size()+2);
+      if (logType == resip::Log::Syslog)
+      {
+         _instance << mLevel;
+      }
+      _instance << mData << std::endl;  
    }
 }
 
@@ -785,8 +972,7 @@ Log::ThreadData::Instance(unsigned int bytesToWrite)
       case Log::Syslog:
          if (mLogger == 0)
          {
-            std::cerr << "Creating a syslog stream" << std::endl;
-            mLogger = new SysLogStream;
+            mLogger = new SysLogStream(mAppName, mSyslogFacility);
          }
          return *mLogger;
 
@@ -798,28 +984,40 @@ Log::ThreadData::Instance(unsigned int bytesToWrite)
 
       case Log::File:
          if (mLogger == 0 ||
-             (maxLineCount() && mLineCount >= maxLineCount()) ||
-             (maxByteCount() && ((unsigned int)mLogger->tellp()+bytesToWrite) >= maxByteCount()))
+            (maxLineCount() && mLineCount >= maxLineCount()) ||
+            (maxByteCount() && ((unsigned int)mLogger->tellp() + bytesToWrite) >= maxByteCount()))
          {
-            std::cerr << "Creating a logger for file \"" << mLogFileName.c_str() << "\"" << std::endl;
             Data logFileName(mLogFileName != "" ? mLogFileName : "resiprocate.log");
             if (mLogger)
             {
-               Data oldLogFileName(logFileName + ".old");
-               delete mLogger;
-               // Keep one backup file: Delete .old file, Rename log file to .old
-               // Could be expanded in the future to keep X backup log files
-               remove(oldLogFileName.c_str());
-               rename(logFileName.c_str(), oldLogFileName.c_str());
+               if (keepAllLogFiles())
+               {
+                  char buffer[256];
+                  Data ts(Data::Borrow, buffer, sizeof(buffer));
+                  Data oldLogFileName(logFileName + "_" + timestamp(ts));
+
+                  delete mLogger;
+
+                  // Keep all log files, rename the log file with timestamp
+                  rename(logFileName.c_str(), oldLogFileName.c_str());
+               }
+               else
+               {
+                  Data oldLogFileName(logFileName + ".old");
+                  delete mLogger;
+                  // Keep one backup file: Delete .old file, Rename log file to .old
+                  // Could be expanded in the future to keep X backup log files
+                  remove(oldLogFileName.c_str());
+                  rename(logFileName.c_str(), oldLogFileName.c_str());
+               }
             }
-            // Append to log if we have a line count or byte count limit - otherwise truncate
-            mLogger = new std::ofstream(logFileName.c_str(), std::ios_base::out | ((maxLineCount() > 0 || maxByteCount() > 0) ? std::ios_base::app : std::ios_base::trunc));
+            mLogger = new std::ofstream(logFileName.c_str(), std::ios_base::out | std::ios_base::app);
             mLineCount = 0;
          }
          mLineCount++;
          return *mLogger;
       default:
-         assert(0);
+         resip_assert(0);
          return std::cout;
    }
 }
@@ -830,6 +1028,22 @@ Log::ThreadData::reset()
    delete mLogger;
    mLogger = NULL;
 }
+
+#ifndef WIN32
+void
+Log::ThreadData::droppingPrivileges(uid_t uid, pid_t pid)
+{
+   if(mType == Log::File)
+   {
+      Data logFileName(mLogFileName != "" ? mLogFileName : "resiprocate.log");
+      if(chown(logFileName.c_str(), uid, pid) < 0)
+      {
+         // Some error occurred
+         std::cerr << "ERROR: chown failed on " << logFileName << std::endl;
+      }
+   }
+}
+#endif
 
 /* ====================================================================
  * The Vovida Software License, Version 1.0 

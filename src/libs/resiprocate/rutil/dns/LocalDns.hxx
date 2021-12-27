@@ -29,11 +29,11 @@ class LocalDns : public ExternalDns
 
       void lookup(const char* target, unsigned short type, ExternalDnsHandler* handler, void* userData);
 
-      virtual void lookupARecords(const char* /*target*/, ExternalDnsHandler* /*handler*/, void* /*userData*/) {}
-      virtual void lookupAAAARecords(const char* /*target*/, ExternalDnsHandler* /*handler*/, void* /*userData*/) {}
-      virtual void lookupNAPTR(const char* /*target*/, ExternalDnsHandler* /*handler*/, void* /*userData*/) {}
-      virtual void lookupSRV(const char* /*target*/, ExternalDnsHandler* /*handler*/, void* /*userData*/) {}
-      virtual char* errorMessage(long /*errorCode*/)
+      virtual void lookupARecords(const char* target, ExternalDnsHandler* handler, void* userData) {}
+      virtual void lookupAAAARecords(const char* target, ExternalDnsHandler* handler, void* userData) {}
+      virtual void lookupNAPTR(const char* target, ExternalDnsHandler* handler, void* userData) {}
+      virtual void lookupSRV(const char* target, ExternalDnsHandler* handler, void* userData) {}
+      virtual char* errorMessage(long errorCode) 
       {
          const char* msg = "Local Dns";
 

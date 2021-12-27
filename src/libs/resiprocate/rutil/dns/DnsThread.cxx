@@ -30,8 +30,7 @@ DnsThread::thread()
       try
       {
          mDnsStub.processTimers();
-         if (mPollGrp.get())
-            mPollGrp->waitAndProcess(25);
+         mPollGrp->waitAndProcess(25);
       }
       catch(BaseException& e)
       {

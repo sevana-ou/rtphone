@@ -1,5 +1,5 @@
-#include "rutil/Logger.hxx"
 #include "resip/stack/Helper.hxx"
+#include "rutil/Logger.hxx"
 #include "resip/dum/DialogUsageManager.hxx"
 #include "resip/dum/MasterProfile.hxx"
 #include "resip/dum/BaseCreator.hxx"
@@ -43,7 +43,7 @@ BaseCreator::getUserProfile()
 void 
 BaseCreator::makeInitialRequest(const NameAddr& target, MethodTypes method)
 {
-   assert(mUserProfile.get());
+   resip_assert(mUserProfile.get());
    makeInitialRequest(target, mUserProfile->getDefaultFrom(), method);
 }
 
@@ -63,7 +63,7 @@ BaseCreator::makeInitialRequest(const NameAddr& target, const NameAddr& from, Me
    mLastRequest->header(h_From).param(p_tag) = Helper::computeTag(Helper::tagSize);
    mLastRequest->header(h_CallId).value() = Helper::computeCallId();
 
-   assert(mUserProfile.get());
+   resip_assert(mUserProfile.get());
    if (!mUserProfile->getImsAuthUserName().empty())
    {
       Auth auth;
@@ -137,33 +137,15 @@ BaseCreator::makeInitialRequest(const NameAddr& target, const NameAddr& from, Me
    Via via;
    mLastRequest->header(h_Vias).push_front(via);
 
-   if(mUserProfile->isAdvertisedCapability(Headers::Allow)) 
-   {
-      mLastRequest->header(h_Allows) = mDum.getMasterProfile()->getAllowedMethods();
-   }
-   if(mUserProfile->isAdvertisedCapability(Headers::AcceptEncoding)) 
-   {
-      mLastRequest->header(h_AcceptEncodings) = mDum.getMasterProfile()->getSupportedEncodings();
-   }
-   if(mUserProfile->isAdvertisedCapability(Headers::AcceptLanguage)) 
-   {
-      mLastRequest->header(h_AcceptLanguages) = mDum.getMasterProfile()->getSupportedLanguages();
-   }
-   if(mUserProfile->isAdvertisedCapability(Headers::AllowEvents)) 
-   {
-      mLastRequest->header(h_AllowEvents) = mDum.getMasterProfile()->getAllowedEvents();
-   }
-   if(mUserProfile->isAdvertisedCapability(Headers::Supported)) 
-   {
-      mLastRequest->header(h_Supporteds) = mDum.getMasterProfile()->getSupportedOptionTags();
-   }
+   // Add Advertised Capabilities to initial request
+   mDum.setAdvertisedCapabilities(*mLastRequest.get(), mUserProfile);
 
    // Merge Embedded parameters
    mLastRequest->mergeUri(target.uri());
 
    //DumHelper::setOutgoingEncryptionLevel(mLastRequest, mEncryptionLevel);
 
-   DebugLog ( << "BaseCreator::makeInitialRequest: " << std::endl << std::endl << mLastRequest);
+   DebugLog ( << "BaseCreator::makeInitialRequest: " << std::endl << std::endl << *mLastRequest);
 }
 
 

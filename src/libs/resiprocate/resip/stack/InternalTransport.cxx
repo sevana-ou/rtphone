@@ -27,23 +27,27 @@ InternalTransport::InternalTransport(Fifo<TransactionMessage>& rxFifo,
                                      const Data& interfaceObj,
                                      AfterSocketCreationFuncPtr socketFunc,
                                      Compression &compression,
-                                     unsigned transportFlags) :
+                                     unsigned transportFlags,
+                                     const Data& netNs) :
    Transport(rxFifo, portNum, version, interfaceObj, Data::Empty,
-             socketFunc, compression, transportFlags),
+             socketFunc, compression, transportFlags, netNs),
    mFd(INVALID_SOCKET),
    mInterruptorHandle(0),
    mTxFifoOutBuffer(mTxFifo),
    mPollGrp(NULL),
-   mPollItemHandle(NULL),
-   mTransportLogger(NULL)
+   mPollItemHandle(NULL)
 {}
 
 InternalTransport::~InternalTransport()
 {
-   if (mPollItemHandle && mPollGrp)
+   if (mPollItemHandle)
+   {
       mPollGrp->delPollItem(mPollItemHandle);
-   if (mInterruptorHandle && mPollGrp)
+   }
+   if (mInterruptorHandle)
+   {
       mPollGrp->delPollItem(mInterruptorHandle);
+   }
 
    if  (mFd != INVALID_SOCKET)
    {
@@ -55,6 +59,7 @@ InternalTransport::~InternalTransport()
    {
       WarningLog(<< "TX Fifo non-empty in ~InternalTransport! Has " << mTxFifo.size() << " messages.");
    }
+   setCongestionManager(0);  // Clear out congestion manager
 }
 
 bool
@@ -86,7 +91,7 @@ InternalTransport::socket(TransportType type, IpVersion ipVer)
          break;
       default:
          InfoLog (<< "Try to create an unsupported socket type: " << Tuple::toData(type));
-         assert(0);
+         resip_assert(0);
          throw Transport::Exception("Unsupported transport", __FILE__,__LINE__);
    }
 
@@ -97,6 +102,22 @@ InternalTransport::socket(TransportType type, IpVersion ipVer)
       throw Transport::Exception("Can't create TcpBaseTransport", __FILE__,__LINE__);
    }
 
+#ifdef USE_IPV6
+#ifdef __linux__
+   int on = 1;
+   if (ipVer == V6)
+   {
+      if ( ::setsockopt(fd, IPPROTO_IPV6, IPV6_V6ONLY, &on, sizeof(on)) )
+      {
+          int e = getErrno();
+          InfoLog (<< "Couldn't set sockoptions IPV6_V6ONLY: " << strerror(e));
+          error(e);
+          throw Exception("Failed setsockopt", __FILE__,__LINE__);
+      }
+   }
+#endif
+#endif
+
    DebugLog (<< "Creating fd=" << fd << (ipVer == V4 ? " V4/" : " V6/") << (type == UDP ? "UDP" : "TCP"));
 
    return fd;
@@ -105,7 +126,12 @@ InternalTransport::socket(TransportType type, IpVersion ipVer)
 void
 InternalTransport::bind()
 {
-   DebugLog (<< "Binding to " << Tuple::inet_ntop(mTuple));
+#ifdef USE_NETNS
+   DebugLog (<< "Binding to " << Tuple::inet_ntop(mTuple) 
+             << " in netns=\"" <<mTuple.getNetNs() << "\"");
+#else
+   DebugLog (<< "Binding to " << Tuple::inet_ntop(mTuple)); 
+#endif
 
    if ( ::bind( mFd, &mTuple.getMutableSockaddr(), mTuple.length()) == SOCKET_ERROR )
    {
@@ -125,10 +151,10 @@ InternalTransport::bind()
    }
 
    // If we bound to port 0, then query OS for assigned port number
-   if(mTuple.getPort() == 0)
+   if (mTuple.getPort() == 0)
    {
-	  socklen_t len = mTuple.isV4() ? sizeof(sockaddr_in) : sizeof(sockaddr_in6);
-      if(::getsockname(mFd, &mTuple.getMutableSockaddr(), &len) == SOCKET_ERROR)
+      socklen_t len = mTuple.length();
+      if (::getsockname(mFd, &mTuple.getMutableSockaddr(), &len) == SOCKET_ERROR)
       {
          int e = getErrno();
          ErrLog (<<"getsockname failed, error=" << e);
@@ -162,17 +188,10 @@ InternalTransport::hasDataToSend() const
 }
 
 void
-InternalTransport::send(std::unique_ptr<SendData> data)
+InternalTransport::send(std::auto_ptr<SendData> data)
 {
    mTxFifo.add(data.release());
 }
-
-void
-InternalTransport::setTransportLogger(TransportLogger* logger)
-{
-  mTransportLogger = logger;
-}
-
 
 void
 InternalTransport::setPollGrp(FdPollGrp *grp)
@@ -214,6 +233,15 @@ InternalTransport::poke()
       // this new outgoing message.
       mSelectInterruptor.handleProcessNotification();
    }
+}
+
+void 
+InternalTransport::invokeAfterSocketCreationFunc() const
+{
+    if (mSocketFunc)
+    {
+        mSocketFunc(mFd, transport(), __FILE__, __LINE__);
+    }
 }
 
 

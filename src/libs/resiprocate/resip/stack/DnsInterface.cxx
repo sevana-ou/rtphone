@@ -32,74 +32,137 @@ using namespace resip;
 
 #define RESIPROCATE_SUBSYSTEM resip::Subsystem::DNS
 
-DnsInterface::DnsInterface(DnsStub& dnsStub) : 
+DnsInterface::DnsInterface(DnsStub& dnsStub, bool useDnsVip) : 
+   mUdpOnlyOnNumeric(false),
    mDnsStub(dnsStub)
 {
-
-#ifdef USE_DNS_VIP
-   mDnsStub.setResultTransform(&mVip);
-#endif
+   if (useDnsVip)
+   {
+      mDnsStub.setResultTransform(&mVip);
+   }
 }
 
 DnsInterface::~DnsInterface()
 {
 }
 
+void 
+DnsInterface::addTransportType(TransportType type, IpVersion version)
+{
+   Lock lock(mSupportedMutex);
+   mSupportedTransports[std::make_pair(type, version)]++;
+   const Data* pNaptrType = getSupportedNaptrType(type);
+   if(pNaptrType)
+   {
+       mSupportedNaptrs[*pNaptrType]++;
+   }
+   //logSupportedTransports();
+}
+
+void 
+DnsInterface::removeTransportType(TransportType type, IpVersion version)
+{
+   Lock lock(mSupportedMutex);
+   TransportMap::iterator itTrans = mSupportedTransports.find(std::make_pair(type, version));
+   if(itTrans != mSupportedTransports.end())
+   {
+      // Remove from map if ref count hits zero
+      if(--itTrans->second == 0)
+      {
+         mSupportedTransports.erase(itTrans);
+      }
+   }
+
+   const Data* pNaptrType = getSupportedNaptrType(type);
+   if(pNaptrType)
+   {
+      SupportedNaptrMap::iterator itNT = mSupportedNaptrs.find(*pNaptrType);
+      if(itNT != mSupportedNaptrs.end())
+      {
+         // Remove from map if ref count hits zero
+         if(--itNT->second == 0)
+         {
+            mSupportedNaptrs.erase(itNT);
+         }
+      }
+   }
+   //logSupportedTransports();
+}
+
 static Data UdpNAPTRType("SIP+D2U");
 static Data TcpNAPTRType("SIP+D2T");
 static Data TlsNAPTRType("SIPS+D2T");
 static Data DtlsNAPTRType("SIPS+D2U");
-void 
-DnsInterface::addTransportType(TransportType type, IpVersion version)
+static Data WsNAPTRType("SIP+D2W");
+static Data WssNAPTRType("SIPS+D2W");
+const Data* 
+DnsInterface::getSupportedNaptrType(TransportType type)
 {
-   mSupportedTransports.push_back(std::make_pair(type, version));
+   Data* pNaptrType = 0;
    switch (type)
    {
-      case UDP:
-         mSupportedNaptrs.insert(UdpNAPTRType);
-         break;
-      case TCP:
-         mSupportedNaptrs.insert(TcpNAPTRType);
-         break;
-      case TLS:
-         mSupportedNaptrs.insert(TlsNAPTRType);
-         break;
-      case DTLS:
-         mSupportedNaptrs.insert(DtlsNAPTRType);
-         break;         
-      default:
-         assert(0);
-         break;
+   case UDP:
+      pNaptrType = &UdpNAPTRType;
+      break;
+   case TCP:
+      pNaptrType = &TcpNAPTRType;
+      break;
+   case TLS:
+      pNaptrType = &TlsNAPTRType;
+      break;
+   case DTLS:
+      pNaptrType = &DtlsNAPTRType;
+      break;
+   case WS:
+      pNaptrType = &WsNAPTRType;
+      break;
+   case WSS:
+      pNaptrType = &WssNAPTRType;
+      break;
+   default:
+      resip_assert(0);
+      break;
+   }
+   return pNaptrType;
+}
+
+void 
+DnsInterface::logSupportedTransports()
+{
+   TransportMap::iterator itTrans = mSupportedTransports.begin();
+   for(; itTrans != mSupportedTransports.end(); itTrans++)
+   {
+      InfoLog(<< "logSupportedTransports: mSupportedTransports[" << toData(itTrans->first.first) << "," << (itTrans->first.second == V4 ? "V4" : "V6") << "] = " << itTrans->second);
+   }
+
+   SupportedNaptrMap::iterator itNT = mSupportedNaptrs.begin();
+   for(; itNT != mSupportedNaptrs.end(); itNT++)
+   {
+      InfoLog(<< "logSupportedTransports: mSupportedNaptrs[" << itNT->first << "] = " << itNT->second);
    }
 }
 
 bool
 DnsInterface::isSupported(const Data& service)
 {
+   Lock lock(mSupportedMutex);
    return mSupportedNaptrs.count(service) != 0;
 }
-
 
 bool
 DnsInterface::isSupported(TransportType t, IpVersion version)
 {
-  if (t != UNKNOWN_TRANSPORT)
-    return std::find(mSupportedTransports.begin(), mSupportedTransports.end(), std::make_pair(t, version)) != mSupportedTransports.end();
-  else
-  {
-    for (TransportMap::size_type i=0; i<mSupportedTransports.size(); i++)
-      if (mSupportedTransports[i].second == version)
-        return true;
-    return false;
-  }
+   Lock lock(mSupportedMutex);
+   return mSupportedTransports.find(std::make_pair(t, version)) != mSupportedTransports.end();
 }
 
 bool
 DnsInterface::isSupportedProtocol(TransportType t)
 {
+   Lock lock(mSupportedMutex);
    for (TransportMap::const_iterator i=mSupportedTransports.begin(); i != mSupportedTransports.end(); ++i)
    {
-      if (i->first == t)
+      if (i->first.first == t)
       {
          return true;
       }
@@ -109,9 +172,9 @@ DnsInterface::isSupportedProtocol(TransportType t)
 
 int DnsInterface::supportedProtocols()
 {
+   Lock lock(mSupportedMutex);
    return (int)mSupportedTransports.size();
 }
-
 
 DnsResult*
 DnsInterface::createDnsResult(DnsHandler* handler)
@@ -123,38 +186,14 @@ DnsInterface::createDnsResult(DnsHandler* handler)
 void 
 DnsInterface::lookup(DnsResult* res, const Uri& uri)
 {
-   res->lookup(uri, mDnsStub.getEnumSuffixes(),
-      mDnsStub.getEnumDomains());
+   res->lookup(uri);
 }
-
-// DnsResult* 
-// DnsInterface::lookup(const Via& via, DnsHandler* handler)
-// {
-//    assert(0);
-
-//    //DnsResult* result = new DnsResult(*this);
-//    return NULL;
-// }
 
 //?dcm? -- why is this here?
 DnsHandler::~DnsHandler()
 {
 }
 
-/* moved to DnsStub.
-void 
-DnsInterface::lookupRecords(const Data& target, unsigned short type, DnsRawSink* sink)
-{
-   mDnsProvider->lookup(target.c_str(), type, this, sink);
-}
-
-void 
-DnsInterface::handleDnsRaw(ExternalDnsRawResult res)
-{
-   reinterpret_cast<DnsRawSink*>(res.userData)->onDnsRaw(res.errorCode(), res.abuf, res.alen);
-   mDnsProvider->freeResult(res);
-}
-*/
 
 //  Copyright (c) 2003, Jason Fischl 
 /* ====================================================================

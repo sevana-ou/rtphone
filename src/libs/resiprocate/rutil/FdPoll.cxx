@@ -1,4 +1,4 @@
-#include <assert.h>
+#include "rutil/ResipAssert.h"
 #include <string.h>
 
 #include "rutil/FdPoll.hxx"
@@ -26,16 +26,20 @@ FdPollItemIf::~FdPollItemIf()
 }
 
 FdPollItemBase::FdPollItemBase(FdPollGrp *grp, Socket fd, FdPollEventMask mask) :
-  mPollGrp(grp), mPollSocket(fd)
+  mPollGrp(grp), mPollSocket(fd), mPollHandle(0)
 {
-    if (mPollGrp)
-       mPollHandle = mPollGrp->addPollItem(fd, mask, this);
+   if(mPollGrp)
+   {
+      mPollHandle = mPollGrp->addPollItem(fd, mask, this);
+   }
 }
 
 FdPollItemBase::~FdPollItemBase()
 {
-  if (mPollGrp)  
-    mPollGrp->delPollItem(mPollHandle);
+   if(mPollGrp)
+   {
+      mPollGrp->delPollItem(mPollHandle);
+   }
 }
 
 /*****************************************************************
@@ -114,34 +118,31 @@ class FdPollItemFdSetInfo
       int mNextIdx;             // next link for live or free list
 };
 
-
-
 class FdPollImplFdSet : public FdPollGrp
 {
    public:
       FdPollImplFdSet();
       ~FdPollImplFdSet();
 
-      virtual const char*       getImplName() const { return "fdset"; }
+      virtual const char* getImplName() const { return "fdset"; }
+      virtual ImplType getImplType() const { return FdSetImpl; }
 
-      virtual FdPollItemHandle  addPollItem(Socket fd,
-                                  FdPollEventMask newMask, FdPollItemIf *item);
-      virtual void              modPollItem(FdPollItemHandle handle,
-                                  FdPollEventMask newMask);
-      virtual void              delPollItem(FdPollItemHandle handle);
+      virtual FdPollItemHandle addPollItem(Socket fd, FdPollEventMask newMask, FdPollItemIf *item);
+      virtual void modPollItem(FdPollItemHandle handle, FdPollEventMask newMask);
+      virtual void delPollItem(FdPollItemHandle handle);
 
       virtual void registerFdSetIOObserver(FdSetIOObserver& observer);
       virtual void unregisterFdSetIOObserver(FdSetIOObserver& observer);
 
-      virtual bool              waitAndProcess(int ms=0);
+      virtual bool waitAndProcess(int ms=0);
       virtual void buildFdSet(FdSet& fdSet);
       virtual bool processFdSet(FdSet& fdset);
 
    protected:
       virtual unsigned int buildFdSetForObservers(FdSet& fdSet);
-      void                      killCache(Socket fd);
+      void killCache(Socket fd);
 
-      std::vector<FdPollItemFdSetInfo>  mItems;
+      std::vector<FdPollItemFdSetInfo> mItems;
       std::vector<FdSetIOObserver*> mFdSetObservers;
 
       /*
@@ -151,15 +152,15 @@ class FdPollImplFdSet : public FdPollGrp
        * boost::intrusive::slist, except we use indices not pointers
        * since the vector may reallocate and move around.
        */
-      int                       mLiveHeadIdx;
-      int                       mFreeHeadIdx;
+      int mLiveHeadIdx;
+      int mFreeHeadIdx;
 
       /*
        * This is temporary cache of poll events. It is a member (and
        * not on stack) for two reasons: (1) simpler memory management,
        * and (2) so delPollItem() can traverse it and clean up.
        */
-      FdSet                     mSelectSet;
+      FdSet mSelectSet;
 };
 
 };      // namespace
@@ -175,7 +176,6 @@ FdPollImplFdSet::FdPollImplFdSet()
 
 FdPollImplFdSet::~FdPollImplFdSet()
 {
-   // assert( mEvCacheLen == 0 );  // poll not active
    unsigned itemIdx;
    for (itemIdx=0; itemIdx < mItems.size(); itemIdx++)
    {
@@ -192,8 +192,8 @@ FdPollItemHandle
 FdPollImplFdSet::addPollItem(Socket fd, FdPollEventMask newMask, FdPollItemIf *item)
 {
    // if this isn't true then the linked lists will get messed up
-   assert(item);
-   assert(fd!=INVALID_SOCKET);
+   resip_assert(item);
+   resip_assert(fd!=INVALID_SOCKET);
 
    unsigned useIdx;
    if ( mFreeHeadIdx >= 0 )
@@ -224,12 +224,9 @@ FdPollImplFdSet::addPollItem(Socket fd, FdPollEventMask newMask, FdPollItemIf *i
    info.mNextIdx = mLiveHeadIdx;
    mLiveHeadIdx = useIdx;
 
-   if ( info.mEvMask & FPEM_Read )
-      mSelectSet.setRead(info.mSocketFd);
-   if ( info.mEvMask & FPEM_Write )
-      mSelectSet.setWrite(info.mSocketFd);
-   if ( info.mEvMask & FPEM_Error )
-      mSelectSet.setExcept(info.mSocketFd);
+   if(info.mEvMask & FPEM_Read)  mSelectSet.setRead(info.mSocketFd);
+   if(info.mEvMask & FPEM_Write) mSelectSet.setWrite(info.mSocketFd);
+   if(info.mEvMask & FPEM_Error) mSelectSet.setExcept(info.mSocketFd);
 
    return IMPL_FDSET_IdxToHandle(useIdx);
 }
@@ -238,30 +235,32 @@ void
 FdPollImplFdSet::modPollItem(const FdPollItemHandle handle, FdPollEventMask newMask)
 {
    int useIdx = IMPL_FDSET_HandleToIdx(handle);
-   assert(useIdx>=0 && ((unsigned)useIdx) < mItems.size());
+   resip_assert(useIdx>=0 && ((unsigned)useIdx) < mItems.size());
    FdPollItemFdSetInfo& info = mItems[useIdx];
-   assert(info.mSocketFd!=INVALID_SOCKET);
-   assert(info.mItemObj);
+   resip_assert(info.mSocketFd!=INVALID_SOCKET);
+   resip_assert(info.mItemObj);
    info.mEvMask = newMask;
 
-   killCache(info.mSocketFd);
-   if ( info.mEvMask & FPEM_Read )
-      mSelectSet.setRead(info.mSocketFd);
-   if ( info.mEvMask & FPEM_Write )
-      mSelectSet.setWrite(info.mSocketFd);
-   if ( info.mEvMask & FPEM_Error )
-      mSelectSet.setExcept(info.mSocketFd);
+   if(info.mSocketFd != INVALID_SOCKET && info.mSocketFd)
+   {
+      killCache(info.mSocketFd);
+      if(info.mEvMask & FPEM_Read)  mSelectSet.setRead(info.mSocketFd);
+      if(info.mEvMask & FPEM_Write) mSelectSet.setWrite(info.mSocketFd);
+      if(info.mEvMask & FPEM_Error) mSelectSet.setExcept(info.mSocketFd);
+   }
 }
 
 void
 FdPollImplFdSet::delPollItem(FdPollItemHandle handle)
 {
+   if(!handle) return;
+
    int useIdx = IMPL_FDSET_HandleToIdx(handle);
    //DebugLog(<<"deleting epoll item fd="<<fd);
-   assert(useIdx>=0 && ((unsigned)useIdx) < mItems.size());
+   resip_assert(useIdx>=0 && ((unsigned)useIdx) < mItems.size());
    FdPollItemFdSetInfo& info = mItems[useIdx];
-   assert(info.mSocketFd!=INVALID_SOCKET);
-   assert(info.mItemObj);
+   resip_assert(info.mSocketFd!=INVALID_SOCKET);
+   resip_assert(info.mItemObj);
    killCache(info.mSocketFd);
    // we don't change the lists here since the select loop might
    // be iterating. Just mark it as dead and gc it later.
@@ -319,7 +318,6 @@ FdPollImplFdSet::killCache(Socket fd)
    mSelectSet.clear(fd);
 }
 
-
 bool
 FdPollImplFdSet::waitAndProcess(int ms)
 {
@@ -344,7 +342,7 @@ FdPollImplFdSet::waitAndProcess(int ms)
       if ( err!=EINTR )
       {
          CritLog(<<"select() failed: "<<strerror(err));
-         assert(0);     // .kw. not sure correct behavior...
+         resip_assert(0);     // .kw. not sure correct behavior...
       }
       return false;
    }
@@ -367,12 +365,12 @@ FdPollImplFdSet::buildFdSet(FdSet& fdset)
    // Step 1: build a new FdSet from the Items vector
    while ( (itemIdx = *prevIdxRef) != -1 )
    {
-      assert( ++loopCnt < 99123123 );
+      resip_assert( ++loopCnt < 99123123 );
       FdPollItemFdSetInfo& info = mItems[itemIdx];
       if ( info.mItemObj==0 )
       {
          // item was deleted, need to garbage collect
-         assert( info.mEvMask==0 );
+         resip_assert( info.mEvMask==0 );
          // unlink from live list
          *prevIdxRef = info.mNextIdx;
          // link into free list
@@ -382,13 +380,10 @@ FdPollImplFdSet::buildFdSet(FdSet& fdset)
       }
       if ( info.mEvMask!=0 )
       {
-         assert(info.mSocketFd!=INVALID_SOCKET);
-         if ( info.mEvMask & FPEM_Read )
-            fdset.setRead(info.mSocketFd);
-         if ( info.mEvMask & FPEM_Write )
-            fdset.setWrite(info.mSocketFd);
-         if ( info.mEvMask & FPEM_Error )
-            fdset.setExcept(info.mSocketFd);
+         resip_assert(info.mSocketFd!=INVALID_SOCKET);
+         if(info.mEvMask & FPEM_Read)  fdset.setRead(info.mSocketFd);
+         if(info.mEvMask & FPEM_Write) fdset.setWrite(info.mSocketFd);
+         if(info.mEvMask & FPEM_Error) fdset.setExcept(info.mSocketFd);
       }
       prevIdxRef = &info.mNextIdx;
    }
@@ -425,17 +420,14 @@ FdPollImplFdSet::processFdSet(FdSet& fdset)
    while ( (itemIdx = *prevIdxRef) != -1 )
    {
       FdPollItemFdSetInfo& info = mItems[itemIdx];
-      assert( ++loopCnt < 99123123 );
+      resip_assert( ++loopCnt < 99123123 );
       if ( info.mEvMask!=0 && info.mItemObj!=0 )
       {
          FdPollEventMask usrMask = 0;
-         assert(info.mSocketFd!=INVALID_SOCKET);
-         if ( fdset.readyToRead(info.mSocketFd) )
-            usrMask |= FPEM_Read;
-         if ( fdset.readyToWrite(info.mSocketFd) )
-            usrMask |= FPEM_Write;
-         if ( fdset.hasException(info.mSocketFd) )
-            usrMask |= FPEM_Error;
+         resip_assert(info.mSocketFd!=INVALID_SOCKET);
+         if(fdset.readyToRead(info.mSocketFd))  usrMask |= FPEM_Read;
+         if(fdset.readyToWrite(info.mSocketFd)) usrMask |= FPEM_Write;
+         if(fdset.hasException(info.mSocketFd)) usrMask |= FPEM_Error;
 
          // items's mask may have changed since select occured, so mask it again
          usrMask &= info.mEvMask;
@@ -465,8 +457,377 @@ FdPollImplFdSet::processFdSet(FdSet& fdset)
    return didsomething;
 }
 
-
 // end of ImplFdSet
+
+
+/*****************************************************************
+ *
+ * FdPollImplPoll
+ *
+ *****************************************************************/
+#ifdef RESIP_POLL_IMPL_POLL
+
+namespace resip
+{
+
+class FdPollItemPollInfo
+{
+   public:
+      FdPollItemPollInfo()
+         : mSocketFd(INVALID_SOCKET), mItemObj(0), mFdPollCacheIndex(-1)
+      {
+      }
+
+      Socket mSocketFd; // socket
+      FdPollItemIf* mItemObj; // callback object
+      unsigned int mFdPollCacheIndex;
+};
+
+class FdPollImplPoll : public FdPollGrp
+{
+   public:
+      FdPollImplPoll();
+      ~FdPollImplPoll();
+
+      virtual const char* getImplName() const { return "poll"; }
+      virtual ImplType getImplType() const { return PollImpl; }
+
+      virtual FdPollItemHandle addPollItem(Socket fd, FdPollEventMask newMask, FdPollItemIf *item);
+      virtual void modPollItem(FdPollItemHandle handle, FdPollEventMask newMask);
+      virtual void delPollItem(FdPollItemHandle handle);
+      virtual void registerFdSetIOObserver(FdSetIOObserver& observer);
+      virtual void unregisterFdSetIOObserver(FdSetIOObserver& observer);
+
+      virtual bool waitAndProcess(int ms=0);
+
+      /// See baseclass. This is integer fd, not Socket
+      virtual int getEPollFd() const { return -1; }
+      virtual void buildFdSet(FdSet& fdSet);
+      virtual bool processFdSet(FdSet& fdset);
+
+   protected:
+      typedef std::map<Socket, FdPollItemPollInfo> FdPollItemPollInfoMap;
+      FdPollItemPollInfoMap mItems; // indexed by fd/handle
+      std::vector<FdSetIOObserver*> mFdSetObservers;
+
+      /*
+       * This is temporary cache of pollfds. It is a member (and
+       * not on stack) for two reasons: (1) simpler memory management,
+       * and (2) so delPollItem() can traverse it and clean up.
+       */
+      std::vector<pollfd> mPollFdCache;  // This list is adjustable while we are waiting/processing
+      std::vector<pollfd> mPollFds;
+      Mutex mMutex;
+};
+
+// NOTE: shift by one so that fd=0 doesn't have NULL handle
+#define IMPL_POLL_FdToHandle(fd) ((FdPollItemHandle)( ((char*)0) + ((fd)+1) ))
+#define IMPL_POLL_HandleToFd(handle) ( ((char*)(handle)) - ((char*)0) - 1)
+
+};      // namespace
+
+FdPollImplPoll::FdPollImplPoll() 
+{
+   int sz = 200;
+   mPollFdCache.reserve(sz);
+   mPollFds.reserve(sz);
+}
+
+FdPollImplPoll::~FdPollImplPoll()
+{
+   FdPollItemPollInfoMap::iterator it;
+   for(it = mItems.begin(); it != mItems.end(); it++)
+   {
+       CritLog(<<"FdPollItem fd=" << it->first <<" not deleted prior to destruction");
+   }
+}
+
+static inline unsigned short
+CvtSysToUsrMask(unsigned long sysMask)
+{
+   unsigned usrMask = 0;
+   if(sysMask & POLLIN)  usrMask |= FPEM_Read;
+   if(sysMask & POLLOUT) usrMask |= FPEM_Write;
+   if(sysMask & (POLLERR|POLLHUP)) usrMask |= FPEM_Error|FPEM_Read|FPEM_Write;
+   // NOTE: above, fake read and write if error to encourage
+   // apps to actually do something about it
+   return usrMask;
+}
+
+static inline unsigned long
+CvtUsrToSysMask(unsigned short usrMask)
+{
+   unsigned long sysMask = 0;
+   if(usrMask & FPEM_Read)  sysMask |= POLLIN;
+   if(usrMask & FPEM_Write) sysMask |= POLLOUT;
+   //if(usrMask & FPEM_Error)  sysMask |= POLLERR;  // Note:  We don't need to ask for error signalling, POLLERR is an output mask only for revents member
+   return sysMask;
+}
+
+FdPollItemHandle
+FdPollImplPoll::addPollItem(Socket fd, FdPollEventMask newMask, FdPollItemIf *item)
+{
+   resip_assert(fd>=0);
+   //InfoLog(<<"adding poll item fd="<<fd);
+   
+   Lock lock(mMutex);
+   FdPollItemPollInfo& info = mItems[fd];
+   info.mSocketFd = fd;
+   info.mItemObj = item;
+   info.mFdPollCacheIndex = mPollFdCache.size();
+
+   pollfd pollFD;
+   pollFD.fd = fd;
+   pollFD.events = (short)CvtUsrToSysMask(newMask);
+   mPollFdCache.push_back(pollFD);
+
+   return IMPL_POLL_FdToHandle(fd);
+}
+
+void
+FdPollImplPoll::modPollItem(const FdPollItemHandle handle, FdPollEventMask newMask)
+{
+   int fd = IMPL_POLL_HandleToFd(handle);
+
+   Lock lock(mMutex);
+   FdPollItemPollInfoMap::iterator it = mItems.find(fd);
+   if(it != mItems.end())
+   {
+      FdPollItemPollInfo& info = it->second;
+      resip_assert(info.mSocketFd!=INVALID_SOCKET);
+      resip_assert(info.mItemObj);
+
+      if(info.mSocketFd != INVALID_SOCKET && info.mSocketFd)
+      {
+         mPollFdCache[info.mFdPollCacheIndex].events = (short)CvtUsrToSysMask(newMask);
+      }
+   }
+}
+
+void
+FdPollImplPoll::delPollItem(FdPollItemHandle handle)
+{
+   int fd = IMPL_POLL_HandleToFd(handle);
+   //InfoLog(<<"deleting poll item fd="<<fd);
+
+   Lock lock(mMutex);
+   FdPollItemPollInfoMap::iterator it = mItems.find(fd);
+   if(it != mItems.end())
+   {
+      FdPollItemPollInfo& info = it->second;
+      resip_assert(info.mSocketFd!=INVALID_SOCKET);
+      resip_assert(info.mItemObj);
+      resip_assert(info.mFdPollCacheIndex != -1);
+      resip_assert(mPollFdCache.size() >= 1);
+
+      if(mPollFdCache.size() > 1)
+      {
+         // About to reassign this cache slot to be the current last item in the cache, then
+         // we will remove the last item
+         size_t lastCacheIndex = mPollFdCache.size() - 1;
+
+         // Adjust index of last item in cache - to be index of deleted item
+         mItems[mPollFdCache[lastCacheIndex].fd].mFdPollCacheIndex = info.mFdPollCacheIndex;
+
+         // Adjust Cache - reassign index being deleted to last index
+         mPollFdCache[info.mFdPollCacheIndex] = mPollFdCache[mPollFdCache.size() - 1];
+      }
+      // Remove last cache item - no longer used - was last item, or re-assigned above
+      mPollFdCache.pop_back();
+
+      // Remove from Map
+      mItems.erase(it);
+   }
+}
+
+void 
+FdPollImplPoll::registerFdSetIOObserver(FdSetIOObserver& observer)
+{
+   // .bwc. Could make this sorted. Probably not worth the trouble.
+   mFdSetObservers.push_back(&observer);
+}
+
+void 
+FdPollImplPoll::unregisterFdSetIOObserver(FdSetIOObserver& observer)
+{
+   // .bwc. Could make this sorted. Probably not worth the trouble.
+   for(std::vector<FdSetIOObserver*>::iterator o=mFdSetObservers.begin();
+         o!=mFdSetObservers.end();++o)
+   {
+      if(*o==&observer)
+      {
+         mFdSetObservers.erase(o);
+         return;
+      }
+   }
+}
+
+bool
+FdPollImplPoll::waitAndProcess(int ms)
+{
+   int waitMs = ms;
+
+   // Copy vector - cheaper than rebuilding from scratch each time
+   // Need to copy, since vector cannot be changed while Poll is running.
+   { // Scope for Lock
+      Lock lock(mMutex);
+      mPollFds = mPollFdCache;
+      //InfoLog(<<"FdPollImplPoll::waitAndProcess() ms=" << ms << ", numFds " << mPollFds.size());
+   }
+   size_t observerStartIndex = mPollFds.size();  // record so we know if an observer Fd signalled from Poll or not
+   bool observerFdSignalled = false;
+   FdSet fdset; // for FdSet Observer processing
+
+   if(!mFdSetObservers.empty())
+   {
+      if(ms < 0)
+      {
+         ms=INT_MAX;
+         waitMs=INT_MAX;
+      }
+
+      // Warning; big fat hack. This is likely to be a tad inefficient, and this 
+      // is why we want to move away from FdSetIOObserver, at least in 
+      // conjunction with stuff that uses poll/epoll. The only holdout right now is
+      // the cares DNS code.
+      // Also, a fair bit of duplicated code here. 
+
+      // gather fds from mFdSetObservers
+      for(std::vector<FdSetIOObserver*>::iterator o=mFdSetObservers.begin(); o!=mFdSetObservers.end(); ++o)
+      {
+         (*o)->buildFdSet(fdset);
+         waitMs = resipMin((unsigned int)ms, (*o)->getTimeTillNextProcessMS());
+      }
+
+      // Get fd's into poll handle list - build up map of masks first
+      std::map<Socket, short> observerFds;
+      unsigned int i;
+      for(i = 0; i < fdset.read.fd_count; i++)
+      {
+          observerFds[fdset.read.fd_array[i]] |= POLLIN;
+      }
+      for(i = 0; i < fdset.write.fd_count; i++)
+      {
+          observerFds[fdset.write.fd_array[i]] |= POLLOUT;
+      }
+      // Note:  We don't need to ask for error signalling, POLLERR is an output mask only for revents member
+      
+      // Add items from map to mPollFds vector
+      std::map<Socket, short>::iterator it;
+      for(it = observerFds.begin(); it != observerFds.end(); it++)
+      {
+         pollfd pollFD;
+         pollFD.fd = it->first;
+         pollFD.events = it->second;
+         mPollFds.push_back(pollFD);
+      }
+   }
+
+   if(mPollFds.size() == 0)
+   {
+       // no handles to poll
+       return false;
+   }
+
+   bool didsomething=false;
+
+   pollfd *pollFDArray = &(mPollFds.front());
+#ifdef WIN32
+   int numReadyFDs = WSAPoll(pollFDArray, mPollFds.size(), waitMs);
+#else
+   int numReadyFDs = poll(pollFDArray, mPollFds.size(), waitMs);
+#endif
+   if ( numReadyFDs < 0 )
+   {
+      int err = getErrno();
+      if ( err != EINTR )
+      {
+         CritLog(<<"poll() failed: " << err << " " << strerror(err));
+         resip_assert(0);     // .kw. not sure correct behavior...
+      }
+      return false;
+   }
+
+   if ( numReadyFDs==0 )
+   {
+      return false;     // timer expired
+   }
+
+   // Process poll result now
+   {  // Scope for Lock
+      Lock lock(mMutex);
+      for (unsigned short index = 0; index < mPollFds.size() && numReadyFDs > 0; index++) 
+      {
+         int revents = pollFDArray[index].revents;
+         if (revents)
+         {
+            //InfoLog(<<"FdPollImplPoll::waitAndProcess() fd=" << pollFDArray[index].fd << " signalled, revent=" << revents);
+
+            numReadyFDs--;
+            // array indexes below observerStartIndex are standard/non-observer fd's
+            if(index < observerStartIndex)
+            {
+               FdPollItemPollInfoMap::iterator it = mItems.find(pollFDArray[index].fd);
+               if(it != mItems.end())
+               {
+                  FdPollItemIf* pdPollItem = it->second.mItemObj;
+                  processItem(pdPollItem, CvtSysToUsrMask(revents));
+                  didsomething = true;
+               }
+            }
+            else
+            {
+                // And observer fd signalled - flag it
+                observerFdSignalled = true;
+                didsomething = true;
+            }
+         }
+      }//for
+   }
+
+   // Do observer processing now (if required)
+   if(observerFdSignalled)
+   {
+      // Call select in order to get Fdset properly populated - use a wait 
+      // time of 0 since we know something has signalled from Poll call
+      int numReady = fdset.selectMilliSeconds(0);
+      if ( numReady < 0 )
+      {
+         int err = getErrno();
+         if (err != EINTR)
+         {
+            CritLog(<<"select() failed: "<<strerror(err));
+            resip_assert(0);     // .kw. not sure correct behavior...
+         }
+      }
+
+      // Process the observer fd's
+      for(std::vector<FdSetIOObserver*>::iterator o=mFdSetObservers.begin(); o!=mFdSetObservers.end(); ++o)
+      {
+         (*o)->process(fdset);
+      }
+   }
+
+   return didsomething;
+}
+
+void
+FdPollImplPoll::buildFdSet(FdSet& fdset)
+{
+   CritLog(<<"buildFdSet failed - API not supported for FdPollImplPoll.");
+   resip_assert(false);
+}
+
+bool
+FdPollImplPoll::processFdSet(FdSet& fdset)
+{
+   CritLog(<<"processFdSet failed - API not supported for FdPollImplPoll.");
+   resip_assert(false);
+   return false;
+}
+
+#endif // RESIP_POLL_IMPL_POLL
+
 
 
 /*****************************************************************
@@ -480,8 +841,6 @@ FdPollImplFdSet::processFdSet(FdSet& fdset)
 namespace resip
 {
 
-
-
 class FdPollImplEpoll : public FdPollGrp
 {
    public:
@@ -489,6 +848,7 @@ class FdPollImplEpoll : public FdPollGrp
       ~FdPollImplEpoll();
 
       virtual const char*       getImplName() const { return "epoll"; }
+      virtual ImplType getImplType() const { return EPollImpl; }
 
       virtual FdPollItemHandle  addPollItem(Socket fd,
                                   FdPollEventMask newMask, FdPollItemIf *item);
@@ -544,7 +904,7 @@ FdPollImplEpoll::FdPollImplEpoll() :
 
 FdPollImplEpoll::~FdPollImplEpoll()
 {
-   assert( mEvCacheLen == 0 );  // poll not active
+   resip_assert( mEvCacheLen == 0 );  // poll not active
    unsigned itemIdx;
    for (itemIdx=0; itemIdx < mItems.size(); itemIdx++)
    {
@@ -565,12 +925,9 @@ static inline unsigned short
 CvtSysToUsrMask(unsigned long sysMask)
 {
    unsigned usrMask = 0;
-   if ( sysMask & EPOLLIN )
-       usrMask |= FPEM_Read;
-   if ( sysMask & EPOLLOUT )
-       usrMask |= FPEM_Write;
-   if ( sysMask & EPOLLERR )
-       usrMask |= FPEM_Error|FPEM_Read|FPEM_Write;
+   if(sysMask & EPOLLIN)  usrMask |= FPEM_Read;
+   if(sysMask & EPOLLOUT) usrMask |= FPEM_Write;
+   if(sysMask & EPOLLERR) usrMask |= FPEM_Error|FPEM_Read|FPEM_Write;
    // NOTE: above, fake read and write if error to encourage
    // apps to actually do something about it
    return usrMask;
@@ -580,19 +937,16 @@ static inline unsigned long
 CvtUsrToSysMask(unsigned short usrMask)
 {
    unsigned long sysMask = 0;
-   if ( usrMask & FPEM_Read )
-       sysMask |= EPOLLIN;
-   if ( usrMask & FPEM_Write )
-       sysMask |= EPOLLOUT;
-   if ( usrMask & FPEM_Edge )
-       sysMask |= EPOLLET;
+   if(usrMask & FPEM_Read)  sysMask |= EPOLLIN;
+   if(usrMask & FPEM_Write) sysMask |= EPOLLOUT;
+   if(usrMask & FPEM_Edge)  sysMask |= EPOLLET;
    return sysMask;
 }
 
 FdPollItemHandle
 FdPollImplEpoll::addPollItem(Socket fd, FdPollEventMask newMask, FdPollItemIf *item)
 {
-   assert(fd>=0);
+   resip_assert(fd>=0);
    //DebugLog(<<"adding epoll item fd="<<fd);
    if (mItems.size() <= (unsigned)fd)
    {
@@ -603,7 +957,7 @@ FdPollImplEpoll::addPollItem(Socket fd, FdPollEventMask newMask, FdPollItemIf *i
       mItems.resize(newsz);
    }
    FdPollItemIf *olditem = mItems[fd];
-   assert(olditem == NULL);     // what is right thing to do?
+   resip_assert(olditem == NULL);     // what is right thing to do?
    mItems[fd] = item;
    struct epoll_event ev;
    memset(&ev, 0, sizeof(ev));  // make valgrind happy
@@ -621,8 +975,8 @@ void
 FdPollImplEpoll::modPollItem(const FdPollItemHandle handle, FdPollEventMask newMask)
 {
    int fd = IMPL_EPOLL_HandleToFd(handle);
-   assert(fd>=0 && ((unsigned)fd) < mItems.size());
-   assert(mItems[fd] != NULL);
+   resip_assert(fd>=0 && ((unsigned)fd) < mItems.size());
+   resip_assert(mItems[fd] != NULL);
 
    struct epoll_event ev;
    memset(&ev, 0, sizeof(ev));  // make valgrind happy
@@ -640,8 +994,8 @@ FdPollImplEpoll::delPollItem(FdPollItemHandle handle)
 {
    int fd = IMPL_EPOLL_HandleToFd(handle);
    //DebugLog(<<"deleting epoll item fd="<<fd);
-   assert(fd>=0 && ((unsigned)fd) < mItems.size());
-   assert( mItems[fd] != NULL );
+   resip_assert(fd>=0 && ((unsigned)fd) < mItems.size());
+   resip_assert( mItems[fd] != NULL );
    mItems[fd] = NULL;
    if (epoll_ctl(mEPollFd, EPOLL_CTL_DEL, fd, NULL) < 0)
    {
@@ -716,7 +1070,7 @@ FdPollImplEpoll::waitAndProcess(int ms)
 {
    bool didSomething = false;
    int waitMs = ms;
-   assert( mEvCache.size() > 0 );
+   resip_assert( mEvCache.size() > 0 );
 
    if(!mFdSetObservers.empty())
    {
@@ -757,7 +1111,7 @@ FdPollImplEpoll::waitAndProcess(int ms)
          if ( err!=EINTR )
          {
             CritLog(<<"select() failed: "<<strerror(err));
-            assert(0);     // .kw. not sure correct behavior...
+            resip_assert(0);     // .kw. not sure correct behavior...
          }
          return false;
       }
@@ -845,7 +1199,7 @@ FdPollImplEpoll::epollWait(int waitMs)
             continue;      // was killed by killCache()
          }
          int sysEvtMask = mEvCache[ne].events;
-         assert(fd>=0 && fd < (int)mItems.size());
+         resip_assert(fd>=0 && fd < (int)mItems.size());
          FdPollItemIf *item = mItems[fd];
          if (item == NULL)
          {
@@ -882,11 +1236,17 @@ FdPollGrp::create(const char *implName)
       return new FdPollImplEpoll();
    }
 #endif
+#ifdef RESIP_POLL_IMPL_POLL
+   if ( implName==0 || strcmp(implName,"poll")==0 )
+   {
+      return new FdPollImplPoll();
+   }
+#endif
    if ( implName==0 || strcmp(implName,"fdset")==0 )
    {
       return new FdPollImplFdSet();
    }
-   assert(0);
+   resip_assert(0);
    return NULL;
 }
 
@@ -896,9 +1256,17 @@ FdPollGrp::getImplList()
    // .kw. this isn't really scalable approach if we get a lot of impls
    // but it works for now
 #ifdef RESIP_POLL_IMPL_EPOLL
+ #ifdef RESIP_POLL_IMPL_POLL
+   return "event|epoll|fdset|poll";
+ #else
    return "event|epoll|fdset";
+ #endif
 #else
+ #ifdef RESIP_POLL_IMPL_POLL
+   return "event|fdset|poll";
+ #else
    return "event|fdset";
+ #endif
 #endif
 }
 

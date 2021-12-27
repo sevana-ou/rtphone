@@ -12,7 +12,9 @@ static const Data transportNames[MAX_TRANSPORT] =
    Data("UDP"),
    Data("SCTP"),
    Data("DCCP"),
-   Data("DTLS")
+   Data("DTLS"),
+   Data("WS"),
+   Data("WSS")
 };
 
 static const Data transportNamesLower[MAX_TRANSPORT] =
@@ -23,7 +25,9 @@ static const Data transportNamesLower[MAX_TRANSPORT] =
    Data("udp"),
    Data("sctp"),
    Data("dccp"),
-   Data("dtls")
+   Data("dtls"),
+   Data("ws"),
+   Data("wss")
 };
 
 TransportType 
@@ -61,14 +65,14 @@ getTransportNameFromTypeLower(const TransportType typeEnum)
 const resip::Data& 
 toData(const TransportType typeEnum)
 {
-   assert(typeEnum >= UNKNOWN_TRANSPORT && typeEnum < MAX_TRANSPORT);
+   resip_assert(typeEnum >= UNKNOWN_TRANSPORT && typeEnum < MAX_TRANSPORT);
    return transportNames[typeEnum];
 }
 
 const resip::Data& 
 toDataLower(const TransportType typeEnum)
 {
-   assert(typeEnum >= UNKNOWN_TRANSPORT && typeEnum < MAX_TRANSPORT);
+   resip_assert(typeEnum >= UNKNOWN_TRANSPORT && typeEnum < MAX_TRANSPORT);
    return transportNamesLower[typeEnum];
 }
 
@@ -80,10 +84,44 @@ isReliable(TransportType type)
       case TLS:
       case TCP:
       case SCTP:
+      case WS:
+      case WSS:
          return true;
       case UDP:
       case DCCP:
       case DTLS:
+      default:
+         return false;
+   }
+}
+
+bool
+isSecure(TransportType type)
+{
+   switch(type)
+   {
+      case TLS:
+      case DTLS:
+      case WSS:
+         return true;
+      case UDP:
+      case TCP:
+      case DCCP:
+      case SCTP:
+      case WS:
+      default:
+         return false;
+   }
+}
+
+bool
+isWebSocket(TransportType type)
+{
+   switch(type)
+   {
+      case WS:
+      case WSS:
+         return true;
       default:
          return false;
    }

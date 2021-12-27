@@ -2,6 +2,7 @@
 #include "resip/dum/Profile.hxx"
 #include "resip/dum/MasterProfile.hxx"
 #include "resip/stack/HeaderTypes.hxx"
+#include "rutil/Logger.hxx"
 
 using namespace resip;
 #define RESIPROCATE_SUBSYSTEM Subsystem::DUM
@@ -22,7 +23,8 @@ MasterProfile::MasterProfile() :
    mUasReliableProvisionalMode(Never),
    mServerRegistrationMinExpires(0),
    mServerRegistrationMaxExpires(UINT_MAX),
-   mServerRegistrationDefaultExpires(3600)
+   mServerRegistrationDefaultExpires(3600),
+   mAdditionalTransactionTerminatingResponsesEnabled(false)
 {
    // Default settings
    addSupportedMimeType(INVITE, Mime("application", "sdp"));
@@ -62,6 +64,24 @@ MasterProfile::addSupportedMethod(const MethodTypes& method)
 {
    mSupportedMethodTypes.insert(method);
    mSupportedMethods.push_back(Token(getMethodName(method)));
+}
+
+void 
+MasterProfile::removeSupportedMethod(const MethodTypes& method)
+{
+   mSupportedMethodTypes.erase(method);
+   for (Tokens::iterator i = mSupportedMethods.begin();
+            i != mSupportedMethods.end(); ++i)
+   {
+       if (getMethodType(i->value()) == method)
+       {
+           mSupportedMethods.erase(i);
+           break;
+       }
+   }
+
+   // Should we clear the mimetypes as well?
+   // clearSupportedMimeTypes(method);
 }
 
 bool 
@@ -106,8 +126,8 @@ MasterProfile::addSupportedOptionTag(const Token& tag)
 {
    if (tag == Token(Symbols::C100rel))
    {
-      //use enablePrackUas and enablePrackUac
-      assert(0);
+      //use setUasReliableProvisionalMode and setUacReliableProvisionalMode
+      resip_assert(0);
    }
    mSupportedOptionTags.push_back(tag);
 }
@@ -122,9 +142,12 @@ MasterProfile::getUnsupportedOptionsTags(const Tokens& requiresOptionTags)
       {
          tokens.push_back(Token("malformedTag"));
       }
-      else if (*i == Token(Symbols::C100rel) && mUasReliableProvisionalMode == Never)
+      else if (*i == Token(Symbols::C100rel) )
       {
-         tokens.push_back(*i);
+         if (mUasReliableProvisionalMode == Never)
+         {
+            tokens.push_back(*i);
+         }
       }
       // if this option is not supported
       else if (!mSupportedOptionTags.find(*i))
@@ -157,8 +180,6 @@ MasterProfile::setUacReliableProvisionalMode(ReliableProvisionalMode mode)
 void
 MasterProfile::setUasReliableProvisionalMode(ReliableProvisionalMode mode)
 {
-   //.dcm. not supported yet
-  assert(0);
   mUasReliableProvisionalMode = mode;
 }
 
@@ -429,6 +450,40 @@ UserProfile*
 MasterProfile::clone() const
 {
    return new MasterProfile(*this);
+}
+
+bool& MasterProfile::additionalTransactionTerminatingResponsesEnabled()
+{
+  return mAdditionalTransactionTerminatingResponsesEnabled;
+}
+
+bool MasterProfile::additionalTransactionTerminatingResponsesEnabled() const
+{
+  return mAdditionalTransactionTerminatingResponsesEnabled;
+}
+
+void MasterProfile::addAdditionalTransactionTerminatingResponses(int code)
+{
+  DebugLog(<< "MasterProfile::addAdditionalTransactionTerminatingResponses" << "added code: " << code);
+  mAdditionalTransactionTerminatingResponsess.insert(code);
+}
+
+bool MasterProfile::isAdditionalTransactionTerminatingResponse(int code) const
+{
+  bool isAllowed = (mAdditionalTransactionTerminatingResponsess.end() != mAdditionalTransactionTerminatingResponsess.find(code));
+
+  DebugLog(<< "MasterProfile::isAdditionalTransactionTerminatingResponse" << "is code " << code << " allowed: " << isAllowed);
+  return isAllowed;
+}
+
+const std::set<int>& MasterProfile::getAdditionalTransactionTerminatingResponses() const
+{
+  return mAdditionalTransactionTerminatingResponsess;
+}
+
+void MasterProfile::clearAdditionalTransactionTerminatingResponses(void)
+{
+  mAdditionalTransactionTerminatingResponsess.clear();
 }
 
 /* ====================================================================

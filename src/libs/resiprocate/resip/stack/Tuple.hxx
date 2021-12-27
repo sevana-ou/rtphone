@@ -5,6 +5,7 @@
 #include "config.h"
 #endif
 
+#include <memory>
 
 #include "rutil/Socket.hxx"
 #include "rutil/compat.hxx"
@@ -24,13 +25,12 @@ namespace resip
 {
 
 struct GenericIPAddress;
-class Transport;
 
 // WARNING!!
 // When you change this structure, make sure to update the hash function,
-// operator== and operator< to be consistent with the new structure. For
-// instance, the Connection* and Transport* change value in the Tuple over
-// its lifetime so they must not be included in the hash or comparisons. 
+// operator== and operator< to be consistent with the new structure. Be
+// careful not to include members that change value in the Tuple over
+// its lifetime (they must not be included in the hash or comparisons). 
 
 typedef unsigned long FlowKey;
 typedef unsigned long TransportKey;
@@ -52,8 +52,6 @@ typedef unsigned long TransportKey;
 
    Also included are some comparator classes that can be used for
    containers of Tuple.
-
-
 */
 class Tuple
 {
@@ -70,17 +68,20 @@ class Tuple
             int port, 
             IpVersion ipVer, 
             TransportType type=UNKNOWN_TRANSPORT, 
-            const Data& targetDomain = Data::Empty);
+            const Data& targetDomain = Data::Empty,
+            const Data& netNs = Data::Empty);
 
       Tuple(const Data& printableAddress, 
             int port, 
             TransportType type, 
-            const Data& targetDomain = Data::Empty);
+            const Data& targetDomain = Data::Empty,
+            const Data& netNs = Data::Empty);
 
       Tuple(const in_addr& pipv4, 
             int pport,
             TransportType ptype, 
-            const Data& targetDomain = Data::Empty);
+            const Data& targetDomain = Data::Empty,
+            const Data& netNs = Data::Empty);
 
       Tuple(const sockaddr& addr, 
             TransportType ptype, 
@@ -97,7 +98,8 @@ class Tuple
       Tuple(const in6_addr& pipv6,  
             int pport, 
             TransportType ptype, 
-            const Data& targetDomain = Data::Empty);
+            const Data& targetDomain = Data::Empty,
+            const Data& netNs = Data::Empty);
 #endif
       
       /// @brief Retrieve a const binary representation of the socket address
@@ -107,24 +109,26 @@ class Tuple
       ///  @brief Retrieve the binary representation of the socket address for
       /// this tuple.
       sockaddr& getMutableSockaddr() { return mSockaddr; }
+      ///  @brief Get a copy of the socket address including the interface and
+      /// not the port number
+      void copySockaddrAnyPort(sockaddr *sa);
 
       ///  @brief Set the internal binary representation of the socket address
       /// from the GenericIPAddress.
       void setSockaddr(const GenericIPAddress &);
 
       TransportType getType() const { return mTransportType; }
-      void setType(TransportType type) { mTransportType = type ;}
+      void setType(TransportType type) { mTransportType = type; }
       void setPort(int port);
       int getPort() const;
-      inline FlowKey getFlowKey() const { return mFlowKey;} 
+      inline FlowKey getFlowKey() const { return mFlowKey; } 
 
       /// @deprecated use ipVersion()
-	  /// @todo !dcm! -- should deprecate asap
+      /// @todo !dcm! -- should deprecate asap
       bool isV4() const; 
 
       /// Returns V4 or V6 as appropriate.
       IpVersion ipVersion() const;
-      void setIpVersion(IpVersion version);
 
       ///  @brief TRUE if this address is equal to the "INADDR_ANY" value for
       /// this address family.  
@@ -175,10 +179,8 @@ class Tuple
       /// (It is highly recommended that these ids are unique across all
       /// instances of a transport type)
       FlowKey mFlowKey;
-      TransportKey transportKey;
+      TransportKey mTransportKey;
 
-      // deprecate
-      Transport* transport;
       bool onlyUseExistingConnection;
 
       ///  @brief compares this tuple with the one passed in for family, port
@@ -240,7 +242,19 @@ class Tuple
       {
          return mTargetDomain;
       }
-      
+
+      /// @brief Set the netns (network namespace) for this Tuple
+      void setNetNs(const Data& netNs)
+      {
+          mNetNs = netNs;
+      }
+
+      /// @brief Get the netns for this Tuple
+      const Data& getNetNs() const
+      {
+          return(mNetNs);
+      }
+
       /**
          @brief Creates a 32-bit hash based on the contents of this Tuple.
       */
@@ -256,10 +270,12 @@ private:
             // ?bwc? Is there a more standard preprocessor macro for this?
             sockaddr_in6 m_anonv6;
 #endif
-            char pad[28]; //< this make union same size if v6 is in or out
+            char pad[RESIP_MAX_SOCKADDR_SIZE]; //< this make union same size if v6 is in or out
       };
       TransportType mTransportType;
       Data mTargetDomain; 
+
+      Data mNetNs;  ///< The network namespace to which the address and port are scoped
 
       friend EncodeStream& operator<<(EncodeStream& strm, const Tuple& tuple);
       friend class DnsResult;

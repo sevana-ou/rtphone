@@ -1,15 +1,18 @@
 #ifndef RESIP_FileSystem_hxx
 #define RESIP_FileSystem_hxx
 
+#include "rutil/BaseException.hxx"
 #include "rutil/Data.hxx"
 
 #if !defined(WIN32)
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/uio.h>
-# if !defined(TARGET_ANDROID)
-#  include <sys/fcntl.h>
-# endif
+#if defined(__ANDROID__)
+#include <fcntl.h>
+#else
+#include <sys/fcntl.h>
+#endif
 #include <unistd.h>
 #include <dirent.h>
 #else
@@ -28,6 +31,18 @@ namespace resip
 class FileSystem
 {
    public:
+
+      class Exception : public BaseException
+      {
+         public:
+            Exception(const Data& msg,
+                      const Data& file,
+                      const int line)
+               : BaseException(msg, file, line) {}
+         protected:
+            virtual const char* name() const { return "ConfigParse::Exception"; }
+      };
+
       class Directory
       {
          public:
@@ -61,6 +76,8 @@ class FileSystem
                   struct dirent* mDirent;
 #endif
                   Data mFile;
+                  Data mPath;
+                  Data mFullFilename;
             };
 
             iterator begin() const;

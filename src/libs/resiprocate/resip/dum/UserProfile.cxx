@@ -14,7 +14,8 @@ const resip::NameAddr UserProfile::mAnonymous("\"Anonymous\" <sip:anonymous@anon
 UserProfile::UserProfile() : Profile(), 
    mGruuEnabled(false),
    mRegId(0),
-   mClientOutboundEnabled(false)
+   mClientOutboundEnabled(false),
+   mDigestCacheUseLimit(0)
 {
     //InfoLog (<< "************ UserProfile created (no base)!: " << *this);
 }
@@ -22,7 +23,8 @@ UserProfile::UserProfile() : Profile(),
 UserProfile::UserProfile(SharedPtr<Profile> baseProfile) : Profile(baseProfile), 
    mGruuEnabled(false),
    mRegId(0),
-   mClientOutboundEnabled(false)
+   mClientOutboundEnabled(false),
+   mDigestCacheUseLimit(0)
 {
     //InfoLog (<< "************ UserProfile created (with base)!: " << *this);
 }
@@ -114,7 +116,7 @@ UserProfile::hasGruu(const Data& aor, const Data& instance) const
 NameAddr&
 UserProfile:: getGruu(const Data& aor)
 {
-   assert(0);
+   resip_assert(0);
    static NameAddr gruu;
    return gruu;
 }
@@ -122,7 +124,7 @@ UserProfile:: getGruu(const Data& aor)
 NameAddr&
 UserProfile:: getGruu(const Data& aor, const NameAddr& contact)
 {
-   assert(0);
+   resip_assert(0);
    static NameAddr gruu;
    return gruu;
 }
@@ -150,6 +152,7 @@ UserProfile::getDigestCredential( const Data& realm  )
    if(mDigestCredentials.empty())
    {
       // !jf! why not just throw here? 
+      WarningLog(<< "No digest credentials available");
       return emptyDigestCredential;
    }
 

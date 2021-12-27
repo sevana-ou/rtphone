@@ -3,10 +3,12 @@
 #endif
 
 #include <memory>
+#include "rutil/compat.hxx"
 #include "rutil/Socket.hxx"
 #include "rutil/Data.hxx"
 #include "rutil/DnsUtil.hxx"
 #include "rutil/Logger.hxx"
+#include "rutil/NetNs.hxx"
 #include "resip/stack/TcpBaseTransport.hxx"
 
 #define RESIPROCATE_SUBSYSTEM Subsystem::TRANSPORT
@@ -23,11 +25,17 @@ TcpBaseTransport::TcpBaseTransport(Fifo<TransactionMessage>& fifo,
                                    const Data& pinterface,
                                    AfterSocketCreationFuncPtr socketFunc,
                                    Compression &compression,
-                                   unsigned transportFlags)
-   : InternalTransport(fifo, portNum, version, pinterface, socketFunc, compression, transportFlags)
+                                   unsigned transportFlags,
+                                   const Data& netNs)
+   : InternalTransport(fifo, portNum, version, pinterface, socketFunc, compression, transportFlags, netNs)
 {
    if ( (mTransportFlags & RESIP_TRANSPORT_FLAG_NOBIND)==0 )
    {
+#ifdef USE_NETNS
+      DebugLog(<< "TcpBaseTransport: " << this << " netns: " << netNs);
+      // setns here
+      NetNs::setNs(netNs);
+#endif
       mFd = InternalTransport::socket(TCP, version);
    }
 }
@@ -123,7 +131,7 @@ TcpBaseTransport::setPollGrp(FdPollGrp *grp)
 void
 TcpBaseTransport::buildFdSet( FdSet& fdset)
 {
-   assert( mPollGrp==NULL );
+   resip_assert( mPollGrp==NULL );
    mConnectionManager.buildFdSet(fdset);
    if ( mFd!=INVALID_SOCKET )
    {
@@ -153,7 +161,10 @@ TcpBaseTransport::processListen()
          int e = getErrno();
          switch (e)
          {
-            case EWOULDBLOCK:
+            case EAGAIN:
+#if EAGAIN != EWOULDBLOCK
+            case EWOULDBLOCK:  // Treat EGAIN and EWOULDBLOCK as the same: http://stackoverflow.com/questions/7003234/which-systems-define-eagain-and-ewouldblock-as-different-values
+#endif
                // !jf! this can not be ready in some cases
                // !kw! this will happen every epoll cycle
                return 0;
@@ -162,17 +173,28 @@ TcpBaseTransport::processListen()
          }
          return -1;
       }
+      if(!configureConnectedSocket(sock))
+      {
+         throw Exception("Failed to configure connected socket", __FILE__,__LINE__);
+      }
       makeSocketNonBlocking(sock);
 
-      DebugLog (<< "Received TCP connection from: " << tuple << " as fd=" << sock);
+      DebugLog (<< this << " Received TCP connection from: " << tuple << " mTuple: " << mTuple << " as fd=" << sock);
 
       if (mSocketFunc)
       {
          mSocketFunc(sock, transport(), __FILE__, __LINE__);
       }
 
-      if(!mConnectionManager.findConnection(tuple))
+      Connection* c = mConnectionManager.findConnection(tuple);
+      if(!c)
       {
+         createConnection(tuple, sock, true);
+      }
+      else if(false == c->isServer())
+      {
+         InfoLog( << "Have client connection for " << tuple << ", but got server one, recreate connection" );
+         delete c;
          createConnection(tuple, sock, true);
       }
       else
@@ -190,6 +212,9 @@ TcpBaseTransport::makeOutgoingConnection(const Tuple &dest,
       TransportFailure::FailureReason &failReason, int &failSubCode)
 {
    // attempt to open
+#ifdef USE_NETNS
+      NetNs::setNs(netNs());
+#endif
    Socket sock = InternalTransport::socket( TCP, ipVersion());
    // fdset.clear(sock); !kw! removed as part of epoll impl
 
@@ -198,8 +223,14 @@ TcpBaseTransport::makeOutgoingConnection(const Tuple &dest,
       int err = getErrno();
       InfoLog (<< "Failed to create a socket " << strerror(err));
       error(err);
-      mConnectionManager.gc(ConnectionManager::MinimumGcAge, 1); // free one up
+      if(mConnectionManager.gc(ConnectionManager::MinimumGcAge, 1) == 0)
+      {
+         mConnectionManager.gcWithTarget(1); // free one up
+      }
 
+#ifdef USE_NETNS
+      NetNs::setNs(netNs());
+#endif
       sock = InternalTransport::socket( TCP, ipVersion());
       if ( sock == INVALID_SOCKET )
       {
@@ -212,9 +243,27 @@ TcpBaseTransport::makeOutgoingConnection(const Tuple &dest,
       }
    }
 
-   assert(sock != INVALID_SOCKET);
+   resip_assert(sock != INVALID_SOCKET);
 
    DebugLog (<<"Opening new connection to " << dest);
+   char _sa[RESIP_MAX_SOCKADDR_SIZE];
+   sockaddr *sa = reinterpret_cast<sockaddr*>(_sa);
+   resip_assert(RESIP_MAX_SOCKADDR_SIZE >= mTuple.length());
+   mTuple.copySockaddrAnyPort(sa);
+#ifdef USE_NETNS
+      NetNs::setNs(netNs());
+#endif
+   if(::bind(sock, sa, mTuple.length()) != 0)
+   {
+      WarningLog( << "Error in binding to source interface address. " << strerror(errno));
+      failReason = TransportFailure::Failure;
+      failSubCode = errno;
+      return NULL;
+   }
+   if(!configureConnectedSocket(sock))
+   {
+      throw Exception("Failed to configure connected socket", __FILE__,__LINE__);
+   }
    makeSocketNonBlocking(sock);
    if (mSocketFunc)
    {
@@ -231,7 +280,10 @@ TcpBaseTransport::makeOutgoingConnection(const Tuple &dest,
       switch (err)
       {
          case EINPROGRESS:
-         case EWOULDBLOCK:
+         case EAGAIN:
+#if EAGAIN != EWOULDBLOCK
+         case EWOULDBLOCK:  // Treat EGAIN and EWOULDBLOCK as the same: http://stackoverflow.com/questions/7003234/which-systems-define-eagain-and-ewouldblock-as-different-values
+#endif
             break;
          default:
          {
@@ -249,8 +301,9 @@ TcpBaseTransport::makeOutgoingConnection(const Tuple &dest,
 
    // This will add the connection to the manager
    Connection *conn = createConnection(dest, sock, false);
-   assert(conn);
-   conn->mRequestPostConnectSocketFuncCall = true;
+   resip_assert(conn);
+   conn->mFirstWriteAfterConnectedPending = true;
+
    return conn;
 }
 
@@ -267,41 +320,63 @@ TcpBaseTransport::processAllWriteRequests()
 
       //DebugLog (<< "TcpBaseTransport::processAllWriteRequests() using " << conn);
 
+#ifdef WIN32
+      if(conn && mPollGrp && mPollGrp->getImplType() == FdPollGrp::PollImpl)
+      {
+         // Workaround for bug in WSAPoll implementation: see 
+         // http://daniel.haxx.se/blog/2012/10/10/wsapoll-is-broken/
+         // http://social.msdn.microsoft.com/Forums/windowsdesktop/en-US/18769abd-fca0-4d3c-9884-1a38ce27ae90/wsapoll-and-nonblocking-connects-to-nonexistent-ports?forum=wsk
+         // Note:  This is not an ideal solution - since we won't cleanup the connection until 
+         //        after the connect has timedout and someone else tries to write to the same 
+         //        destination.  However the only impact to users is that requests will take the 
+         //        full 32 seconds transaction timeout to get an error vs the 21s connect timeout
+         //        observered when using the select implemention (vs Poll).  This does save us from
+         //        having to use some form of timer to periodically check the connect state though.
+         if(conn->checkConnectionTimedout())
+         {
+            // If checkConnectionTimedout returns true, then connection is no longer available.
+            // Clear conn so that we create a new connection below.
+            conn = 0;
+         }
+      }
+#endif
+
       // There is no connection yet, so make a client connection
       if (conn == 0 && 
-            !data->destination.onlyUseExistingConnection &&
-            data->command == 0)  // SendData commands (ie. close connection and enable flow timers) shouldn't cause new connections to form
+          !data->destination.onlyUseExistingConnection &&
+          data->command == 0)  // SendData commands (ie. close connection and enable flow timers) shouldn't cause new connections to form
       {
          TransportFailure::FailureReason failCode = TransportFailure::Failure;
          int subCode = 0;
-         if((conn=makeOutgoingConnection(data->destination, failCode, subCode)) == NULL)
+         if((conn = makeOutgoingConnection(data->destination, failCode, subCode)) == 0)
          {
+            DebugLog (<< "Failed to create connection: " << data->destination);
             fail(data->transactionId, failCode, subCode);
             delete data;
-            return;	// .kw. WHY? What about messages left in queue?
+            // NOTE: We fail this one but don't give up on others in queue
+            return;
          }
-         assert(conn->getSocket() != INVALID_SOCKET);
-         // .kw. why do below? We already have the conn, who uses key?
-         data->destination.mFlowKey = conn->getSocket(); // !jf!
+         resip_assert(conn->getSocket() != INVALID_SOCKET);
+         data->destination.mFlowKey = conn->getSocket();
       }
 
       if (conn == 0)
       {
-         DebugLog (<< "Failed to create/get connection: " << data->destination);
+         DebugLog (<< "Failed to find connection: " << data->destination);
          fail(data->transactionId, TransportFailure::TransportNoExistConn, 0);
          delete data;
          // NOTE: We fail this one but don't give up on others in queue
       }
       else // have a connection
       {
-         if (mTransportLogger)
+         // Check if we have written anything or not on the connection.  If not, then this is either the first or 
+         // a subsequent transaction trying to use this connection attempt - set TcpConnectState for this 
+         // transaction to ConnectStarted
+         if (conn->mFirstWriteAfterConnectedPending == true)
          {
-           sockaddr_in addr;
-           memset(&addr, 0, sizeof addr);
-           addr = (const sockaddr_in&)data->destination.getSockaddr();
-           mTransportLogger->onSipMessage(TransportLogger::Flow_Sent, (const char*)data->data.c_str(), data->data.size(), (const sockaddr*)&addr, sizeof addr);
+             // Notify the transaction state that we have started a TCP connect, so that it can run a TCP connect timer
+             setTcpConnectState(data->transactionId, TcpConnectState::ConnectStarted);
          }
-
          conn->requestWrite(data);
       }
    }
@@ -310,55 +385,60 @@ TcpBaseTransport::processAllWriteRequests()
 void
 TcpBaseTransport::process()
 {
-   mStateMachineFifo.flush();
-
    // called within SipStack's thread. There is some risk of
    // recursion here if connection starts doing anything fancy.
    // For backward-compat when not-epoll, don't handle transmit synchronously
    // now, but rather wait for the process() call
    if (mPollGrp)
    {
-      processAllWriteRequests();
+       processAllWriteRequests();
    }
+   mStateMachineFifo.flush();
 }
 
 void
 TcpBaseTransport::process(FdSet& fdSet)
 {
-   assert( mPollGrp==NULL );
+   resip_assert( mPollGrp==NULL );
 
    processAllWriteRequests();
 
    // process the connections in ConnectionManager
    mConnectionManager.process(fdSet);
 
-   mStateMachineFifo.flush();
-
    // process our own listen/accept socket for incoming connections
    if (mFd!=INVALID_SOCKET && fdSet.readyToRead(mFd))
    {
       processListen();
    }
+
+   mStateMachineFifo.flush();
 }
 
 void
-TcpBaseTransport::processPollEvent(FdPollEventMask mask) {
-   if ( mask & FPEM_Read )
+TcpBaseTransport::processPollEvent(FdPollEventMask mask) 
+{
+   if (mask & FPEM_Read)
    {
-      while ( processListen() > 0 )
-         ;
+      while(processListen() > 0);
    }
 }
 
 void
 TcpBaseTransport::setRcvBufLen(int buflen)
 {
-   assert(0);	// not implemented yet
+   resip_assert(0);	// not implemented yet
    // need to store away the length and use when setting up new connections
 }
 
-
-
+void 
+TcpBaseTransport::invokeAfterSocketCreationFunc() const
+{
+    // Call for base socket
+    InternalTransport::invokeAfterSocketCreationFunc();
+    // Call for each connection
+    mConnectionManager.invokeAfterSocketCreationFunc();
+}
 
 
 /* ====================================================================
