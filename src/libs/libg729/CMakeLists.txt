@@ -37,3 +37,4 @@ set (G729_SOURCES
 )
 
 add_library(g729_codec ${G729_SOURCES})
+set_property(TARGET g729_codec PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")

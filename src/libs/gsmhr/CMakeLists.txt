@@ -12,3 +12,4 @@ set (GSMHR_SOURCES
 )
 
 add_library(gsmhr_codec ${GSMHR_SOURCES})
+set_property(TARGET gsmhr_codec PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")

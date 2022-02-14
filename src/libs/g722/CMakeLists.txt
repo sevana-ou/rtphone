@@ -13,3 +13,5 @@ set (G722_SOURCES
 )
 
 add_library(g722_codec ${G722_SOURCES})
+set_property(TARGET g722_codec PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+

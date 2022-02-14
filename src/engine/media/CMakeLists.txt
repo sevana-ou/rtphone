@@ -79,6 +79,8 @@ if (CMAKE_SYSTEM MATCHES "Windows*")
 endif()
 
 add_library(media_lib ${SOURCES})
+set_property(TARGET media_lib PROPERTY
+  MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 
 target_include_directories(media_lib
     PUBLIC  ${CMAKE_CURRENT_SOURCE_DIR}/../../libs/

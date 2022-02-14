@@ -22,6 +22,7 @@ set (AUDIOLIB_SOURCES
 )
 
 add_library(audio_lib ${AUDIOLIB_SOURCES})
+set_property(TARGET audio_lib PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 
 ##
 target_include_directories(audio_lib

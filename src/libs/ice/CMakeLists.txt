@@ -37,3 +37,4 @@ set (ICE_STACK_SOURCES ICEAddress.cpp
 add_definitions(-DUSE_NATIVE_SMARTPTR -D_WINSOCK_DEPRECATED_NO_WARNINGS)
 
 add_library(ice_stack ${ICE_STACK_SOURCES})
+set_property(TARGET ice_stack PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")

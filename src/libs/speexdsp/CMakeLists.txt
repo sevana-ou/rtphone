@@ -25,3 +25,5 @@ target_compile_definitions(speexdsp PUBLIC -DUSE_KISS_FFT -DFIXED_POINT -DHAVE_S
 target_include_directories(speexdsp PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/libspeexdsp
     ${CMAKE_CURRENT_SOURCE_DIR}/include)
+
+set_property(TARGET speexdsp PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")

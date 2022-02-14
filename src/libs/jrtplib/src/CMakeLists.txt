@@ -91,4 +91,6 @@ set(JRTPLIB_SOURCES
 	rtpexternaltransmitter.cpp)
 
 add_library(jrtplib STATIC ${JRTPLIB_SOURCES})
+set_property(TARGET jrtplib PROPERTY
+  MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 
