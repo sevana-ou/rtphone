@@ -478,6 +478,7 @@ void Session::getSessionInfo(Session::InfoOptions options, VariantMap& info)
     info[SessionInfo_ReceivedRtp] = static_cast<int>(stat.mReceivedRtp);
     info[SessionInfo_ReceivedRtcp] = static_cast<int>(stat.mReceivedRtcp);
     info[SessionInfo_LostRtp] = static_cast<int>(stat.mPacketLoss);
+    info[SessionInfo_DroppedRtp] = static_cast<int>(stat.mPacketDropped);
     info[SessionInfo_SentRtp] = static_cast<int>(stat.mSentRtp);
     info[SessionInfo_SentRtcp] = static_cast<int>(stat.mSentRtcp);
     if (stat.mFirstRtpTime)
@@ -726,7 +727,7 @@ void Session::buildSdp(resip::SdpContents &sdp, SdpDirection sdpDirection)
         if (mUserAgent->mConfig[CONFIG_MULTIPLEXING].asBool())
             media.addAttribute("rtcp-mux");
 
-        // Ask provider about specific information
+        // Ask provider about specific information - codecs are filled here
         provider.updateSdpOffer(media, sdpDirection);
 
         // Add ICE information

@@ -4,6 +4,7 @@
 #include "helper/HL_StreamState.h"
 #include "helper/HL_VariantMap.h"
 #include "helper/HL_CsvReader.h"
+#include "helper/HL_Base64.h"
 #include <fstream>
 
 #if defined(USE_PVQA_LIBRARY)
@@ -208,10 +209,13 @@ void AgentImpl::processStart(JsonCpp::Value& /*request*/, JsonCpp::Value &answer
     PVariantMap priorityConfig = std::make_shared<VariantMap>();
     MT::CodecList& cl = mTerminal->codeclist();
     for (int i=0; i<cl.count(); i++)
-        if (cl.codecAt(i).payloadType() < 96)
+        priorityConfig->at(i) = i;
+
+    // Disable dynamic payload codec types - commented for now
+        /*if (cl.codecAt(i).payloadType() < 96)
             priorityConfig->at(i) = i;
         else
-            priorityConfig->at(i) = -1;
+            priorityConfig->at(i) = -1;*/
 
     config()[CONFIG_CODEC_PRIORITY] = priorityConfig;
 
@@ -332,17 +336,20 @@ void AgentImpl::processStartSession(JsonCpp::Value& request, JsonCpp::Value& ans
         std::string path_faults = request["path_faults"].asString();
 
         sevana::aqua::config config = {
-                { "avlp",              "off"   },
-                { "decor",             "off"   },
-                { "mprio",             "off"   },
-                { "miter",             "1"     },
-                { "enorm",             "off"   },
-                { "voip",              "on"    },
-                { "g711",              "on"    },
-                { "spfrcor",           "on"    },
-                { "grad",              "off"   },
-                { "ratem",             "%%m"   },
-                { "trim",              "a 2"   },
+                {"avlp",    "off"},
+                {"smtnrm",  "off"},
+                {"decor",   "off"},
+                {"mprio",   "off"},
+                {"npnt",    "auto"},
+                {"voip",    "on"},
+                {"enorm",   "rms"},
+                {"g711",    "off"},
+                {"spfrcor", "on"},
+                {"grad",    "off"},
+                {"tmc",     "on"},
+                {"miter",              "1"},
+                { "ratem",             "%m"   },
+                { "trim",              "a 10"   },
                 { "output",            "json"  },
                 { "fau",               path_faults},
                 { "specp",             "32"}
@@ -528,6 +535,9 @@ void AgentImpl::processGetMediaStats(JsonCpp::Value& request, JsonCpp::Value& an
 #endif
         if (result.exists(SessionInfo_PacketLoss))
             answer["rtp_lost"] = result[SessionInfo_LostRtp].asInt();
+        if (result.exists(SessionInfo_DroppedRtp))
+            answer["rtp_dropped"] = result[SessionInfo_DroppedRtp].asInt();
+
         if (result.exists(SessionInfo_SentRtp))
             answer["rtp_sent"] = result[SessionInfo_SentRtp].asInt();
         if (result.exists(SessionInfo_ReceivedRtp))
@@ -549,6 +559,8 @@ void AgentImpl::processGetMediaStats(JsonCpp::Value& request, JsonCpp::Value& an
         if (includeAqua)
         {
             answer["incoming_audio"] = mAquaIncoming.hexstring();
+            answer["incoming_audio_samplerate"] = AUDIO_SAMPLERATE;
+            answer["incoming_audio_channels"] = AUDIO_CHANNELS;
 
             ICELogInfo(<< "Running AQuA analyzer.");
             ByteBuffer referenceAudio;
@@ -593,6 +605,12 @@ void AgentImpl::processGetMediaStats(JsonCpp::Value& request, JsonCpp::Value& an
                     }
                     answer["aqua_mos"] = r.mMos;
                     answer["aqua_report"] = r.mFaultsText;
+                    /*std::string aqua_audio_text;
+                    if (Base64::Encode(std::string(reinterpret_cast<const char*>(mAquaIncoming.data()), mAquaIncoming.size()), &aqua_audio_text))
+                    {
+                        answer["aqua_audio"] = aqua_audio_text;
+                    }*/
+
                     if (r.mErrorCode) {
                         answer["aqua_error_code"] = r.mErrorCode;
                         answer["aqua_error_message"] = r.mErrorMessage;

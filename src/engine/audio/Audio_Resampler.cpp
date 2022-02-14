@@ -154,7 +154,7 @@ int ChannelConverter::stereoToMono(const void *source, int sourceLength, void *d
 
 int ChannelConverter::monoToStereo(const void *source, int sourceLength, void *dest, int destLength)
 {
-    assert(destLength == sourceLength * 2);
+    assert (destLength == sourceLength * 2);
     const short* input = (const short*)source;
     short* output = (short*)dest;
     // Convert starting from the end of buffer to allow inplace conversion

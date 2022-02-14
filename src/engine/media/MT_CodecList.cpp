@@ -96,7 +96,7 @@ CodecList::CodecList(const Settings& settings)
   :mSettings(settings)
 {
   //mFactoryList.push_back(new OpusCodec::OpusFactory(16000, 1));
-#if !defined(TARGET_ANDROID) && defined(USE_OPUS_CODEC)
+#if defined(USE_OPUS_CODEC)
   if (settings.mOpusSpec.empty())
   {
     mFactoryList.push_back(new OpusCodec::OpusFactory(48000, 2, MT_OPUS_CODEC_PT));
@@ -126,8 +126,8 @@ CodecList::CodecList(const Settings& settings)
 #endif
 #endif
 
-  //mFactoryList.push_back(new IsacCodec::IsacFactory16K(mSettings.mIsac16KPayloadType));
-  //mFactoryList.push_back(new IlbcCodec::IlbcFactory(mSettings.mIlbc20PayloadType, mSettings.mIlbc30PayloadType));
+  mFactoryList.push_back(new IsacCodec::IsacFactory16K(mSettings.mIsac16KPayloadType));
+  mFactoryList.push_back(new IlbcCodec::IlbcFactory(mSettings.mIlbc20PayloadType, mSettings.mIlbc30PayloadType));
   mFactoryList.push_back(new G711Codec::AlawFactory());
   mFactoryList.push_back(new G711Codec::UlawFactory());
 
@@ -231,7 +231,7 @@ void CodecListPriority::setupFrom(PVariantMap vmap)
     {
       Item item;
       item.mCodecIndex = i;
-      item.mPriority = vmap->exists(i) ? vmap->at(i).asInt() : -1;
+      item.mPriority = vmap->exists(i) ? vmap->at(i).asInt() : 1000; // Non listed codecs will get lower priority
       mPriorityList.push_back(item);
     }
 

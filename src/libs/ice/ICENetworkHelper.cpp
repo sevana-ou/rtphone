@@ -443,7 +443,7 @@ void NetworkHelper::NetworkToHost(const in6_addr& addr6, uint32_t* output)
     output[i] = ntohl(((uint32_t*)addr6.u.Byte[0])[i]);
 #elif defined(TARGET_IOS) || defined(TARGET_OSX)
     output[i] = ntohl(addr6.__u6_addr.__u6_addr32[i]);
-#elif defined(TARGET_OPENWRT)
+#elif defined(TARGET_OPENWRT) || defined(TARGET_MUSL)
       output[i] = ntohl(addr6.__in6_union.__s6_addr32[i]);
 #elif defined(TARGET_LINUX)
     output[i] = ntohl(addr6.__in6_u.__u6_addr32[i]);
@@ -459,7 +459,7 @@ void NetworkHelper::HostToNetwork(const uint32_t* input, in6_addr& output)
     ((uint32_t*)&output.u.Byte[0])[i] = htonl(input[i]);
 #elif defined(TARGET_OSX) || defined(TARGET_IOS)
     output.__u6_addr.__u6_addr32[i] = htonl(input[i]);
-#elif defined(TARGET_OPENWRT)
+#elif defined(TARGET_OPENWRT) || defined(TARGET_MUSL)
       output.__in6_union.__s6_addr32[i] = htonl(input[i]);
 #elif defined(TARGET_LINUX)
     output.__in6_u.__u6_addr32[i] = htonl(input[i]);

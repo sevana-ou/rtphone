@@ -26,7 +26,7 @@ AudioProvider::AudioProvider(UserAgent& agent, MT::Terminal& terminal)
     if (mUserAgent.config().exists(CONFIG_CODEC_PRIORITY))
         mCodecPriority.setupFrom(mUserAgent.config()[CONFIG_CODEC_PRIORITY].asVMap());
     mSrtpSuite = SRTP_NONE;
-    setState((int)StreamState::SipRecv | (int)StreamState::SipSend | (int)StreamState::Receiving | (int)StreamState::Sending);
+    setStateImpl((int)StreamState::SipRecv | (int)StreamState::SipSend | (int)StreamState::Receiving | (int)StreamState::Sending);
 }
 
 AudioProvider::~AudioProvider()
@@ -182,6 +182,7 @@ void AudioProvider::sessionEstablished(int conntype)
     {
         RemoteCodec& rc = mAvailableCodecs.front();
         mActiveStream->setTransmittingCodec(*rc.mFactory, rc.mRemotePayloadType);
+        auto codec = dynamic_cast<MT::AudioStream*>(mActiveStream.get())->transmittingCodec();
         dynamic_cast<MT::AudioStream*>(mActiveStream.get())->setTelephoneCodec(mRemoteTelephoneCodec);
     }
 }
@@ -271,11 +272,10 @@ bool AudioProvider::processSdpOffer(const resip::SdpContents::Session::Medium& m
     return true;
 }
 
+
 void AudioProvider::setState(unsigned state)
 {
-    mState = state;
-    if (mActiveStream)
-        mActiveStream->setState(state);
+    setStateImpl(state);
 }
 
 unsigned AudioProvider::state()
@@ -380,4 +380,11 @@ void AudioProvider::setupMirror(bool enable)
 {
     if (mActiveStream)
         mActiveStream->setupMirror(enable);
+}
+
+void AudioProvider::setStateImpl(unsigned int state) {
+    mState = state;
+    if (mActiveStream)
+        mActiveStream->setState(state);
+
 }

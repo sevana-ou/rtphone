@@ -11,7 +11,8 @@ set (CMAKE_POSITION_INDEPENDENT_CODE ON)
 set (USE_AMR_CODEC       OFF CACHE BOOL "Use AMR codec. Requires libraries.")
 set (USE_EVS_CODEC       OFF CACHE BOOL "Use EVS codec."                    )
 set (USE_OPUS_CODEC      OFF CACHE BOOL "Use Opus codec."                   )
-set (USE_SEVANA_LIB      OFF CACHE BOOL "Build with Sevana libraries"       )
+set (USE_PVQA_LIB        OFF CACHE BOOL "Build with Sevana PVQA library"    )
+set (USE_AQUA_LIB        OFF CACHE BOOL "Build with Sevana AQuA library"    )
 
 set (SOURCES
     MT_Statistics.cpp

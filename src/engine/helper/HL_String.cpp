@@ -119,7 +119,7 @@ std::string StringHelper::toHex(unsigned int value)
 std::string StringHelper::toHex(const void *ptr)
 {
     std::ostringstream oss;
-    oss << std::hex << ptr;
+    oss << std::fixed << std::setw(8) << std::setfill('0') << std::hex << ptr;
     return oss.str();
 }
 

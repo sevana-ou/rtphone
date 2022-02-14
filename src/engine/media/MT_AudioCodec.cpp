@@ -402,6 +402,7 @@ PCodec OpusCodec::OpusFactory::create()
   result->applyParams(mParams);
   PCodec c(result);
   mCodecList.push_back(c);
+
   return c;
 }
 
@@ -534,7 +535,7 @@ int OpusCodec::plc(int lostFrames, void* output, int outputCapacity)
 #define ILBC_CODEC_NAME "ILBC"
 
 IlbcCodec::IlbcCodec(int packetTime)
-:mPacketTime(packetTime)
+:mPacketTime(packetTime), mEncoderCtx(nullptr), mDecoderCtx(nullptr)
 {
   WebRtcIlbcfix_EncoderCreate(&mEncoderCtx);
   WebRtcIlbcfix_DecoderCreate(&mDecoderCtx);

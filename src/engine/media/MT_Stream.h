@@ -52,7 +52,7 @@ namespace MT
 
     virtual void setDestination(const RtpPair<InternetAddress>& dest);
 
-    virtual void setTransmittingCodec(Codec::Factory& factory, int payloadType) = 0;    
+    virtual void setTransmittingCodec(Codec::Factory& factory, int payloadType) = 0;
     virtual void dataArrived(PDatagramSocket s, const void* buffer, int length, InternetAddress& source) = 0;
 
 

@@ -130,7 +130,9 @@ public:
                 mDuplicatedRtp,   // Number of received duplicated rtp packets
                 mOldRtp,          // Number of late rtp packets
                 mPacketLoss,      // Number of lost packets
+                mPacketDropped,   // Number of dropped packets (due to time unsync when playing)
                 mIllegalRtp;      // Number of rtp packets with bad payload type
+
     int         mLoss[128];       // Every item is number of loss of corresping length
     size_t      mAudioTime;       // Decoded/found time in milliseconds
     uint16_t    mSsrc;            // Last known SSRC ID in a RTP stream

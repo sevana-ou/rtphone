@@ -66,12 +66,13 @@ enum SessionInfo
   SessionInfo_ReceivedRtp,
   SessionInfo_ReceivedRtcp,
   SessionInfo_LostRtp,
+  SessionInfo_DroppedRtp,
   SessionInfo_Duration,
   SessionInfo_Jitter,
   SessionInfo_Rtt,
   SessionInfo_BitrateSwitchCounter, // It is for AMR codecs only
   SessionInfo_RemotePeer,
-  SessionInfo_SSRC
+  SessionInfo_SSRC,
 };
 
 

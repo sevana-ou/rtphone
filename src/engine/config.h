@@ -17,7 +17,7 @@
 #define AUDIO_CHANNELS 1
 
 // Samplerate must be 8 / 16 / 24 / 32 / 48 KHz
-#define AUDIO_SAMPLERATE 8000
+#define AUDIO_SAMPLERATE 16000
 #define AUDIO_MIC_BUFFER_COUNT 16
 #define AUDIO_MIC_BUFFER_LENGTH 10
 #define AUDIO_MIC_BUFFER_SIZE  (AUDIO_MIC_BUFFER_LENGTH * AUDIO_SAMPLERATE / 1000 * 2 * AUDIO_CHANNELS)
@@ -84,7 +84,7 @@
 
 // OPUS codec defines
 // #define USE_OPUS_CODEC
-#define MT_OPUS_CODEC_PT -1
+#define MT_OPUS_CODEC_PT 106
 
 // ILBC codec defines
 #define MT_ILBC20_PAYLOADTYPE -1
