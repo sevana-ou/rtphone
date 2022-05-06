@@ -69,6 +69,8 @@ public:
 
 	/** Returns the least significant word. */
 	uint32_t GetLSW() const								{ return lsw; }
+
+        uint64_t Get64() const                                                          { return (uint64_t)msw << 32 | lsw; }
 private:
 	uint32_t msw,lsw;
 };
