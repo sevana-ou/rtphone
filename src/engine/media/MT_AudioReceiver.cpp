@@ -10,6 +10,7 @@
 #include "MT_AudioCodec.h"
 #include "MT_CngHelper.h"
 #include "../helper/HL_Log.h"
+#include "../helper/HL_Time.h"
 #include "../audio/Audio_Interface.h"
 #include "../audio/Audio_Resampler.h"
 #include <cmath>
@@ -47,11 +48,19 @@ int RtpBuffer::Packet::rate() const
     return mRate;
 }
 
+const std::vector<short>& RtpBuffer::Packet::pcm() const
+{
+    return mPcm;
+}
+
+std::vector<short>& RtpBuffer::Packet::pcm()
+{
+    return mPcm;
+}
+
 // ------------ RtpBuffer ----------------
 RtpBuffer::RtpBuffer(Statistics& stat)
-    :mStat(stat), mSsrc(0), mHigh(RTP_BUFFER_HIGH), mLow(RTP_BUFFER_LOW), mPrebuffer(RTP_BUFFER_PREBUFFER),
-      mFirstPacketWillGo(true), mReturnedCounter(0), mAddCounter(0),
-      mFetchedPacket(std::shared_ptr<RTPPacket>(), 0, 0)
+    :mStat(stat)
 {
 }
 
@@ -96,19 +105,28 @@ int RtpBuffer::getCount() const
     return static_cast<int>(mPacketList.size());
 }
 
-bool SequenceSort(const RtpBuffer::Packet& p1, const RtpBuffer::Packet& p2)
+bool SequenceSort(const std::shared_ptr<RtpBuffer::Packet>& p1, const std::shared_ptr<RtpBuffer::Packet>& p2)
 {
-    return p1.rtp()->GetExtendedSequenceNumber() < p2.rtp()->GetExtendedSequenceNumber();
+    return p1->rtp()->GetExtendedSequenceNumber() < p2->rtp()->GetExtendedSequenceNumber();
 }
 
-bool RtpBuffer::add(std::shared_ptr<jrtplib::RTPPacket> packet, int timelength, int rate)
+std::shared_ptr<RtpBuffer::Packet> RtpBuffer::add(std::shared_ptr<jrtplib::RTPPacket> packet, int timelength, int rate)
 {
     if (!packet)
-        return false;
+        return std::shared_ptr<Packet>();
 
     Lock l(mGuard);
 
+
     // Update statistics
+    if (mLastAddTime == 0.0)
+        mLastAddTime = now_ms();
+    else
+    {
+        float t = now_ms();
+        mStat.mPacketInterval.process(t - mLastAddTime);
+        mLastAddTime = t;
+    }
     mStat.mSsrc = static_cast<uint16_t>(packet->GetSSRC());
 
     // Update jitter
@@ -121,15 +139,15 @@ bool RtpBuffer::add(std::shared_ptr<jrtplib::RTPPacket> packet, int timelength, 
     // New sequence number
     unsigned newSeqno = packet->GetExtendedSequenceNumber();
 
-    for (Packet& p: mPacketList)
+    for (std::shared_ptr<Packet>& p: mPacketList)
     {
-        unsigned seqno = p.rtp()->GetExtendedSequenceNumber();
+        unsigned seqno = p->rtp()->GetExtendedSequenceNumber();
 
         if (seqno == newSeqno)
         {
             mStat.mDuplicatedRtp++;
             ICELogMedia(<< "Discovered duplicated packet, skipping");
-            return false;
+            return std::shared_ptr<Packet>();
         }
 
         if (seqno > maxno)
@@ -143,8 +161,11 @@ bool RtpBuffer::add(std::shared_ptr<jrtplib::RTPPacket> packet, int timelength, 
 
     if (newSeqno > minno || (available < mHigh))
     {
-        Packet p(packet, timelength, rate);
+        // Insert into queue
+        auto p = std::make_shared<Packet>(packet, timelength, rate);
         mPacketList.push_back(p);
+
+        // Sort again
         std::sort(mPacketList.begin(), mPacketList.end(), SequenceSort);
 
         // Limit by max timelength
@@ -152,21 +173,18 @@ bool RtpBuffer::add(std::shared_ptr<jrtplib::RTPPacket> packet, int timelength, 
 
         if (available > mHigh)
             ICELogMedia(<< "Available " << available << "ms with limit " << mHigh << "ms");
-        /*while (available > mHigh && mPacketList.size())
-        {
-            ICELogDebug( << "Dropping RTP packet from jitter buffer");
-            available -= mPacketList.front().timelength();
-            mPacketList.erase(mPacketList.begin());
-        }*/
+
+        return p;
     }
     else
     {
         ICELogMedia(<< "Too old packet, skipping");
         mStat.mOldRtp++;
-        return false;
+
+        return std::shared_ptr<Packet>();
     }
 
-    return true;
+    return std::shared_ptr<Packet>();
 }
 
 RtpBuffer::FetchResult RtpBuffer::fetch(ResultList& rl)
@@ -182,7 +200,7 @@ RtpBuffer::FetchResult RtpBuffer::fetch(ResultList& rl)
     while (total > mHigh && mPacketList.size())
     {
         ICELogMedia( << "Dropping RTP packets from jitter buffer");
-        total -= mPacketList.front().timelength();
+        total -= mPacketList.front()->timelength();
 
         // Save it as last packet however - to not confuse loss packet counter
         mFetchedPacket = mPacketList.front();
@@ -198,7 +216,11 @@ RtpBuffer::FetchResult RtpBuffer::fetch(ResultList& rl)
         result = FetchResult::NoPacket;
     else
     {
-        if (mFetchedPacket.rtp())
+        bool is_fetched_packet = mFetchedPacket.get() != nullptr;
+        if (is_fetched_packet)
+            is_fetched_packet &= mFetchedPacket->rtp().get() != nullptr;
+
+        if (is_fetched_packet)
         {
             if (mPacketList.empty())
             {
@@ -208,10 +230,10 @@ RtpBuffer::FetchResult RtpBuffer::fetch(ResultList& rl)
             else
             {
                 // Current sequence number ?
-                unsigned seqno = mPacketList.front().rtp()->GetExtendedSequenceNumber();
+                unsigned seqno = mPacketList.front()->rtp()->GetExtendedSequenceNumber();
 
                 // Gap between new packet and previous on
-                int gap = seqno - mFetchedPacket.rtp()->GetSequenceNumber() - 1;
+                int gap = seqno - mFetchedPacket->rtp()->GetSequenceNumber() - 1;
                 gap = std::min(gap, 127);
                 if (gap > 0 && mPacketList.empty())
                 {
@@ -228,29 +250,7 @@ RtpBuffer::FetchResult RtpBuffer::fetch(ResultList& rl)
                     }
 
                     result = FetchResult::RegularPacket;
-                    Packet& p = mPacketList.front();
-                    rl.push_back(p.rtp());
-
-                    // Maybe it is time to replay packet right now ? For case of AMR SID packets
-                    /*if (mFetchedPacket.rtp() && gap == 0 && mFetchedPacket.timelength() >= 10 && p.timelength() >= 10)
-                    {
-                        int timestampDelta;
-                        // Timestamp difference
-                        if (p.rtp()->GetTimestamp() > mFetchedPacket.rtp()->GetTimestamp())
-                            timestampDelta = TimeHelper::getDelta(p.rtp()->GetTimestamp(), mFetchedPacket.rtp()->GetTimestamp());
-                        else
-                            timestampDelta = TimeHelper::getDelta(mFetchedPacket.rtp()->GetTimestamp(), p.rtp()->GetTimestamp());
-
-                        // Timestamp units per packet
-                        int nrOfPackets = timestampDelta / (p.timelength() * (p.rate() / 1000));
-
-                        // Add more copies of SID (most probably) packets
-                        for (int i = 0; i < nrOfPackets - 1; i++)
-                        {
-                            //assert(false);
-                            rl.push_back(p.rtp());
-                        }
-                    }*/
+                    rl.push_back(mPacketList.front());
 
                     // Save last returned normal packet
                     mFetchedPacket = mPacketList.front();
@@ -269,7 +269,7 @@ RtpBuffer::FetchResult RtpBuffer::fetch(ResultList& rl)
                 result = FetchResult::RegularPacket;
 
                 // Put it to output list
-                rl.push_back(mPacketList.front().rtp());
+                rl.push_back(mPacketList.front());
 
                 // Remember returned packet
                 mFetchedPacket = mPacketList.front();
@@ -295,7 +295,7 @@ int RtpBuffer::findTimelength()
 {
     int available = 0;
     for (unsigned i = 0; i < mPacketList.size(); i++)
-        available += mPacketList[i].timelength();
+        available += mPacketList[i]->timelength();
     return available;
 }
 
@@ -321,7 +321,7 @@ Receiver::~Receiver()
 
 //-------------- AudioReceiver ----------------
 AudioReceiver::AudioReceiver(const CodecList::Settings& settings, MT::Statistics &stat)
-    :Receiver(stat), mBuffer(stat), mFrameCount(0), mFailedCount(0), mCodecSettings(settings),
+    :Receiver(stat), mBuffer(stat), mCodecSettings(settings),
       mCodecList(settings)
 {
     // Init resamplers
@@ -354,9 +354,45 @@ AudioReceiver::~AudioReceiver()
     mDecodedDump.reset();
 }
 
+size_t decode_packet(Codec& codec, RTPPacket& p, void* output_buffer, size_t output_capacity)
+{
+    // How much data was produced
+    size_t result = 0;
+
+    // Handle here regular RTP packets
+    // Check if payload length is ok
+    int tail = codec.rtpLength() ? p.GetPayloadLength() % codec.rtpLength() : 0;
+
+    if (!tail)
+    {
+        // Find number of frames
+        int frame_count = codec.rtpLength() ? p.GetPayloadLength() / codec.rtpLength() : 1;
+        int frame_length = codec.rtpLength() ? codec.rtpLength() : (int)p.GetPayloadLength();
+
+        // Save last packet time length
+        // mLastPacketTimeLength = mFrameCount * mCodec->frameTime();
+
+        // Decode
+
+        for (int i=0; i < frame_count; i++)
+        {
+            auto decoded_length = codec.decode(p.GetPayloadData() + i * codec.rtpLength(),
+                                               frame_length,
+                                               output_buffer,
+                                               output_capacity);
+
+            result += decoded_length;
+        }
+    }
+    else
+        ICELogMedia(<< "RTP packet with tail.");
+
+    return result;
+}
 
 bool AudioReceiver::add(const std::shared_ptr<jrtplib::RTPPacket>& p, Codec** codec)
 {
+    // ICELogInfo(<< "Adding packet No " << p->GetSequenceNumber());
     // Increase codec counter
     mStat.mCodecCount[p->GetPayloadType()]++;
 
@@ -410,7 +446,22 @@ bool AudioReceiver::add(const std::shared_ptr<jrtplib::RTPPacket>& p, Codec** co
         }
 
     // Queue packet to buffer
-    return mBuffer.add(p, time_length, codecIter->second->samplerate());
+    auto packet = mBuffer.add(p, time_length, codecIter->second->samplerate()).get();
+
+    if (packet)
+    {
+        // Check if early decoding configured
+        if (mEarlyDecode && *codec)
+        {
+            // Move data to packet buffer
+            size_t available = decode_packet(**codec, *p, mDecodedFrame, sizeof mDecodedFrame);
+            packet->pcm().resize(available / 2);
+            memcpy(packet->pcm().data(), mDecodedFrame, available / 2);
+        }
+        return true;
+    }
+    else
+        return false;
 }
 
 void AudioReceiver::processDecoded(Audio::DataWindow& output, int options)
@@ -435,7 +486,7 @@ void AudioReceiver::processDecoded(Audio::DataWindow& output, int options)
 
 bool AudioReceiver::getAudio(Audio::DataWindow& output, int options, int* rate)
 {
-    bool result = false;
+    bool result = false, /*had_cng = false, */had_decode = false;
 
     // Get next packet from buffer
     RtpBuffer::ResultList rl;
@@ -443,7 +494,7 @@ bool AudioReceiver::getAudio(Audio::DataWindow& output, int options, int* rate)
     switch (fr)
     {
     case RtpBuffer::FetchResult::Gap:
-        ICELogInfo(<< "Gap detected.");
+        ICELogDebug(<< "Gap detected.");
 
         mDecodedLength = mResampledLength = 0;
         if (mCngPacket && mCodec)
@@ -482,14 +533,14 @@ bool AudioReceiver::getAudio(Audio::DataWindow& output, int options, int* rate)
     case RtpBuffer::FetchResult::RegularPacket:
         mFailedCount = 0;
 
-        for (std::shared_ptr<RTPPacket>& p: rl)
+        for (std::shared_ptr<RtpBuffer::Packet>& p: rl)
         {
             assert(p);
             // Check if previously CNG packet was detected. Emit CNG audio here if needed.
             if (options & DecodeOptions_FillCngGap && mCngPacket && mCodec)
             {
                 // Fill CNG audio is server mode is present
-                int units = p->GetTimestamp() - mCngPacket->GetTimestamp();
+                int units = p->rtp()->GetTimestamp() - mCngPacket->GetTimestamp();
                 int milliseconds = units / (mCodec->samplerate() / 1000);
                 if (milliseconds > mLastPacketTimeLength)
                 {
@@ -522,69 +573,83 @@ bool AudioReceiver::getAudio(Audio::DataWindow& output, int options, int* rate)
                 }
             }
 
-            // Find codec
-            mCodec = mCodecMap[p->GetPayloadType()];
-            if (mCodec)
+            if (mEarlyDecode)
             {
-                if (rate)
-                    *rate = mCodec->samplerate();
+                // ToDo - copy the decoded data to output buffer
 
-                // Check if it is CNG packet
-                if ((p->GetPayloadType() == 0 || p->GetPayloadType() == 8) && p->GetPayloadLength() >= 1 && p->GetPayloadLength() <= 6)
+            }
+            else
+            {
+                // Find codec by payload type
+                int ptype = p->rtp()->GetPayloadType();
+                mCodec = mCodecMap[ptype];
+                if (mCodec)
                 {
-                    if (options & DecodeOptions_SkipDecode)
-                        mDecodedLength = 0;
-                    else
+                    if (rate)
+                        *rate = mCodec->samplerate();
+
+                    // Check if it is CNG packet
+                    if ((ptype == 0 || ptype == 8) && p->rtp()->GetPayloadLength() >= 1 && p->rtp()->GetPayloadLength() <= 6)
                     {
-                        mCngPacket = p;
-                        mCngDecoder.decode3389(p->GetPayloadData(), p->GetPayloadLength());
-                        // Emit CNG mLastPacketLength milliseconds
-                        mDecodedLength = mCngDecoder.produce(mCodec->samplerate(), mLastPacketTimeLength,
-                                                             (short*)mDecodedFrame, true);
-                        if (mDecodedLength)
-                            processDecoded(output, options);
-                    }
-                    result = true;
-                }
-                else
-                {
-                    // Reset CNG packet
-                    mCngPacket.reset();
-
-                    // Handle here regular RTP packets
-                    // Check if payload length is ok
-                    int tail = mCodec->rtpLength() ? p->GetPayloadLength() % mCodec->rtpLength() : 0;
-
-                    if (!tail)
-                    {
-                        // Find number of frames
-                        mFrameCount = mCodec->rtpLength() ? p->GetPayloadLength() / mCodec->rtpLength() : 1;
-                        int frameLength = mCodec->rtpLength() ? mCodec->rtpLength() : (int)p->GetPayloadLength();
-
-                        // Save last packet time length
-                        mLastPacketTimeLength = mFrameCount * mCodec->frameTime();
-
-                        // Decode
-                        for (int i=0; i<mFrameCount && !mCodecSettings.mSkipDecode; i++)
+                        if (options & DecodeOptions_SkipDecode)
+                            mDecodedLength = 0;
+                        else
                         {
-                            if (options & DecodeOptions_SkipDecode)
-                                mDecodedLength = 0;
-                            else
-                            {
-                                // Decode frame by frame
-                                mDecodedLength = mCodec->decode(p->GetPayloadData() + i*mCodec->rtpLength(),
-                                                                frameLength, mDecodedFrame, sizeof mDecodedFrame);
-                                if (mDecodedLength)
-                                    processDecoded(output, options);
-                            }
+                            mCngPacket = p->rtp();
+                            mCngDecoder.decode3389(p->rtp()->GetPayloadData(), p->rtp()->GetPayloadLength());
+                            // Emit CNG mLastPacketLength milliseconds
+                            mDecodedLength = mCngDecoder.produce(mCodec->samplerate(), mLastPacketTimeLength,
+                                                                 (short*)mDecodedFrame, true);
+                            if (mDecodedLength)
+                                processDecoded(output, options);
                         }
-                        result = mFrameCount > 0;
-
-                        // Check for bitrate counter
-                        processStatisticsWithAmrCodec(mCodec.get());
+                        result = true;
                     }
                     else
-                        ICELogMedia(<< "RTP packet with tail.");
+                    {
+                        // Reset CNG packet
+                        mCngPacket.reset();
+
+                        // Handle here regular RTP packets
+                        // Check if payload length is ok
+                        int tail = mCodec->rtpLength() ? p->rtp()->GetPayloadLength() % mCodec->rtpLength() : 0;
+
+                        if (!tail)
+                        {
+                            // Find number of frames
+                            mFrameCount = mCodec->rtpLength() ? p->rtp()->GetPayloadLength() / mCodec->rtpLength() : 1;
+                            int frameLength = mCodec->rtpLength() ? mCodec->rtpLength() : (int)p->rtp()->GetPayloadLength();
+
+                            // Save last packet time length
+                            mLastPacketTimeLength = mFrameCount * mCodec->frameTime();
+
+                            // Decode
+                            for (int i=0; i<mFrameCount && !mCodecSettings.mSkipDecode; i++)
+                            {
+                                if (options & DecodeOptions_SkipDecode)
+                                    mDecodedLength = 0;
+                                else
+                                {
+                                    // Trigger the statistics
+                                    had_decode = true;
+
+                                    // Decode frame by frame
+                                    mDecodedLength = mCodec->decode(p->rtp()->GetPayloadData() + i * mCodec->rtpLength(),
+                                                                    frameLength, mDecodedFrame, sizeof mDecodedFrame);
+                                    // mDecodedLength = 3840; // Opus 20 ms stereo
+                                    if (mDecodedLength)
+                                        processDecoded(output, options);
+                                }
+                            }
+                            result = mFrameCount > 0;
+
+                            // Check for bitrate counter
+                            processStatisticsWithAmrCodec(mCodec.get());
+                        }
+                        else
+                            ICELogMedia(<< "RTP packet with tail.");
+
+                    }
                 }
             }
         }
@@ -594,6 +659,18 @@ bool AudioReceiver::getAudio(Audio::DataWindow& output, int options, int* rate)
         assert(0);
     }
 
+    if (had_decode)
+    {
+        // mStat.mDecodeRequested++;
+        if (mLastDecodeTime == 0.0)
+            mLastDecodeTime = now_ms();
+        else
+        {
+            float t = now_ms();
+            mStat.mDecodingInterval.process(t - mLastDecodeTime);
+            mLastDecodeTime = t;
+        }
+    }
     return result;
 }
 
@@ -670,12 +747,12 @@ void AudioReceiver::updatePvqa(const void *data, int size)
             mPvqaBuffer->addZero(size);
 
         Audio::Format fmt;
-        int frames = (int)fmt.timeFromSize(mPvqaBuffer->filled()) / (PVQA_INTERVAL * 1000);
+        int frames = static_cast<int>(fmt.timeFromSize(mPvqaBuffer->filled())) / (PVQA_INTERVAL * 1000);
         if (frames > 0)
         {
             int time4pvqa = (int)(frames * PVQA_INTERVAL * 1000);
             int size4pvqa = (int)fmt.sizeFromTime(time4pvqa);
-            ICELogInfo(<< "PVQA buffer has " << time4pvqa << " milliseconds of audio.");
+            ICELogDebug(<< "PVQA buffer has " << time4pvqa << " milliseconds of audio.");
             mPVQA->update(mPvqaBuffer->data(), size4pvqa);
             mPvqaBuffer->erase(size4pvqa);
         }

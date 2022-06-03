@@ -88,10 +88,16 @@ if (CMAKE_SYSTEM MATCHES "Darwin*")
     add_definitions (-DTARGET_OSX)
 endif()
 
+if (CMAKE_SYSTEM MATCHES "Android")
+    message("Adding the Oboe library")
+    set (OBOE_DIR libs/oboe)
+    add_subdirectory (${OBOE_DIR} ./oboe)
+    include_directories (${OBOE_DIR}/include)
+endif()
+
 if (USE_MUSL)
     add_definitions(-DTARGET_MUSL)
 endif()
-
 
 if (USE_AQUA_LIB)
     message("Use AQuA library")
@@ -102,7 +108,8 @@ endif()
 if (USE_PVQA_LIBRARY)
     message("Use PVQA libraries")
     add_definitions( -DUSE_PVQA_LIBRARY )
-    include_directories(${CMAKE_CURRENT_SOURCE_DIR}/libs/pvqa/include)
+    include_directories(${CMAKE_CURRENT_SOURCE_DIR}/libs/pvqa/include
+                        ${CMAKE_CURRENT_SOURCE_DIR}/libs/pvqa++/include)
 endif()
 
 set (RTPHONE_SOURCES
@@ -201,6 +208,10 @@ else ()
     set (LIBS ${LIBS} dl uuid)
 endif ()
 
+if (CMAKE_SYSTEM MATCHES "Android")
+    set (LIBS ${LIBS} oboe)
+endif()
+
 if (USE_AMR_CODEC)
     set (LIBS ${LIBS})
 endif (USE_AMR_CODEC)
@@ -215,7 +226,7 @@ target_link_libraries(rtphone
     uuid
     ${OPENSSL_SSL}
     ${OPENSSL_CRYPTO}
-    ${LIBS})
+    ${LIBS} )
 
 
 target_include_directories(rtphone

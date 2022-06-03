@@ -75,7 +75,9 @@ namespace ice
     static bool isSameHost(const NetworkAddress& a1, const NetworkAddress& a2);
     
     static bool isSame(const NetworkAddress& a1, const NetworkAddress& a2);
-    
+
+    NetworkAddress& operator = (const NetworkAddress& src);
+
     bool operator == (const NetworkAddress& rhs) const;
     bool operator != (const NetworkAddress& rhs) const;
     bool operator < (const NetworkAddress& rhs) const;

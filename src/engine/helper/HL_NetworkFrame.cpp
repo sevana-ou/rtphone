@@ -25,10 +25,15 @@ NetworkFrame::PacketData NetworkFrame::GetUdpPayloadForEthernet(NetworkFrame::Pa
     uint16_t proto = 0;
     if (ethernet->mEtherType == 129)
     {
-        const VlanHeader* vlan = reinterpret_cast<const VlanHeader*>(packet.mData);
-        packet.mData += sizeof(VlanHeader);
-        packet.mLength -= sizeof(VlanHeader);
-        proto = ntohs(vlan->mData);
+        // Skip 1 or more VLAN headers
+        do
+        {
+            const VlanHeader* vlan = reinterpret_cast<const VlanHeader*>(packet.mData);
+            packet.mData += sizeof(VlanHeader);
+            packet.mLength -= sizeof(VlanHeader);
+            proto = ntohs(vlan->mData);
+        }
+        while (proto == 0x8100);
     }
 
     // Skip MPLS headers

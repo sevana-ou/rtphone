@@ -63,8 +63,13 @@ public:
     virtual int channels() { return 1; }
 
 
+    // Returns size of encoded data (RTP) in bytes
     virtual int encode(const void* input, int inputBytes, void* output, int outputCapacity) = 0;
+
+    // Returns size of decoded data (PCM signed short) in bytes
     virtual int decode(const void* input, int inputBytes, void* output, int outputCapacity) = 0;
+
+    // Returns size of produced data (PCM signed short) in bytes
     virtual int plc(int lostFrames, void* output, int outputCapacity) = 0;
 
     // Returns size of codec in memory

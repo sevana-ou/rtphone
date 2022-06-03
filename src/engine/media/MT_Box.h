@@ -26,10 +26,11 @@ namespace MT
     CodecList& codeclist();  
 
     PStream createStream(int type, VariantMap& config);
-    void freeStream(PStream s);
+    void freeStream(const PStream& s);
     
     Audio::PDevicePair audio();
     void setAudio(const Audio::PDevicePair& audio);
+
   protected:
     StreamList mAudioList;
     std::mutex mAudioListMutex;

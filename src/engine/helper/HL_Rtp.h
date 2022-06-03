@@ -85,6 +85,7 @@ struct MediaStreamId
     std::string toString() const;
     std::string getDetectDescription() const;
     std::string getFinishDescription() const;
+    MediaStreamId& operator = (const MediaStreamId& src);
 };
 
 std::ostream& operator << (std::ostream& output, const MediaStreamId& id);

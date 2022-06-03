@@ -783,3 +783,12 @@ bool NetworkAddress::isSame(const NetworkAddress& a1, const NetworkAddress& a2)
   }
   return false;
 }
+
+NetworkAddress& NetworkAddress::operator = (const NetworkAddress& src)
+{
+    this->mInitialized = src.mInitialized;
+    this->mRelayed = src.mRelayed;
+    this->mAddr6 = src.mAddr6;
+
+    return *this;
+}

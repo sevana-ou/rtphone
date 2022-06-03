@@ -245,6 +245,17 @@ std::string MediaStreamId::getFinishDescription() const
     return oss.str();
 }
 
+MediaStreamId& MediaStreamId::operator = (const MediaStreamId& src)
+{
+    this->mDestination = src.mDestination;
+    this->mSource = src.mSource;
+    this->mLinkId = src.mLinkId;
+    this->mSSRC = src.mSSRC;
+    this->mSsrcIsId = src.mSsrcIsId;
+
+    return *this;
+}
+
 std::ostream& operator << (std::ostream& output, const MediaStreamId& id)
 {
     return (output << id.toString());

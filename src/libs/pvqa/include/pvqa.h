@@ -29,6 +29,7 @@ typedef struct
 
   long   dNumPoorIntervals;
   long   dNumTotalIntervals;
+  long   dNumUncertainIntervals;
 
   double dTimeShift;
 } TPVQA_Results;
@@ -38,7 +39,7 @@ typedef struct
 {
   long    dSampleRate;  // Sample rate of signal
   long    dNChannels;   // Number of sound channels in audio
-  short * pSamples;     // Pointer to the samples of signal
+  const short * pSamples;     // Pointer to the samples of signal
   long    dNSamples;    // Number of samples
 }  TPVQA_AudioItem;
 
@@ -82,7 +83,7 @@ PVQA_API int PVQA_AudioQualityAnalyzerCreateDelayLine(void * aPVQA_ID, long aSam
 PVQA_API int PVQA_StartRecordingWave(void * aPVQA_ID, const char * aPWavFName, long aSampleRate, long aNChannels);
 
 // Performs audio file quality estimation
-PVQA_API int PVQA_OnTestAudioFile(void * aPVQA_ID, const char * aPFileName);
+PVQA_API int PVQA_OnTestAudioFile(void * aPVQA_ID, const char * aPFileName, double offset_begin, double offset_end);
 
 // Process loaded in memory audio data 
 PVQA_API int PVQA_OnTestAudioData(void * aPVQA_ID, TPVQA_AudioItem * aPVQA_PAudio);
@@ -95,14 +96,12 @@ PVQA_API int PVQA_OnStartStreamData(void * aPVQA_ID);
 
 // Process streaming Audio data
 PVQA_API int PVQA_OnAddStreamAudioData(void * aPVQA_ID, TPVQA_AudioItem * aPVQA_PAudio);
-PVQA_API int PVQA_OnAddStreamAudioDataHex(void * aPVQA_ID, int rate, int channels, const char* samples);
 
 // Updates quality results data
 PVQA_API int PVQA_OnUpdateStreamQualityResults(void * aPVQA_ID, int rate, int millisecondsFromEnd);
 
 // Finalize quality measurements at this moment (not finalize stream processing)
 PVQA_API int PVQA_OnFinalizeStream(void * aPVQA_ID, long aSampleRate);
-
 
 
 // --------------------------------------------------------------------------------------
@@ -129,7 +128,10 @@ PVQA_API const char ** PVQA_GetProcessorValuesNamesList(void * aPVQA_ID, const c
 
 typedef struct 
 {
+    // number of columns and rows
     int columns, rows;
+
+    // data itself
     float* data;
 } PVQA_Array2D;
 
@@ -137,6 +139,7 @@ typedef struct
 // Returned value has to be released via PVQA_ReleaseArray2D
 PVQA_API PVQA_Array2D* PVQA_GetProcessorValuesList(void * aPVQA_ID, const char * aPDetectorName, long aStartTime,
                                                                              long aStopTime, const char * aStatType, int * errCode);
+
 // Release allocated 2D array
 PVQA_API void PVQA_ReleaseArray2D(PVQA_Array2D* array);
 

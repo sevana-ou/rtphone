@@ -197,7 +197,7 @@ void DevicePair::onSpkData(const Format& f, void* buffer, int length)
 
       // Resample these 10 milliseconds it to native format
       size_t wasProcessed = 0;
-      size_t wasProduced = mSpkResampler.resample(AUDIO_SAMPLERATE, mOutput10msBuffer.data(), mOutput10msBuffer.capacity(), wasProcessed, f.mRate,
+      size_t wasProduced = mSpkResampler.resample(nativeFormat.mRate, mOutput10msBuffer.data(), mOutput10msBuffer.capacity(), wasProcessed, f.mRate,
                                                mOutputNativeData.mutableData() + mOutputNativeData.filled(), mOutputNativeData.capacity() - mOutputNativeData.filled());
       mOutputNativeData.setFilled(mOutputNativeData.filled() + wasProduced);
 #ifdef CONSOLE_LOGGING
@@ -206,7 +206,7 @@ void DevicePair::onSpkData(const Format& f, void* buffer, int length)
     }
   }
 
-  assert(mOutputNativeData.filled() >= length);
+  // assert(mOutputNativeData.filled() >= length);
 #ifdef DUMP_NATIVEOUTPUT
   if (mNativeOutputDump)
     mNativeOutputDump->write(mOutputNativeData.data(), length);

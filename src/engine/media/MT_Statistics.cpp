@@ -191,6 +191,9 @@ Statistics& Statistics::operator += (const Statistics& src)
 
     mJitter = src.mJitter;
     mRttDelay = src.mRttDelay;
+    mDecodingInterval = src.mDecodingInterval;
+    mDecodeRequested = src.mDecodeRequested;
+
     if (!src.mCodecName.empty())
         mCodecName = src.mCodecName;
 
@@ -239,13 +242,16 @@ Statistics& Statistics::operator -= (const Statistics& src)
 }
 
 
-std::string Statistics::toShortString() const
+std::string Statistics::toString() const
 {
     std::ostringstream oss;
     oss << "Received: "     << mReceivedRtp
         << ", lost: "       << mPacketLoss
         << ", dropped: "    << mPacketDropped
-        << ", sent: "       << mSentRtp;
+        << ", sent: "       << mSentRtp
+        << ", decoding interval: " << mDecodingInterval.average()
+        << ", decode requested: " << mDecodeRequested.average()
+        << ", packet interval: " << mPacketInterval.average();
 
     return oss.str();
 }

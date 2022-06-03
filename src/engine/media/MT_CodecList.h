@@ -82,6 +82,9 @@ public:
         };
         std::vector<OpusSpec> mOpusSpec;
 
+        // Textual representation - used in logging
+        std::string toString() const;
+
         static Settings DefaultSettings;
     };
 

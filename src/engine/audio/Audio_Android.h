@@ -25,7 +25,6 @@
 
 namespace Audio
 {
-
     class AndroidEnumerator: public Enumerator
     {
     public:

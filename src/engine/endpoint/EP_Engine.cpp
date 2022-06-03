@@ -93,7 +93,7 @@ void UserAgent::start()
   }
   
   // Initialize resip loggег
-  resip::Log::initialize(resip::Log::OnlyExternal, resip::Log::Info, "Client", *this);
+  resip::Log::initialize(resip::Log::OnlyExternal, resip::Log::Debug, "Client", *this);
 
   // Build list of nameservers if specified
   resip::DnsStub::NameserverList nslist;
@@ -151,7 +151,7 @@ void UserAgent::start()
 
   switch (mConfig[CONFIG_TRANSPORT].asInt())
   {
-  case 0:
+  case TransportType_Any:
     if (mConfig[CONFIG_IPV4].asBool())
     {
       ADD_TRANSPORT4(resip::TCP)
@@ -166,21 +166,21 @@ void UserAgent::start()
     }
     break;
 
-  case 1:
+  case TransportType_Udp:
     if (mConfig[CONFIG_IPV4].asBool())
       ADD_TRANSPORT4(resip::UDP);
     if (mConfig[CONFIG_IPV6].asBool())
       ADD_TRANSPORT6(resip::UDP);
     break;
 
-  case 2:
+  case TransportType_Tcp:
     if (mConfig[CONFIG_IPV4].asBool())
       ADD_TRANSPORT4(resip::TCP);
     if (mConfig[CONFIG_IPV6].asBool())
       ADD_TRANSPORT6(resip::TCP);
     break;
 
-  case 3:
+  case TransportType_Tls:
     if (mConfig[CONFIG_IPV4].asBool())
       ADD_TRANSPORT4(resip::TLS);
     if (mConfig[CONFIG_IPV6].asBool())

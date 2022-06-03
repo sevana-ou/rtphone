@@ -1,4 +1,4 @@
-/* Copyright(C) 2007-2014 VoIP objects (voipobjects.com)
+/* Copyright(C) 2007-2021 VoIP objects (voipobjects.com)
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -8,6 +8,7 @@
 
 #include "../helper/HL_Log.h"
 #include "../helper/HL_Sync.h"
+#include "../helper/HL_Statistics.h"
 #include "Audio_Interface.h"
 #include <deque>
 #include <map>
@@ -48,15 +49,18 @@ namespace Audio
     void onMicData(const Format& f, const void* buffer, int length);
     void onSpkData(const Format& f, void* buffer, int length);
     void onFilePlayed();
-    void scheduleRelease();
     void obtain(int usageId);
+
   public:
     Player();
     ~Player();
+
     void setDelegate(EndOfAudioDelegate* d);
     EndOfAudioDelegate* getDelegate() const;
+
     void setOutput(POutputDevice output);
     POutputDevice getOutput() const;
+
     void add(int usageId, PWavFileReader file, bool loop, int timelength);
     void release(int usageId);
     void clear();

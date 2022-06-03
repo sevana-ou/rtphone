@@ -19,6 +19,7 @@ SingleAudioStream::SingleAudioStream(const CodecList::Settings& codecSettings, S
 
 SingleAudioStream::~SingleAudioStream()
 {
+
 }
 
 void SingleAudioStream::process(const std::shared_ptr<jrtplib::RTPPacket>& packet)
