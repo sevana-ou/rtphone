@@ -131,7 +131,7 @@ public:
 
 	/** Returns the payload length. */
 	size_t GetPayloadLength() const														{ return payloadlength; }
-  void SetPayloadLength(size_t l)                           { payloadlength = l; }
+    void SetPayloadLength(size_t l)                           { payloadlength = l; }
 
 	/** If a header extension is present, this function returns the extension identifier. */
 	uint16_t GetExtensionID() const														{ return extid; }

@@ -63,6 +63,8 @@ public:
                 mPacketDropped,   // Number of dropped packets (due to time unsync when playing)б
                 mIllegalRtp;      // Number of rtp packets with bad payload type
 
+    size_t      mDecodedAudio;    // Size of decoded audio bytes
+
     TestResult<float> mDecodingInterval, // Average interval on call to packet decode
                       mDecodeRequested,  // Average amount of requested audio frames to play
                       mPacketInterval;   // Average interval between packet adding to jitter buffer
@@ -98,10 +100,10 @@ public:
     Statistics& operator -= (const Statistics& src);
 
     float mNetworkMos = 0.0;
-#if defined(USE_PVQA_LIBRARY) && !defined(PVQA_SERVER)
-    float mPvqaMos = 0.0;
-    std::string mPvqaReport;
-#endif
+// #if defined(USE_PVQA_LIBRARY) && !defined(PVQA_SERVER)
+    // float mPvqaMos = 0.0;
+    //std::string mPvqaReport;
+// #endif
 
     std::string toString() const;
 };

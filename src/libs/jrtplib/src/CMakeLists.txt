@@ -91,4 +91,4 @@ set(JRTPLIB_SOURCES
 	rtpexternaltransmitter.cpp)
 
 add_library(jrtplib STATIC ${JRTPLIB_SOURCES})
-
+target_include_directories(jrtplib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})

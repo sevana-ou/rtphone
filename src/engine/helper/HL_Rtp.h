@@ -72,22 +72,4 @@ public:
 };
 #endif
 
-struct MediaStreamId
-{
-    InternetAddress mSource;
-    InternetAddress mDestination;
-    uint32_t mSSRC = 0;
-    bool mSsrcIsId = true;
-    Uuid mLinkId;
-    bool operator < (const MediaStreamId& s2) const;
-    bool operator == (const MediaStreamId& right) const;
-
-    std::string toString() const;
-    std::string getDetectDescription() const;
-    std::string getFinishDescription() const;
-    MediaStreamId& operator = (const MediaStreamId& src);
-};
-
-std::ostream& operator << (std::ostream& output, const MediaStreamId& id);
-
 #endif
