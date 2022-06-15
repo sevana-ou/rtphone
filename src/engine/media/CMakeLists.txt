@@ -80,6 +80,8 @@ if (CMAKE_SYSTEM MATCHES "Windows*")
 endif()
 
 add_library(media_lib ${SOURCES})
+# Depending on ice stack library to provide bit level operations
+target_link_libraries(media_lib PUBLIC ice_stack)
 
 target_include_directories(media_lib
     PUBLIC  ${CMAKE_CURRENT_SOURCE_DIR}/../../libs/
