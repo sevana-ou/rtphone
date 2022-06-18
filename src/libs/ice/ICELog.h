@@ -86,8 +86,14 @@ protected:
 class LogLock
 {
 public:
-    LogLock(LogGuard& g) :mGuard(g)   {  mGuard.Lock();   }
-    ~LogLock()                        {  mGuard.Unlock(); }
+    LogLock(LogGuard& g) :mGuard(g)
+    {
+        mGuard.Lock();
+    }
+    ~LogLock()
+    {
+        mGuard.Unlock();
+    }
 
 protected:
     LogGuard& mGuard;

@@ -201,7 +201,6 @@ void Logger::beginLine(LogLevel level, const char* filename, int linenumber, con
 void
 Logger::endLine()
 {
-    *mStream << std::endl;
     *mStream << std::flush;
     mStream->flush();
 
@@ -213,7 +212,7 @@ Logger::endLine()
 
     result << time_buffer << ":"  << (unix_timestamp_ms.count() % 1000 ) << "\t" << " | " << std::setw(8) << ThreadInfo::currentThread() << " | " << std::setw(30)
            << mFilename.c_str() << " | " << std::setw(4) << mLine << " | " << std::setw(12) << mSubsystem.c_str() << " | "
-           << mStream->str().c_str();
+           << mStream->str().c_str() << std::endl;
 
     std::string t = result.str();
     if (mUseDebugWindow) {
