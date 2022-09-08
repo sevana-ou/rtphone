@@ -190,6 +190,7 @@ void AgentImpl::processConfig(JsonCpp::Value &d, JsonCpp::Value &answer)
     mUseNativeAudio = d["nativeaudio"].asBool();
     config()[CONFIG_OWN_DNS] = d["dns_servers"].asString();
     config()[CONFIG_SIPS] = d["secure"].asBool();
+    config()[CONFIG_STUNSERVER_IP] = d["stun_server"].asString();
 
     answer["status"] = Status_Ok;
 }

@@ -730,7 +730,11 @@ void AudioReceiver::initPvqa()
     if (!mPVQA)
     {
         mPVQA = std::make_shared<sevana::pvqa>();
-        mPVQA->open(AUDIO_SAMPLERATE, 1, PVQA_INTERVAL);
+        bool is_opened = mPVQA->open(AUDIO_SAMPLERATE, 1, PVQA_INTERVAL);
+        if (!is_opened)
+        {
+            //
+        }
     }
 }
 
@@ -753,7 +757,11 @@ void AudioReceiver::updatePvqa(const void *data, int size)
             int time4pvqa = (int)(frames * PVQA_INTERVAL * 1000);
             int size4pvqa = (int)fmt.sizeFromTime(time4pvqa);
             ICELogDebug(<< "PVQA buffer has " << time4pvqa << " milliseconds of audio.");
-            mPVQA->update(mPvqaBuffer->data(), size4pvqa);
+            bool update_result = mPVQA->update(mPvqaBuffer->data(), size4pvqa);
+            if (!update_result)
+            {
+                //
+            }
             mPvqaBuffer->erase(size4pvqa);
         }
     }

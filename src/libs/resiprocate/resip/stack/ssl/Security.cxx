@@ -453,7 +453,7 @@ BaseSecurity::addCertPEM (PEMType type,
       ErrLog(<< name << " is empty. Skipping.");
       return;
    }
-   X509* cert=NULL;
+   X509* cert = NULL;
    
    BIO* in = BIO_new_mem_buf(const_cast<char*>(certPEM.c_str()), -1);
    if ( !in )
@@ -466,7 +466,7 @@ BaseSecurity::addCertPEM (PEMType type,
    {
       ErrLog( << "Could not load X509 cert from '" << certPEM << "'" );
       BIO_free(in); 
-      throw Exception("Could not load X509 cert from BIO buffer", __FILE__,__LINE__);
+      // throw Exception("Could not load X509 cert from BIO buffer", __FILE__,__LINE__);
    }
    
    addCertX509(type,name,cert,write);

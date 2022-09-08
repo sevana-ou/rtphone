@@ -185,6 +185,7 @@ void DevicePair::onSpkData(const Format& f, void* buffer, int length)
     {
       memset(mOutput10msBuffer.mutableData(), 0, (size_t)mOutput10msBuffer.capacity());
 
+      // Ask audio data on main AUDIO_SAMPLERATE frequency
       if (mDelegate)
         mDelegate->onSpkData(Format(), mOutput10msBuffer.mutableData(), mOutput10msBuffer.capacity());
 
@@ -197,8 +198,12 @@ void DevicePair::onSpkData(const Format& f, void* buffer, int length)
 
       // Resample these 10 milliseconds it to native format
       size_t wasProcessed = 0;
-      size_t wasProduced = mSpkResampler.resample(nativeFormat.mRate, mOutput10msBuffer.data(), mOutput10msBuffer.capacity(), wasProcessed, f.mRate,
-                                               mOutputNativeData.mutableData() + mOutputNativeData.filled(), mOutputNativeData.capacity() - mOutputNativeData.filled());
+      size_t wasProduced = mSpkResampler.resample(Format().mRate,
+                                                  mOutput10msBuffer.data(),
+                                                  mOutput10msBuffer.capacity(),
+                                                  wasProcessed, f.mRate,
+                                               mOutputNativeData.mutableData() + mOutputNativeData.filled(),
+                                               mOutputNativeData.capacity() - mOutputNativeData.filled());
       mOutputNativeData.setFilled(mOutputNativeData.filled() + wasProduced);
 #ifdef CONSOLE_LOGGING
       printf("Resampled %d to %d\n", wasProcessed, wasProduced);
