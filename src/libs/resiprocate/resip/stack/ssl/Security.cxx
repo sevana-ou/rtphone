@@ -1040,7 +1040,7 @@ BaseSecurity::BaseSecurity (const CipherList& cipherSuite) :
    mRootSslCerts = X509_STORE_new();
    assert(mRootTlsCerts && mRootSslCerts);
 
-   mTlsCtx = SSL_CTX_new( TLSv1_method() );
+   mTlsCtx = SSL_CTX_new( TLSv1_2_method() );
    if (!mTlsCtx)
    {
       ErrLog(<< "SSL_CTX_new failed, dumping OpenSSL error stack:");
