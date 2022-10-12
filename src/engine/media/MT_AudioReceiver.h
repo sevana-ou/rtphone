@@ -20,9 +20,9 @@
 #include "../audio/Audio_DataWindow.h"
 #include "../audio/Audio_Resampler.h"
 
-#if defined(USE_PVQA_LIBRARY)
+/*#if defined(USE_PVQA_LIBRARY)
 # include "pvqa++.h"
-#endif
+#endif*/
 
 #include <map>
 
@@ -199,6 +199,7 @@ namespace MT
     // Resamples, sends to analysis, writes to dump and queues to output decoded frames from mDecodedFrame
     void processDecoded(Audio::DataWindow& output, int options);
 
+/*
 #if defined(USE_PVQA_LIBRARY) && defined(PVQA_IN_RECEIVER)
     std::shared_ptr<sevana::pvqa> mPVQA;
     void initPvqa();
@@ -207,7 +208,7 @@ namespace MT
 
     std::shared_ptr<Audio::DataWindow> mPvqaBuffer;
 #endif
-
+*/
     void processStatisticsWithAmrCodec(Codec* c);
   };
   

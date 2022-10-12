@@ -67,7 +67,7 @@ void JitterStatistics::process(jrtplib::RTPPacket* packet, int rate)
 Statistics::Statistics()
     :mReceived(0), mSent(0), mReceivedRtp(0), mSentRtp(0),
       mReceivedRtcp(0), mSentRtcp(0), mDuplicatedRtp(0), mOldRtp(0), mIllegalRtp(0),
-      mPacketLoss(0), mJitter(0.0), mAudioTime(0), mSsrc(0), mPacketDropped(0)
+      mPacketLoss(0), mJitter(0.0), mAudioTime(0), mDecodedSize(0), mSsrc(0), mPacketDropped(0)
 {
     mBitrateSwitchCounter = 0;
     memset(mLoss, 0, sizeof mLoss);
@@ -95,6 +95,7 @@ void Statistics::reset()
     mJitter = 0.0;
     mAudioTime = 0;
     mPacketDropped = 0;
+    mDecodedSize = 0;
 
     memset(mLoss, 0, sizeof mLoss);
 }

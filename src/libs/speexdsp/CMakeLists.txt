@@ -20,7 +20,7 @@ set (SPEEXDSP_SOURCES
 )
 
 add_library(speexdsp ${SPEEXDSP_SOURCES})
-target_compile_definitions(speexdsp PUBLIC -DUSE_KISS_FFT -DFIXED_POINT -DHAVE_STDINT_H)
+target_compile_definitions(speexdsp PUBLIC -DUSE_KISS_FFT -DFLOATING_POINT -DHAVE_STDINT_H)
 
 target_include_directories(speexdsp PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/libspeexdsp

@@ -185,6 +185,7 @@ void RtpDump::flush()
 #endif
 
 
+#ifndef EXTERNAL_MEDIA_STREAM_ID
 // -------------- MediaStreamId --------------------
 bool MediaStreamId::operator < (const MediaStreamId& right) const
 {
@@ -260,4 +261,5 @@ std::ostream& operator << (std::ostream& output, const MediaStreamId& id)
 {
     return (output << id.toString());
 }
+#endif
 

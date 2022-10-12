@@ -80,6 +80,10 @@ if (CMAKE_SYSTEM MATCHES "Windows*")
 endif()
 
 add_library(media_lib ${SOURCES})
+
+# Dependency on ice_stack - Linux build requires it
+target_link_libraries(media_lib ice_stack)
+
 set_property(TARGET media_lib PROPERTY
   MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 
@@ -101,6 +105,7 @@ target_include_directories(media_lib
             ${CMAKE_CURRENT_SOURCE_DIR}/../../libs/libevs/basic_op
             ${CMAKE_CURRENT_SOURCE_DIR}/../../libs/libevs/basic_math
 )
+
 if (USE_RESIP_INTEGRATION)
     message("USE_RESIP_INTEGRATION is turned on!")
     target_compile_definitions(media_lib PUBLIC -DUSE_RESIP_INTEGRATION)

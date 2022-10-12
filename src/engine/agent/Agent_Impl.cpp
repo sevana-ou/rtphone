@@ -7,13 +7,6 @@
 #include "helper/HL_Base64.h"
 #include <fstream>
 
-#if defined(USE_PVQA_LIBRARY)
-# include "pvqa++.h"
-#endif
-
-#if defined(USE_AQUA_LIBRARY)
-# include "aqua++.h"
-#endif
 
 const std::string Status_Ok = "ok";
 const std::string Status_SessionNotFound = "session not found";
@@ -155,20 +148,6 @@ std::string AgentImpl::read()
 void AgentImpl::processConfig(JsonCpp::Value &d, JsonCpp::Value &answer)
 {
     std::unique_lock<std::recursive_mutex> l(mAgentMutex);
-
-#if !defined(TARGET_ANDROID) && defined(USE_PVQA_LIBRARY)
-    // It works for desktop OSes only
-    // Because Android requires special initializing procedure (valid JNI environment context)
-    std::string pvqaLicense = d["pvqa-license"].asString(), pvqaConfig = d["pvqa-config"].asString();
-    if (!pvqaLicense.empty() && !pvqaConfig.empty())
-        sevana::pvqa::initialize(pvqaLicense, pvqaConfig);
-#endif
-
-#if !defined(TARGET_ANDROID) && defined(USE_AQUA_LIBRARY)
-    std::string aquaLicense = d["aqua-license"].asString();
-    if (!aquaLicense.empty())
-        sevana::aqua::initialize(aquaLicense.c_str(), aquaLicense.size());
-#endif
 
     std::string transport = d["transport"].asString();
     config()[CONFIG_TRANSPORT] = (transport == "any") ? TransportType_Any : (transport == "udp" ? TransportType_Udp : (transport == "tcp" ? TransportType_Tcp : TransportType_Tls));

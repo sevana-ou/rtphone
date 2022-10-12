@@ -69,6 +69,7 @@ public:
 
     int         mLoss[128];       // Every item is number of loss of corresping length
     size_t      mAudioTime;       // Decoded/found time in milliseconds
+    size_t      mDecodedSize;     // Number of decoded bytes
     uint16_t    mSsrc;            // Last known SSRC ID in a RTP stream
     ice::NetworkAddress mRemotePeer; // Last known remote RTP address
 
