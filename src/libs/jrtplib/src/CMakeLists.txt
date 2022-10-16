@@ -95,4 +95,4 @@ target_include_directories(jrtplib PUBLIC .)
 
 set_property(TARGET jrtplib PROPERTY
   MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
-
+target_include_directories(jrtplib PUBLIC .)
