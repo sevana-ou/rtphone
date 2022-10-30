@@ -612,7 +612,10 @@ bool AudioReceiver::getAudio(Audio::DataWindow& output, int options, int* rate)
 
                         // Handle here regular RTP packets
                         // Check if payload length is ok
-                        int tail = mCodec->rtpLength() ? p->rtp()->GetPayloadLength() % mCodec->rtpLength() : 0;
+                        size_t payload_length = p->rtp()->GetPayloadLength();
+                        size_t rtp_frame_length = mCodec->rtpLength();
+
+                        int tail = rtp_frame_length ? payload_length % rtp_frame_length : 0;
 
                         if (!tail)
                         {

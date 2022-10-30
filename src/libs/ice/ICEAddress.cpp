@@ -427,7 +427,7 @@ std::string NetworkAddress::ip() const
 {
   assert(mInitialized == true);
 
-  char resultbuf[160], ip6[160]; resultbuf[0] = 0;
+  char resultbuf[159], ip6[161]; resultbuf[0] = 0;
 
 #ifdef TARGET_WIN
   DWORD resultsize = sizeof(resultbuf);
