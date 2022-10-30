@@ -1,9 +1,0 @@
-build_exe:
-    script:
-        - apt install cmake c++
-        - mkdir -p build
-        - cd build
-        - git clone https://gitlab.com/dmytro.bogovych/libraries.git
-        - cmake -D LIB_PLATFORM=libraries ../src
-        - cmake --build .
-        
