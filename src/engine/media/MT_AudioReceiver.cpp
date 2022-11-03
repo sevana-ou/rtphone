@@ -484,9 +484,10 @@ void AudioReceiver::processDecoded(Audio::DataWindow& output, int options)
     output.add(mResampledFrame, mResampledLength);
 }
 
-bool AudioReceiver::getAudio(Audio::DataWindow& output, int options, int* rate)
+AudioReceiver::DecodeResult AudioReceiver::getAudio(Audio::DataWindow& output, int options, int* rate)
 {
-    bool result = false, /*had_cng = false, */had_decode = false;
+    DecodeResult result = DecodeResult_Skip;
+    bool had_decode = false;
 
     // Get next packet from buffer
     RtpBuffer::ResultList rl;
@@ -505,19 +506,19 @@ bool AudioReceiver::getAudio(Audio::DataWindow& output, int options, int* rate)
                                                  reinterpret_cast<short*>(mDecodedFrame), false);
         }
         else
-            if (mCodec && mFrameCount && !mCodecSettings.mSkipDecode)
-            {
-                // Do PLC to mDecodedFrame/mDecodedLength
-                if (options & DecodeOptions_SkipDecode)
-                    mDecodedLength = 0;
-                else
-                    mDecodedLength = mCodec->plc(mFrameCount, mDecodedFrame, sizeof mDecodedFrame);
-            }
+        if (mCodec && mFrameCount && !mCodecSettings.mSkipDecode)
+        {
+            // Do PLC to mDecodedFrame/mDecodedLength
+            if (options & DecodeOptions_SkipDecode)
+                mDecodedLength = 0;
+            else
+                mDecodedLength = mCodec->plc(mFrameCount, mDecodedFrame, sizeof mDecodedFrame);
+        }
 
         if (mDecodedLength)
         {
             processDecoded(output, options);
-            result = true;
+            result = DecodeResult_Ok;
         }
         break;
 
@@ -569,7 +570,7 @@ bool AudioReceiver::getAudio(Audio::DataWindow& output, int options, int* rate)
                         if (mDecodedLength)
                             processDecoded(output, options);
                     }
-                    result = true;
+                    result = DecodeResult_Ok;
                 }
             }
 
@@ -603,7 +604,7 @@ bool AudioReceiver::getAudio(Audio::DataWindow& output, int options, int* rate)
                             if (mDecodedLength)
                                 processDecoded(output, options);
                         }
-                        result = true;
+                        result = DecodeResult_Ok;
                     }
                     else
                     {
@@ -644,14 +645,16 @@ bool AudioReceiver::getAudio(Audio::DataWindow& output, int options, int* rate)
                                         processDecoded(output, options);
                                 }
                             }
-                            result = mFrameCount > 0;
+                            result = mFrameCount > 0 ? DecodeResult_Ok : DecodeResult_Skip;
 
                             // Check for bitrate counter
                             processStatisticsWithAmrCodec(mCodec.get());
                         }
                         else
-                            ICELogMedia(<< "RTP packet with tail.");
-
+                        {
+                            result = DecodeResult_BadPacket;
+                            // ICELogMedia(<< "RTP packet with tail.");
+                        }
                     }
                 }
             }

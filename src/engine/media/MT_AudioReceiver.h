@@ -138,7 +138,14 @@ namespace MT
       DecodeOptions_SkipDecode = 4
     };
 
-    bool getAudio(Audio::DataWindow& output, int options = DecodeOptions_ResampleToMainRate, int* rate = nullptr);
+    enum DecodeResult
+    {
+        DecodeResult_Ok,
+        DecodeResult_Skip,
+        DecodeResult_BadPacket
+    };
+
+    DecodeResult getAudio(Audio::DataWindow& output, int options = DecodeOptions_ResampleToMainRate, int* rate = nullptr);
 
     // Looks for codec by payload type
     Codec* findCodec(int payloadType);

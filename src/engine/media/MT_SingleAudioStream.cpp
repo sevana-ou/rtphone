@@ -34,8 +34,10 @@ void SingleAudioStream::process(const std::shared_ptr<jrtplib::RTPPacket>& packe
 void SingleAudioStream::copyPcmTo(Audio::DataWindow& output, int needed)
 {
     while (output.filled() < needed)
-        if (!mReceiver.getAudio(output))
+    {
+        if (mReceiver.getAudio(output) != AudioReceiver::DecodeResult_Ok)
             break;
+    }
 
     if (output.filled() < needed)
         ICELogError(<< "Not enough data for speaker's mixer");
