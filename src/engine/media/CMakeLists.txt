@@ -7,13 +7,6 @@ set (CMAKE_CXX_STANDARD_REQUIRED ON)
 # Produce PIC code always
 set (CMAKE_POSITION_INDEPENDENT_CODE ON)
 
-# Set of variables to control references to codecs
-set (USE_AMR_CODEC       OFF CACHE BOOL "Use AMR codec. Requires libraries.")
-set (USE_EVS_CODEC       OFF CACHE BOOL "Use EVS codec."                    )
-set (USE_OPUS_CODEC      OFF CACHE BOOL "Use Opus codec."                   )
-set (USE_PVQA_LIB        OFF CACHE BOOL "Build with Sevana PVQA library"    )
-set (USE_AQUA_LIB        OFF CACHE BOOL "Build with Sevana AQuA library"    )
-
 set (SOURCES
     MT_Statistics.cpp
     MT_WebRtc.cpp
@@ -47,19 +40,21 @@ set (SOURCES
     )
 
 if (USE_AMR_CODEC)
-    message("AMR NB and WB codecs will be included.")
+    message("Media: AMR NB and WB codecs will be included.")
     add_definitions(-DUSE_AMR_CODEC)
-    set(SOURCES ${SOURCES} MT_AmrCodec.cpp MT_AmrCodec.h)
+    set (SOURCES ${SOURCES} MT_AmrCodec.cpp MT_AmrCodec.h)
+    set (LIBS_CODEC)
 endif()
 
 if (USE_EVS_CODEC)
-    message("EVS codec will be included.")
+    message("Media: EVS codec will be included.")
     add_definitions (-DUSE_EVS_CODEC)
     set (SOURCES ${SOURCES} MT_EvsCodec.cpp MT_EvsCodec.h)
+    set (LIBS_CODEC evs)
 endif()
 
 if (USE_OPUS_CODEC)
-    message("Opus codec will be included.")
+    message("Media: Opus codec will be included.")
     add_definitions(-DUSE_OPUS_CODEC)
 endif()
 
@@ -75,14 +70,19 @@ endif()
 
 if (CMAKE_SYSTEM MATCHES "Windows*")
     # Windows Specific flags - MSVC expected
-    add_definitions(-D_CRT_SECURE_NO_WARNINGS -DHAVE_WINSOCK2_H
-        -D_SILENCE_STDEXT_HASH_DEPRECATION_WARNINGS -DUNICODE -D_UNICODE )
+    add_definitions(
+        -D_CRT_SECURE_NO_WARNINGS
+        -DHAVE_WINSOCK2_H
+        -D_SILENCE_STDEXT_HASH_DEPRECATION_WARNINGS
+        -DUNICODE
+        -D_UNICODE )
 endif()
 
 add_library(media_lib ${SOURCES})
 
 # Dependency on ice_stack - Linux build requires it
-target_link_libraries(media_lib ice_stack)
+# Codec libraries as well
+target_link_libraries(media_lib ice_stack ${LIBS_CODEC})
 
 set_property(TARGET media_lib PROPERTY
   MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")

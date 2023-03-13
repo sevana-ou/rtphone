@@ -57,12 +57,10 @@ set (CMAKE_CXX_STANDARD_REQUIRED ON)
 set (rtphone_libs libs)
 set (rtphone_engine engine)
 
-set (USE_AMR_CODEC       OFF CACHE BOOL "Use AMR codec. Requires libraries.")
-set (USE_EVS_CODEC       OFF CACHE BOOL "Use EVS codec."                    )
-set (USE_OPUS_CODEC      OFF CACHE BOOL "Use Opus codec."                   )
-set (USE_PVQA_LIB        OFF CACHE BOOL "Build with Sevana PVQA library"    )
-set (USE_AQUA_LIB        OFF CACHE BOOL "Build with Sevana AQuA library"    )
-set (USE_MUSL            OFF CACHE BOOL "Build with MUSL library"           )
+option (USE_AMR_CODEC   "Use AMR codec. Requires libraries."    ON)
+option (USE_EVS_CODEC   "Use EVS codec."                        ON)
+option (USE_OPUS_CODEC  "Use Opus codec."                       ON)
+option (USE_MUSL        "Build with MUSL library"               OFF)
 
 # PIC code by default
 set (CMAKE_POSITION_INDEPENDENT_CODE ON)
@@ -97,19 +95,6 @@ endif()
 
 if (USE_MUSL)
     add_definitions(-DTARGET_MUSL)
-endif()
-
-if (USE_AQUA_LIB)
-    message("Use AQuA library")
-    add_definitions( -DUSE_AQUA_LIBRARY )
-    include_directories(${CMAKE_CURRENT_SOURCE_DIR}/libs/pvqa/include)
-endif()
-
-if (USE_PVQA_LIBRARY)
-    message("Use PVQA libraries")
-    add_definitions( -DUSE_PVQA_LIBRARY )
-    include_directories(${CMAKE_CURRENT_SOURCE_DIR}/libs/pvqa/include
-                        ${CMAKE_CURRENT_SOURCE_DIR}/libs/pvqa++/include)
 endif()
 
 set (RTPHONE_SOURCES
@@ -165,12 +150,12 @@ set (RTPHONE_SOURCES
 
 if (USE_AMR_CODEC)
     add_definitions(-DUSE_AMR_CODEC)
-    set(RTPHONE_SOURCES ${RTPHONE_SOURCES} ${rtphone_engine}/media/MT_AmrCodec.cpp ${rtphone_engine}/media/MT_AmrCodec.h)
+    set (RTPHONE_SOURCES ${RTPHONE_SOURCES} ${rtphone_engine}/media/MT_AmrCodec.cpp ${rtphone_engine}/media/MT_AmrCodec.h)
 endif()
 
 if (USE_EVS_CODEC)
     add_definitions(-DUSE_EVS_CODEC)
-    set(RTPHONE_SOURCES ${RTPHONE_SOURCES} ${rtphone_engine}/media/MT_EvsCodec.cpp ${rtphone_engine}/media/MT_EvsCodec.h)
+    set (RTPHONE_SOURCES ${RTPHONE_SOURCES} ${rtphone_engine}/media/MT_EvsCodec.cpp ${rtphone_engine}/media/MT_EvsCodec.h)
 endif()
 
 if (USE_OPUS_CODEC)
@@ -212,9 +197,6 @@ if (CMAKE_SYSTEM MATCHES "Android")
     set (LIBS ${LIBS} oboe)
 endif()
 
-if (USE_AMR_CODEC)
-    set (LIBS ${LIBS})
-endif (USE_AMR_CODEC)
 
 target_link_libraries(rtphone
     ice_stack jrtplib g729_codec gsm_codec

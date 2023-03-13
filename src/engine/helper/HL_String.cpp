@@ -1,4 +1,4 @@
-/* Copyright(C) 2007-2017 VoIPobjects (voipobjects.com)
+/* Copyright(C) 2007-2023 VoIPobjects (voipobjects.com)
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -8,6 +8,7 @@
 #include <iomanip>
 #include <memory.h>
 #include <algorithm>
+#include <inttypes.h>
 
 #ifdef TARGET_WIN
 # include <WinSock2.h>
@@ -92,11 +93,7 @@ int StringHelper::toInt(const char *s, int defaultValue, bool* isOk)
 uint64_t StringHelper::toUint64(const char* s, uint64_t def, bool *isOk)
 {
     uint64_t result = def;
-#if defined(TARGET_WIN)
-    if (sscanf(s, "%I64d", &result) != 1)
-#else
-    if (sscanf(s, "%llu", &result) != 1)
-#endif
+    if (sscanf(s, "%" SCNu64, &result) != 1)
     {
         if (isOk)
             *isOk = false;

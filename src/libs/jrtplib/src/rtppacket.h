@@ -119,6 +119,7 @@ public:
 
 	/** Returns the SSRC identifier stored in this packet. */
 	uint32_t GetSSRC() const															{ return ssrc; }
+    void SetSSRC(uint32_t ssrc)                                                         { this->ssrc = ssrc; }
 
 	/** Returns a pointer to the data of the entire packet. */
 	uint8_t *GetPacketData() const														{ return packet; }
@@ -131,7 +132,7 @@ public:
 
 	/** Returns the payload length. */
 	size_t GetPayloadLength() const														{ return payloadlength; }
-  void SetPayloadLength(size_t l)                           { payloadlength = l; }
+    void SetPayloadLength(size_t l)                                                     { payloadlength = l; }
 
 	/** If a header extension is present, this function returns the extension identifier. */
 	uint16_t GetExtensionID() const														{ return extid; }

@@ -80,6 +80,14 @@ unsigned RtpHelper::findSsrc(const void* buffer, size_t length)
         return reinterpret_cast<const RtcpHeader*>(buffer)->ssrc;
 }
 
+void RtpHelper::setSsrc(void* buffer, size_t length, uint32_t ssrc)
+{
+    if (isRtp(buffer, length))
+        reinterpret_cast<RtpHeader*>(buffer)->ssrc = ssrc;
+    else
+        reinterpret_cast<RtcpHeader*>(buffer)->ssrc = ssrc;
+}
+
 int RtpHelper::findPtype(const void* buffer, size_t length)
 {
     if (isRtp(buffer, length))

@@ -58,7 +58,7 @@ public:
 	 *  The flag which indicates whether this data is RTP or RTCP data is set to \c rtp. A memory
 	 *  manager can be installed as well.
 	 */
-	RTPRawPacket(uint8_t *data,size_t datalen,RTPAddress *address,RTPTime &recvtime,bool rtp,RTPMemoryManager *mgr = 0);
+    RTPRawPacket(uint8_t *data,size_t datalen,RTPAddress *address,const RTPTime &recvtime,bool rtp,RTPMemoryManager *mgr = 0);
 	~RTPRawPacket();
 	
 	/** Returns the pointer to the data which is contained in this packet. */
@@ -92,12 +92,13 @@ private:
 	bool isrtp;
 };
 
-inline RTPRawPacket::RTPRawPacket(uint8_t *data,size_t datalen,RTPAddress *address,RTPTime &recvtime,bool rtp,RTPMemoryManager *mgr):RTPMemoryObject(mgr),receivetime(recvtime)
+inline RTPRawPacket::RTPRawPacket(uint8_t *data,size_t datalen,RTPAddress *address, const RTPTime &recvtime,bool rtp,RTPMemoryManager *mgr):RTPMemoryObject(mgr),receivetime(recvtime)
 {
 	packetdata = data;
 	packetdatalength = datalen;
 	senderaddress = address;
 	isrtp = rtp;
+    receivetime = recvtime;
 }
 
 inline RTPRawPacket::~RTPRawPacket()

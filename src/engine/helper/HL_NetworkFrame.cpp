@@ -11,15 +11,36 @@
 #define MPLS_STACK_MASK (0x00000100)
 #define MPLS_STACK_SHIFT (8)
 
-NetworkFrame::PacketData NetworkFrame::GetUdpPayloadForEthernet(NetworkFrame::PacketData& packet, InternetAddress& source, InternetAddress& destination)
+NetworkFrame::Payload NetworkFrame::GetUdpPayloadForRaw(const Packet& data)
 {
-    PacketData result(packet);
+    const Ip4Header* ip4 = reinterpret_cast<const Ip4Header*>(data.mData);
 
-    const EthernetHeader* ethernet = reinterpret_cast<const EthernetHeader*>(packet.mData);
+    if (ip4->mProtocol != IPPROTO_UDP && ip4->mProtocol != 0)
+        return Payload();
+
+
+    switch (ip4->version())
+    {
+    case 4:
+        return GetUdpPayloadForIp4(data);
+
+    case 6:
+        return GetUdpPayloadForIp6(data);
+
+    default:
+        return Payload();
+    }
+}
+
+NetworkFrame::Payload NetworkFrame::GetUdpPayloadForEthernet(const Packet& data)
+{
+    Packet result(data);
+
+    const EthernetHeader* ethernet = reinterpret_cast<const EthernetHeader*>(data.mData);
 
     // Skip ethernet header
-    packet.mData += sizeof(EthernetHeader);
-    packet.mLength -= sizeof(EthernetHeader);
+    result.mData += sizeof(EthernetHeader);
+    result.mLength -= sizeof(EthernetHeader);
 
     // See if there is Vlan header
     uint16_t proto = 0;
@@ -28,9 +49,9 @@ NetworkFrame::PacketData NetworkFrame::GetUdpPayloadForEthernet(NetworkFrame::Pa
         // Skip 1 or more VLAN headers
         do
         {
-            const VlanHeader* vlan = reinterpret_cast<const VlanHeader*>(packet.mData);
-            packet.mData += sizeof(VlanHeader);
-            packet.mLength -= sizeof(VlanHeader);
+            const VlanHeader* vlan = reinterpret_cast<const VlanHeader*>(result.mData);
+            result.mData += sizeof(VlanHeader);
+            result.mLength -= sizeof(VlanHeader);
             proto = ntohs(vlan->mData);
         }
         while (proto == 0x8100);
@@ -43,10 +64,10 @@ NetworkFrame::PacketData NetworkFrame::GetUdpPayloadForEthernet(NetworkFrame::Pa
     case ETHERTYPE_MPLS_MC:
         // Parse MPLS here until marker "bottom of mpls stack"
         for(bool bottomOfStack = false; !bottomOfStack;
-            bottomOfStack = ((ntohl(*(uint32_t*)(packet.mData - 4)) & MPLS_STACK_MASK) >> MPLS_STACK_SHIFT) != 0)
+            bottomOfStack = ((ntohl(*(uint32_t*)(result.mData - 4)) & MPLS_STACK_MASK) >> MPLS_STACK_SHIFT) != 0)
         {
-            packet.mData += 4;
-            packet.mLength -=4;
+            result.mData += 4;
+            result.mLength -=4;
         }
         break;
 
@@ -59,86 +80,86 @@ NetworkFrame::PacketData NetworkFrame::GetUdpPayloadForEthernet(NetworkFrame::Pa
         break;
     }
 
-    const Ip4Header* ip4 = reinterpret_cast<const Ip4Header*>(packet.mData);
+    const Ip4Header* ip4 = reinterpret_cast<const Ip4Header*>(result.mData);
 
     if (ip4->mProtocol != IPPROTO_UDP && ip4->mProtocol != 0)
-        return PacketData();
+        return Payload();
 
 
     switch (ip4->version())
     {
     case 4:
-        return GetUdpPayloadForIp4(packet, source, destination);
+        return GetUdpPayloadForIp4(result);
 
     case 6:
-        return GetUdpPayloadForIp6(packet, source, destination);
+        return GetUdpPayloadForIp6(result);
 
     default:
-        return PacketData();
+        return Payload();
     }
 }
 
-NetworkFrame::PacketData NetworkFrame::GetUdpPayloadForSLL(NetworkFrame::PacketData& packet, InternetAddress& source, InternetAddress& destination)
+NetworkFrame::Payload NetworkFrame::GetUdpPayloadForSLL(const Packet& data)
 {
-    PacketData result(packet);
+    Packet result(data);
 
-    if (packet.mLength < 16)
-        return PacketData();
+    if (result.mLength < 16)
+        return Payload();
 
-    const LinuxSllHeader* sll = reinterpret_cast<const LinuxSllHeader*>(packet.mData);
+    const LinuxSllHeader* sll = reinterpret_cast<const LinuxSllHeader*>(result.mData);
 
-    packet.mData += sizeof(LinuxSllHeader);
-    packet.mLength -= sizeof(LinuxSllHeader);
+    result.mData += sizeof(LinuxSllHeader);
+    result.mLength -= sizeof(LinuxSllHeader);
 
     switch (ntohs(sll->mProtocolType))
     {
     case 0x0800:
-        return GetUdpPayloadForIp4(packet, source, destination);
+        return GetUdpPayloadForIp4(result);
 
     case 0x86DD:
-        return GetUdpPayloadForIp6(packet, source, destination);
+        return GetUdpPayloadForIp6(result);
 
     default:
-        return PacketData();
+        return Payload();
     }
 }
 
-NetworkFrame::PacketData NetworkFrame::GetUdpPayloadForLoopback(NetworkFrame::PacketData& packet, InternetAddress& source, InternetAddress& destination)
+NetworkFrame::Payload NetworkFrame::GetUdpPayloadForLoopback(const Packet& data)
 {
-    PacketData result(packet);
+    Packet result(data);
 
-    if (packet.mLength < 16)
-        return PacketData();
+    if (result.mLength < 16)
+        return Payload();
 
     struct LoopbackHeader
     {
         uint32_t mProtocolType;
     };
 
-    const LoopbackHeader* lh = reinterpret_cast<const LoopbackHeader*>(packet.mData);
+    const LoopbackHeader* lh = reinterpret_cast<const LoopbackHeader*>(result.mData);
 
-    packet.mData += sizeof(LoopbackHeader);
-    packet.mLength -= sizeof(LoopbackHeader);
+    result.mData += sizeof(LoopbackHeader);
+    result.mLength -= sizeof(LoopbackHeader);
 
     switch (lh->mProtocolType)
     {
     case AF_INET:
-        return GetUdpPayloadForIp4(packet, source, destination);
+        return GetUdpPayloadForIp4(result);
 
     case AF_INET6:
-        return GetUdpPayloadForIp6(packet, source, destination);
+        return GetUdpPayloadForIp6(result);
 
     default:
-        return PacketData();
+        return Payload();
     }
 }
 
-NetworkFrame::PacketData NetworkFrame::GetUdpPayloadForIp4(NetworkFrame::PacketData& packet, InternetAddress& source, InternetAddress& destination)
+NetworkFrame::Payload NetworkFrame::GetUdpPayloadForIp4(const Packet& data)
 {
-    PacketData result(packet);
-    const Ip4Header* ip4 = reinterpret_cast<const Ip4Header*>(packet.mData);
+    Packet result(data);
+    const Ip4Header* ip4 = reinterpret_cast<const Ip4Header*>(data.mData);
     if (ip4->mProtocol != IPPROTO_UDP && ip4->mProtocol != 0)
-        return PacketData(nullptr, 0);
+        return Payload();
 
     result.mData += ip4->headerLength();
     result.mLength -= ip4->headerLength();
@@ -152,13 +173,15 @@ NetworkFrame::PacketData NetworkFrame::GetUdpPayloadForIp4(NetworkFrame::PacketD
     if (length - sizeof(UdpHeader) < (size_t)result.mLength)
         result.mLength = length - sizeof(UdpHeader);
 
-    source.setIp(ip4->mSource);
-    source.setPort(ntohs(udp->mSourcePort));
+    InternetAddress addr_source;
+    addr_source.setIp(ip4->mSource);
+    addr_source.setPort(ntohs(udp->mSourcePort));
 
-    destination.setIp(ip4->mDestination);
-    destination.setPort(ntohs(udp->mDestinationPort));
+    InternetAddress addr_dest;
+    addr_dest.setIp(ip4->mDestination);
+    addr_dest.setPort(ntohs(udp->mDestinationPort));
 
-    return result;
+    return {.data = result, .source = addr_source, .dest = addr_dest};
 }
 
 struct Ip6Header
@@ -188,10 +211,10 @@ struct Ip6Header
     struct	in6_addr	dst_ip;
 };
 
-NetworkFrame::PacketData NetworkFrame::GetUdpPayloadForIp6(NetworkFrame::PacketData& packet, InternetAddress& source, InternetAddress& destination)
+NetworkFrame::Payload NetworkFrame::GetUdpPayloadForIp6(const Packet& data)
 {
-    PacketData result(packet);
-    const Ip6Header* ip6 = reinterpret_cast<const Ip6Header*>(packet.mData);
+    Packet result(data);
+    const Ip6Header* ip6 = reinterpret_cast<const Ip6Header*>(result.mData);
     /*if (ip6->mProtocol != IPPROTO_UDP && ip4->mProtocol != 0)
     return PacketData(nullptr, 0);
   */
@@ -203,18 +226,13 @@ NetworkFrame::PacketData NetworkFrame::GetUdpPayloadForIp6(NetworkFrame::PacketD
     result.mData += sizeof(UdpHeader);
     result.mLength -= sizeof(UdpHeader);
 
-    /*
-  if (result.mLength != ntohs(udp->mDatagramLength))
-    return PacketData(nullptr, 0);
-  */
+    InternetAddress addr_source;
+    addr_source.setIp(ip6->src_ip);
+    addr_source.setPort(ntohs(udp->mSourcePort));
 
-    source.setIp(ip6->src_ip);
-    source.setPort(ntohs(udp->mSourcePort));
-    //std::cout << source.toStdString() << " - ";
+    InternetAddress addr_dest;
+    addr_dest.setIp(ip6->dst_ip);
+    addr_dest.setPort(ntohs(udp->mDestinationPort));
 
-    destination.setIp(ip6->dst_ip);
-    destination.setPort(ntohs(udp->mDestinationPort));
-    //std::cout << destination.toStdString() << std::endl;
-
-    return result;
+    return {.data = result, .source = addr_source, .dest = addr_dest};
 }

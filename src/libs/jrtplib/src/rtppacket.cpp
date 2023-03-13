@@ -126,11 +126,11 @@ int RTPPacket::ParseRawPacket(RTPRawPacket &rawpack)
 		return ERR_RTP_PACKET_INVALIDPACKET;
 	
 	// The length should be at least the size of the RTP header
-  packetlen = rawpack.GetDataLength();
+    packetlen = rawpack.GetDataLength();
 	if (packetlen < sizeof(RTPHeader))
 		return ERR_RTP_PACKET_INVALIDPACKET;
 
-  packetbytes = (uint8_t *)rawpack.GetData();
+    packetbytes = (uint8_t *)rawpack.GetData();
 	rtpheader = (RTPHeader *)packetbytes;
 	
 	// The version number should be correct
@@ -208,7 +208,7 @@ int RTPPacket::ParseRawPacket(RTPRawPacket &rawpack)
 	RTPPacket::payloadlength = payloadlength;
 
 	// We'll zero the data of the raw packet, since we're using it here now!
-  rawpack.ZeroData();
+    rawpack.ZeroData();
 
 	return 0;
 }

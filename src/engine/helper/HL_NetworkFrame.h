@@ -7,25 +7,38 @@
 class NetworkFrame
 {
 public:
-    struct PacketData
+    struct Packet
     {
         const uint8_t* mData;
         size_t mLength;
 
-        PacketData(const uint8_t* data, size_t length)
+        Packet(const uint8_t* data, size_t length)
             :mData(data), mLength(length)
         {}
 
-        PacketData()
+        Packet()
             :mData(nullptr), mLength(0)
         {}
+
+        bool is_empty() const
+        {
+            return mData == nullptr || mLength == 0;
+        }
     };
 
-    static PacketData GetUdpPayloadForEthernet(PacketData& packet, InternetAddress& source, InternetAddress& destination);
-    static PacketData GetUdpPayloadForIp4(PacketData& packet, InternetAddress& source, InternetAddress& destination);
-    static PacketData GetUdpPayloadForIp6(PacketData& packet, InternetAddress& source, InternetAddress& destination);
-    static PacketData GetUdpPayloadForSLL(PacketData& packet, InternetAddress& source, InternetAddress& destination);
-    static PacketData GetUdpPayloadForLoopback(PacketData& packet, InternetAddress& source, InternetAddress& destination);
+    struct Payload
+    {
+        Packet data;
+        InternetAddress source;
+        InternetAddress dest;
+    };
+
+    static Payload GetUdpPayloadForEthernet(const Packet& data);
+    static Payload GetUdpPayloadForIp4(const Packet& data);
+    static Payload GetUdpPayloadForIp6(const Packet& data);
+    static Payload GetUdpPayloadForSLL(const Packet& data);
+    static Payload GetUdpPayloadForLoopback(const Packet& data);
+    static Payload GetUdpPayloadForRaw(const Packet& data);
 
     struct EthernetHeader
     {

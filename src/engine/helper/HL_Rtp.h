@@ -36,13 +36,14 @@ struct RtpPair
 class RtpHelper
 {
 public:
-    static bool isRtp(const void* buffer, size_t length);
-    static int findPtype(const void* buffer, size_t length);
-    static int findPacketNo(const void* buffer, size_t length);
-    static bool isRtpOrRtcp(const void* buffer, size_t length);
-    static bool isRtcp(const void* buffer, size_t length);
+    static bool     isRtp(const void* buffer, size_t length);
+    static int      findPtype(const void* buffer, size_t length);
+    static int      findPacketNo(const void* buffer, size_t length);
+    static bool     isRtpOrRtcp(const void* buffer, size_t length);
+    static bool     isRtcp(const void* buffer, size_t length);
     static unsigned findSsrc(const void* buffer, size_t length);
-    static int findPayloadLength(const void* buffer, size_t length);
+    static void     setSsrc(void* buffer, size_t length, uint32_t ssrc);
+    static int      findPayloadLength(const void* buffer, size_t length);
 };
 
 #if defined(USE_RTPDUMP)

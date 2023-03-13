@@ -15,5 +15,5 @@ add_library(helper_lib ${HELPER_LIB_SOURCES})
 set_property(TARGET helper_lib PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 
 # Private include directories
-target_include_directories(helper_lib PRIVATE ../../libs/ ../../engine ../)
+target_include_directories(helper_lib PUBLIC ../../libs/ ../../engine ../ .)
 target_compile_definitions(helper_lib PRIVATE -D_CRT_SECURE_NO_WARNINGS -D_UNICODE)
