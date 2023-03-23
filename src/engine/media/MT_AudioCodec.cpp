@@ -520,12 +520,13 @@ int OpusCodec::plc(int lostFrames, void* output, int outputCapacity)
 {
   int nrOfSamplesInFrame = pcmLength() / (sizeof(short) * channels());
   memset(output, 0, outputCapacity);
+
+  int nr_of_decoded_samples = 0;
   for (int i=0; i<lostFrames; i++)
   {
-    /*int decodedSamples = */opus_decode(mDecoderCtx, NULL, 0, (opus_int16*)output + nrOfSamplesInFrame * i, nrOfSamplesInFrame, 0);
-
+    nr_of_decoded_samples += opus_decode(mDecoderCtx, nullptr, 0, (opus_int16*)output + nrOfSamplesInFrame * i, nrOfSamplesInFrame, 0);
   }
-  return lostFrames * pcmLength();
+  return nr_of_decoded_samples ? lostFrames * pcmLength() : 0;
 }
 #endif
 
