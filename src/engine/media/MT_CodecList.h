@@ -7,9 +7,11 @@
 #define __MT_CODEC_LIST_H
 
 #include "../config.h"
+
 #if defined(USE_RESIP_INTEGRATION)
 # include "resiprocate/resip/stack/SdpContents.hxx"
 #endif
+
 #include "MT_Codec.h"
 #include <vector>
 #include <set>
@@ -109,7 +111,7 @@ public:
     ~CodecListPriority();
 
     void setupFrom(PVariantMap vmap);
-    int count(const CodecList& cl) const;
+    int  count(const CodecList& cl) const;
     Codec::Factory& codecAt(const CodecList& cl, int index) const;
 
 protected:
