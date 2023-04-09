@@ -26,9 +26,16 @@ namespace ice
     NetworkAddress(int stunType);
     NetworkAddress(const std::string& ip, unsigned short port);
     NetworkAddress(const char* ip, unsigned short port);
+
+    // Both ip_4 and port are network byte order
+    NetworkAddress(uint32_t ip_4, uint16_t port);
+
+    // Both ip_6 and port are network byte order
+    NetworkAddress(const uint8_t* ip_6, uint16_t port);
+
     NetworkAddress(const in6_addr& ip, unsigned short port);
     NetworkAddress(const in_addr& ip, unsigned short port);
-	  NetworkAddress(const sockaddr& addr, unsigned addrLen);
+    NetworkAddress(const sockaddr& addr, unsigned addrLen);
     NetworkAddress(const NetworkAddress& src);
     ~NetworkAddress();
 

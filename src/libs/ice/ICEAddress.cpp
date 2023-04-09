@@ -185,6 +185,24 @@ NetworkAddress::NetworkAddress(const char *ip, unsigned short port)
     setPort(port);
 }
 
+NetworkAddress::NetworkAddress(uint32_t ip_4, uint16_t port)
+    :mInitialized(true), mRelayed(false)
+{
+    memset(&mAddr6, 0, sizeof(mAddr6));
+    mAddr4.sin_family = AF_INET;
+    mAddr4.sin_addr.s_addr = ip_4;
+    mAddr4.sin_port = port;
+}
+
+NetworkAddress::NetworkAddress(const uint8_t* ip_6, uint16_t port)
+    :mInitialized(true), mRelayed(false)
+{
+    memset(&mAddr6, 0, sizeof(mAddr6));
+    mAddr6.sin6_family = AF_INET6;
+    memmove(&mAddr6.sin6_addr, ip_6, sizeof(mAddr6.sin6_addr));
+    mAddr6.sin6_port = port;
+}
+
 NetworkAddress::NetworkAddress(const sockaddr& addr, unsigned addrLen)
 :mInitialized(true), mRelayed(false)
 {

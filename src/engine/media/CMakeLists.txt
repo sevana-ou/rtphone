@@ -50,7 +50,7 @@ if (USE_EVS_CODEC)
     message("Media: EVS codec will be included.")
     add_definitions (-DUSE_EVS_CODEC)
     set (SOURCES ${SOURCES} MT_EvsCodec.cpp MT_EvsCodec.h)
-    set (LIBS_CODEC evs)
+    set (LIBS_CODEC evs_codec)
 endif()
 
 if (USE_OPUS_CODEC)

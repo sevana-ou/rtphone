@@ -5,7 +5,7 @@ project (helper_lib)
 set (CMAKE_CXX_STANDARD 11)
 set (CMAKE_CXX_STANDARD_REQUIRED ON)
 
-set (USE_NULL_UUID OFF CACHE BOOL "When enabled linking to libuuid is avoided")
+option (USE_NULL_UUID "When enabled linking to libuuid is avoided" OFF)
 
 set (CMAKE_POSITION_INDEPENDENT_CODE ON)
 
