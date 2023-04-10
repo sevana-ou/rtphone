@@ -132,7 +132,7 @@ CodecList::CodecList(const Settings& settings)
   :mSettings(settings)
 {
   //mFactoryList.push_back(new OpusCodec::OpusFactory(16000, 1));
-/*
+
 #if defined(USE_OPUS_CODEC)
   if (settings.mOpusSpec.empty())
   {
@@ -146,7 +146,7 @@ CodecList::CodecList(const Settings& settings)
     }
   }
 #endif
- */
+
 
 #if !defined(TARGET_ANDROID) && !defined(TARGET_OPENWRT) && !defined(TARGET_RPI)
 #if defined(USE_AMR_CODEC)

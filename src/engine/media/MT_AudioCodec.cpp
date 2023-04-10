@@ -493,16 +493,18 @@ int OpusCodec::encode(const void* input, int inputBytes, void* output, int outpu
 
 int OpusCodec::decode(const void* input, int inputBytes, void* output, int outputCapacity)
 {
-  int nrOfChannelsInPacket = opus_packet_get_nb_channels((const unsigned char*)input);
-  assert(nrOfChannelsInPacket == 1);
+  int nr_of_channels = opus_packet_get_nb_channels((const unsigned char*)input);
+  assert(nr_of_channels == channels());
 
-  int nrOfSamplesInPacket = opus_decoder_get_nb_samples(mDecoderCtx, (const unsigned char*)input, inputBytes);
-  if (nrOfSamplesInPacket > 0)
+  int nr_of_frames = opus_decoder_get_nb_samples(mDecoderCtx, (const unsigned char*)input, inputBytes);
+  if (nr_of_frames > 0)
   {
     // Send number of bytes for input and number of samples for output
-    int capacity = nrOfSamplesInPacket * sizeof(opus_int16) * channels();
+    int capacity = nr_of_frames * sizeof(opus_int16) * channels();
+
+    // Dangerous !
     opus_int16* buffer = (opus_int16*)alloca(capacity);
-    int decoded = opus_decode(mDecoderCtx, (const unsigned char*)input, inputBytes, (opus_int16*)buffer, capacity / (sizeof(short) * channels()), 1);
+    int decoded = opus_decode(mDecoderCtx, (const unsigned char*)input, inputBytes, (opus_int16*)buffer, capacity / (sizeof(short) * channels()), 0 /* FEC decoding is for lost packets */);
     if (decoded < 0)
       return 0;
     else
