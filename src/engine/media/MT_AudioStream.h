@@ -25,10 +25,10 @@
 
 namespace MT
 {
-  
-  class AudioStream: public Stream
-  {
-  public:
+
+class AudioStream: public Stream
+{
+public:
     AudioStream(const CodecList::Settings& codecSettings);
     ~AudioStream();
 
@@ -38,7 +38,7 @@ namespace MT
     void setTransmittingCodec(Codec::Factory& factory, int payloadType) override;
     PCodec transmittingCodec();
 
-    // Called to queue data captured from microphone. 
+    // Called to queue data captured from microphone.
     // Buffer holds 16bits PCM data with AUDIO_SAMPLERATE rate and AUDIO_CHANNELS channels.
     void addData(const void* buffer, int length);
     
@@ -51,7 +51,7 @@ namespace MT
     void setState(unsigned state) override;
     
     void setTelephoneCodec(int payloadType);
-    DtmfContext& queueOfDtmf();    
+    DtmfContext& queueOfDtmf();
 
     void readFile(const Audio::PWavFileReader& stream, MediaDirection direction) override;
     void writeFile(const Audio::PWavFileWriter& writer, MediaDirection direction) override;
@@ -59,7 +59,7 @@ namespace MT
 
     void setFinalStatisticsOutput(Statistics* stats);
 
-  protected:
+protected:
     Audio::DataWindow mCapturedAudio;     // Data from microphone
     Audio::DataWindow mStereoCapturedAudio;
     char mIncomingPcmBuffer[AUDIO_MIC_BUFFER_SIZE]; // Temporary buffer to allow reading from file
@@ -83,18 +83,18 @@ namespace MT
     RtpDump* mRtpDump = nullptr;
 #endif
     Audio::Resampler  mCaptureResampler8,
-                      mCaptureResampler16,
-                      mCaptureResampler32,
-                      mCaptureResampler48;
-    DtmfContext mDtmfContext;  
+    mCaptureResampler16,
+    mCaptureResampler32,
+    mCaptureResampler48;
+    DtmfContext mDtmfContext;
     char mReceiveBuffer[MAX_VALID_UDPPACKET_SIZE];
 
     struct
     {
-      Audio::PWavFileWriter  mStreamForRecordingIncoming,
-                      mStreamForRecordingOutgoing;
-      Audio::PWavFileReader  mStreamForReadingIncoming,
-                      mStreamForReadingOutgoing;
+        Audio::PWavFileWriter  mStreamForRecordingIncoming,
+        mStreamForRecordingOutgoing;
+        Audio::PWavFileReader  mStreamForReadingIncoming,
+        mStreamForReadingOutgoing;
     } mDumpStreams;
 
     Audio::PWavFileWriter mSendingDump;
@@ -106,7 +106,7 @@ namespace MT
     Statistics* mFinalStatistics = nullptr;
 
     bool decryptSrtp(void* data, int* len);
-  };
+};
 };
 
 #endif

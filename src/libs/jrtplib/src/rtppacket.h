@@ -80,7 +80,7 @@ public:
 		  bool gotextension,uint16_t extensionid,uint16_t extensionlen_numwords,const void *extensiondata,
 		  void *buffer,size_t buffersize,RTPMemoryManager *mgr = 0);
 
-  virtual ~RTPPacket();
+    virtual ~RTPPacket();
 
 	/** If an error occurred in one of the constructors, this function returns the error code. */
 	int GetCreationError() const														{ return error; }

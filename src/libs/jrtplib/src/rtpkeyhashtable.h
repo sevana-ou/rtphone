@@ -54,13 +54,13 @@ class RTPKeyHashTable : public RTPMemoryObject
 {
 public:
 	RTPKeyHashTable(RTPMemoryManager *mgr = 0,int memtype = RTPMEM_TYPE_OTHER);
-	~RTPKeyHashTable()					{ Clear(); }
+    ~RTPKeyHashTable()					    { Clear(); }
 
 	void GotoFirstElement()					{ curhashelem = firsthashelem; }
 	void GotoLastElement()					{ curhashelem = lasthashelem; }
 	bool HasCurrentElement()				{ return (curhashelem == 0)?false:true; }
 	int DeleteCurrentElement();
-	Element &GetCurrentElement()				{ return curhashelem->GetElement(); }
+    Element &GetCurrentElement()		    { return curhashelem->GetElement(); }
 	Key &GetCurrentKey()					{ return curhashelem->GetKey(); }
 	int GotoElement(const Key &k);
 	bool HasElement(const Key &k);

@@ -809,7 +809,9 @@ int RTPSources::ObtainSourceDataInstance(uint32_t ssrc,RTPInternalSourceData **s
 #endif // RTP_SUPPORT_PROBATION
 		if (srcdat2 == 0)
 			return ERR_RTP_OUTOFMEM;
-		if ((status = sourcelist.AddElement(ssrc,srcdat2)) < 0)
+
+        // Add new source item
+        if ((status = sourcelist.AddElement(ssrc,srcdat2)) < 0)
 		{
 			RTPDelete(srcdat2,GetMemoryManager());
 			return status;

@@ -96,6 +96,8 @@ public:
 
 	/** Use this function to inject an RTP or RTCP packet and the transmitter will try to figure out which type of packet it is. */
 	void InjectRTPorRTCP(const void *data, size_t len, const RTPAddress &a);
+
+    void InjectRaw(RTPRawPacket* packet);
 private:
 	RTPExternalTransmitter *transmitter;
 };
@@ -186,6 +188,8 @@ public:
 	void InjectRTP(const void *data, size_t len, const RTPAddress &a);
 	void InjectRTCP(const void *data, size_t len, const RTPAddress &a);
 	void InjectRTPorRTCP(const void *data, size_t len, const RTPAddress &a);
+    void InjectRaw(RTPRawPacket* packet);
+
 private:
 	void FlushPackets();
 	
@@ -231,6 +235,11 @@ inline void RTPExternalPacketInjecter::InjectRTCP(const void *data, size_t len, 
 inline void RTPExternalPacketInjecter::InjectRTPorRTCP(const void *data, size_t len, const RTPAddress &a)
 { 
 	transmitter->InjectRTPorRTCP(data, len, a); 
+}
+
+inline void RTPExternalPacketInjecter::InjectRaw(RTPRawPacket* packet)
+{
+    transmitter->InjectRaw(packet);
 }
 
 } // end namespace

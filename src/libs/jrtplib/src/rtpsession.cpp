@@ -1444,8 +1444,8 @@ int RTPSession::ProcessPolledData()
 	RTPTime colltimeout = RTPTime(Td*collisionmultiplier);
 	RTPTime notetimeout = RTPTime(Td*notemultiplier);
 	
-	sources.MultipleTimeouts(t,sendertimeout,byetimeout,generaltimeout,notetimeout);
-	collisionlist.Timeout(t,colltimeout);
+    // sources.MultipleTimeouts(t,sendertimeout,byetimeout,generaltimeout,notetimeout);
+    // collisionlist.Timeout(t,colltimeout);
 	
 	// We'll check if it's time for RTCP stuff
 

@@ -100,6 +100,7 @@ RTCPScheduler::~RTCPScheduler()
 
 void RTCPScheduler::Reset()
 {
+    pmembers = 0;
 	headeroverhead = 0; // user has to set this to an appropriate value
 	hassentrtcp = false;
 	firstcall = true;

@@ -900,8 +900,25 @@ void RTPExternalTransmitter::InjectRTPorRTCP(const void *data, size_t len, const
 	AbortWaitInternal();
 
 	MAINMUTEX_UNLOCK
-
 }
+
+void RTPExternalTransmitter::InjectRaw(RTPRawPacket* packet)
+{
+    if (!init)
+        return;
+
+    MAINMUTEX_LOCK
+    if (!created)
+    {
+        MAINMUTEX_UNLOCK
+        return;
+    }
+    rawpacketlist.push_back(packet);
+    AbortWaitInternal();
+
+    MAINMUTEX_UNLOCK
+}
+
 
 #ifdef RTPDEBUG
 void RTPExternalTransmitter::Dump()

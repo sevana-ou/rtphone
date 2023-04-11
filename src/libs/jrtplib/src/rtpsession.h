@@ -55,6 +55,8 @@
 	#include <jthread/jmutex.h>	
 #endif // RTP_SUPPORT_THREAD
 
+#include <iostream>
+
 namespace jrtplib
 {
 
@@ -474,7 +476,11 @@ protected:
 	                              const uint8_t *cname,size_t cnamelength)				{ }
 
 	/** Is called when a new entry \c srcdat is added to the source table. */
-	virtual void OnNewSource(RTPSourceData *srcdat)			 				{ }
+    virtual void OnNewSource(RTPSourceData *srcdat)
+    {
+        // Sync timestamp unit
+        srcdat->SetTimestampUnit(timestampunit);
+    }
 
 	/** Is called when the entry \c srcdat is about to be deleted from the source table. */
 	virtual void OnRemoveSource(RTPSourceData *srcdat)						{ }
