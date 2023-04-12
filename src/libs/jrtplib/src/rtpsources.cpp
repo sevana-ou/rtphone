@@ -659,6 +659,7 @@ int RTPSources::ProcessRTCPSenderInfo(uint32_t ssrc,const RTPNTPTime &ntptime,ui
 	// Call the callback
 	if (created)
 		OnNewSource(srcdat);
+    OnSenderReport(srcdat);
 
 	return 0;
 }
@@ -682,7 +683,9 @@ int RTPSources::ProcessRTCPReportBlock(uint32_t ssrc,uint8_t fractionlost,int32_
 	// Call the callback
 	if (created)
 		OnNewSource(srcdat);
-			
+
+    OnReceiverReport(srcdat);
+
 	return 0;
 }
 

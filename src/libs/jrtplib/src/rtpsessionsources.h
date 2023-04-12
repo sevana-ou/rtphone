@@ -74,7 +74,9 @@ private:
 	void OnUnknownPacketFormat(RTCPPacket *rtcppack,const RTPTime &receivetime,
 	                           const RTPAddress *senderaddress);
 	void OnNoteTimeout(RTPSourceData *srcdat);
-	
+    void OnSenderReport(RTPSourceData* srcdat);
+    void OnReceiverReport(RTPSourceData* srcdat);
+
 	RTPSession &rtpsession;
 	bool owncollision;
 };

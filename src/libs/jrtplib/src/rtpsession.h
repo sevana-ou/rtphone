@@ -49,6 +49,7 @@
 #include "rtptimeutilities.h"
 #include "rtcpcompoundpacketbuilder.h"
 #include "rtpmemoryobject.h"
+#include "rtpsourcedata.h"
 #include <list>
 
 #ifdef RTP_SUPPORT_THREAD
@@ -476,11 +477,7 @@ protected:
 	                              const uint8_t *cname,size_t cnamelength)				{ }
 
 	/** Is called when a new entry \c srcdat is added to the source table. */
-    virtual void OnNewSource(RTPSourceData *srcdat)
-    {
-        // Sync timestamp unit
-        srcdat->SetTimestampUnit(timestampunit);
-    }
+    virtual void OnNewSource(RTPSourceData *srcdat)                         { }
 
 	/** Is called when the entry \c srcdat is about to be deleted from the source table. */
 	virtual void OnRemoveSource(RTPSourceData *srcdat)						{ }
@@ -513,6 +510,10 @@ protected:
 
 	/** Is called when an RTCP compound packet has just been sent (useful to inspect outgoing RTCP data). */
 	virtual void OnSendRTCPCompoundPacket(RTCPCompoundPacket *pack)					{ }
+
+    virtual void OnSenderReport(RTPSourceData* srcdat) {}
+    virtual void OnReceiverReport(RTPSourceData* srcdat) {}
+
 #ifdef RTP_SUPPORT_THREAD
 	/** Is called when error \c errcode was detected in the poll thread. */
 	virtual void OnPollThreadError(int errcode)							{ }

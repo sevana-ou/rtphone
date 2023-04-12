@@ -110,5 +110,15 @@ void RTPSessionSources::OnNoteTimeout(RTPSourceData *srcdat)
 	rtpsession.OnNoteTimeout(srcdat);
 }
 
+void RTPSessionSources::OnSenderReport(RTPSourceData *srcdat)
+{
+    rtpsession.OnSenderReport(srcdat);
+}
+
+void RTPSessionSources::OnReceiverReport(RTPSourceData *srcdat)
+{
+    rtpsession.OnReceiverReport(srcdat);
+}
+
 } // end namespace
 

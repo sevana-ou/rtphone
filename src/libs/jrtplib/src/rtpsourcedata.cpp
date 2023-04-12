@@ -43,6 +43,9 @@
 #include <string>
 #endif // RTPDEBUG
 
+#include <iostream>
+#include <iomanip>
+
 #include "rtpdebug.h"
 
 #define ACCEPTPACKETCODE									\
@@ -197,16 +200,19 @@ void RTPSourceStats::ProcessPacket(RTPPacket *pack,const RTPTime &receivetime,do
             djitter += diff;
             jitter = (uint32_t)djitter;
 #else
+            // Current packet receive time
             RTPTime curtime = receivetime;
             double diffts1,diffts2,diff;
+
+            // Packet timestamp in units
             uint32_t curts = pack->GetTimestamp();
 
-            curtime -= prevpacktime;
-            diffts1 = curtime.GetDouble() / tsunit;
+            curtime -= prevpacktime; // Difference in RTPTime (seconds)
+            diffts1 = curtime.GetDouble() / tsunit;   // Current time in units
 
-            if (curts > prevtimestamp)
+            if (curts > prevtimestamp) // If packets are ordered ok
             {
-                uint32_t unsigneddiff = curts - prevtimestamp;
+                uint32_t unsigneddiff = curts - prevtimestamp; // Difference in units
 
                 if (unsigneddiff < 0x10000000) // okay, curts realy is larger than prevtimestamp
                     diffts2 = (double)unsigneddiff;
@@ -235,13 +241,17 @@ void RTPSourceStats::ProcessPacket(RTPPacket *pack,const RTPTime &receivetime,do
             else
                 diffts2 = 0;
 
-            diff = diffts1 - diffts2;
+            diff = diffts1 - diffts2; // diffts1 is delta between packets in receive time; difftw2 is delta in timestamp. Both are expressed in units.
             if (diff < 0)
-                diff = -diff;
-            diff -= djitter;
-            diff /= 16.0;
-            djitter += diff;
-            jitter = (uint32_t)djitter;
+                diff = -diff; // Get abs() if needed
+
+            djitter = djitter + (diff - djitter) / 16.0;
+            // std::cout << std::setprecision(3) << djitter << std::endl;
+            // diff -= djitter;
+            // diff /= 16.0;
+            // djitter += diff;
+
+            jitter = (uint32_t)djitter; // This is timestamp units !
 #endif
         }
         else
