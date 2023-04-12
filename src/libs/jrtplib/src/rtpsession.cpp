@@ -221,8 +221,9 @@ int RTPSession::InternalCreate(const RTPSessionParams &sessparams)
 		return status;
 	}
 
+    sources.AcceptAllSSRC(sessparams.GetAcceptAllSSRC());
+
 	// Set the initial receive mode
-	
 	if ((status = rtptrans->SetReceiveMode(sessparams.GetReceiveMode())) < 0)
 	{
 		packetbuilder.Destroy();

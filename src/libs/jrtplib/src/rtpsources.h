@@ -99,6 +99,9 @@ public:
     /** Deletes the entry for our own SSRC identifier. */
     int DeleteOwnSSRC();
 
+    /** This is needed to allow accept RR when running as delay calculator in network analyzer project **/
+    void AcceptAllSSRC(bool accept) { acceptallssrc = accept; }
+
     /** This function should be called if our own session has sent an RTP packet.
      *  This function should be called if our own session has sent an RTP packet.
      *  For our own SSRC entry, the sender flag is updated based upon outgoing packets instead of incoming packets.
@@ -352,6 +355,7 @@ private:
 
     RTPKeyHashTable<const uint32_t,RTPInternalSourceData*,RTPSources_GetHashIndex,RTPSOURCES_HASHSIZE> sourcelist;
 
+    bool acceptallssrc;
     int sendercount;
     int totalcount;
     int activecount;

@@ -70,6 +70,10 @@ public:
 	/** Returns the maximum allowed packet size (default is 1400 bytes). */
 	size_t GetMaximumPacketSize() const					{ return maxpacksize; }
 
+    // Accept packets with any SSRC when using as delay calculator - for network analyzer project
+    void SetAcceptAllSSRC(bool accept)                  { acceptallssrc = accept; }
+    bool GetAcceptAllSSRC() const                       { return acceptallssrc; }
+
 	/** If the argument is \c true, the session should accept its own packets and store 
 	 *  them accordingly in the source table.
 	 */
@@ -212,6 +216,7 @@ public:
 	/** Returns the currently set CNAME, is blank when this will be generated automatically (the default). */
 	std::string GetCNAME() const						{ return cname; }
 private:
+    bool acceptallssrc;
 	bool acceptown;
 	bool usepollthread;
 	size_t maxpacksize;

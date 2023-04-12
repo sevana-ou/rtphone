@@ -47,7 +47,8 @@ RTPSessionParams::RTPSessionParams() : mininterval(0,0)
 #else
 	usepollthread = false;
 #endif // RTP_SUPPORT_THREAD
-	maxpacksize = RTP_DEFAULTPACKETSIZE;
+    acceptallssrc = false;
+    maxpacksize = RTP_DEFAULTPACKETSIZE;
 	receivemode = RTPTransmitter::AcceptAll;
 	acceptown = false;
 	owntsunit = -1; // The user will have to set it to the correct value himself

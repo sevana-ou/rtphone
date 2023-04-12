@@ -60,6 +60,8 @@ RTPSources::RTPSources(ProbationType probtype,RTPMemoryManager *mgr) : RTPMemory
 	sendercount = 0;
 	activecount = 0;
 	owndata = 0;
+    acceptallssrc = false;
+
 #ifdef RTP_SUPPORT_PROBATION
 	probationtype = probtype;
 #endif // RTP_SUPPORT_PROBATION
@@ -109,7 +111,7 @@ int RTPSources::CreateOwnSSRC(uint32_t ssrc)
 		owndata = 0; // just to make sure
 		return status;
 	}
-	owndata->SetOwnSSRC();	
+    owndata->SetOwnSSRC();
 	owndata->SetRTPDataAddress(0);
 	owndata->SetRTCPDataAddress(0);
 
@@ -393,7 +395,7 @@ int RTPSources::ProcessRTCPCompoundPacket(RTCPCompoundPacket *rtcpcomppack,const
 						int num = p->GetReceptionReportCount();
 						for (i = 0 ; i < num ; i++)
 						{
-							if (p->GetSSRC(i) == ownssrc) // data is meant for us
+                            if (p->GetSSRC(i) == ownssrc || acceptallssrc) // data is meant for us
 							{
 								gotinfo = true;
 								status = ProcessRTCPReportBlock(senderssrc,p->GetFractionLost(i),p->GetLostPacketCount(i),
@@ -425,7 +427,7 @@ int RTPSources::ProcessRTCPCompoundPacket(RTCPCompoundPacket *rtcpcomppack,const
 						int num = p->GetReceptionReportCount();
 						for (i = 0 ; i < num ; i++)
 						{
-							if (p->GetSSRC(i) == ownssrc)
+                            if (p->GetSSRC(i) == ownssrc || acceptallssrc)
 							{
 								gotinfo = true;
 								status = ProcessRTCPReportBlock(senderssrc,p->GetFractionLost(i),p->GetLostPacketCount(i),
