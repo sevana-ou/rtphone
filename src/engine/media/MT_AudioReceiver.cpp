@@ -233,7 +233,7 @@ RtpBuffer::FetchResult RtpBuffer::fetch(ResultList& rl)
                 unsigned seqno = mPacketList.front()->rtp()->GetExtendedSequenceNumber();
 
                 // Gap between new packet and previous on
-                int gap = seqno - mFetchedPacket->rtp()->GetSequenceNumber() - 1;
+                int gap = (int64_t)seqno - (int64_t)mFetchedPacket->rtp()->GetExtendedSequenceNumber() - 1;
                 gap = std::min(gap, 127);
                 if (gap > 0 && mPacketList.empty())
                 {
@@ -352,6 +352,18 @@ AudioReceiver::~AudioReceiver()
     mResampler32.stop();
     mResampler48.stop();
     mDecodedDump.reset();
+}
+
+// Update codec settings
+void AudioReceiver::setCodecSettings(const CodecList::Settings& codecSettings)
+{
+    if (mCodecSettings == codecSettings)
+        return;
+
+    mCodecSettings = codecSettings;
+    mCodecMap.clear();
+    mCodecList.setSettings(mCodecSettings);
+    mCodecList.fillCodecMap(mCodecMap);
 }
 
 size_t decode_packet(Codec& codec, RTPPacket& p, void* output_buffer, size_t output_capacity)

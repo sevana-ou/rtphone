@@ -6,6 +6,7 @@ set (CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # Produce PIC code always
 set (CMAKE_POSITION_INDEPENDENT_CODE ON)
+option (USE_RESIP_INTEGRATION "Use some resiprocate specific routines" OFF)
 
 set (SOURCES
     MT_Statistics.cpp

@@ -20,10 +20,10 @@ bool CsvReader::readLine(std::vector<std::string>& cells)
   std::string line;
   if (!std::getline(mInputStream, line))
     return false;
-  StringHelper::trim(line);
+  strx::trim(line);
   if (line.empty())
       return false;
 
-  StringHelper::split(line, cells, ",;");
+  strx::split(line, cells, ",;");
   return true;
 }

@@ -22,7 +22,7 @@
 
 using namespace MT;
 
-using strx = StringHelper;
+using strx = strx;
 
 // ---------------- EvsSpec ---------------
 
@@ -125,13 +125,80 @@ CodecList::Settings::OpusSpec CodecList::Settings::OpusSpec::parse(const std::st
     return result;
 }
 
+CodecList::Settings CodecList::Settings::parseSdp(const std::list<resip::Codec>& codeclist)
+{
+    CodecList::Settings r{DefaultSettings};
+
+    for (auto& c: codeclist)
+    {
+        std::string codec_name = strx::uppercase(c.getName().c_str());
+        int samplerate = c.getRate();
+        int ptype = c.payloadType();
+
+        // Dynamic payload type codecs only - ISAC / iLBC / Speex / etc.
+        if (codec_name == "OPUS")
+        {
+            // Check the parameters
+            auto enc_params = c.encodingParameters(); // This must channels number for Opus codec
+            auto params = c.parameters();
+            int channels = strx::toInt(enc_params.c_str(), 1);
+            r.mOpusSpec.push_back({ptype, samplerate, channels});
+        }
+    }
+    return r;
+}
+
+bool CodecList::Settings::operator == (const Settings& rhs) const
+{
+    if (std::tie(mWrapIuUP, mSkipDecode, mIsac16KPayloadType, mIsac32KPayloadType, mIlbc20PayloadType, mIlbc30PayloadType, mGsmFrPayloadType, mGsmFrPayloadLength, mGsmEfrPayloadType, mGsmHrPayloadType) !=
+            std::tie(rhs.mWrapIuUP, rhs.mSkipDecode, rhs.mIsac16KPayloadType, rhs.mIsac32KPayloadType, rhs.mIlbc20PayloadType, rhs.mIlbc30PayloadType, rhs.mGsmFrPayloadType, rhs.mGsmFrPayloadLength, rhs.mGsmEfrPayloadType, rhs.mGsmHrPayloadType))
+        return false;
+
+    if (mAmrNbOctetPayloadType != rhs.mAmrNbOctetPayloadType)
+        return false;
+
+    if (mAmrNbPayloadType != rhs.mAmrNbPayloadType)
+        return false;
+
+    if (mAmrWbOctetPayloadType != rhs.mAmrWbOctetPayloadType)
+        return false;
+
+    if (mAmrWbPayloadType != rhs.mAmrWbPayloadType)
+        return false;
+
+    // ToDo: compare EVS and Opus specs
+    if (mEvsSpec.size() != rhs.mEvsSpec.size())
+        return false;
+
+    for (size_t i = 0; i < mEvsSpec.size(); i++)
+        if (mEvsSpec[i] != rhs.mEvsSpec[i])
+            return false;
+
+    if (mOpusSpec.size() != rhs.mOpusSpec.size())
+        return false;
+
+    for (size_t i = 0; i < mOpusSpec.size(); i++)
+        if (mOpusSpec[i] != rhs.mOpusSpec[i])
+            return false;
+
+    return true;
+}
+
+
 // ----------------------------------------
 CodecList::Settings CodecList::Settings::DefaultSettings;
 
 CodecList::CodecList(const Settings& settings)
   :mSettings(settings)
 {
-  //mFactoryList.push_back(new OpusCodec::OpusFactory(16000, 1));
+    init(mSettings);
+}
+
+void CodecList::init(const Settings& settings)
+{
+  for (auto f: mFactoryList)
+      delete f;
+  mFactoryList.clear();
 
 #if defined(USE_OPUS_CODEC)
   if (settings.mOpusSpec.empty())
@@ -191,8 +258,8 @@ CodecList::CodecList(const Settings& settings)
 
 CodecList::~CodecList()
 {
-  for (FactoryList::size_type i=0; i<mFactoryList.size(); i++)
-    delete mFactoryList[i];
+  for (auto f: mFactoryList)
+    delete f;
 }
 
 int CodecList::count() const
@@ -217,10 +284,12 @@ int CodecList::findCodec(const std::string &name) const
 
 void CodecList::fillCodecMap(CodecMap& cm)
 {
+  cm.clear();
   for (auto& factory: mFactoryList)
   {
     // Create codec here. Although they are not needed right now - they can be needed to find codec's info.
-    cm[factory->payloadType()] = factory->create();
+    PCodec c = factory->create();
+    cm.insert({factory->payloadType(), c});
   }
 }
 

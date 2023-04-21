@@ -228,11 +228,11 @@ int G729Codec::plc(int lostFrames, void* output, int outputCapacity)
 
 #if defined(USE_OPUS_CODEC)
 // -------------- Opus -------------------
-#define OPUS_CODEC_NAME "OPUS"
-#define OPUS_CODEC_RATE 16000
-#define OPUS_TARGET_BITRATE 64000
-#define OPUS_PACKET_LOSS 30
-#define OPUS_CODEC_COMPLEXITY 2
+#define OPUS_CODEC_NAME         "OPUS"
+#define OPUS_CODEC_RATE         16000
+#define OPUS_TARGET_BITRATE     64000
+#define OPUS_PACKET_LOSS        10
+#define OPUS_CODEC_COMPLEXITY   2
 
 OpusCodec::Params::Params()
   :mUseDtx(false), mUseInbandFec(true), mStereo(true), mPtime(20)
@@ -321,7 +321,7 @@ void OpusCodec::Params::parse(const resip::Data &params)
       mStereo = paramIter->mValue == "1";
     else
     if (paramIter->mName == "ptime")
-      mPtime = StringHelper::toInt(paramIter->mValue.c_str(), 20);
+      mPtime = strx::toInt(paramIter->mValue.c_str(), 20);
   }
 }
 #endif

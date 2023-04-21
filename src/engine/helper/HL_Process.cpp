@@ -287,7 +287,7 @@ std::shared_ptr<std::thread> OsProcess::asyncExecCommand(const std::string& cmdl
                     if (d != std::string::npos)
                     {
                         if (line_callback)
-                            line_callback(StringHelper::trim(lines.substr(p, d-p)));
+                            line_callback(strx::trim(lines.substr(p, d-p)));
                         p = d + 1;
                     }
                 }

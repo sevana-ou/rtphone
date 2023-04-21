@@ -203,8 +203,8 @@ NetworkAddress::NetworkAddress(const uint8_t* ip_6, uint16_t port)
     mAddr6.sin6_port = port;
 }
 
-NetworkAddress::NetworkAddress(const sockaddr& addr, unsigned addrLen)
-:mInitialized(true), mRelayed(false)
+NetworkAddress::NetworkAddress(const sockaddr& addr, size_t addrLen)
+    :mInitialized(true), mRelayed(false)
 {
   switch (addr.sa_family)
   {

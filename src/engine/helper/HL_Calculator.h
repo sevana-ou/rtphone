@@ -312,7 +312,7 @@ namespace Calc
       {
         // Dot is here - is it float
         bool isFloat = false;
-        StringHelper::toFloat(mCurrentLexem.mValue, 0.0f, &isFloat);
+        strx::toFloat(mCurrentLexem.mValue, 0.0f, &isFloat);
         if (isFloat)
           mCurrentLexem.mType = LexemType::Float;
         else
@@ -488,7 +488,7 @@ namespace Calc
 
       case LexemType::Hex:
         result->mType = Ast::Type::Number;
-        result->mValue = StringHelper::fromHex2Int(l.mValue);
+        result->mValue = strx::fromHex2Int(l.mValue);
         break;
 
       case LexemType::Float:

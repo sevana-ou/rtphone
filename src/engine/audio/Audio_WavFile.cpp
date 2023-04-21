@@ -81,7 +81,7 @@ bool WavFileReader::open(const std::tstring& filename)
   #ifdef WIN32
     mHandle = _wfopen(filename.c_str(), L"rb");
   #else
-    mHandle = fopen(StringHelper::makeUtf8(filename).c_str(), "rb");
+    mHandle = fopen(strx::makeUtf8(filename).c_str(), "rb");
   #endif
     if (NULL == mHandle)
     {
@@ -287,11 +287,11 @@ bool WavFileWriter::open(const std::tstring& filename, int rate, int channels)
 #ifdef WIN32
   mHandle = _wfopen(filename.c_str(), L"wb");
 #else
-  mHandle = fopen(StringHelper::makeUtf8(filename).c_str(), "wb");
+  mHandle = fopen(strx::makeUtf8(filename).c_str(), "wb");
 #endif
   if (nullptr == mHandle)
   {
-    ICELogError(<< "Failed to create .wav file: filename = " << StringHelper::makeUtf8(filename) << " , error = " << errno);
+    ICELogError(<< "Failed to create .wav file: filename = " << strx::makeUtf8(filename) << " , error = " << errno);
     return false;
   }
 

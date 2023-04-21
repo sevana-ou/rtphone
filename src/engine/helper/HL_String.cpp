@@ -16,7 +16,7 @@
 # include <cctype>
 #endif
 
-std::string StringHelper::extractFilename(const std::string& path)
+std::string strx::extractFilename(const std::string& path)
 {
     if (path.empty())
         return std::string();
@@ -31,7 +31,7 @@ std::string StringHelper::extractFilename(const std::string& path)
         return path.substr(p_bs + 1);
 }
 
-std::string StringHelper::appendPath(const std::string& s1, const std::string& s2)
+std::string strx::appendPath(const std::string& s1, const std::string& s2)
 {
     std::string result = s1;
     if (!endsWith(result, "/") && !endsWith(result, "\\"))
@@ -45,7 +45,7 @@ std::string StringHelper::appendPath(const std::string& s1, const std::string& s
     return result + s2;
 }
 
-std::string StringHelper::makeUtf8(const std::tstring &arg)
+std::string strx::makeUtf8(const std::tstring &arg)
 {
 #if defined(TARGET_WIN)
     size_t required = WideCharToMultiByte(CP_UTF8, 0, arg.c_str(), -1, NULL, 0, NULL, NULL);
@@ -57,12 +57,12 @@ std::string StringHelper::makeUtf8(const std::tstring &arg)
 #endif
 }
 
-std::string StringHelper::toUtf8(const std::tstring &arg)
+std::string strx::toUtf8(const std::tstring &arg)
 {
     return makeUtf8(arg);
 }
 
-std::tstring StringHelper::makeTstring(const std::string& arg)
+std::tstring strx::makeTstring(const std::string& arg)
 {
 #if defined(TARGET_WIN)
     size_t count = MultiByteToWideChar(CP_UTF8, 0, arg.c_str(), -1, NULL, 0);
@@ -74,7 +74,7 @@ std::tstring StringHelper::makeTstring(const std::string& arg)
 #endif
 }
 
-int StringHelper::toInt(const char *s, int defaultValue, bool* isOk)
+int strx::toInt(const char *s, int defaultValue, bool* isOk)
 {
     int result;
     if (sscanf(s, "%d", &result) != 1)
@@ -90,7 +90,7 @@ int StringHelper::toInt(const char *s, int defaultValue, bool* isOk)
     return result;
 }
 
-uint64_t StringHelper::toUint64(const char* s, uint64_t def, bool *isOk)
+uint64_t strx::toUint64(const char* s, uint64_t def, bool *isOk)
 {
     uint64_t result = def;
     if (sscanf(s, "%" SCNu64, &result) != 1)
@@ -106,14 +106,14 @@ uint64_t StringHelper::toUint64(const char* s, uint64_t def, bool *isOk)
     return result;
 }
 
-std::string StringHelper::toHex(unsigned int value)
+std::string strx::toHex(unsigned int value)
 {
     char buffer[32];
     sprintf(buffer, "%x", value);
     return buffer;
 }
 
-std::string StringHelper::toHex(const void *ptr)
+std::string strx::toHex(const void *ptr)
 {
     std::ostringstream oss;
     oss << std::fixed << std::setw(8) << std::setfill('0') << std::hex << ptr;
@@ -123,7 +123,7 @@ std::string StringHelper::toHex(const void *ptr)
 //must be lowercase for MD5
 static const char hexmap[] = "0123456789abcdef";
 
-std::string StringHelper::toHex(const uint8_t* input, size_t inputLength)
+std::string strx::toHex(const uint8_t* input, size_t inputLength)
 {
     std::string result; result.resize(inputLength * 2);
 
@@ -144,7 +144,7 @@ std::string StringHelper::toHex(const uint8_t* input, size_t inputLength)
     return result;
 }
 
-std::string StringHelper::prefixLines(const std::string &source, const std::string &prefix)
+std::string strx::prefixLines(const std::string &source, const std::string &prefix)
 {
     // Read source line by line
     std::istringstream iss(source);
@@ -157,7 +157,7 @@ std::string StringHelper::prefixLines(const std::string &source, const std::stri
     return oss.str();
 }
 
-std::string StringHelper::doubleToString(double value, int precision)
+std::string strx::doubleToString(double value, int precision)
 {
     std::stringstream ss;
     ss << std::fixed << std::setprecision(precision) << value;
@@ -165,7 +165,7 @@ std::string StringHelper::doubleToString(double value, int precision)
 }
 
 
-const char* StringHelper::findSubstring(const char* buffer, const char* substring, size_t bufferLength)
+const char* strx::findSubstring(const char* buffer, const char* substring, size_t bufferLength)
 {
 #if defined(TARGET_WIN)
     return (const char*)strstr(buffer, substring);
@@ -175,7 +175,7 @@ const char* StringHelper::findSubstring(const char* buffer, const char* substrin
 }
 
 
-void StringHelper::split(const std::string& src, std::vector<std::string>& dst, const std::string& delims)
+void strx::split(const std::string& src, std::vector<std::string>& dst, const std::string& delims)
 {
     dst.clear();
     std::string::size_type p = 0;
@@ -199,21 +199,21 @@ void StringHelper::split(const std::string& src, std::vector<std::string>& dst, 
     }
 }
 
-std::vector<std::string> StringHelper::split(const std::string& src, const std::string& delims)
+std::vector<std::string> strx::split(const std::string& src, const std::string& delims)
 {
     std::vector<std::string> r;
     split(src, r, delims);
     return r;
 }
 
-std::pair<std::string, int> StringHelper::parseHost(const std::string& host, int defaultPort)
+std::pair<std::string, int> strx::parseHost(const std::string& host, int defaultPort)
 {
     std::pair<std::string, int> result;
     std::size_t p = host.find(':');
     if (p != std::string::npos)
     {
         result.first = host.substr(0, p);
-        result.second = StringHelper::toInt(host.c_str() + p + 1, defaultPort);
+        result.second = strx::toInt(host.c_str() + p + 1, defaultPort);
     }
     else
     {
@@ -223,15 +223,15 @@ std::pair<std::string, int> StringHelper::parseHost(const std::string& host, int
     return result;
 }
 
-std::pair<std::string, std::string> StringHelper::parseAssignment(const std::string& s, bool trimQuotes)
+std::pair<std::string, std::string> strx::parseAssignment(const std::string& s, bool trimQuotes)
 {
     std::pair<std::string, std::string> result;
 
     std::string::size_type p = s.find('=');
     if (p != std::string::npos)
     {
-        result.first = StringHelper::trim(s.substr(0, p));
-        result.second = StringHelper::trim(s.substr(p+1));
+        result.first = strx::trim(s.substr(0, p));
+        result.second = strx::trim(s.substr(p+1));
         if (trimQuotes && result.second.size() >= 2)
         {
             if ((result.second[0] == '"' && result.second[result.second.size()-1] == '"') ||
@@ -240,19 +240,19 @@ std::pair<std::string, std::string> StringHelper::parseAssignment(const std::str
         }
     }
     else
-        result.first = StringHelper::trim(s);
+        result.first = strx::trim(s);
 
     return result;
 }
 
-std::string StringHelper::intToString(int value)
+std::string strx::intToString(int value)
 {
     char buffer[32];
     sprintf(buffer, "%d", value);
     return buffer;
 }
 
-float StringHelper::toFloat(const std::string &s, float v, bool* isOk)
+float strx::toFloat(const std::string &s, float v, bool* isOk)
 {
     float result = 0.0;
     int code = sscanf(s.c_str(), "%f", &result);
@@ -271,14 +271,14 @@ float StringHelper::toFloat(const std::string &s, float v, bool* isOk)
     return result;
 }
 
-std::string StringHelper::trim(const std::string &s)
+std::string strx::trim(const std::string &s)
 {
     auto wsfront = std::find_if_not(s.begin(), s.end(), [](int c) { return std::isspace(c) || c == '\r' || c == '\n'; });
     auto wsback = std::find_if_not(s.rbegin(), s.rend(), [](int c) { return std::isspace(c) || c == '\r' || c == '\n'; }).base();
     return (wsback <= wsfront ? std::string() : std::string(wsfront,wsback));
 }
 
-std::string StringHelper::timeToString(time_t t)
+std::string strx::timeToString(time_t t)
 {
     char buffer[128] = "";
     struct tm lt;
@@ -292,12 +292,12 @@ std::string StringHelper::timeToString(time_t t)
     return buffer;
 }
 
-std::string StringHelper::millisecondsToString(uint64_t t)
+std::string strx::millisecondsToString(uint64_t t)
 {
     return timeToString(t/1000);
 }
 
-int StringHelper::fromHex2Int(const std::string &s)
+int strx::fromHex2Int(const std::string &s)
 {
     int result = 0;
     sscanf(s.c_str(), "%x", &result);
@@ -320,7 +320,7 @@ static int hex2code(const char* s)
     return (hex2code(s[0]) << 4) + hex2code(s[1]);
 }
 
-std::string StringHelper::fromHex2String(const std::string& s)
+std::string strx::fromHex2String(const std::string& s)
 {
     std::string result; result.resize(s.size() / 2);
     const char* t = s.c_str();
@@ -330,7 +330,7 @@ std::string StringHelper::fromHex2String(const std::string& s)
     return result;
 }
 
-std::string StringHelper::replace(const std::string& s, char f, char r)
+std::string strx::replace(const std::string& s, char f, char r)
 {
     std::string result(s);
     for (std::string::size_type i = 0; i < result.size(); i++)
@@ -340,7 +340,7 @@ std::string StringHelper::replace(const std::string& s, char f, char r)
     return result;
 }
 
-std::string StringHelper::replace(const std::string& s, const std::string& tmpl, const std::string& n)
+std::string strx::replace(const std::string& s, const std::string& tmpl, const std::string& n)
 {
     std::string result(s);
     std::string::size_type p = 0;
@@ -353,7 +353,7 @@ std::string StringHelper::replace(const std::string& s, const std::string& tmpl,
     return result;
 }
 
-std::string StringHelper::decodeUri(const std::string& s)
+std::string strx::decodeUri(const std::string& s)
 {
     std::string ret;
     ret.reserve(s.size());
@@ -376,19 +376,19 @@ std::string StringHelper::decodeUri(const std::string& s)
     return ret;
 }
 
-bool StringHelper::startsWith(const std::string& s, const std::string& prefix)
+bool strx::startsWith(const std::string& s, const std::string& prefix)
 {
     std::string::size_type p = s.find(prefix);
     return p == 0;
 }
 
-bool StringHelper::endsWith(const std::string& s, const std::string& suffix)
+bool strx::endsWith(const std::string& s, const std::string& suffix)
 {
     std::string::size_type p = s.rfind(suffix);
     return (p == s.size() - suffix.size());
 }
 
-int StringHelper::stringToDuration(const std::string& s)
+int strx::stringToDuration(const std::string& s)
 {
     if (endsWith(s, "ms"))
         return std::stoi(s.substr(0, s.size()-2));
@@ -402,92 +402,9 @@ int StringHelper::stringToDuration(const std::string& s)
         return std::stoi(s) * 1000;
 }
 
-#define XML_HEADER "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"no\"?>"
-// --------------------- XcapHelper -----------------
-std::string XcapHelper::buildBuddyList(std::string listName, std::vector<std::string> buddies)
+std::string strx::uppercase(const std::string& s)
 {
-    std::ostringstream result;
-    result << XML_HEADER <<
-              "<resource-lists xmlns=\"urn:ietf:params:xml:ns:resource-lists\">" <<
-              "<list name=\"" << listName.c_str() << "\">";
-
-    // to test CT only!
-    //result << "<entry uri=\"" << "sip:dbogovych1@10.11.1.25" << "\"/>";
-    //result << "<entry uri=\"" << "sip:dbogovych2@10.11.1.25" << "\"/>";
-
-    for (unsigned i = 0; i<buddies.size(); i++)
-    {
-        result << "<entry uri=\"" << normalizeSipUri(buddies[i]).c_str() << "\"/>";
-    }
-    result << "</list></resource-lists>";
-    return result.str();
-}
-
-std::string XcapHelper::buildRules(std::vector<std::string> buddies)
-{
-    std::ostringstream result;
-    result << XML_HEADER <<
-              "<ruleset xmlns=\"urn:ietf:params:xml:ns:common-policy\">" <<
-              "<rule id=\"presence_allow\">" <<
-              "<conditions>";
-
-    for (unsigned i = 0; i<buddies.size(); i++)
-    {
-        result << "<identity><one id=\"" <<
-                  normalizeSipUri(buddies[i]).c_str() << "\"/></identity>";
-    }
-    result << "</conditions>" <<
-              "<actions>" <<
-              "<sub-handling xmlns=\"urn:ietf:params:xml:ns:pres-rules\">" <<
-              "allow" <<
-              "</sub-handling>" <<
-              "</actions>" <<
-              "<transformations>" <<
-              "<provide-devices xmlns=\"urn:ietf:params:xml:ns:pres-rules\">" <<
-              "<all-devices/>" <<
-              "</provide-devices>" <<
-              "<provide-persons xmlns=\"urn:ietf:params:xml:ns:pres-rules\">" <<
-              "<all-persons/>" <<
-              "</provide-persons>" <<
-              "<provide-services xmlns=\"urn:ietf:params:xml:ns:pres-rules\">" <<
-              "<all-services/>" <<
-              "</provide-services>" <<
-              "</transformations>" <<
-              "</rule>" <<
-              "</ruleset>";
-    return result.str();
-}
-
-std::string XcapHelper::buildServices(std::string serviceUri, std::string listRef)
-{
-    std::ostringstream result;
-
-    result << "<?xml version=\"1.0\" encoding=\"UTF-8\"?>" << std::endl <<
-              "<rls-services xmlns=\"urn:ietf:params:xml:ns:rls-services\"" << std::endl <<
-              "xmlns:rl=\"urn:ietf:params:xml:ns:resource-lists\"" << std::endl <<
-              "xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\">" << std::endl <<
-              "<service uri=\"" << normalizeSipUri(serviceUri).c_str() << "\">" << std::endl <<
-              "<resource-list>" << listRef.c_str() << "</resource-list>" << std::endl <<
-              "<packages>" << std::endl <<
-              "<package>presence</package>" << std::endl <<
-              "</packages>" << std::endl <<
-              "</service>" << std::endl <<
-              "</rls-services>";
-
-    return result.str();
-}
-
-std::string XcapHelper::normalizeSipUri(std::string uri)
-{
-    if (uri.length())
-    {
-        if (uri[0] == '<')
-            uri.erase(0,1);
-        if (uri.length())
-        {
-            if (uri[uri.length()-1] == '>')
-                uri.erase(uri.length()-1, 1);
-        }
-    }
-    return uri;
+    std::string r(s);
+    std::transform(r.begin(), r.end(), r.begin(), ::toupper);
+    return r;
 }

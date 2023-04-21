@@ -69,6 +69,10 @@ public:
             Encoding mEncodingType = Encoding_MIME;
             bool isValid() const;
             static EvsSpec parse(const std::string& spec);
+
+            bool operator == (const EvsSpec& rhs) const { return std::tie(mPayloadType, mBandwidth, mEncodingType) == std::tie(rhs.mPayloadType, rhs.mBandwidth, rhs.mEncodingType);}
+            bool operator != (const EvsSpec& rhs) const { return ! (operator ==) (rhs);};
+
         };
 
         std::vector<EvsSpec> mEvsSpec;
@@ -79,7 +83,14 @@ public:
             int mRate           = -1;
             int mChannels       = -1;
 
+            OpusSpec(int ptype = -1, int rate = -1, int channels = -1)
+                :mPayloadType(ptype), mRate(rate), mChannels(channels)
+            {}
+
             bool isValid() const;
+            bool operator == (const OpusSpec& rhs) const { return std::tie(mPayloadType, mRate, mChannels) == std::tie(rhs.mPayloadType, rhs.mRate, rhs.mChannels);}
+            bool operator != (const OpusSpec& rhs) const { return ! (operator ==) (rhs);};
+
             static OpusSpec parse(const std::string& spec);
         };
         std::vector<OpusSpec> mOpusSpec;
@@ -88,20 +99,29 @@ public:
         std::string toString() const;
 
         static Settings DefaultSettings;
+
+        #if defined(USE_RESIP_INTEGRATION)
+        static Settings parseSdp(const std::list<resip::Codec>& codeclist);
+        #endif
+        bool operator == (const Settings& rhs) const;
     };
 
     CodecList(const Settings& settings);
     ~CodecList();
+    void setSettings(const Settings& settings) { init(settings); }
 
     int count() const;
     Codec::Factory& codecAt(int index) const;
     int findCodec(const std::string& name) const;
     void fillCodecMap(CodecMap& cm);
 
+
 protected:
     typedef std::vector<Codec::Factory*> FactoryList;
     FactoryList mFactoryList;
     Settings mSettings;
+
+    void init(const Settings& settings);
 };
 
 class CodecListPriority
