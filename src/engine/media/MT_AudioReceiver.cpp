@@ -341,12 +341,6 @@ AudioReceiver::AudioReceiver(const CodecList::Settings& settings, MT::Statistics
 
 AudioReceiver::~AudioReceiver()
 {
-#if defined(USE_PVQA_LIBRARY) && defined(PVQA_IN_RECEIVER)
-    if (mPVQA && mPvqaBuffer)
-    {
-        mStat.mPvqaMos = calculatePvqaMos(AUDIO_SAMPLERATE, mStat.mPvqaReport);
-    }
-#endif
     mResampler8.stop();
     mResampler16.stop();
     mResampler32.stop();
@@ -487,11 +481,6 @@ void AudioReceiver::processDecoded(Audio::DataWindow& output, int options)
     makeMonoAndResample(resample ? mCodec->samplerate() : 0,
                         mCodec->channels());
 
-    // Update PVQA with stats
-#if defined(USE_PVQA_LIBRARY) && defined(PVQA_IN_RECEIVER)
-    updatePvqa(mResampledFrame, mResampledLength);
-#endif
-
     // Send to output
     output.add(mResampledFrame, mResampledLength);
 }
@@ -537,10 +526,6 @@ AudioReceiver::DecodeResult AudioReceiver::getAudio(Audio::DataWindow& output, i
     case RtpBuffer::FetchResult::NoPacket:
         ICELogDebug(<< "No packet available in jitter buffer");
         mFailedCount++;
-#if defined(USE_PVQA_LIBRARY) && defined(PVQA_IN_RECEIVER)
-        if (mResampledLength > 0)
-            updatePvqa(nullptr, mResampledLength);
-#endif
         break;
 
     case RtpBuffer::FetchResult::RegularPacket:
@@ -734,70 +719,6 @@ Codec* AudioReceiver::findCodec(int payloadType)
     return codecIter->second.get();
 }
 
-#if defined(USE_PVQA_LIBRARY) && defined(PVQA_IN_RECEIVER)
-void AudioReceiver::initPvqa()
-{
-    // Allocate space for 20 seconds audio
-    if (!mPvqaBuffer)
-    {
-        mPvqaBuffer = std::make_shared<Audio::DataWindow>();
-        mPvqaBuffer->setCapacity(Audio::Format().sizeFromTime(30000));
-    }
-
-    // Instantiate & open PVQA analyzer
-    if (!mPVQA)
-    {
-        mPVQA = std::make_shared<sevana::pvqa>();
-        bool is_opened = mPVQA->open(AUDIO_SAMPLERATE, 1, PVQA_INTERVAL);
-        if (!is_opened)
-        {
-            //
-        }
-    }
-}
-
-void AudioReceiver::updatePvqa(const void *data, int size)
-{
-    if (!mPVQA)
-        initPvqa();
-
-    if (mPVQA)
-    {
-        if (data)
-            mPvqaBuffer->add(data, size);
-        else
-            mPvqaBuffer->addZero(size);
-
-        Audio::Format fmt;
-        int frames = static_cast<int>(fmt.timeFromSize(mPvqaBuffer->filled())) / (PVQA_INTERVAL * 1000);
-        if (frames > 0)
-        {
-            int time4pvqa = (int)(frames * PVQA_INTERVAL * 1000);
-            int size4pvqa = (int)fmt.sizeFromTime(time4pvqa);
-            ICELogDebug(<< "PVQA buffer has " << time4pvqa << " milliseconds of audio.");
-            bool update_result = mPVQA->update(mPvqaBuffer->data(), size4pvqa);
-            if (!update_result)
-            {
-                //
-            }
-            mPvqaBuffer->erase(size4pvqa);
-        }
-    }
-}
-
-float AudioReceiver::calculatePvqaMos(int rate, std::string& report)
-{
-    if (mPVQA && mPvqaBuffer)
-    {
-        sevana::pvqa::result result;
-        if (mPVQA->get_result(result)) {
-            report = result.mReport;
-            return result.mMos;
-        }
-    }
-    return 0.0f;
-}
-#endif
 
 void AudioReceiver::processStatisticsWithAmrCodec(Codec* c)
 {

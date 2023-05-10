@@ -959,7 +959,7 @@ int Session::processSdp(UInt64 version, bool iceAvailable, std::string icePwd, s
             targetAddr.mRtcp.setPort( remoteStream.port() );
         else
             if (stream.rtcpAttr())
-                targetAddr.mRtcp.setPort( StringHelper::toInt(remoteStream.getValues("rtcp").front().c_str(), remoteStream.port() + 1 ) );
+                targetAddr.mRtcp.setPort( strx::toInt(remoteStream.getValues("rtcp").front().c_str(), remoteStream.port() + 1 ) );
             else
                 targetAddr.mRtcp.setPort( remoteStream.port() + 1);
 

@@ -105,7 +105,7 @@ void UserAgent::start()
 
     while (std::getline(ss, line))
     {
-      line = StringHelper::trim(line);
+      line = strx::trim(line);
       ice::NetworkAddress addr(line.c_str(), 0); addr.setPort(80); // Fake port to make ICEAddress initialized
       switch (addr.family())
       {
@@ -661,7 +661,7 @@ bool UserAgent::operator()(resip::Log::Level level, const resip::Subsystem& subs
   std::string filename = file;
   std::stringstream ss;
 
-  ss << "File "  << StringHelper::extractFilename(filename).c_str() << ", line " << line << ": " << message.c_str();
+  ss << "File "  << strx::extractFilename(filename).c_str() << ", line " << line << ": " << message.c_str();
   if (level <= resip::Log::Crit)
       ICELogCritical(<< ss.str())
   else
@@ -948,7 +948,7 @@ void UserAgent::onAnswer(resip::InviteSessionHandle h, const resip::SipMessage& 
 
         // See if remote stream has "rtcp" or "rtcp-mux" attributes
         if (remoteStream.exists("rtcp"))
-          addr2.setPort( StringHelper::toInt(remoteStream.getValues("rtcp").front().c_str(), remoteDefaultPort+1) );
+          addr2.setPort( strx::toInt(remoteStream.getValues("rtcp").front().c_str(), remoteDefaultPort+1) );
         else
         if (remoteStream.exists("rtcp-mux"))
           addr2.setPort( remoteDefaultPort );
@@ -1568,11 +1568,11 @@ void UserAgent::onSipMessage(int flow, const char* msg, unsigned int length, con
   {
   case resip::InternalTransport::TransportLogger::Flow_Received:
     ICELogDebug(<< "Received from " << addressText << ":" << "\n"
-                        << StringHelper::prefixLines(d, "--->"));
+                        << strx::prefixLines(d, "--->"));
     break;
 
   case resip::InternalTransport::TransportLogger::Flow_Sent:
-    ICELogDebug(<< "Sent to " << addressText << "\n" << StringHelper::prefixLines(d, "<---"));
+    ICELogDebug(<< "Sent to " << addressText << "\n" << strx::prefixLines(d, "<---"));
     break;
   }
 }

@@ -10,6 +10,7 @@
 #include "MT_CodecList.h"
 #include "MT_AudioCodec.h"
 #include "MT_CngHelper.h"
+
 #include "../helper/HL_Pointer.h"
 #include "../helper/HL_Sync.h"
 #include "../helper/HL_Optional.hpp"
@@ -19,10 +20,6 @@
 #include "jrtplib/src/rtpsourcedata.h"
 #include "../audio/Audio_DataWindow.h"
 #include "../audio/Audio_Resampler.h"
-
-/*#if defined(USE_PVQA_LIBRARY)
-# include "pvqa++.h"
-#endif*/
 
 #include <map>
 
@@ -209,16 +206,6 @@ namespace MT
     // Resamples, sends to analysis, writes to dump and queues to output decoded frames from mDecodedFrame
     void processDecoded(Audio::DataWindow& output, int options);
 
-/*
-#if defined(USE_PVQA_LIBRARY) && defined(PVQA_IN_RECEIVER)
-    std::shared_ptr<sevana::pvqa> mPVQA;
-    void initPvqa();
-    void updatePvqa(const void* data, int size);
-    float calculatePvqaMos(int rate, std::string& report);
-
-    std::shared_ptr<Audio::DataWindow> mPvqaBuffer;
-#endif
-*/
     void processStatisticsWithAmrCodec(Codec* c);
   };
   

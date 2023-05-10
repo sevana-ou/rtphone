@@ -14,7 +14,7 @@
 #include <mutex>
 #include <condition_variable>
 
-class AgentImpl: public UserAgent
+class AgentImpl: public UserAgent, public MT::Stream::MediaObserver
 {
 protected:
   std::recursive_mutex mAgentMutex;
@@ -29,13 +29,6 @@ protected:
   typedef std::map<int, PSession> SessionMap;
   SessionMap mSessionMap;
 
-#if defined(USE_AQUA_LIBRARY)
-  // Keys are the same as used in mSessionMap
-  typedef std::map<int, std::shared_ptr<sevana::aqua>> AquaMap;
-  AquaMap mAquaMap;
-  ByteBuffer mAquaIncoming, mAquaOutgoing;
-  void closeAqua(int sessionId);
-#endif
 
   std::shared_ptr<std::thread> mThread;
   volatile bool mShutdown;
@@ -121,10 +114,8 @@ public:
   // Called when problem with SIP connection(s) detected
   void onSipConnectionFailed() override;
 
-#if defined(USE_AQUA_LIBRARY)
   // Called on incoming & outgoing audio for voice sessions
   void onMedia(const void* data, int length, MT::Stream::MediaDirection direction, void* context, void* userTag) override;
-#endif
 };
 
 #endif

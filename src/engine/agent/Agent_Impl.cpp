@@ -132,7 +132,9 @@ std::string AgentImpl::command(const std::string& command)
     {
         answer["status"] = e.what();
     }
-    return answer.toStyledString();
+    std::string result = answer.toStyledString();
+
+    return result;
 }
 
 bool AgentImpl::waitForData(int /*milliseconds*/)
@@ -238,7 +240,7 @@ void AgentImpl::processCreateAccount(JsonCpp::Value &d, JsonCpp::Value& answer)
     (*c)[CONFIG_DOMAIN] = d["domain"].asString();
     (*c)[CONFIG_EXTERNALIP] = d["use_external_ip"].asBool();
 
-    auto nameAndPort = StringHelper::parseHost(d["stun_server"].asString(), 3478);
+    auto nameAndPort = strx::parseHost(d["stun_server"].asString(), 3478);
     (*c)[CONFIG_STUNSERVER_NAME] = nameAndPort.first;
     (*c)[CONFIG_STUNSERVER_PORT] = nameAndPort.second;
 
@@ -320,7 +322,7 @@ void AgentImpl::processStartSession(JsonCpp::Value& request, JsonCpp::Value& ans
         PDataProvider audioProvider = std::make_shared<AudioProvider>(*this, *mTerminal);
         audioProvider->setState(audioProvider->state() | static_cast<int>(StreamState::Grabbing) | static_cast<int>(StreamState::Playing));
 
-#if defined(USE_AQUA_LIBRARY)
+/*#if defined(USE_AQUA_LIBRARY)
         std::string path_faults = request["path_faults"].asString();
 
         sevana::aqua::config config = {
@@ -344,8 +346,8 @@ void AgentImpl::processStartSession(JsonCpp::Value& request, JsonCpp::Value& ans
         };
 
         // std::string config = "-avlp on -smtnrm on -decor off -mprio off -npnt auto -voip off -enorm off -g711 on -spfrcor off -grad off -tmc on -miter 1 -trim a 10 -output json";
-        /*if (temp_path.size())
-            config += " -fau " + temp_path; */
+        // if (temp_path.size())
+        //    config += " -fau " + temp_path;
 
         auto qc = std::make_shared<sevana::aqua>();
         if (!qc->is_open())
@@ -358,6 +360,7 @@ void AgentImpl::processStartSession(JsonCpp::Value& request, JsonCpp::Value& ans
         mAquaMap[sessionIter->first] = qc;
         dynamic_cast<AudioProvider*>(audioProvider.get())->configureMediaObserver(this, (void*)qc.get());
 #endif
+        */
 
         // TODO: support SRTP via StreamState::Srtp option in audio provider state
 
@@ -432,9 +435,9 @@ void AgentImpl::processDestroySession(JsonCpp::Value& request, JsonCpp::Value& a
     auto sessionIter = mSessionMap.find(sessionId);
     if (sessionIter != mSessionMap.end())
         mSessionMap.erase(sessionIter);
-#if defined(USE_AQUA_LIBRARY)
-    closeAqua(sessionId);
-#endif
+//#if defined(USE_AQUA_LIBRARY)
+//    closeAqua(sessionId);
+//#endif
     answer["status"] = Status_Ok;
 }
 
@@ -469,7 +472,7 @@ static JsonCpp::Value CsvReportToJson(const std::string& report)
     {
         JsonCpp::Value detectorNames;
         for (size_t nameIndex = 0; nameIndex < cells.size(); nameIndex++)
-            detectorNames[static_cast<int>(nameIndex)] = StringHelper::trim(cells[nameIndex]);
+            detectorNames[static_cast<int>(nameIndex)] = strx::trim(cells[nameIndex]);
         // Put first line name of columns
         detectorValues[0] = detectorNames;
 
@@ -481,7 +484,7 @@ static JsonCpp::Value CsvReportToJson(const std::string& report)
             for (size_t valueIndex = 0; valueIndex < cells.size(); valueIndex++)
             {
                 bool isFloat = true;
-                float v = StringHelper::toFloat(cells[valueIndex], 0.0, &isFloat);
+                float v = strx::toFloat(cells[valueIndex], 0.0, &isFloat);
                 if (isFloat)
                     row[static_cast<int>(valueIndex)] = static_cast<double>(v);
                 else
@@ -544,7 +547,7 @@ void AgentImpl::processGetMediaStats(JsonCpp::Value& request, JsonCpp::Value& an
             answer["rtp_remotepeer"] = result[SessionInfo_RemotePeer].asStdString();
 
 #if defined(USE_AQUA_LIBRARY)
-        if (includeAqua)
+/*        if (includeAqua)
         {
             answer["incoming_audio"] = mAquaIncoming.hexstring();
             answer["incoming_audio_samplerate"] = AUDIO_SAMPLERATE;
@@ -561,7 +564,7 @@ void AgentImpl::processGetMediaStats(JsonCpp::Value& request, JsonCpp::Value& an
                 auto sa = mAquaMap[sessionIter->first];
                 if (sa) {
                     Audio::WavFileReader reader;
-                    reader.open(StringHelper::makeTstring(aquaReference));
+                    reader.open(strx::makeTstring(aquaReference));
 
                     if (reader.isOpened()) {
                         char buffer[1024];
@@ -593,11 +596,6 @@ void AgentImpl::processGetMediaStats(JsonCpp::Value& request, JsonCpp::Value& an
                     }
                     answer["aqua_mos"] = r.mMos;
                     answer["aqua_report"] = r.mFaultsText;
-                    /*std::string aqua_audio_text;
-                    if (Base64::Encode(std::string(reinterpret_cast<const char*>(mAquaIncoming.data()), mAquaIncoming.size()), &aqua_audio_text))
-                    {
-                        answer["aqua_audio"] = aqua_audio_text;
-                    }*/
 
                     if (r.mErrorCode) {
                         answer["aqua_error_code"] = r.mErrorCode;
@@ -608,7 +606,7 @@ void AgentImpl::processGetMediaStats(JsonCpp::Value& request, JsonCpp::Value& an
             }
             // Remove test audio
             mAquaIncoming.clear(); mAquaOutgoing.clear();
-        }
+        }*/
 #endif
 
         answer["status"] = Status_Ok;
@@ -730,7 +728,7 @@ void AgentImpl::processUseStreamForSession(JsonCpp::Value& request, JsonCpp::Val
                 else
                 {
                     Audio::PWavFileReader reader = std::make_shared<Audio::WavFileReader>();
-                    if (!reader->open(StringHelper::makeTstring(path)))
+                    if (!reader->open(strx::makeTstring(path)))
                         answer["status"] = Status_FailedToOpenFile;
                     else
                     {
@@ -751,7 +749,7 @@ void AgentImpl::processUseStreamForSession(JsonCpp::Value& request, JsonCpp::Val
                     else
                     {
                         Audio::PWavFileWriter writer = std::make_shared<Audio::WavFileWriter>();
-                        if (!writer->open(StringHelper::makeTstring(path), AUDIO_SAMPLERATE, AUDIO_CHANNELS))
+                        if (!writer->open(strx::makeTstring(path), AUDIO_SAMPLERATE, AUDIO_CHANNELS))
                             answer["status"] = Status_FailedToOpenFile;
                         else
                         {
@@ -774,25 +772,14 @@ void AgentImpl::processUseStreamForSession(JsonCpp::Value& request, JsonCpp::Val
     }
 }
 
-#if defined(USE_AQUA_LIBRARY)
 void AgentImpl::onMedia(const void* data, int length, MT::Stream::MediaDirection direction, void* context, void* userTag)
 {
-    /*  if (mIncomingAudioDump && direction == MT::Stream::MediaDirection::Incoming)
-    mIncomingAudioDump->write(data, length);
-
-  if (mOutgoingAudioDump && direction == MT::Stream::MediaDirection::Outgoing)
-    mOutgoingAudioDump->write(data, length);*/
-
-    // User tag points to accumulator object which includes
-    // auto* sa = reinterpret_cast<sevana::aqua*>(userTag);
-
-    switch (direction)
+    /*switch (direction)
     {
     case MT::Stream::MediaDirection::Incoming: mAquaIncoming.appendBuffer(data, length); break;
     case MT::Stream::MediaDirection::Outgoing: mAquaOutgoing.appendBuffer(data, length); break;
-    }
+    }*/
 }
-#endif
 
 
 // Called on new incoming session; providers shoukld
@@ -949,12 +936,12 @@ void AgentImpl::addEvent(const JsonCpp::Value& v)
 }
 
 #if defined(USE_AQUA_LIBRARY)
-void AgentImpl::closeAqua(int sessionId)
+/*void AgentImpl::closeAqua(int sessionId)
 {
     auto aquaIter = mAquaMap.find(sessionId);
     if (aquaIter != mAquaMap.end()) {
         aquaIter->second->close();
         mAquaMap.erase(aquaIter);
     }
-}
+}*/
 #endif

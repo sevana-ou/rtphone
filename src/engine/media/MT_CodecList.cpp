@@ -1,8 +1,9 @@
-/* Copyright(C) 2007-2022 VoIPobjects (voipobjects.com)
+/* Copyright(C) 2007-2023 VoIPobjects (voipobjects.com)
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 #include <algorithm>
+#include <list>
 
 #include "../config.h"
 #include "MT_CodecList.h"
@@ -125,6 +126,7 @@ CodecList::Settings::OpusSpec CodecList::Settings::OpusSpec::parse(const std::st
     return result;
 }
 
+#if defined(USE_RESIP_INTEGRATION)
 CodecList::Settings CodecList::Settings::parseSdp(const std::list<resip::Codec>& codeclist)
 {
     CodecList::Settings r{DefaultSettings};
@@ -147,6 +149,8 @@ CodecList::Settings CodecList::Settings::parseSdp(const std::list<resip::Codec>&
     }
     return r;
 }
+#endif
+
 
 bool CodecList::Settings::operator == (const Settings& rhs) const
 {
