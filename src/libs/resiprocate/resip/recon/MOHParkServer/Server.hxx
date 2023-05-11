@@ -56,8 +56,11 @@ public:
    void shutdown();
 
    recon::UserAgent* getMyUserAgent() { return mMyUserAgent; }
-   MOHManager& getMOHManager() { return mMOHManager; }
-   ParkManager& getParkManager() { return mParkManager; }
+
+   // Legacy API's that assume one set of settings for MOH and Park - return first defined MOH and ParkSettings
+   MOHManager& getMOHManager() { assert(mMOHManagerMap.size() != 0);  return *mMOHManagerMap.begin()->second; }
+   ParkManager& getParkManager() { assert(mParkManagerMap.size() != 0);  return *mParkManagerMap.begin()->second; }
+
    void getActiveCallsInfo(CallInfoList& callInfos);
 
    // Timer handler
@@ -81,6 +84,7 @@ protected:
    virtual void onParticipantConnected(recon::ParticipantHandle partHandle, const resip::SipMessage& msg);
    virtual void onParticipantRedirectSuccess(recon::ParticipantHandle partHandle);
    virtual void onParticipantRedirectFailure(recon::ParticipantHandle partHandle, unsigned int statusCode);
+   virtual void onParticipantRequestedHold(recon::ParticipantHandle partHandle, bool held);
 
 private:
    friend class MOHManager;
@@ -90,8 +94,13 @@ private:
    bool mIsV6Avail;
    recon::UserAgent* mMyUserAgent;
    resip::SharedPtr<recon::UserAgentMasterProfile> mUserAgentMasterProfile;
-   MOHManager mMOHManager;
-   ParkManager mParkManager;
+
+   typedef std::map<unsigned long, MOHManager*> MOHManagerMap;
+   MOHManagerMap mMOHManagerMap;
+
+   typedef std::map<unsigned long, ParkManager*> ParkManagerMap;
+   ParkManagerMap mParkManagerMap;
+
    WebAdmin* mWebAdmin;
    WebAdminThread* mWebAdminThread;
 };
@@ -102,7 +111,7 @@ private:
 
 /* ====================================================================
 
- Copyright (c) 2010, SIP Spectrum, Inc.
+ Copyright (c) 2010-2016, SIP Spectrum, Inc.
  All rights reserved.
 
  Redistribution and use in source and binary forms, with or without

@@ -1,12 +1,14 @@
 #if !defined(RESIP_SERVERSUBSCRIPTION_HXX)
 #define RESIP_SERVERSUBSCRIPTION_HXX
 
+#include "resip/stack/Helper.hxx"
 #include "resip/dum/BaseSubscription.hxx"
 
 namespace resip
 {
 
 class DialogUsageManager;
+class ServerSubscriptionHandler;
 
 //!dcm! -- no Subscription State expires parameter generation yet. 
 class ServerSubscription : public BaseSubscription 
@@ -30,7 +32,7 @@ class ServerSubscription : public BaseSubscription
       void setSubscriptionState(SubscriptionState state);
 
       SharedPtr<SipMessage> update(const Contents* document);
-      void end(TerminateReason reason, const Contents* document = 0);
+      void end(TerminateReason reason, const Contents* document = 0, int retryAfter = 0);
 
       virtual void end();
       virtual void send(SharedPtr<SipMessage> msg);
@@ -49,7 +51,6 @@ class ServerSubscription : public BaseSubscription
 
    protected:
       virtual ~ServerSubscription();
-      virtual void dialogDestroyed(const SipMessage& msg);           
       void onReadyToSend(SipMessage& msg);
       virtual void flowTerminated();
       
@@ -63,11 +64,9 @@ class ServerSubscription : public BaseSubscription
       
       bool shouldDestroyAfterSendingFailure(const SipMessage& msg);      
 
+      void terminateSubscription(ServerSubscriptionHandler* handler);
+
       Data mSubscriber;
-
-//      const Contents* mCurrentEventDocument;
-      SipMessage mLastSubscribe;
-
       UInt32 mExpires;
 
       // disabled

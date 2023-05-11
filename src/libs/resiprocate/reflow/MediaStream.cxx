@@ -2,13 +2,17 @@
 #include "config.h"
 #endif
 
+#include <boost/function.hpp>
+#include <boost/shared_ptr.hpp>
+
 #include <rutil/Log.hxx>
 #include <rutil/Logger.hxx>
 #include <rutil/Timer.hxx>
 
+#include "MediaStream.hxx"
 #include "FlowManagerSubsystem.hxx"
 #include "FlowManager.hxx"
-#include "MediaStream.hxx"
+
 
 using namespace flowmanager;
 #ifdef USE_SSL
@@ -33,7 +37,10 @@ MediaStream::MediaStream(asio::io_service& ioService,
                          const char* natTraversalServerHostname, 
                          unsigned short natTraversalServerPort, 
                          const char* stunUsername,
-                         const char* stunPassword) :
+                         const char* stunPassword,
+                         bool forceCOMedia,
+                         SharedPtr<RTCPEventLoggingHandler> rtcpEventLoggingHandler,
+                         SharedPtr<FlowContext> context) :
 #ifdef USE_SSL
    mDtlsFactory(dtlsFactory),
 #endif  
@@ -44,6 +51,7 @@ MediaStream::MediaStream(asio::io_service& ioService,
    mNatTraversalServerPort(natTraversalServerPort),
    mStunUsername(stunUsername),
    mStunPassword(stunPassword),
+   mForceCOMedia(forceCOMedia),
    mMediaStreamHandler(mediaStreamHandler)
 {
    // Rtcp is enabled if localRtcpBinding transport type != None
@@ -57,7 +65,10 @@ MediaStream::MediaStream(asio::io_service& ioService,
 #endif
                           RTP_COMPONENT_ID, 
                           localRtpBinding, 
-                          *this);
+                          *this,
+                          mForceCOMedia,
+                          SharedPtr<RTCPEventLoggingHandler>(),
+                          context);
 
       mRtcpFlow = new Flow(ioService, 
 #ifdef USE_SSL
@@ -65,7 +76,10 @@ MediaStream::MediaStream(asio::io_service& ioService,
 #endif
                            RTCP_COMPONENT_ID,
                            localRtcpBinding, 
-                           *this);
+                           *this,
+                           mForceCOMedia,
+                           rtcpEventLoggingHandler,
+                           context);
 
       mRtpFlow->activateFlow(StunMessage::PropsPortPair);
 
@@ -83,7 +97,10 @@ MediaStream::MediaStream(asio::io_service& ioService,
 #endif
                           RTP_COMPONENT_ID,
                           localRtpBinding, 
-                          *this);
+                          *this,
+                          mForceCOMedia,
+                          SharedPtr<RTCPEventLoggingHandler>(),
+                          context);
       mRtpFlow->activateFlow(StunMessage::PropsPortEven);
       mRtcpFlow = 0;
    }
@@ -138,6 +155,7 @@ MediaStream::createOutboundSRTPSession(SrtpCryptoSuite cryptoSuite, const char* 
          srtp_dealloc(mSRTPSessionOut);
       }
    }
+   memset(&mSRTPPolicyOut, 0, sizeof(mSRTPPolicyOut));
 
    // Copy key locally
    memcpy(mSRTPMasterKeyOut, key, SRTP_MASTER_KEY_LEN);
@@ -162,7 +180,7 @@ MediaStream::createOutboundSRTPSession(SrtpCryptoSuite cryptoSuite, const char* 
    // set remaining policy settings
    mSRTPPolicyOut.ssrc.type = ssrc_any_outbound;   
    mSRTPPolicyOut.key = mSRTPMasterKeyOut;
-   mSRTPPolicyOut.next = 0;
+   mSRTPPolicyOut.window_size = 64;
 
    // Allocate and initailize the SRTP sessions
    status = srtp_create(&mSRTPSessionOut, &mSRTPPolicyOut);
@@ -202,6 +220,7 @@ MediaStream::createInboundSRTPSession(SrtpCryptoSuite cryptoSuite, const char* k
          srtp_dealloc(mSRTPSessionIn);
       }
    }
+   memset(&mSRTPPolicyIn, 0, sizeof(mSRTPPolicyIn));
 
    // Copy key locally
    memcpy(mSRTPMasterKeyIn, key, SRTP_MASTER_KEY_LEN);
@@ -226,7 +245,7 @@ MediaStream::createInboundSRTPSession(SrtpCryptoSuite cryptoSuite, const char* k
    // set remaining policy settings
    mSRTPPolicyIn.ssrc.type = ssrc_any_inbound;   
    mSRTPPolicyIn.key = mSRTPMasterKeyIn;
-   mSRTPPolicyIn.next = 0;
+   mSRTPPolicyIn.window_size = 64;
 
    // Allocate and initailize the SRTP sessions
    status = srtp_create(&mSRTPSessionIn, &mSRTPPolicyIn);

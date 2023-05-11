@@ -11,12 +11,12 @@
 */
 
 #include "rutil/SharedCount.hxx"
-#include <memory>               // for std::unique_ptr
+#include <memory>               // for std::auto_ptr
 #include <algorithm>            // for std::swap
 #include <functional>           // for std::less
 #include <typeinfo>             // for std::bad_cast
 #include <iosfwd>               // for std::basic_ostream
-#include <cassert>
+#include "rutil/ResipAssert.h"
 
 namespace resip
 {
@@ -151,7 +151,7 @@ public:
    }
 
    template<class Y>
-   explicit SharedPtr(std::unique_ptr<Y> & r): px(r.get()), pn()
+   explicit SharedPtr(std::auto_ptr<Y> & r): px(r.get()), pn()
    {
       Y * tmp = r.get();
       pn = shared_count(r);
@@ -167,7 +167,7 @@ public:
    }
 
    template<class Y>
-   SharedPtr & operator=(std::unique_ptr<Y> & r)
+   SharedPtr & operator=(std::auto_ptr<Y> & r)
    {
       this_type(r).swap(*this);
       return *this;
@@ -180,7 +180,7 @@ public:
 
    template<class Y> void reset(Y * p) // Y must be complete
    {
-      assert(p == 0 || p != px); // catch self-reset errors
+      resip_assert(p == 0 || p != px); // catch self-reset errors
       this_type(p).swap(*this);
    }
 
@@ -191,13 +191,13 @@ public:
 
    reference operator* () const // never throws
    {
-      assert(px != 0);
+      resip_assert(px != 0);
       return *px;
    }
 
    T * operator-> () const // never throws
    {
-      assert(px != 0);
+      resip_assert(px != 0);
       return px;
    }
     
@@ -335,7 +335,7 @@ template<class T, class U> SharedPtr<T> shared_polymorphic_cast(SharedPtr<U> con
 
 template<class T, class U> SharedPtr<T> shared_polymorphic_downcast(SharedPtr<U> const & r)
 {
-    assert(dynamic_cast<T *>(r.get()) == r.get());
+    resip_assert(dynamic_cast<T *>(r.get()) == r.get());
     return shared_static_cast<T>(r);
 }
 

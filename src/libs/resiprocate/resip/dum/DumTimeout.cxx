@@ -1,4 +1,4 @@
-#include <cassert>
+#include "rutil/ResipAssert.h"
 #include "DumTimeout.hxx"
 #include "rutil/WinLeakCheck.hxx"
 #include "resip/dum/BaseUsage.hxx"
@@ -63,7 +63,7 @@ const Data & DumTimeout::transactionId() const
 bool 
 DumTimeout::isClientTransaction() const
 {
-   assert(0);
+   resip_assert(0);
    return false;
 }
       
@@ -99,6 +99,12 @@ DumTimeout::encode(EncodeStream& strm) const
          break;
       case Retransmit1xx:
          strm <<"Retransmit1xx";
+         break;
+      case Retransmit1xxRel:
+         strm <<"Retransmit1xxRel";
+         break;
+      case Resubmit1xxRel:
+         strm <<"Resubmit1xxRel";
          break;
       case WaitForAck:
          strm <<"WaitForAck";

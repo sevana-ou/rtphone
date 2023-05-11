@@ -8,8 +8,8 @@
 #include <spawn.h>
 #endif
 
-#include "Server.hxx"
 #include "../UserAgent.hxx"
+#include "Server.hxx"
 #include "AppSubsystem.hxx"
 #include "WebAdmin.hxx"
 #include "WebAdminThread.hxx"
@@ -80,7 +80,7 @@ public:
       InfoLog(<< "onSubscriptionTerminated: handle=" << handle << " statusCode=" << statusCode);
    }
 
-   virtual void onSubscriptionNotify(SubscriptionHandle handle, Data& notifyData)
+   virtual void onSubscriptionNotify(SubscriptionHandle handle, const Data& notifyData)
    {
       InfoLog(<< "onSubscriptionNotify: handle=" << handle << " data=" << endl << notifyData);
    }
@@ -116,8 +116,6 @@ Server::Server(ConfigParser& config) :
    mConfig(config),
    mIsV6Avail(false),
    mMyUserAgent(0),
-   mMOHManager(*this),
-   mParkManager(*this),
    mWebAdmin(0),
    mWebAdminThread(0)
 {
@@ -131,28 +129,40 @@ Server::Server(ConfigParser& config) :
    }
 
    InfoLog( << "MOHParkServer settings:");
-   InfoLog( << "  MOH URI = " << mConfig.mMOHUri);
-   InfoLog( << "  MOH Registration Time = " << mConfig.mMOHRegistrationTime);
-   InfoLog( << "  MOH Filename URL = " << mConfig.mMOHFilenameUrl);
-   InfoLog( << "  Park URI = " << mConfig.mParkUri);
-   InfoLog( << "  Park Registration Time = " << mConfig.mParkRegistrationTime);
-   InfoLog( << "  Park MOH Filename URL = " << mConfig.mParkMOHFilenameUrl);
-   InfoLog( << "  Park Orbit Range Start = " << mConfig.mParkOrbitRangeStart);
-   InfoLog( << "  Park Number of Orbits = " << mConfig.mParkNumOrbits);
-   InfoLog( << "  Park Orbit Registration Time = " << mConfig.mParkOrbitRegistrationTime);
+   ConfigParser::MOHSettingsMap::iterator itMOH = mConfig.mMOHSettingsMap.begin();
+   for (; itMOH != mConfig.mMOHSettingsMap.end(); itMOH++)
+   {
+      InfoLog(<< "  MOH" << itMOH->first << " URI = " << itMOH->second.mUri);
+      InfoLog(<< "  MOH" << itMOH->first << " Registration Time = " << itMOH->second.mRegistrationTime);
+      InfoLog(<< "  MOH" << itMOH->first << " Outbound Proxy = " << itMOH->second.mOutboundProxy);
+      InfoLog(<< "  MOH" << itMOH->first << " Filename URL = " << itMOH->second.mMOHFilenameUrl);
+   }
+   ConfigParser::ParkSettingsMap::iterator itPark = mConfig.mParkSettingsMap.begin();
+   for (; itPark != mConfig.mParkSettingsMap.end(); itPark++)
+   {
+      InfoLog(<< "  Park" << itPark->first << " URI = " << itPark->second.mUri);
+      InfoLog(<< "  Park" << itPark->first << " Registration Time = " << itPark->second.mRegistrationTime);
+      InfoLog(<< "  Park" << itPark->first << " Outbound Proxy = " << itPark->second.mOutboundProxy);
+      InfoLog(<< "  Park" << itPark->first << " Filename URL = " << itPark->second.mMOHFilenameUrl);
+      InfoLog(<< "  Park" << itPark->first << " Orbit Range Start = " << itPark->second.mOrbitRangeStart);
+      InfoLog(<< "  Park" << itPark->first << " Number of Orbits = " << itPark->second.mNumOrbits);
+      InfoLog(<< "  Park" << itPark->first << " Orbit Registration Time = " << itPark->second.mOrbitRegistrationTime);
+      InfoLog(<< "  Park" << itPark->first << " Max Park Time = " << itPark->second.mMaxParkTime);
+   }
    InfoLog( << "  Local IP Address = " << mConfig.mAddress);
    InfoLog( << "  Override DNS Servers = " << mConfig.mDnsServers);
    InfoLog( << "  UDP Port = " << mConfig.mUdpPort);
    InfoLog( << "  TCP Port = " << mConfig.mTcpPort);
    InfoLog( << "  TLS Port = " << mConfig.mTlsPort);
    InfoLog( << "  TLS Domain = " << mConfig.mTlsDomain);
+   InfoLog( << "  Certificate Path = " << mConfig.mCertificatePath);
    InfoLog( << "  Keepalives = " << (mConfig.mKeepAlives ? "enabled" : "disabled"));
    InfoLog( << "  Outbound Proxy = " << mConfig.mOutboundProxy);
    InfoLog( << "  Media Port Range Start = " << mConfig.mMediaPortRangeStart);
    InfoLog( << "  Media Port Range Size = " << mConfig.mMediaPortRangeSize);
    InfoLog( << "  Log Level = " << mConfig.mLogLevel);
 
-   resip::Data ;
+   resip::Data foo;
 
    if(!mConfig.mAddress.empty())
    {
@@ -198,27 +208,27 @@ Server::Server(ConfigParser& config) :
       }
       if(mConfig.mUdpPort != (unsigned short)-1)
       {
-         profile->addTransport(UDP, mConfig.mUdpPort, V4, mConfig.mAddress);
+         profile->addTransport(UDP, mConfig.mUdpPort, V4, StunDisabled, mConfig.mAddress);
          if(mIsV6Avail)
          {
-            profile->addTransport(UDP, mConfig.mUdpPort, V6, mConfig.mAddress);
+            profile->addTransport(UDP, mConfig.mUdpPort, V6, StunDisabled, mConfig.mAddress);
          }
       }
       if(mConfig.mTcpPort != (unsigned short)-1)
       {
-         profile->addTransport(TCP, mConfig.mTcpPort, V4, mConfig.mAddress);
+         profile->addTransport(TCP, mConfig.mTcpPort, V4, StunDisabled, mConfig.mAddress);
          if(mIsV6Avail)
          {
-            profile->addTransport(TCP, mConfig.mTcpPort, V6, mConfig.mAddress);
+            profile->addTransport(TCP, mConfig.mTcpPort, V6, StunDisabled, mConfig.mAddress);
          }
       }
 #ifdef USE_SSL
       if(mConfig.mTlsPort != (unsigned short)-1)
       {
-         profile->addTransport(TLS, mConfig.mTlsPort, V4, mConfig.mAddress, mConfig.mTlsDomain);
+         profile->addTransport(TLS, mConfig.mTlsPort, V4, StunDisabled, mConfig.mAddress, mConfig.mTlsDomain);
          if(mIsV6Avail)
          {
-            profile->addTransport(TLS, mConfig.mTlsPort, V6, mConfig.mAddress, mConfig.mTlsDomain);
+            profile->addTransport(TLS, mConfig.mTlsPort, V6, StunDisabled, mConfig.mAddress, mConfig.mTlsDomain);
          }
       }
 #endif
@@ -229,6 +239,7 @@ Server::Server(ConfigParser& config) :
       InfoLog (<< "Caught: " << e);
       exit(-1);
    }
+   profile->certPath() = mConfig.mCertificatePath;
 
    // DNS Servers
    ParseBuffer pb(mConfig.mDnsServers);
@@ -333,7 +344,7 @@ Server::Server(ConfigParser& config) :
       // Create WebAdmin
       mWebAdmin = new WebAdmin(*this, true /* noWebChallenges */, Data::Empty, Data::Empty, mConfig.mHttpPort, resip::V4);
       mWebAdminThread = new WebAdminThread(*mWebAdmin);
-      assert(mWebAdminThread && mWebAdmin);
+      resip_assert(mWebAdminThread && mWebAdmin);
       mWebAdminThread->run();
    }
 }
@@ -355,38 +366,83 @@ Server::~Server()
 
    shutdown();
    delete mMyUserAgent;
+
+   // Should be deleted in shutdown - but done here also for safety
+   MOHManagerMap::iterator itMOH = mMOHManagerMap.begin();
+   for (; itMOH != mMOHManagerMap.end(); itMOH++)
+   {
+      delete itMOH->second;
+   }
+
+   ParkManagerMap::iterator itPark = mParkManagerMap.begin();
+   for (; itPark != mParkManagerMap.end(); itPark++)
+   {
+      delete itPark->second;
+   }
 }
 
 void 
 Server::initializeResipLogging(unsigned int maxByteCount, const Data& level, const Data& resipFilename)
 {
    // Initialize loggers
-   GenericLogImpl::MaxByteCount = maxByteCount; 
+   Log::setMaxByteCount(maxByteCount); 
    Log::initialize("file", level.c_str(), "", resipFilename.c_str(), &g_MOHParkServerLogger);
 }
 
 void
 Server::startup()
 {
-   assert(mMyUserAgent);
+   resip_assert(mMyUserAgent);
    mMyUserAgent->startup();
-   mMOHManager.startup();
-   mParkManager.startup();
+
+   // Create an MOHManager for each setting in map and call startup
+   resip_assert(mMOHManagerMap.empty());
+   ConfigParser::MOHSettingsMap::iterator itMOH = mConfig.mMOHSettingsMap.begin();
+   for (; itMOH != mConfig.mMOHSettingsMap.end(); itMOH++)
+   {
+      MOHManager* mohManager = new MOHManager(*this);
+      mMOHManagerMap[itMOH->first] = mohManager;
+      mohManager->startup(itMOH->second);
+   }
+
+   // Create a ParkManager for each setting in map can call startup
+   assert(mParkManagerMap.empty());
+   ConfigParser::ParkSettingsMap::iterator itPark = mConfig.mParkSettingsMap.begin();
+   for (; itPark != mConfig.mParkSettingsMap.end(); itPark++)
+   {
+      ParkManager* parkManager = new ParkManager(*this);
+      mParkManagerMap[itPark->first] = parkManager;
+      parkManager->startup(itPark->second);
+   }
 }
 
 void 
 Server::process(int timeoutMs)
 {
-   assert(mMyUserAgent);
+   resip_assert(mMyUserAgent);
    mMyUserAgent->process(timeoutMs);
 }
 
 void
 Server::shutdown()
 {
-   mMOHManager.shutdown(true /*shuttingDownServer*/);
-   mParkManager.shutdown(true /*shuttingDownServer*/);
-   assert(mMyUserAgent);
+   MOHManagerMap::iterator itMOH = mMOHManagerMap.begin();
+   for (; itMOH != mMOHManagerMap.end(); itMOH++)
+   {
+      itMOH->second->shutdown(true /*shuttingDownServer*/);
+      delete itMOH->second;
+   }
+   mMOHManagerMap.clear();
+
+   ParkManagerMap::iterator itPark = mParkManagerMap.begin();
+   for (; itPark != mParkManagerMap.end(); itPark++)
+   {
+      itPark->second->shutdown(true /*shuttingDownServer*/);
+      delete itPark->second;
+   }
+   mParkManagerMap.clear();
+
+   resip_assert(mMyUserAgent);
    mMyUserAgent->shutdown();
    OsSysLog::shutdown();
 }
@@ -417,8 +473,20 @@ void
 Server::getActiveCallsInfo(std::list<ActiveCallInfo>& callInfos)
 {
     callInfos.clear();
-    mMOHManager.getActiveCallsInfo(callInfos);
-    mParkManager.getActiveCallsInfo(callInfos);
+
+    // Get Calls from all the MOH Managers
+    MOHManagerMap::iterator itMOH = mMOHManagerMap.begin();
+    for (; itMOH != mMOHManagerMap.end(); itMOH++)
+    {
+       itMOH->second->getActiveCallsInfo(callInfos);
+    }
+
+    // Get Calls from all the MOH Managers
+    ParkManagerMap::iterator itPark = mParkManagerMap.begin();
+    for (; itPark != mParkManagerMap.end(); itPark++)
+    {
+       itPark->second->getActiveCallsInfo(callInfos);
+    }
 }
 
 void 
@@ -431,9 +499,24 @@ void
 Server::onParticipantDestroyed(ParticipantHandle partHandle)
 {
    InfoLog(<< "onParticipantDestroyed: handle=" << partHandle);
-   if(!mMOHManager.removeParticipant(partHandle))
+
+   // Try each manager until participant is found
+   MOHManagerMap::iterator itMOH = mMOHManagerMap.begin();
+   for (; itMOH != mMOHManagerMap.end(); itMOH++)
    {
-      mParkManager.removeParticipant(partHandle);
+      if (itMOH->second->removeParticipant(partHandle))
+      {
+         return;
+      }
+   }
+
+   ParkManagerMap::iterator itPark = mParkManagerMap.begin();
+   for (; itPark != mParkManagerMap.end(); itPark++)
+   {
+      if (itPark->second->removeParticipant(partHandle))
+      {
+         return;
+      }
    }
 }
 
@@ -448,36 +531,59 @@ Server::onIncomingParticipant(ParticipantHandle partHandle, const SipMessage& ms
 {
    InfoLog(<< "onIncomingParticipant: handle=" << partHandle << " auto=" << autoAnswer << " msg=" << msg.brief());
 
-   if(mMOHManager.isMyProfile(conversationProfile))
+   // Try each manager until conversationProfile is found
+   MOHManagerMap::iterator itMOH = mMOHManagerMap.begin();
+   for (; itMOH != mMOHManagerMap.end(); itMOH++)
    {
-      mMOHManager.addParticipant(partHandle, msg.header(h_From).uri(), msg.header(h_From).uri());      
+      if (itMOH->second->isMyProfile(conversationProfile))
+      {
+         itMOH->second->addParticipant(partHandle, msg.header(h_From).uri(), msg.header(h_From).uri());
+         return;
+      }
    }
-   else if(mParkManager.isMyProfile(conversationProfile))
+
+   ParkManagerMap::iterator itPark = mParkManagerMap.begin();
+   for (; itPark != mParkManagerMap.end(); itPark++)
    {
-      mParkManager.incomingParticipant(partHandle, msg);      
+      if (itPark->second->isMyProfile(conversationProfile))
+      {
+         itPark->second->incomingParticipant(partHandle, msg);
+         return;
+      }
    }
-   else
-   {
-      rejectParticipant(partHandle, 404);
-   }
+
+   // Not found anywhere - reject with a 404
+   rejectParticipant(partHandle, 404);
 }
 
 void 
 Server::onRequestOutgoingParticipant(ParticipantHandle partHandle, const SipMessage& msg, ConversationProfile& conversationProfile)
 {
    InfoLog(<< "onRequestOutgoingParticipant: handle=" << partHandle << " msg=" << msg.brief());
-   if(mMOHManager.isMyProfile(conversationProfile))
+
+   // Try each manager until conversationProfile is found
+   MOHManagerMap::iterator itMOH = mMOHManagerMap.begin();
+   for (; itMOH != mMOHManagerMap.end(); itMOH++)
    {
-      mMOHManager.addParticipant(partHandle, msg.header(h_ReferTo).uri().getAorAsUri(), msg.header(h_From).uri());
+      if (itMOH->second->isMyProfile(conversationProfile))
+      {
+         itMOH->second->addParticipant(partHandle, msg.header(h_ReferTo).uri().getAorAsUri(), msg.header(h_From).uri());
+         return;
+      }
    }
-   else if(mParkManager.isMyProfile(conversationProfile))
+
+   ParkManagerMap::iterator itPark = mParkManagerMap.begin();
+   for (; itPark != mParkManagerMap.end(); itPark++)
    {
-      mParkManager.parkParticipant(partHandle, msg);      
+      if (itPark->second->isMyProfile(conversationProfile))
+      {
+         itPark->second->parkParticipant(partHandle, msg);
+         return;
+      }
    }
-   else
-   {
-      rejectParticipant(partHandle, 404);
-   }
+
+   // Not found anywhere - reject with a 404
+   rejectParticipant(partHandle, 404);
 }
     
 void 
@@ -525,18 +631,32 @@ Server::onParticipantRedirectFailure(ParticipantHandle partHandle, unsigned int 
    InfoLog(<< "onParticipantRedirectFailure: handle=" << partHandle << " statusCode=" << statusCode);
 }
 
+void
+Server::onParticipantRequestedHold(ParticipantHandle partHandle, bool held)
+{
+   InfoLog(<< "onParticipantRequestedHold: handle=" << partHandle << " held=" << held);
+}
+
 void 
 Server::onMaxParkTimeout(recon::ParticipantHandle participantHandle)
 {
-   // Pass to ParkManager to see if participant is still around
-   mParkManager.onMaxParkTimeout(participantHandle);
+   // Pass to ParkManager(s) to see if participant is still around
+   ParkManagerMap::iterator itPark = mParkManagerMap.begin();
+   for (; itPark != mParkManagerMap.end(); itPark++)
+   {
+      if (itPark->second->onMaxParkTimeout(participantHandle))
+      {
+         // Once participant is found, we can stop
+         return;
+      }
+   }
 }
 
 }
 
 /* ====================================================================
 
- Copyright (c) 2010, SIP Spectrum, Inc.
+ Copyright (c) 2010-2016, SIP Spectrum, Inc.
  All rights reserved.
 
  Redistribution and use in source and binary forms, with or without

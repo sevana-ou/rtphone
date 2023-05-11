@@ -1,7 +1,7 @@
 #if !defined(RESIP_SOCKET_HXX)
 #define RESIP_SOCKET_HXX  
 
-#include <cassert>
+#include "rutil/ResipAssert.h"
 #include <errno.h>
 #include <algorithm>
 
@@ -34,7 +34,6 @@
 #endif
 typedef int socklen_t;
 
-
 //this list taken from <winsock2.h>, see #if 0 removed block.
 #define EWOULDBLOCK             WSAEWOULDBLOCK
 #define EINPROGRESS             WSAEINPROGRESS
@@ -65,7 +64,7 @@ typedef int socklen_t;
 #define ECONNREFUSED            WSAECONNREFUSED
 #define ELOOP                   WSAELOOP
 //#define ENAMETOOLONG            WSAENAMETOOLONG
-
+#define EHOSTDOWN               WSAEHOSTDOWN
 #define EHOSTUNREACH            WSAEHOSTUNREACH
 //#define ENOTEMPTY               WSAENOTEMPTY
 #define EPROCLIM                WSAEPROCLIM
@@ -73,9 +72,6 @@ typedef int socklen_t;
 #define EDQUOT                  WSAEDQUOT
 #define ESTALE                  WSAESTALE
 #define EREMOTE                 WSAEREMOTE
-
-
-# define EHOSTDOWN               WSAEHOSTDOWN
 
 #if defined(_MSC_VER) && (_MSC_VER >= 1600)
 #pragma warning (pop)
@@ -96,9 +92,7 @@ initNetwork();
 
 #ifndef WIN32
 typedef int Socket;		// Un*x fds are signed
-#ifndef INVALID_SOCKET
 #define INVALID_SOCKET (-1)
-#endif
 #define SOCKET_ERROR   (-1)
 inline int getErrno() { return errno; }
 #else
@@ -115,6 +109,7 @@ typedef void(*AfterSocketCreationFuncPtr)(Socket s, int transportType, const cha
 
 bool makeSocketNonBlocking(Socket fd);
 bool makeSocketBlocking(Socket fd);
+bool configureConnectedSocket(Socket fd);
 int closeSocket( Socket fd );
 int getSocketError(Socket fd);	// getsockopt(SOCK_SOCKET,SO_ERROR)
 int increaseLimitFds(unsigned int targetFds);
@@ -132,6 +127,11 @@ public:
       FD_ZERO(&read);
       FD_ZERO(&write);
       FD_ZERO(&except);
+   }
+
+   int select()
+   {
+      return numReady = ::select(size, &read, &write, &except, NULL);
    }
 
    int select(struct timeval& tv)
@@ -164,11 +164,11 @@ public:
 
    void setRead(Socket fd)
    {
-      assert( FD_SETSIZE >= 8 );
+      resip_assert( FD_SETSIZE >= 8 );
 #ifndef WIN32 // windows fd are not int's and don't start at 0 - this won't work in windows
-      assert( fd < (int)FD_SETSIZE ); // redefineing FD_SETSIZE will not work 
+      resip_assert( fd < (int)FD_SETSIZE ); // redefineing FD_SETSIZE will not work 
 #else
-      assert(read.fd_count < FD_SETSIZE); // Ensure there is room to add new FD
+      resip_assert(read.fd_count < FD_SETSIZE); // Ensure there is room to add new FD
 #endif
       FD_SET(fd, &read);
       size = ( int(fd+1) > size) ? int(fd+1) : size;
@@ -177,9 +177,9 @@ public:
    void setWrite(Socket fd)
    {
 #ifndef WIN32 // windows fd are not int's and don't start at 0 - this won't work in windows
-      assert( fd < (int)FD_SETSIZE ); // redefinitn FD_SETSIZE will not work 
+      resip_assert( fd < (int)FD_SETSIZE ); // redefinitn FD_SETSIZE will not work 
 #else
-      assert(write.fd_count < FD_SETSIZE); // Ensure there is room to add new FD
+      resip_assert(write.fd_count < FD_SETSIZE); // Ensure there is room to add new FD
 #endif
       FD_SET(fd, &write);
       size = ( int(fd+1) > size) ? int(fd+1) : size;
@@ -188,9 +188,9 @@ public:
    void setExcept(Socket fd)
    {
 #ifndef WIN32 // windows fd are not int's and don't start at 0 - this won't work in windows
-      assert( fd < (int)FD_SETSIZE ); // redefinitn FD_SETSIZE will not work 
+      resip_assert( fd < (int)FD_SETSIZE ); // redefinitn FD_SETSIZE will not work 
 #else
-      assert(except.fd_count < FD_SETSIZE); // Ensure there is room to add new FD
+      resip_assert(except.fd_count < FD_SETSIZE); // Ensure there is room to add new FD
 #endif
       FD_SET(fd,&except);
       size = ( int(fd+1) > size) ? int(fd+1) : size;

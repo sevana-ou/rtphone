@@ -1,9 +1,17 @@
+// !slg! At least for builds in Visual Studio on windows this include needs to be above ASIO and boost includes since inlined getErrno has 
+// a different linkage signature if included after - haven't investigated the full details as to exactly why this happens
+#include <rutil/Socket.hxx>
+
 #include <asio.hpp>
+#ifdef USE_SSL
+#include <asio/ssl.hpp>
+#endif
 #include <boost/function.hpp>
+#include <boost/shared_ptr.hpp>
 #include <rutil/Data.hxx>
 
 // SYSTEM INCLUDES
-#include <assert.h>
+#include "rutil/ResipAssert.h"
 #include <stdio.h>
 #ifndef _WIN32
 #include <netinet/in.h>
@@ -12,7 +20,7 @@
 #endif
 
 // APPLICATION INCLUDES
-#include "Flow.hxx"
+#include "reflow/Flow.hxx"
 #include "FlowManagerSipXSocket.hxx"
 
 using namespace std;
@@ -39,20 +47,20 @@ FlowManagerSipXSocket::~FlowManagerSipXSocket()
 
 OsSocket* FlowManagerSipXSocket::getSocket()
 {
-    assert(false);
+    resip_assert(false);
     return 0;
 }
 
 int FlowManagerSipXSocket::getSocketDescriptor() const
 { 
-   assert(mFlow);
+   resip_assert(mFlow);
    return mFlow->getSelectSocketDescriptor();
 }
 
 int FlowManagerSipXSocket::read(char* buffer, int bufferLength)
 {
    //cout << "read: bufferlen=" << bufferLength << endl;
-   assert(mFlow);
+   resip_assert(mFlow);
    unsigned int len = bufferLength;
    if(mFlow->receive(buffer, len, 0))
    {
@@ -71,7 +79,7 @@ int FlowManagerSipXSocket::read(char* buffer, int bufferLength,
    unsigned short receivedPort=0;
 
    //cout << "read(get address): bufferlen=" << bufferLength << endl;  // **********
-   assert(mFlow);
+   resip_assert(mFlow);
 
    unsigned int len = bufferLength;
    if(mFlow->receive(buffer, len, 0, &receivedAddress, &receivedPort))
@@ -115,7 +123,7 @@ int FlowManagerSipXSocket::read(char* buffer, int bufferLength,
 int FlowManagerSipXSocket::read(char* buffer, int bufferLength, long waitMilliseconds)
 {        
    //cout << "read: bufferlen=" << bufferLength << ", waitMilliseconds=" << waitMilliseconds << "ms" << endl;
-   assert(mFlow);
+   resip_assert(mFlow);
    unsigned int len = bufferLength;
    if(!mFlow->receive(buffer, len, waitMilliseconds))
    {
@@ -130,7 +138,7 @@ int FlowManagerSipXSocket::read(char* buffer, int bufferLength, long waitMillise
 int FlowManagerSipXSocket::write(const char* buffer, int bufferLength)
 {
     //cout << "write: bufferlen=" << bufferLength << endl;  // *********
-    assert(mFlow);
+    resip_assert(mFlow);
     mFlow->send((char *)buffer, bufferLength);
     return 0;
 }
@@ -141,7 +149,7 @@ int FlowManagerSipXSocket::write(const char* buffer,
                                int port)
 {
    //cout << "write: bufferlen=" << bufferLength << ", address=" << ipAddress << ", port=" << port << endl;
-   assert(mFlow);
+   resip_assert(mFlow);
    mFlow->sendTo(asio::ip::address::from_string(ipAddress), port, (char*)buffer, bufferLength);
    return 0;
 }
@@ -150,7 +158,7 @@ int FlowManagerSipXSocket::write(const char* buffer, int bufferLength,
                                long waitMilliseconds)
 {
     //cout << "write: bufferlen=" << bufferLength << ", waitMilliseconds=" << waitMilliseconds << endl;
-    assert(0);
+    resip_assert(0);
     mFlow->send((char*)buffer, bufferLength);  // !SLG! We don't have a timed out send???  Not used by sipX anyway
     return 0;
 }
@@ -159,6 +167,7 @@ int FlowManagerSipXSocket::write(const char* buffer, int bufferLength,
 /* ====================================================================
 
  Copyright (c) 2007-2008, Plantronics, Inc.
+ Copyright (c) 2008-2018, SIP Spectrum, Inc.
  All rights reserved.
 
  Redistribution and use in source and binary forms, with or without

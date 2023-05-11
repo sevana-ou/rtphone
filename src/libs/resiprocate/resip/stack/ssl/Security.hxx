@@ -79,7 +79,18 @@ class BaseSecurity
       static CipherList ExportableSuite;
       static CipherList StrongestSuite;
       
-      BaseSecurity(const CipherList& cipherSuite = ExportableSuite);
+      /**
+       * Note:
+       *
+       * To allow these to be backported to v1.9.x without ABI breakage,
+       * they are implemented as static fields.  In the next release branch,
+       * non-static versions could be added and the static values
+       * used as defaults.
+       */
+      static long OpenSSLCTXSetOptions;
+      static long OpenSSLCTXClearOptions;
+
+      BaseSecurity(const CipherList& cipherSuite = StrongestSuite, const Data& defaultPrivateKeyPassPhrase = Data::Empty, const Data& dHParamsFilename = Data::Empty);
       virtual ~BaseSecurity();
 
       // used to initialize the openssl library
@@ -123,7 +134,7 @@ class BaseSecurity
       void removeDomainCert(const Data& domainName);
       Data getDomainCertDER(const Data& domainName) const;
 
-      void addDomainPrivateKeyPEM(const Data& domainName, const Data& privateKeyPEM);
+      void addDomainPrivateKeyPEM(const Data& domainName, const Data& privateKeyPEM, const Data& privateKeyPassPhrase = Data::Empty);
       bool hasDomainPrivateKey(const Data& domainName) const;
       void removeDomainPrivateKey(const Data& domainName);
       Data getDomainPrivateKeyPEM(const Data& domainName) const;
@@ -139,8 +150,8 @@ class BaseSecurity
       void removeUserPassPhrase(const Data& aor);
       Data getUserPassPhrase(const Data& aor) const;
 
-      void addUserPrivateKeyPEM(const Data& aor, const Data& certPEM);
-      void addUserPrivateKeyDER(const Data& aor, const Data& certDER);
+      void addUserPrivateKeyPEM(const Data& aor, const Data& certPEM, const Data& privateKeyPassPhrase = Data::Empty);
+      void addUserPrivateKeyDER(const Data& aor, const Data& certDER, const Data& privateKeyPassPhrase = Data::Empty);
       bool hasUserPrivateKey(const Data& aor) const;
       void removeUserPrivateKey(const Data& aor);
       Data getUserPrivateKeyPEM(const Data& aor) const;
@@ -181,6 +192,9 @@ class BaseSecurity
       static void setAllowWildcardCertificates(bool bEnable) { mAllowWildcardCertificates = bEnable; }
       static bool allowWildcardCertificates() { return mAllowWildcardCertificates; }
 
+      static SecurityTypes::SSLType parseSSLType(const Data& typeName);
+      static long parseOpenSSLCTXOption(const Data& optionName);
+
    public:
       SSL_CTX*       getTlsCtx ();
       SSL_CTX*       getSslCtx ();
@@ -197,11 +211,23 @@ class BaseSecurity
       typedef std::map<Data,Data>      PassPhraseMap;
 
    protected:
+      /**
+       * Note:
+       *
+       * mTlsCtx is being used when TLSv1 is requested.
+       * Adding more non-static fields like mTlsCtx for subsequent
+       * versions (e.g. for OpenSSL TLSv1_1_method()) breaks ABI
+       * compatability and is therefore difficult to backport onto
+       * release branches.  Better to use SSLv23_method and use OpenSSL
+       * options flags to specify the exact protocol versions to support.
+       */
       SSL_CTX*       mTlsCtx;
       SSL_CTX*       mSslCtx;
       static void dumpAsn(char*, Data);
 
       CipherList mCipherList;
+      Data mDefaultPrivateKeyPassPhrase;
+      Data mDHParamsFilename;
 
       // root cert list
       X509List       mRootCerts;
@@ -222,8 +248,8 @@ class BaseSecurity
       Data getCertDER (PEMType type, const Data& name) const;
       void addCertX509(PEMType type, const Data& name, X509* cert, bool write);
 
-      void addPrivateKeyPEM (PEMType type, const Data& name, const Data& privateKeyPEM, bool write);
-      void addPrivateKeyDER (PEMType type, const Data& name, const Data& privateKeyDER, bool write);
+      void addPrivateKeyPEM (PEMType type, const Data& name, const Data& privateKeyPEM, bool write, const Data& privateKeyPassPhrase = Data::Empty);
+      void addPrivateKeyDER (PEMType type, const Data& name, const Data& privateKeyDER, bool write, const Data& privateKeyPassPhrase = Data::Empty);
       bool hasPrivateKey    (PEMType type, const Data& name) const;
       void removePrivateKey (PEMType type, const Data& name);
       Data getPrivateKeyPEM (PEMType type, const Data& name) const;
@@ -233,19 +259,25 @@ class BaseSecurity
       // match with wildcards
       static int matchHostNameWithWildcards(const Data& certificateName, const Data& domainName);
       static bool mAllowWildcardCertificates;
+
+      void setDHParams(SSL_CTX* ctx);
 };
 
 class Security : public BaseSecurity
 {
    public:
-      Security(const Data& pathToCerts, const CipherList& = ExportableSuite);
-      Security(const CipherList& = ExportableSuite);
+      Security(const Data& pathToCerts, const CipherList& = StrongestSuite, const Data& defaultPrivateKeyPassPhrase = Data::Empty, const Data& dHParamsFilename = Data::Empty);
+      Security(const CipherList& = StrongestSuite, const Data& defaultPrivateKeyPassPhrase = Data::Empty, const Data& dHParamsFilename = Data::Empty);
 
       void addCADirectory(const Data& caDirectory);
       void addCAFile(const Data& caFile);
 
+      void loadCADirectory(const Data& directoryName);
+      void loadCAFile(const Data& fileName);
       virtual void preload();
-      virtual SSL_CTX* createDomainCtx(const SSL_METHOD* method, const Data& domain);
+      virtual SSL_CTX* createDomainCtx(const SSL_METHOD* method, const Data& domain, const Data& certificateFilename, 
+                                       const Data& privateKeyFilename, const Data& privateKeyPassPhrase);
+      virtual void updateDomainCtx(SSL_CTX* ctx, const Data& domain, const Data& certificateFilename, const Data& privateKeyFilename, const Data& privateKeyPassPhrase);
 
       virtual void onReadPEM(const Data& name, PEMType type, Data& buffer) const;
       virtual void onWritePEM(const Data& name, PEMType type, const Data& buffer) const;

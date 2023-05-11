@@ -2,10 +2,12 @@
 #define RESIP_PROXY_HXX 
 
 #include <memory>
+#include <map>
 
 #include "resip/stack/SipMessage.hxx"
 #include "resip/stack/TransactionUser.hxx"
 #include "rutil/HashMap.hxx"
+#include "rutil/Mutex.hxx"
 #include "rutil/ThreadIf.hxx"
 #include "rutil/KeyValueStore.hxx"
 #include "repro/AccountingCollector.hxx"
@@ -66,19 +68,20 @@ class Proxy : public resip::TransactionUser, public resip::ThreadIf
 
       // Note:  These are not thread safe and should be called before run() only
       void setOptionsHandler(OptionsHandler* handler);
-      void setRequestContextFactory(std::unique_ptr<RequestContextFactory> requestContextFactory);
+      void setRequestContextFactory(std::auto_ptr<RequestContextFactory> requestContextFactory);
 
       virtual bool isShutDown() const ;
       virtual void thread();
       
-      bool isMyUri(const resip::Uri& uri) const;
-      const resip::NameAddr& getRecordRoute(const resip::Transport* transport) const;
-      bool getRecordRouteForced() const;
-
-      void setAssumePath(bool f) { mAssumePath = f; }
-      bool getAssumePath() const { return mAssumePath; }
+      virtual bool isMyUri(const resip::Uri& uri) const;
+      void addTransportRecordRoute(unsigned int transportKey, const resip::NameAddr& recordRoute);
+      void removeTransportRecordRoute(unsigned int transportKey);
+      const resip::NameAddr& getRecordRoute(unsigned int transportKey, bool* transportSpecific = 0) const;
+      bool getRecordRouteForced() const { return mRecordRouteForced; }
+      void setRecordRouteForced(bool forced) { mRecordRouteForced = forced; }
 
       bool isPAssertedIdentityProcessingEnabled() { return mPAssertedIdentityProcessing; }
+      bool isNeverStripProxyAuthorizationHeadersEnabled() { return mNeverStripProxyAuthorizationHeaders; }
       
       UserStore& getUserStore();
       resip::SipStack& getStack(){return mStack;}
@@ -86,9 +89,9 @@ class Proxy : public resip::TransactionUser, public resip::ThreadIf
       void send(const resip::SipMessage& msg);
       void addClientTransaction(const resip::Data& transactionId, RequestContext* rc);
 
-      void postTimerC(std::unique_ptr<TimerCMessage> tc);
+      void postTimerC(std::auto_ptr<TimerCMessage> tc);
 
-      void postMS(std::unique_ptr<resip::ApplicationMessage> msg, int msec);
+      void postMS(std::auto_ptr<resip::ApplicationMessage> msg, int msec);
 
       bool compressionEnabled() const;
 
@@ -104,16 +107,21 @@ class Proxy : public resip::TransactionUser, public resip::ThreadIf
       void doSessionAccounting(const resip::SipMessage& sip, bool received, RequestContext& context);
       void doRegistrationAccounting(repro::AccountingCollector::RegistrationEvent regEvent, const resip::SipMessage& sip);
 
+      virtual void processUnknownMessage(resip::Message* msg);
+
    protected:
       virtual const resip::Data& name() const;
 
-   private:
       resip::SipStack& mStack;
       ProxyConfig& mConfig;
       resip::NameAddr mRecordRoute;
+      typedef std::map<unsigned int, resip::NameAddr> TransportRecordRouteMap;
+      TransportRecordRouteMap mTransportRecordRoutes;
+      mutable resip::Mutex mTransportRecordRouteMutex;
+
       bool mRecordRouteForced;
-      bool mAssumePath;
       bool mPAssertedIdentityProcessing;
+      bool mNeverStripProxyAuthorizationHeaders;
       resip::Data mServerText;
       int mTimerC;
       resip::KeyValueStore mKeyValueStore;
@@ -128,13 +136,14 @@ class Proxy : public resip::TransactionUser, public resip::ThreadIf
           TransactionTerminated events from the stack will be passed to the
           RequestContext
       */
-      HashMap<resip::Data, RequestContext*> mClientRequestContexts;
-      HashMap<resip::Data, RequestContext*> mServerRequestContexts;
+      typedef HashMap<resip::Data, RequestContext*> RequestContextMap;
+      RequestContextMap mClientRequestContexts;
+      RequestContextMap mServerRequestContexts;
       
       UserStore &mUserStore;
       std::set<resip::Data> mSupportedOptions;
       OptionsHandler* mOptionsHandler;
-      std::unique_ptr<RequestContextFactory> mRequestContextFactory;
+      std::auto_ptr<RequestContextFactory> mRequestContextFactory;
 
       bool mSessionAccountingEnabled;
       bool mRegistrationAccountingEnabled;

@@ -1,5 +1,4 @@
 #include "TurnAsyncUdpSocket.hxx"
-#include <boost/bind.hpp>
 
 // Remove warning about 'this' use in initiator list - pointer is only stored
 #if defined(WIN32) && !defined(__GNUC__)
@@ -48,7 +47,14 @@ TurnAsyncUdpSocket::onReceiveSuccess(const asio::ip::address& address, unsigned 
 void 
 TurnAsyncUdpSocket::onReceiveFailure(const asio::error_code& e)
 {
-   if(mTurnAsyncSocketHandler) mTurnAsyncSocketHandler->onReceiveFailure(getSocketDescriptor(), e);
+   if (e.value() == 234) // ?jjg? ERROR_MORE_DATA -- is this right on all platforms?
+   {
+      turnReceive();
+   }
+   else
+   {
+      if(mTurnAsyncSocketHandler) mTurnAsyncSocketHandler->onReceiveFailure(getSocketDescriptor(), e);
+   }
 }
  
 void 

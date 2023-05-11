@@ -1,16 +1,16 @@
 # $Id$
 
-EXTRA_DIST = *.vcxproj *.vcxproj.filters
-EXTRA_DIST += *.vcproj
+EXTRA_DIST = *.vcxproj
 
 #AM_CXXFLAGS = -DUSE_ARES
+AM_CXXFLAGS = -I $(top_srcdir)
 
 sbin_PROGRAMS = queuetostream
 queuetostream_SOURCES = queuetostream.cpp
 queuetostream_LDADD = ../librepro.la
 queuetostream_LDADD += ../../resip/dum/libdum.la
 queuetostream_LDADD += ../../resip/stack/libresip.la ../../rutil/librutil.la
-queuetostream_LDADD += @LIBSSL_LIBADD@ -lpthread
+queuetostream_LDADD += @LIBSSL_LIBADD@ @LIBPTHREAD_LIBADD@ -ldb_cxx
 
 ##############################################################################
 # 

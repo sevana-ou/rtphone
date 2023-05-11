@@ -5,6 +5,9 @@
 #include <rutil/compat.hxx>
 #include <rutil/Data.hxx>
 #include <asio.hpp>
+#ifdef USE_SSL
+#include <asio/ssl.hpp>
+#endif
 
 #include "StunTuple.hxx"
 
@@ -49,11 +52,18 @@ public:
    void setSoftware(const char* software);
    void setTurnData(const char* data, unsigned int len);
 
+   // ICE-specific attributes
+   void setIcePriority(UInt32 priority);
+   void setIceUseCandidate();
+   void setIceControlled();
+   void setIceControlling();
+
    void createHeader(UInt16 stunclass, UInt16 method);  // Set info needed for a new stun message - set's tid as well
    void createUsernameAndPassword();  // Ensure mRemoteTuple is set first
    void generateShortTermPasswordForUsername(resip::Data& password);  // Ensure username is set first
    void getTupleFromUsername(StunTuple& tuple);   // note: does not set transport type
    void calculateHmacKey(resip::Data& hmacKey, const resip::Data& longtermAuthenticationPassword);
+   void calculateHmacKeyForHa1(resip::Data& hmacKey, const resip::Data& ha1);
    void calculateHmacKey(resip::Data& hmacKey, const resip::Data& username, const resip::Data& realm, const resip::Data& longtermAuthenticationPassword);
    bool checkMessageIntegrity(const resip::Data& hmacKey);
    bool checkFingerprint();
@@ -146,6 +156,13 @@ public:
    //const static UInt16 TurnTimerVal         = 0x0021; // reserved (removed from latest draft)
    const static UInt16 TurnReservationToken   = 0x0022;
    const static UInt16 TurnConnectStat        = 0x0023; // tcp allocations
+   const static UInt16 TurnRequestedAddressFamily = 0x0017; // RFC 6156
+
+   // ICE specific message attributes - from draft-ietf-mmusic-ice-19
+   const static UInt16 IcePriority            = 0x0024;
+   const static UInt16 IceUseCandidate        = 0x0025;
+   const static UInt16 IceControlled          = 0x8029;
+   const static UInt16 IceControlling         = 0x802A;
 
    const static UInt32 StunMagicCookie  = 0x2112A442;  
    typedef struct 
@@ -218,8 +235,8 @@ public:
    UInt16 mClass;    // Request, Response, Indication
    UInt16 mMethod;   // Binding Request, Shared Secret Request, Allocation Request, etc.
    bool mHasMagicCookie;  // Set to true if stun magic cookie is in message header
-   StunTuple mLocalTuple;  // Local address and port that received stun message
-   StunTuple mRemoteTuple; // Remote address and port that send stun message
+   StunTuple mLocalTuple;  // Local address and port that received the stun message
+   StunTuple mRemoteTuple; // Remote address and port that sent the stun message
    resip::Data mBuffer;
    resip::Data mHmacKey;
 
@@ -315,6 +332,20 @@ public:
    bool mHasTurnConnectStat;
    UInt32 mTurnConnectStat;
 
+   bool mHasTurnRequestedAddressFamily;
+   UInt16 mTurnRequestedAddressFamily;
+
+   bool mHasIcePriority;
+   UInt32 mIcePriority;
+
+   bool mHasIceUseCandidate;
+
+   bool mHasIceControlled;
+   UInt64 mIceControlledTieBreaker;
+
+   bool mHasIceControlling;
+   UInt64 mIceControllingTieBreaker;
+
    StunAtrUnknown mUnknownRequiredAttributes;
 
    // Utility APIs
@@ -340,6 +371,7 @@ private:
 
    char* encode16(char* buf, UInt16 data);
    char* encode32(char* buf, UInt32 data);
+   char* encode64(char* buf, const UInt64 data);
    char* encode(char* buf, const char* data, unsigned int length);
    char* encodeTurnData(char *ptr, const resip::Data* td);
    char* encodeAtrUInt32(char* ptr, UInt16 type, UInt32 value);

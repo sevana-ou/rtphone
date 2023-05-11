@@ -1,5 +1,7 @@
-#include <cassert>
+#include "rutil/ResipAssert.h"
 #include <time.h>
+
+#include <resip/recon/UserAgent.hxx>
 
 #include <resip/stack/Symbols.hxx>
 #include <resip/stack/Tuple.hxx>
@@ -137,12 +139,12 @@ WebAdmin::buildPage( const Data& uri,
    }
    else
    {
-       assert(false);
+       resip_assert(false);
    }
    buildPageOutlinePost(s);
    s.flush();
 
-   assert( !page.empty() );   
+   resip_assert( !page.empty() );   
    setPage( page, pageNumber,200 );
 }
   

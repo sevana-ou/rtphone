@@ -3,7 +3,12 @@
 #endif
 
 #include <asio.hpp>
+#ifdef USE_SSL
+#include <asio/ssl.hpp>
+#endif
 #include <boost/function.hpp>
+#include <boost/shared_ptr.hpp>
+
 #include <rutil/Log.hxx>
 #include <rutil/Logger.hxx>
 #include <rutil/Timer.hxx>
@@ -24,12 +29,12 @@ using namespace dtls;
 
 using namespace std;
 
-#define MAX_RECEIVE_FIFO_DURATION 10 // seconds
-#define MAX_RECEIVE_FIFO_SIZE (100 * MAX_RECEIVE_FIFO_DURATION)  // 1000 = 1 message every 10 ms for 10 seconds - appropriate for RTP
+int Flow::maxReceiveFifoDuration = 10; // seconds
+int Flow::maxReceiveFifoSize = 100 * maxReceiveFifoDuration; // 1000 = 1 message every 10 ms for 10 seconds - appropriate for RTP
 
 #define RESIPROCATE_SUBSYSTEM FlowManagerSubsystem::FLOWMANAGER
 
-char* srtp_error_string(err_status_t error)
+const char* srtp_error_string(err_status_t error)
 {
    switch(error)
    {
@@ -119,7 +124,10 @@ Flow::Flow(asio::io_service& ioService,
 #endif
            unsigned int componentId,
            const StunTuple& localBinding, 
-           MediaStream& mediaStream) 
+           MediaStream& mediaStream,
+           bool forceCOMedia,
+           SharedPtr<RTCPEventLoggingHandler> rtcpEventLoggingHandler,
+           resip::SharedPtr<FlowContext> context)
   : mIOService(ioService),
 #ifdef USE_SSL
     mSslContext(sslContext),
@@ -127,12 +135,22 @@ Flow::Flow(asio::io_service& ioService,
     mComponentId(componentId),
     mLocalBinding(localBinding), 
     mMediaStream(mediaStream),
+    mForceCOMedia(forceCOMedia),
+    mRtcpEventLoggingHandler(rtcpEventLoggingHandler),
+    mFlowContext(context),
+    mPrivatePeer(false),
     mAllocationProps(StunMessage::PropsNone),
     mReservationToken(0),
     mFlowState(Unconnected),
-    mReceivedDataFifo(MAX_RECEIVE_FIFO_DURATION,MAX_RECEIVE_FIFO_SIZE)
+    mReceivedDataFifo(maxReceiveFifoDuration, maxReceiveFifoSize)
 {
    InfoLog(<< "Flow: flow created for " << mLocalBinding << "  ComponentId=" << mComponentId);
+
+   if(componentId != RTCP_COMPONENT_ID && mRtcpEventLoggingHandler.get())
+   {
+      ErrLog(<< "attempting to set an RTCPEventLoggingHandler for non-RTCP flow");
+      mRtcpEventLoggingHandler.reset();
+   }
 
    switch(mLocalBinding.getTransportType())
    {
@@ -154,7 +172,7 @@ Flow::Flow(asio::io_service& ioService,
       break;
    default:
       // Bad Transport type!
-      assert(false);
+      resip_assert(false);
    }
 
    if(mTurnSocket.get() && 
@@ -243,7 +261,7 @@ Flow::getSocketDescriptor()
 void
 Flow::send(char* buffer, unsigned int size)
 {
-   assert(mTurnSocket.get());
+   resip_assert(mTurnSocket.get());
    if(isReady())
    {
       if(processSendData(buffer, size, mTurnSocket->getConnectedAddress(), mTurnSocket->getConnectedPort()))
@@ -260,7 +278,7 @@ Flow::send(char* buffer, unsigned int size)
 void
 Flow::sendTo(const asio::ip::address& address, unsigned short port, char* buffer, unsigned int size)
 {
-   assert(mTurnSocket.get());
+   resip_assert(mTurnSocket.get());
    if(isReady())
    {
       if(processSendData(buffer, size, address, port))
@@ -278,7 +296,7 @@ Flow::sendTo(const asio::ip::address& address, unsigned short port, char* buffer
 void
 Flow::rawSendTo(const asio::ip::address& address, unsigned short port, const char* buffer, unsigned int size)
 {
-   assert(mTurnSocket.get());
+   resip_assert(mTurnSocket.get());
    mTurnSocket->sendTo(address, port, buffer, size);
 }
 
@@ -286,6 +304,12 @@ Flow::rawSendTo(const asio::ip::address& address, unsigned short port, const cha
 bool
 Flow::processSendData(char* buffer, unsigned int& size, const asio::ip::address& address, unsigned short port)
 {
+   if(mRtcpEventLoggingHandler.get())
+   {
+      Data _buf(Data::Share, buffer, size);
+      StunTuple dest(mLocalBinding.getTransportType(), address, port);
+      mRtcpEventLoggingHandler->outboundEvent(mFlowContext, mLocalBinding, dest, _buf);
+   }
    if(mMediaStream.mSRTPSessionOutCreated)
    {
       err_status_t status = mMediaStream.srtpProtect((void*)buffer, (int*)&size, mComponentId == RTCP_COMPONENT_ID);
@@ -346,7 +370,7 @@ Flow::receiveFrom(const asio::ip::address& address, unsigned short port, char* b
          return asio::error_code(flowmanager::ReceiveTimeout, asio::error::misc_category);
       }
 
-      recvTimeout = timeout ? timeout - (Timer::getTimeMs() - startTime) : 0;
+      recvTimeout = timeout ? (unsigned int)(timeout - (Timer::getTimeMs() - startTime)) : 0;
       if(timeout != 0 && recvTimeout <= 0)
       {
          // timeout
@@ -472,6 +496,12 @@ Flow::processReceivedData(char* buffer, unsigned int& size, ReceivedData* receiv
       {
          *sourcePort = receivedData->mPort;
       }
+      if(mRtcpEventLoggingHandler.get())
+      {
+         Data _buf(Data::Share, buffer, size);
+         StunTuple _source(mLocalBinding.getTransportType(), *sourceAddress, *sourcePort);
+         mRtcpEventLoggingHandler->inboundEvent(mFlowContext, _source, mLocalBinding, _buf);
+      }
    }
    return errorCode;
 }
@@ -481,17 +511,33 @@ Flow::setActiveDestination(const char* address, unsigned short port)
 {
    if(mTurnSocket.get())
    {
+      asio::ip::address peerAddress = asio::ip::address::from_string(address);
+
+      if(peerAddress.is_v4())
+      {
+         asio::ip::address_v4::bytes_type _bytes = peerAddress.to_v4().to_bytes();
+
+         mPrivatePeer = _bytes[0] == 10 ||
+            (_bytes[0] == 172 && (_bytes[1] & 0xf0) == 16) ||
+            (_bytes[0] == 192 && _bytes[1] == 168);
+         DebugLog(<<"Peer address " << address << " private: " << (mPrivatePeer ? "true" : "false"));
+      }
+
       if(mMediaStream.mNatTraversalMode != MediaStream::TurnAllocation)
       {         
+         DebugLog(<<"Connecting socket to remote peer " << address << ":" << port);
          changeFlowState(Connecting);
          mTurnSocket->connect(address, port);
       }
       else
       {
-         mTurnSocket->setActiveDestination(asio::ip::address::from_string(address), port);
+         DebugLog(<<"Setting TURN destination to remote peer " << address << ":" << port);
+         mTurnSocket->setActiveDestination(peerAddress, port);
 
       }
    }
+   else
+      WarningLog(<<"No TURN Socket, can't send media to destination");
 }
 
 #ifdef USE_SSL
@@ -540,7 +586,7 @@ Flow::getLocalTuple()
 StunTuple
 Flow::getSessionTuple()
 {
-   assert(mFlowState == Ready);
+   resip_assert(mFlowState == Ready);
    Lock lock(mMutex);
 
    if(mMediaStream.mNatTraversalMode == MediaStream::TurnAllocation)
@@ -557,7 +603,7 @@ Flow::getSessionTuple()
 StunTuple
 Flow::getRelayTuple() 
 { 
-   assert(mFlowState == Ready);
+   resip_assert(mFlowState == Ready);
    Lock lock(mMutex);
    return mRelayTuple; 
 }  
@@ -565,7 +611,7 @@ Flow::getRelayTuple()
 StunTuple
 Flow::getReflexiveTuple() 
 { 
-   assert(mFlowState == Ready);
+   resip_assert(mFlowState == Ready);
    Lock lock(mMutex);
    return mReflexiveTuple; 
 } 
@@ -573,7 +619,7 @@ Flow::getReflexiveTuple()
 UInt64 
 Flow::getReservationToken()
 {
-   assert(mFlowState == Ready);
+   resip_assert(mFlowState == Ready);
    Lock lock(mMutex);
    return mReservationToken; 
 }
@@ -636,7 +682,7 @@ Flow::onSharedSecretFailure(unsigned int socketDesc, const asio::error_code& e)
 }
 
 void 
-Flow::onBindSuccess(unsigned int socketDesc, const StunTuple& reflexiveTuple)
+Flow::onBindSuccess(unsigned int socketDesc, const StunTuple& reflexiveTuple, const StunTuple& stunServerTuple)
 {
    InfoLog(<< "Flow::onBindingSuccess: socketDesc=" << socketDesc << ", reflexive=" << reflexiveTuple << ", componentId=" << mComponentId);
    {
@@ -647,7 +693,7 @@ Flow::onBindSuccess(unsigned int socketDesc, const StunTuple& reflexiveTuple)
    mMediaStream.onFlowReady(mComponentId);
 }
 void 
-Flow::onBindFailure(unsigned int socketDesc, const asio::error_code& e)
+Flow::onBindFailure(unsigned int socketDesc, const asio::error_code& e, const StunTuple& stunServerTuple)
 {
    WarningLog(<< "Flow::onBindingFailure: socketDesc=" << socketDesc << " error=" << e.value() << "(" << e.message() << "), componentId=" << mComponentId );
    changeFlowState(Connected);
@@ -723,6 +769,24 @@ Flow::onClearActiveDestinationFailure(unsigned int socketDesc, const asio::error
 }
 
 void 
+Flow::onChannelBindRequestSent(unsigned int socketDesc, unsigned short channelNumber)
+{
+   InfoLog(<< "Flow::onChannelBindRequestSent: socketDesc=" << socketDesc << ", channelNumber=" << channelNumber << ", componentId=" << mComponentId);
+}
+
+void 
+Flow::onChannelBindSuccess(unsigned int socketDesc, unsigned short channelNumber)
+{
+   InfoLog(<< "Flow::onChannelBindSuccess: socketDesc=" << socketDesc << ", channelNumber=" << channelNumber << ", componentId=" << mComponentId);
+}
+
+void 
+Flow::onChannelBindFailure(unsigned int socketDesc, const asio::error_code& e)
+{
+   WarningLog(<< "Flow::onChannelBindFailure: socketDesc=" << socketDesc << " error=" << e.value() << "(" << e.message() << "), componentId=" << mComponentId );
+}
+
+void 
 Flow::onSendSuccess(unsigned int socketDesc)
 {
    //InfoLog(<< "Flow::onSendSuccess: socketDesc=" << socketDesc);
@@ -747,6 +811,16 @@ void
 Flow::onReceiveSuccess(unsigned int socketDesc, const asio::ip::address& address, unsigned short port, boost::shared_ptr<reTurn::DataBuffer>& data)
 {
    DebugLog(<< "Flow::onReceiveSuccess: socketDesc=" << socketDesc << ", fromAddress=" << address.to_string() << ", fromPort=" << port << ", size=" << data->size() << ", componentId=" << mComponentId);
+
+   if(address != mTurnSocket->getConnectedAddress() || port != mTurnSocket->getConnectedPort())
+   {
+      if(mForceCOMedia && isReady() && mPrivatePeer)
+      {
+         DebugLog(<<"Peer with private IP " << mTurnSocket->getConnectedAddress() << ":" << mTurnSocket->getConnectedPort()
+                  << " appears to be sending from " << address << ":" << port);
+         setActiveDestination(address.to_string().c_str(), port);
+      }
+   }
 
 #ifdef USE_SSL
    // Check if packet is a dtls packet - if so then process it
@@ -790,9 +864,16 @@ Flow::onReceiveFailure(unsigned int socketDesc, const asio::error_code& e)
    // Make sure we keep receiving if we get an ICMP error on a UDP socket
    if(e.value() == asio::error::connection_reset && mLocalBinding.getTransportType() == StunTuple::UDP)
    {
-      assert(mTurnSocket.get());
+      resip_assert(mTurnSocket.get());
       mTurnSocket->turnReceive();
    }
+}
+
+void 
+Flow::onIncomingBindRequestProcessed(unsigned int socketDesc, const StunTuple& sourceTuple)
+{
+   InfoLog(<< "Flow::onIncomingBindRequestProcessed: socketDesc=" << socketDesc << ", sourceTuple=" << sourceTuple );
+   // TODO - handle
 }
 
 void 
@@ -802,7 +883,7 @@ Flow::changeFlowState(FlowState newState)
    mFlowState = newState;
 }
 
-char*
+const char*
 Flow::flowStateToString(FlowState state)
 {
    switch(state)
@@ -822,7 +903,7 @@ Flow::flowStateToString(FlowState state)
    case Ready:
       return "Ready";
    default:
-      assert(false);
+      resip_assert(false);
       return "Unknown";
    }
 }

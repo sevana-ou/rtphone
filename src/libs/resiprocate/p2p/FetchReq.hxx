@@ -19,7 +19,7 @@ class FetchReq : public ResourceMessage
       DataSpecifiers& specifiers();
       const DataSpecifiers& specifiers() const;
 
-      std::unique_ptr<Event> event()
+      std::auto_ptr<Event> event()
       {
          return wrap(this);
       }

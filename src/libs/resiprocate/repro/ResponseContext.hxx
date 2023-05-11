@@ -58,6 +58,8 @@ class ResponseContext
          @param beginImmediately Whether to immediately start a transaction 
             for this target.
 
+         @param checkDuplicates Whether to see if target exists already or not
+
          @returns If beginImmediately=false, true iff the Target was
          successfully added (could happen if a final response has already
          been forwarded). If beginImmediately=true, true iff a transaction
@@ -68,7 +70,7 @@ class ResponseContext
          @note Targets are not checked for duplicate uris until an attempt 
             is made to start them.
       */
-      bool addTarget(std::unique_ptr<repro::Target> target, bool beginImmediately=false);
+      bool addTarget(std::auto_ptr<repro::Target> target, bool beginImmediately = false, bool checkDuplicates = true);
 
       /**
          Adds a batch of Targets. 
@@ -113,37 +115,49 @@ class ResponseContext
       
       /**
          Cancels all active client transactions. Does not clear Candidate
-         transactions.
+         transactions.  
+         
+         @param reasons Optional reasons header to be added to any
+                        resulting CANCEL requests.
          
          @returns true iff any transaction was placed in either the
          WaitingToCancel or Cancelled state.
       */ 
-      bool cancelActiveClientTransactions();
+      bool cancelActiveClientTransactions(const resip::Tokens* reasons = 0);
       
       /**
          Cancels all active client transactions. Also clears Candidate
-         transactions (they are transitioned directly to Terminated)
-         
+         transactions (they are transitioned directly to Terminated).
+
+         @param reasons Optional reasons header to be added to any
+         resulting CANCEL requests.
+
          @returns true iff any transaction was placed in either the
          WaitingToCancel, Cancelled, or Terminated state.
       */ 
-      bool cancelAllClientTransactions();
+      bool cancelAllClientTransactions(const resip::Tokens* reasons = 0);
       
       /**
-         Removes all Candidate transactions.
-         
+         Removes all Candidate transactions. 
+
+         @param reasons Optional reasons header to be added to any
+         resulting CANCEL requests.
+
          @returns true iff at least one Candidate transaction was removed.
       */
-      bool clearCandidateTransactions();
+      bool clearCandidateTransactions(const resip::Tokens* reasons = 0);
       
       /**
          Cancels this client transaction if active, or Terminates it if
-         Candidate.
-         
-         @returns true iff this transaction was placed in either the 
+         Candidate.    
+
+         @param reasons Optional reasons header to be added to any
+         resulting CANCEL requests.
+
+         @returns true iff this transaction was placed in either the
          WaitingToCancel, Cancelled, or Terminated state.
       */
-      bool cancelClientTransaction(const resip::Data& serial);
+      bool cancelClientTransaction(const resip::Data& serial, const resip::Tokens* reasons = 0);
             
       /**
          Self-explanatory
@@ -230,8 +244,7 @@ class ResponseContext
       void processTimerC();
 
       void beginClientTransaction(repro::Target* target);
-      void cancelClientTransaction(repro::Target* target);
-
+      void cancelClientTransaction(repro::Target* target, const resip::Tokens* reasons = 0);
 
       void terminateClientTransaction(const resip::Data& tid);
       void removeClientTransaction(const resip::Data& transactionId); 
@@ -240,7 +253,9 @@ class ResponseContext
       //a branch is very simple. The guts can be found in the API functions.
       
       void insertRecordRoute(resip::SipMessage& outgoing,
-                             const resip::Transport* receivedTransport,
+                             const resip::Tuple& receivedTransportTuple,
+                             const resip::NameAddr& receivedTransportRecordRoute, 
+                             bool transportSpecificRecordRoute,
                              Target* target,
                              bool doPathInstead=false);
       resip::Data getInboundFlowToken(bool doPathInstead);

@@ -43,7 +43,7 @@ class DtlsMessage;
 
 class DtlsTransport : public UdpTransport
 {
-#if  defined(__INTEL_COMPILER ) || (defined(WIN32) && defined(_MSC_VER) && (_MSC_VER >= 1310))  // !slg! not sure if this works on __INTEL_COMPILER 
+#if  defined(__INTEL_COMPILER ) || (defined(WIN32) && defined(_MSC_VER) && (_MSC_VER >= 1310) && (_MSC_VER < 1900))  // !slg! not sure if this works on __INTEL_COMPILER 
    struct sockaddr_in_hash_compare
    {
       enum { bucket_size = 4, min_buckets = 8 };
@@ -124,20 +124,22 @@ class DtlsTransport : public UdpTransport
                     Security& security,
                     const Data& sipDomain,
                     AfterSocketCreationFuncPtr socketFunc = 0,
-                    Compression &compression = Compression::Disabled);
+                    Compression &compression = Compression::Disabled,
+                    const Data& certificateFilename = "", 
+                    const Data& privateKeyFilename = "",
+                    const Data& privateKeyPassPhrase = "");
       virtual  ~DtlsTransport();
 
       void process(FdSet& fdset);
       bool isReliable() const { return false; }
       bool isDatagram() const { return true; }
-      TransportType transport() const { return DTLS; }
       virtual void buildFdSet( FdSet& fdset);
 
       static const unsigned long DtlsReceiveTimeout = 250000 ;
 
    private:
 
-#if  defined(__INTEL_COMPILER ) || (defined(WIN32) && defined(_MSC_VER) && (_MSC_VER >= 1310))
+#if  defined(__INTEL_COMPILER ) || (defined(WIN32) && defined(_MSC_VER) && (_MSC_VER >= 1310) && (_MSC_VER < 1900))
       typedef HashMap<struct sockaddr_in, 
                       SSL*, 
                       DtlsTransport::sockaddr_in_hash_compare> DtlsConnectionMap;

@@ -37,7 +37,6 @@
 #include "rutil/dns/DnsNaptrRecord.hxx"
 #include "resip/stack/DnsResult.hxx"
 #include "resip/stack/DnsInterface.hxx"
-#include "resip/stack/TupleMarkManager.hxx"
 #include "resip/stack/Tuple.hxx"
 #include "resip/stack/Uri.hxx"
 #include "rutil/WinLeakCheck.hxx"  // not compatible with placement new used below
@@ -60,21 +59,21 @@ EnumResult::~EnumResult()
 void
 EnumResult::onDnsResult(const DNSResult<DnsHostRecord>& result)
 {
-   assert(0);
+   resip_assert(0);
    delete this;
 }
 
 void
 EnumResult::onDnsResult(const DNSResult<DnsAAAARecord>& result)
 {
-   assert(0);
+   resip_assert(0);
    delete this;
 }
 
 void
 EnumResult::onDnsResult(const DNSResult<DnsSrvRecord>&)
 {
-   assert(0);
+   resip_assert(0);
    delete this;
 }
 
@@ -88,13 +87,13 @@ EnumResult::onDnsResult(const DNSResult<DnsNaptrRecord>& result)
 void
 EnumResult::onDnsResult(const DNSResult<DnsCnameRecord>&)
 {
-   assert(0);
+   resip_assert(0);
    delete this;
 }
 
 DnsResult::DnsResult(DnsInterface& interfaceObj, DnsStub& dns, RRVip& vip, DnsHandler* handler) 
    : mInterface(interfaceObj),
-     mDns(dns),
+     mDnsStub(dns),
      mVip(vip),
      mHandler(handler),
      mSRVCount(0),
@@ -112,7 +111,7 @@ DnsResult::DnsResult(DnsInterface& interfaceObj, DnsStub& dns, RRVip& vip, DnsHa
 DnsResult::~DnsResult()
 {
    //DebugLog (<< "DnsResult::~DnsResult() " << *this);
-   assert(mType != Pending);
+   resip_assert(mType != Pending);
 }
 
 void 
@@ -121,7 +120,7 @@ DnsResult::transition(Type t)
    if((t == Pending || t== Available) && 
          (mType== Finished || mType == Destroyed) )
    {
-      assert(0);
+      resip_assert(0);
    }
    
    mType = t;
@@ -130,7 +129,7 @@ DnsResult::transition(Type t)
 void
 DnsResult::destroy()
 {
-   assert(this);
+   resip_assert(this);
    //DebugLog (<< "DnsResult::destroy() " << *this);
    
    if (mType == Pending)
@@ -149,17 +148,16 @@ DnsResult::blacklistLast(UInt64 expiry)
 {
    if(mHaveReturnedResults)
    {
-      assert(!mLastReturnedPath.empty());
-      assert(mLastReturnedPath.size()<=3);
-      Item top = mLastReturnedPath.back();
-   
-      mInterface.getMarkManager().mark(mLastResult,expiry,TupleMarkManager::BLACK);
-   
-      DebugLog( << "Remove vip " << top.domain << "(" << top.rrType << ")");
-      mVip.removeVip(top.domain, top.rrType);
+      resip_assert(!mLastReturnedPath.empty());
+      resip_assert(mLastReturnedPath.size()<=3);
+      GreyOrBlacklistCommand* command = new GreyOrBlacklistCommand(mVip, mInterface.getMarkManager(), 
+                                                                   mLastReturnedPath.back(), 
+                                                                   mLastResult, 
+                                                                   expiry, 
+                                                                   TupleMarkManager::BLACK);
+      mDnsStub.queueCommand(command);
       return true;
    }
-   
    return false;
 }
 
@@ -168,24 +166,32 @@ DnsResult::greylistLast(UInt64 expiry)
 {
    if(mHaveReturnedResults)
    {
-      assert(!mLastReturnedPath.empty());
-      assert(mLastReturnedPath.size()<=3);
-      Item top = mLastReturnedPath.back();
-   
-      mInterface.getMarkManager().mark(mLastResult,expiry,TupleMarkManager::GREY);
-   
-      DebugLog( << "Remove vip " << top.domain << "(" << top.rrType << ")");
-      mVip.removeVip(top.domain, top.rrType);
+      resip_assert(!mLastReturnedPath.empty());
+      resip_assert(mLastReturnedPath.size()<=3);
+      GreyOrBlacklistCommand* command = new GreyOrBlacklistCommand(mVip, mInterface.getMarkManager(), 
+                                                                   mLastReturnedPath.back(), 
+                                                                   mLastResult, 
+                                                                   expiry, 
+                                                                   TupleMarkManager::GREY);
+      mDnsStub.queueCommand(command);
       return true;
    }
-   
    return false;
+}
+
+void
+DnsResult::GreyOrBlacklistCommand::execute()
+{
+   mMarkManager.mark(mResult, mExpiry, mMarkType);
+   
+   DebugLog( << "Remove vip " << mPathTop.domain << "(" << mPathTop.rrType << ")");
+   mVip.removeVip(mPathTop.domain, mPathTop.rrType);
 }
 
 DnsResult::Type
 DnsResult::available()
 {
-   assert(mType != Destroyed);
+   resip_assert(mType != Destroyed);
    if (mType == Available)
    {
       if (!mResults.empty())
@@ -207,8 +213,8 @@ DnsResult::available()
 Tuple
 DnsResult::next()
 {
-   assert(available()==Available);
-   assert(mCurrentPath.size()<=3);
+   resip_assert(available()==Available);
+   resip_assert(mCurrentPath.size()<=3);
    
    mLastResult=mResults.front();
    mResults.pop_front();
@@ -234,8 +240,15 @@ DnsResult::next()
 void
 DnsResult::whitelistLast()
 {
+    WhitelistCommand* command = new WhitelistCommand(mVip, mLastReturnedPath);
+    mDnsStub.queueCommand(command);
+}
+
+void
+DnsResult::WhitelistCommand::execute()
+{
    std::vector<Item>::iterator i;
-   for (i=mLastReturnedPath.begin(); i!=mLastReturnedPath.end(); ++i)
+   for (i=mPath.begin(); i!=mPath.end(); ++i)
    {
       DebugLog( << "Whitelisting " << i->domain << "(" << i->rrType << "): " << i->value);
       mVip.vip(i->domain, i->rrType, i->value);
@@ -243,27 +256,38 @@ DnsResult::whitelistLast()
 }
 
 void
-DnsResult::lookup(const Uri& uri, const std::vector<Data> &enumSuffixes,
-   const std::map<Data,Data> &enumDomains)
+DnsResult::lookup(const Uri& uri)
 {
    DebugLog (<< "DnsResult::lookup " << uri);
-   //int type = this->mType;
-   if (!enumSuffixes.empty() && uri.isEnumSearchable() &&
-      enumDomains.find(uri.host()) != enumDomains.end())
+
+   // Dispatch lookup request to DnsThread
+   LookupCommand *command = new LookupCommand(*this, uri);
+   mDnsStub.queueCommand(command);
+}
+
+void
+DnsResult::lookupInternalWithEnum(const Uri& uri)
+{
+   if ( mType == Destroyed )
+   {
+      destroy();
+      return;
+   }
+   if (!mDnsStub.getEnumSuffixes().empty() && 
+       uri.isEnumSearchable() &&
+       mDnsStub.getEnumDomains().find(uri.host()) != mDnsStub.getEnumDomains().end())
    {
       mInputUri = uri;
       int order = 0;
-      std::vector<Data> enums = uri.getEnumLookups(enumSuffixes);
-      assert(enums.size() >= 1);
+      std::vector<Data> enums = uri.getEnumLookups(mDnsStub.getEnumSuffixes());
+      resip_assert(enums.size() >= 1);
       if (!enums.empty())
       {
          mDoingEnum = enums.size();
-         for(std::vector<Data>::iterator it = enums.begin();
-            it != enums.end(); it++)
+         for(std::vector<Data>::iterator it = enums.begin(); it != enums.end(); it++)
          {
             InfoLog (<< "Doing ENUM lookup on " << *it);
-            mDns.lookup<RR_NAPTR>(*it, Protocol::Enum,
-               new EnumResult(*this, order++)); 
+            mDnsStub.lookup<RR_NAPTR>(*it, Protocol::Enum, new EnumResult(*this, order++)); 
          }
          return;
       }
@@ -279,6 +303,11 @@ DnsResult::lookupInternal(const Uri& uri)
    //assert(uri.scheme() == Symbols::Sips || uri.scheme() == Symbols::Sip);  
    mSips = (uri.scheme() == Symbols::Sips);
    mTarget = (!mSips && uri.exists(p_maddr)) ? uri.param(p_maddr) : uri.host();
+   // remove brackets around ipv6 address if present
+   if (mTarget.size() >= 2 && mTarget[0] == '[' && mTarget[mTarget.size()-1] == ']')
+   {
+      mTarget = mTarget.substr(1,mTarget.size()-2);
+   }
    mSrvKey = Symbols::UNDERSCORE + uri.scheme().substr(0, uri.scheme().size()) + Symbols::DOT;
    bool isNumeric = DnsUtil::isIpAddress(mTarget);
 
@@ -290,7 +319,13 @@ DnsResult::lookupInternal(const Uri& uri)
       if (isNumeric) // IP address specified
       {
          mPort = getDefaultPort(mTransport, uri.port());
-         Tuple tuple(mTarget, mPort, mTransport, mTarget);
+         // If the target Uri has a netns specified, we need to copy it into the Tuple
+         // We need to distinguish between the Uri not having an netns set and the 
+         // the default/global netns "" (emtpy string).
+         Tuple tuple(mTarget, mPort, mTransport, mTarget, uri.netNs());
+#ifdef USE_NETNS
+         DebugLog(<< "DnsResult netns: " << uri.netNs());
+#endif
 
          // ?bwc? If this is greylisted, what can we do? This is the only result
          if(!(mInterface.getMarkManager().getMarkType(tuple)==TupleMarkManager::BLACK))
@@ -321,11 +356,12 @@ DnsResult::lookupInternal(const Uri& uri)
                mTransport = DTLS;
                if (!mInterface.isSupportedProtocol(mTransport))
                {
+                  DebugLog(<<"transport " << toData(mTransport) << " not supported");
                   transition(Finished);
                   if (mHandler) mHandler->handle(this);
                   return;
                }
-               if(!mDns.supportedType(T_SRV)) 
+               if(!mDnsStub.supportedType(T_SRV)) 
                {
                   mPort = getDefaultPort(mTransport, uri.port());
                   lookupHost(mTarget); // for current target and port
@@ -333,7 +369,7 @@ DnsResult::lookupInternal(const Uri& uri)
                else
                {
                   mSRVCount++;
-                  mDns.lookup<RR_SRV>("_sips._udp." + mTarget, Protocol::Sip, this);
+                  mDnsStub.lookup<RR_SRV>("_sips._udp." + mTarget, Protocol::Sip, this);
                   StackLog (<< "Doing SRV lookup of _sips._udp." << mTarget);
                }
             }
@@ -343,11 +379,12 @@ DnsResult::lookupInternal(const Uri& uri)
                mHaveChosenTransport=true;
                if (!mInterface.isSupportedProtocol(mTransport))
                {
+                  DebugLog(<<"transport " << toData(mTransport) << " not supported");
                   transition(Finished);
                   if (mHandler) mHandler->handle(this);
                   return;
                }
-               if(!mDns.supportedType(T_SRV)) 
+               if(!mDnsStub.supportedType(T_SRV)) 
                {
                   mPort = getDefaultPort(mTransport, uri.port());
                   lookupHost(mTarget); // for current target and port
@@ -355,7 +392,7 @@ DnsResult::lookupInternal(const Uri& uri)
                else
                {
                   mSRVCount++;
-                  mDns.lookup<RR_SRV>("_sips._tcp." + mTarget, Protocol::Sip,  this);
+                  mDnsStub.lookup<RR_SRV>("_sips._tcp." + mTarget, Protocol::Sip,  this);
                   StackLog (<< "Doing SRV lookup of _sips._tcp." << mTarget);
                }
             }
@@ -364,12 +401,13 @@ DnsResult::lookupInternal(const Uri& uri)
          {
             if (!mInterface.isSupportedProtocol(mTransport))
             {
+               DebugLog(<<"transport " << toData(mTransport) << " not supported");
                transition(Finished);
                if (mHandler) mHandler->handle(this);
                return;
             }
 
-            if(!mDns.supportedType(T_SRV)) 
+            if(!mDnsStub.supportedType(T_SRV)) 
             {
                mPort = getDefaultPort(mTransport, uri.port());
                lookupHost(mTarget); // for current target and port
@@ -380,17 +418,17 @@ DnsResult::lookupInternal(const Uri& uri)
             {
                case TLS: //deprecated, mean TLS over TCP
                   mSRVCount++;
-                  mDns.lookup<RR_SRV>("_sips._tcp." + mTarget, Protocol::Sip, this);
+                  mDnsStub.lookup<RR_SRV>("_sips._tcp." + mTarget, Protocol::Sip, this);
                   StackLog (<< "Doing SRV lookup of _sips._tcp." << mTarget);
                   break;
                case DTLS: //deprecated, mean TLS over TCP
                   mSRVCount++;
-                  mDns.lookup<RR_SRV>("_sip._dtls." + mTarget, Protocol::Sip, this);
+                  mDnsStub.lookup<RR_SRV>("_sip._dtls." + mTarget, Protocol::Sip, this);
                   StackLog (<< "Doing SRV lookup of _sip._dtls." << mTarget);
                   break;
                case TCP:
                   mSRVCount++;
-                  mDns.lookup<RR_SRV>("_sip._tcp." + mTarget, Protocol::Sip, this);
+                  mDnsStub.lookup<RR_SRV>("_sip._tcp." + mTarget, Protocol::Sip, this);
                   StackLog (<< "Doing SRV lookup of _sip._tcp." << mTarget);
                   break;
                case SCTP:
@@ -398,7 +436,7 @@ DnsResult::lookupInternal(const Uri& uri)
                case UDP:
                default: //fall through to UDP for unimplemented & unknown
                   mSRVCount++;
-                  mDns.lookup<RR_SRV>("_sip._udp." + mTarget, Protocol::Sip, this);
+                  mDnsStub.lookup<RR_SRV>("_sip._udp." + mTarget, Protocol::Sip, this);
                   StackLog (<< "Doing SRV lookup of _sip._udp." << mTarget);
             }
          }
@@ -407,7 +445,7 @@ DnsResult::lookupInternal(const Uri& uri)
    else // transport parameter is not specified
    {
       // if hostname is numeric, a port is specified, or NAPTR queries are not support by the DNS layer - skip NAPTR lookup
-      if (isNumeric || uri.port() != 0 || !mDns.supportedType(T_NAPTR))
+      if (isNumeric || uri.port() != 0 || !mDnsStub.supportedType(T_NAPTR))
       {
          TupleMarkManager::MarkType mark=TupleMarkManager::BLACK;
          Tuple tuple;
@@ -427,6 +465,7 @@ DnsResult::lookupInternal(const Uri& uri)
             }
             else
             {
+               bool udpSupported = false;;
                if(mark!=TupleMarkManager::OK && (mInterface.isSupported(UDP, V4) ||
                                     mInterface.isSupported(UDP, V6)))
                {
@@ -434,24 +473,59 @@ DnsResult::lookupInternal(const Uri& uri)
                   mPort = getDefaultPort(mTransport,uri.port());
                   tuple=Tuple(mTarget,mPort,mTransport,mTarget);
                   mark=mInterface.getMarkManager().getMarkType(tuple);
+                  udpSupported = true;
                }
                
-               if(mark!=TupleMarkManager::OK && (mInterface.isSupported(TCP, V4) ||
-                                    mInterface.isSupported(TCP, V6)))
+               if (!mInterface.getUdpOnlyOnNumeric())
                {
-                  mTransport=TCP;
-                  mPort = getDefaultPort(mTransport,uri.port());
-                  tuple=Tuple(mTarget,mPort,mTransport,mTarget);
-                  mark=mInterface.getMarkManager().getMarkType(tuple);
-               }
-               
-               if(mark!=TupleMarkManager::OK && (mInterface.isSupported(TLS, V4) ||
-                                    mInterface.isSupported(TLS, V6)))
-               {
-                  mTransport=TLS;
-                  mPort = getDefaultPort(mTransport,uri.port());
-                  tuple=Tuple(mTarget,mPort,mTransport,mTarget);
-                  mark=mInterface.getMarkManager().getMarkType(tuple);
+                  bool allMarksNotOK = mark != TupleMarkManager::OK;
+                  bool tcpSupported = false;
+                  if(mark!=TupleMarkManager::OK && (mInterface.isSupported(TCP, V4) ||
+                           mInterface.isSupported(TCP, V6)))
+                  {
+                     mTransport=TCP;
+                     mPort = getDefaultPort(mTransport,uri.port());
+                     // Need to get netns from Uri if set and set it in
+                     // the Tuple for this IP address case
+                     tuple=Tuple(mTarget, mPort, mTransport, mTarget, uri.netNs());
+#ifdef USE_NETNS
+                     DebugLog(<< "DnsResult netns: " << uri.netNs());
+#endif
+                     mark=mInterface.getMarkManager().getMarkType(tuple);
+                     allMarksNotOK = mark != TupleMarkManager::OK;
+                     tcpSupported = true;
+                  }
+
+                  if(mark!=TupleMarkManager::OK && (mInterface.isSupported(TLS, V4) ||
+                           mInterface.isSupported(TLS, V6)))
+                  {
+                     mTransport=TLS;
+                     mPort = getDefaultPort(mTransport,uri.port());
+                     tuple=Tuple(mTarget,mPort,mTransport,mTarget);
+                     mark=mInterface.getMarkManager().getMarkType(tuple);
+                     allMarksNotOK = mark != TupleMarkManager::OK;
+                  }
+
+                  // If all transports are grey or blacklisted, then just fallback to UDP, assuming it is available
+                  // or TCP if it is available.  We don't want to end up continually trying TCP or TLS because all
+                  // transports for this IP Address are greylisted.
+                  if (allMarksNotOK)
+                  {
+                     if (udpSupported && mTransport != UDP)
+                     {
+                        mTransport = UDP;
+                        mPort = getDefaultPort(mTransport, uri.port());
+                        tuple = Tuple(mTarget, mPort, mTransport, mTarget);
+                        mark = mInterface.getMarkManager().getMarkType(tuple);
+                     }
+                     else if (tcpSupported && mTransport != TCP)
+                     {
+                        mTransport = TCP;
+                        mPort = getDefaultPort(mTransport, uri.port());
+                        tuple = Tuple(mTarget, mPort, mTransport, mTarget, uri.netNs());
+                        mark = mInterface.getMarkManager().getMarkType(tuple);
+                     }
+                  }
                }
             }
             
@@ -465,7 +539,7 @@ DnsResult::lookupInternal(const Uri& uri)
             else
             {
                // .bwc. Numeric result is blacklisted. Oh well.
-               assert(mResults.empty());
+               resip_assert(mResults.empty());
                transition(Available);
                DebugLog(<< "Numeric result, but this result is currently blacklisted: " << tuple);
             }
@@ -505,14 +579,14 @@ DnsResult::lookupInternal(const Uri& uri)
             else
             {
                // !bwc! Debatable.
-               assert(0);
+               resip_assert(0);
                if (mHandler) mHandler->handle(this);
             }
          }
       }
       else // do NAPTR
       {
-         mDns.lookup<RR_NAPTR>(mTarget, Protocol::Sip, this); // for current target
+         mDnsStub.lookup<RR_NAPTR>(mTarget, Protocol::Sip, this); // for current target
       }
    }
 }
@@ -524,21 +598,21 @@ void DnsResult::lookupHost(const Data& target)
 #ifdef USE_IPV6
       DebugLog(<< "Doing host (AAAA) lookup: " << target);
       mPassHostFromAAAAtoA = target;
-      mDns.lookup<RR_AAAA>(target, Protocol::Sip, this);
+      mDnsStub.lookup<RR_AAAA>(target, Protocol::Sip, this);
 #else
-      assert(0);
-      mDns.lookup<RR_A>(target, Protocol::Sip, this);
+      resip_assert(0);
+      mDnsStub.lookup<RR_A>(target, Protocol::Sip, this);
 #endif
    }
    else if (mInterface.isSupported(mTransport, V4))
    {
-      mDns.lookup<RR_A>(target, Protocol::Sip, this);
+      mDnsStub.lookup<RR_A>(target, Protocol::Sip, this);
    }
    else
    {
       CritLog(<<"Cannot lookup target="<<target
 	      <<" because DnsInterface doesn't support transport="<<mTransport);
-      assert(0);
+      resip_assert(0);
    }
 }
 
@@ -556,10 +630,14 @@ DnsResult::getDefaultPort(TransportType transport, int port)
          case TLS:
          case DTLS:
             return Symbols::DefaultSipsPort;
+         case WS:
+            return Symbols::SipWsPort;
+         case WSS:
+            return Symbols::SipWssPort;
          default:
             ErrLog( << "Should not get this - unknown transport" );
             return Symbols::DefaultSipPort; // !cj! todo - remove 
-            assert(0);
+            resip_assert(0);
       }
    }
    else
@@ -567,7 +645,7 @@ DnsResult::getDefaultPort(TransportType transport, int port)
       return port;
    }
 
-   assert(0);
+   resip_assert(0);
    return 0;
 }
 
@@ -577,7 +655,7 @@ DnsResult::primeResults()
    StackLog(<< "Priming " << Inserter(mSRVResults));
    //assert(mType != Pending);
    //assert(mType != Finished);
-   assert(mResults.empty());
+   resip_assert(mResults.empty());
 
    if (!mSRVResults.empty())
    {
@@ -608,7 +686,7 @@ DnsResult::primeResults()
       }
       else
       {
-         assert(0);
+         resip_assert(0);
          if (mHandler) mHandler->handle(this);
       }
       // don't call primeResults since we need to wait for the response to
@@ -638,8 +716,8 @@ DnsResult::SRV
 DnsResult::retrieveSRV()
 {
     // !ah! if mTransport is known -- should we ignore those that don't match?!
-   assert(!mSRVResults.empty());
-   assert(mSRVCount==0);
+   resip_assert(!mSRVResults.empty());
+   resip_assert(mSRVCount==0);
 
    const SRV& srv = *mSRVResults.begin();
    int priority = srv.priority;
@@ -660,7 +738,7 @@ DnsResult::retrieveSRV()
       // All SRVs must match. 
       
       transport=mTransport;
-      assert(mSRVResults.begin()->transport==transport);
+      resip_assert(mSRVResults.begin()->transport==transport);
    }
    
    if (mCumulativeWeight == 0)
@@ -670,7 +748,7 @@ DnsResult::retrieveSRV()
               && i->priority == priority 
               && i->transport == transport; i++)
       {
-         assert(i->weight>=0);
+         resip_assert(i->weight>=0);
          mCumulativeWeight += i->weight;
       }
    }
@@ -707,7 +785,7 @@ DnsResult::retrieveSRV()
    {
       InfoLog (<< "SRV Results problem selected=" << selected << " cum=" << mCumulativeWeight);
    }
-   assert(i != mSRVResults.end());
+   resip_assert(i != mSRVResults.end());
    SRV next = *i;
    mCumulativeWeight -= next.weight;
    mSRVResults.erase(i);
@@ -974,7 +1052,7 @@ void DnsResult::onDnsResult(const DNSResult<DnsAAAARecord>& result)
       return;
    }
    StackLog (<< "DnsResult::onDnsResult() " << result.status);
-   assert(mInterface.isSupported(mTransport, V6));
+   resip_assert(mInterface.isSupported(mTransport, V6));
 
    // This function assumes that the AAAA query that caused this callback
    // is the _only_ outstanding DNS query that might result in a
@@ -1005,25 +1083,23 @@ void DnsResult::onDnsResult(const DNSResult<DnsAAAARecord>& result)
             default:
                ;// .bwc. Do nothing.
          }
-      
       }
-      
    }
    else
    {
       StackLog (<< "Failed async AAAA query: " << result.msg);
    }
    // funnel through to host processing
-   mDns.lookup<RR_A>(mPassHostFromAAAAtoA, Protocol::Sip, this);
+   mDnsStub.lookup<RR_A>(mPassHostFromAAAAtoA, Protocol::Sip, this);
 #else
-   assert(0);
+   resip_assert(0);
 #endif
 }
 
 void DnsResult::onDnsResult(const DNSResult<DnsSrvRecord>& result)
 {
    StackLog (<< "Received SRV result for: " << mTarget);
-   assert(mSRVCount>=0);
+   resip_assert(mSRVCount>=0);
    mSRVCount--;
    StackLog (<< "DnsResult::onDnsResult() " << mSRVCount << " status=" << result.status);
 
@@ -1046,14 +1122,6 @@ void DnsResult::onDnsResult(const DNSResult<DnsSrvRecord>& result)
          srv.weight = (*it).weight();
          srv.port = (*it).port();
          srv.target = (*it).target();
-
-         // Workaround for dns server bug - domain name can be doubled via dot
-         Data p1 = srv.target.substr(0, srv.target.size()/2), p2 = srv.target.substr(srv.target.size()/2 + 1);
-         if (p1 == p2)
-         {
-           StackLog (<< "Workaround for SRV result : " << srv.target << " rewrites to " << p1);
-           srv.target = p1;
-         }
          // fillin srv.naptrpref - if found in NAPTR map, then SRV query was driven from a NAPTR lookup
          std::map<Data, NAPTR>::iterator itNaptr = mTopOrderedNAPTRs.find(srv.key);
          if(itNaptr != mTopOrderedNAPTRs.end())
@@ -1134,19 +1202,6 @@ void DnsResult::onDnsResult(const DNSResult<DnsSrvRecord>& result)
                   mTransport = TCP;
                   mHaveChosenTransport=true;
                }
-               else
-               if (mInterface.isSupported(UDP, V6))
-               {
-                 mTransport = UDP;
-                 mHaveChosenTransport = true;
-               }
-               else
-               if (mInterface.isSupported(TCP, V6))
-               {
-                 mTransport = TCP;
-                 mHaveChosenTransport = true;
-               }
-
                /* Yes, there is the possibility that at this point mTransport
                   is still UNKNOWN_TRANSPORT, but this is likely to fail just as
                   well as defaulting to UDP when there isn't an interface that
@@ -1189,7 +1244,7 @@ void
 DnsResult::onEnumResult(const DNSResult<DnsNaptrRecord>& result, int order)
 {
    Lock l(mEnumDestinationsMutex);
-   assert(mDoingEnum > 0);
+   resip_assert(mDoingEnum > 0);
 
    mDoingEnum--;
 
@@ -1319,7 +1374,7 @@ DnsResult::onNaptrResult(const DNSResult<DnsNaptrRecord>& result)
                StackLog (<< "NAPTR record is supported and matches highes priority order. doing SRV query: " << (*it));
                mTopOrderedNAPTRs[(*it).replacement] = (*it);
                mSRVCount++;
-               mDns.lookup<RR_SRV>((*it).replacement, Protocol::Sip, this);
+               mDnsStub.lookup<RR_SRV>((*it).replacement, Protocol::Sip, this);
             }
          }
       }
@@ -1349,32 +1404,32 @@ DnsResult::onNaptrResult(const DNSResult<DnsNaptrRecord>& result)
          }
 
          mSRVCount++;
-         mDns.lookup<RR_SRV>("_sips._tcp." + mTarget, Protocol::Sip, this);
+         mDnsStub.lookup<RR_SRV>("_sips._tcp." + mTarget, Protocol::Sip, this);
          StackLog (<< "Doing SRV lookup of _sips._tcp." << mTarget);
       }
       else
       {
          if (mInterface.isSupportedProtocol(TLS))
          {
-            mDns.lookup<RR_SRV>("_sips._tcp." + mTarget, Protocol::Sip, this);
+            mDnsStub.lookup<RR_SRV>("_sips._tcp." + mTarget, Protocol::Sip, this);
             ++mSRVCount;
             StackLog (<< "Doing SRV lookup of _sips._tcp." << mTarget);
          }
          if (mInterface.isSupportedProtocol(DTLS))
          {
-            mDns.lookup<RR_SRV>("_sips._udp." + mTarget, Protocol::Sip, this);
+            mDnsStub.lookup<RR_SRV>("_sips._udp." + mTarget, Protocol::Sip, this);
             ++mSRVCount;
             StackLog (<< "Doing SRV lookup of _sips._udp." << mTarget);
          }
          if (mInterface.isSupportedProtocol(TCP))
          {
-            mDns.lookup<RR_SRV>("_sip._tcp." + mTarget, Protocol::Sip, this);
+            mDnsStub.lookup<RR_SRV>("_sip._tcp." + mTarget, Protocol::Sip, this);
             ++mSRVCount;
             StackLog (<< "Doing SRV lookup of _sip._tcp." << mTarget);
          }
          if (mInterface.isSupportedProtocol(UDP))
          {
-            mDns.lookup<RR_SRV>("_sip._udp." + mTarget, Protocol::Sip, this);
+            mDnsStub.lookup<RR_SRV>("_sip._udp." + mTarget, Protocol::Sip, this);
             ++mSRVCount;
             StackLog (<< "Doing SRV lookup of _sip._udp." << mTarget);
          }
@@ -1398,7 +1453,6 @@ DnsResult::onDnsResult(const DNSResult<DnsNaptrRecord>& result)
    }
 
    onNaptrResult(result);
-  
 }
 
 void DnsResult::onDnsResult(const DNSResult<DnsCnameRecord>& result)
@@ -1496,3 +1550,5 @@ resip::operator<<(EncodeStream& strm, const resip::DnsResult::SRV& srv)
  * <http://www.vovida.org/>.
  *
  */
+
+// vim: softtabstop=3:shiftwidth=3:expandtab

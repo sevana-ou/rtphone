@@ -2,18 +2,10 @@
 #include <rutil/BaseException.hxx>
 #include <rutil/XMLCursor.hxx>
 #include <rutil/WinLeakCheck.hxx>
+#include <repro/RegSyncServer.hxx>
 
 using namespace resip;
 using namespace std;
-
-void sleepSeconds(unsigned int seconds)
-{
-#ifdef WIN32
-   Sleep(seconds*1000);
-#else
-   sleep(seconds);
-#endif
-}
 
 int 
 main (int argc, char** argv)
@@ -26,35 +18,49 @@ main (int argc, char** argv)
    struct sockaddr_in localAddr, servAddr;
    struct hostent *h;
 
-   if(argc != 2 && argc != 4) 
+   const char* host;
+   short port;
+   int cmdIndex;
+
+   // Look for forward slash in args 1 or 3
+   if(argc >= 2 && argv[1][0] == '/')
    {
-      cerr << "usage: " << argv[0] <<" [<server> <port>] <command> [<parm>=<value>]" << endl;
-      cerr << "  Valid Commands are:" << endl;
-      cerr << "  GetStackInfo - retrieves low level information about the stack state" << endl;
-      cerr << "  GetStackStats - retrieves a dump of the stack statistics" << endl;
-      cerr << "  ResetStackStats - resets all cumulative stack statistics to zero" << endl;
-      cerr << "  LogDnsCache - causes the DNS cache contents to be written to the resip logs" << endl;
-      cerr << "  ClearDnsCache - empties the stacks DNS cache" << endl;
-      cerr << "  GetDnsCache - retrieves the DNS cache contents" << endl;
-      cerr << "  GetCongestionStats - retrieves the stacks congestion manager stats and state" << endl;
-      cerr << "  SetCongestionTolerance metric=<SIZE|WAIT_TIME|TIME_DEPTH> maxTolerance=<value>" << endl;
-      cerr << "                         [fifoDescription=<desc>] - sets congestion tolerances" << endl;
-      cerr << "  Shutdown - signal the proxy to shut down." << endl;
-      cerr << "  Restart - signal the proxy to restart - leaving active registrations in place." << endl;
-      cerr << "  GetProxyConfig - retrieves the all of configuration file settings currently" << endl;
-      cerr << "                   being used by the proxy" << endl;
-      exit(1);
+       host = "127.0.0.1";
+       port = 5081;
+       cmdIndex=1;
    }
-
-   char* host = "127.0.0.1";
-   short port = 5081;
-   int cmdIndex=1;
-
-   if(argc == 4)
+   else if(argc >= 4 && argv[3][0] == '/')
    {
       host = argv[1];
       port = (short)atoi(argv[2]);
       cmdIndex = 3;
+   }
+   else
+   {
+      cerr << "usage: " << argv[0] <<" [<server> <port>] /<command> [<parm>=<value>]" << endl;
+      cerr << "  Valid Commands are:" << endl;
+      cerr << "  /GetStackInfo - retrieves low level information about the stack state" << endl;
+      cerr << "  /GetStackStats - retrieves a dump of the stack statistics" << endl;
+      cerr << "  /ResetStackStats - resets all cumulative stack statistics to zero" << endl;
+      cerr << "  /LogDnsCache - causes the DNS cache contents to be written to the resip logs" << endl;
+      cerr << "  /ClearDnsCache - empties the stacks DNS cache" << endl;
+      cerr << "  /GetDnsCache - retrieves the DNS cache contents" << endl;
+      cerr << "  /GetCongestionStats - retrieves the stacks congestion manager stats and state" << endl;
+      cerr << "  /SetCongestionTolerance metric=<SIZE|WAIT_TIME|TIME_DEPTH> maxTolerance=<value>" << endl;
+      cerr << "                          [fifoDescription=<desc>] - sets congestion tolerances" << endl;
+      cerr << "  /Shutdown - signal the proxy to shut down." << endl;
+      cerr << "  /Restart - signal the proxy to restart - leaving active registrations in place." << endl;
+      cerr << "  /GetProxyConfig - retrieves the all of configuration file settings currently" << endl;
+      cerr << "                    being used by the proxy" << endl;
+      cerr << "  /AddTransport type=<UDP|TCP|etc.> port=<value> [ipVersion=<V4|V6>]" << endl; 
+      cerr << "                [interface=<ipaddress>] [rruri=<AUTO|sip:host:port>]" << endl;
+      cerr << "                [udprcvbuflen=<value>] [stun=<YES|NO>] [flags=<uint>]" << endl;
+      cerr << "                [domain=<tlsdomainname>] [ssltype=<SSLv23|TLSv1>]" << endl;
+      cerr << "                [certfile=<filename>] [keyfile=<filename>]" << endl;
+      cerr << "                [tlscvm=<NONE|OPT|MAN>] [tlsuseemail=<YES|NO>]" << endl;
+      cerr << "                - adds a new transport to the stack." << endl;
+      cerr << "  /RemoveTransport key=<transportKey> - removes the requested transport" << endl; 
+      exit(1);
    }
 
    h = gethostbyname(host);
@@ -65,6 +71,11 @@ main (int argc, char** argv)
    }
 
    servAddr.sin_family = h->h_addrtype;
+   if((unsigned int)h->h_length > sizeof(servAddr.sin_addr.s_addr))
+   {
+      cerr << "bad h_length" << endl;
+      exit(1);
+   }
    memcpy((char *) &servAddr.sin_addr.s_addr, h->h_addr_list[0], h->h_length);
    servAddr.sin_port = htons(port);
   
@@ -81,7 +92,7 @@ main (int argc, char** argv)
    localAddr.sin_addr.s_addr = htonl(INADDR_ANY);
    localAddr.sin_port = 0;
 
-   rc = bind(sd, (struct sockaddr *) &localAddr, sizeof(localAddr));
+   rc = ::bind(sd, (struct sockaddr *) &localAddr, sizeof(localAddr));
    if(rc < 0) 
    {
       cerr <<"error binding locally" << endl;
@@ -89,45 +100,60 @@ main (int argc, char** argv)
    }
 
    // Connect to server
-   rc = connect(sd, (struct sockaddr *) &servAddr, sizeof(servAddr));
+   rc = ::connect(sd, (struct sockaddr *) &servAddr, sizeof(servAddr));
    if(rc < 0) 
    {
       cerr << "error connecting" << endl;
       exit(1);
    }
 
+   Data command(&argv[cmdIndex][1]); // [1] skips leading slash
    Data request(1024, Data::Preallocate);
-   request += "<";
-   request += argv[cmdIndex];
-   request += ">\r\n  <Request>\r\n";
-   for(int i = cmdIndex+1; i < argc; i++)
+   bool dumpRawResult = false;
+   if (isEqualNoCase(command, "initialsync"))
    {
-      Data parm;
-      Data value;
-      Data arg(argv[i]);
-      ParseBuffer pb(arg);
-      const char *anchor = pb.position();
-      pb.skipToChar('=');
-      if(!pb.eof())
+      request += "<InitialSync>\r\n";
+      request += "  <Request>\r\n";
+      request += "     <Version>" + Data(REGSYNC_VERSION) + "</Version>\r\n";
+      request += "  </Request>\r\n";
+      request += "</InitialSync>\r\n";
+
+      dumpRawResult = true;
+   }
+   else
+   {
+      request += "<";
+      request += command;
+      request += ">\r\n  <Request>\r\n";
+      for (int i = cmdIndex + 1; i < argc; i++)
       {
-         pb.data(parm, anchor);
-         pb.skipChar();
-         anchor = pb.position();
-         pb.skipToEnd();
-         pb.data(value, anchor);
+         Data parm;
+         Data value;
+         Data arg(argv[i]);
+         ParseBuffer pb(arg);
+         const char *anchor = pb.position();
+         pb.skipToChar('=');
+         if (!pb.eof())
+         {
+            pb.data(parm, anchor);
+            pb.skipChar();
+            anchor = pb.position();
+            pb.skipToEnd();
+            pb.data(value, anchor);
+         }
+         request += "    <";
+         request += parm;
+         request += ">";
+         request += value;
+         request += "</";
+         request += parm;
+         request += ">\r\n";
       }
-      request += "    <";
-      request += parm;
-      request += ">";
-      request += value;
+      request += "  </Request>\r\n";
       request += "</";
-      request += parm;
+      request += command;
       request += ">\r\n";
    }
-   request += "  </Request>\r\n";
-   request += "</";
-   request += argv[cmdIndex];
-   request += ">\r\n";
 
    //cout << "Sending:\r\n" << request << endl;
 
@@ -153,62 +179,68 @@ main (int argc, char** argv)
       if(rc > 0)
       {
          Data response(Data::Borrow, (const char*)&readBuffer, rc);
-         //cout << "Received response: \r\n" << response.xmlCharDataDecode() << endl;
 
-         ParseBuffer pb(response);
-         XMLCursor xml(pb);
-         bool responseOK = false;
-         if(xml.firstChild() && xml.nextSibling() && xml.firstChild())  // Move to Response node
+         if (dumpRawResult)
          {
-            while(true)
+            //cout << "Received response: \r\n" << response.xmlCharDataDecode() << endl;
+            cout << "Received response: \r\n" << response << endl;
+         }
+         else
+         {
+            ParseBuffer pb(response);
+            XMLCursor xml(pb);
+            bool responseOK = false;
+            if (xml.firstChild() && xml.nextSibling() && xml.firstChild())  // Move to Response node
             {
-               if(isEqualNoCase(xml.getTag(), "Result"))
+               while (true)
                {
-                  unsigned int code=0;
-                  Data text;
-                  XMLCursor::AttributeMap::const_iterator it = xml.getAttributes().find("Code");
-                  if(it != xml.getAttributes().end())
+                  if (isEqualNoCase(xml.getTag(), "Result"))
                   {
-                     code = it->second.convertUnsignedLong();
+                     unsigned int code = 0;
+                     Data text;
+                     XMLCursor::AttributeMap::const_iterator it = xml.getAttributes().find("Code");
+                     if (it != xml.getAttributes().end())
+                     {
+                        code = it->second.convertUnsignedLong();
+                     }
+                     if (xml.firstChild())
+                     {
+                        text = xml.getValue().xmlCharDataDecode();
+                        xml.parent();
+                     }
+                     if (code >= 200 && code < 300)
+                     {
+                        // Success
+                        cout << text << endl;
+                     }
+                     else
+                     {
+                        cout << "Error " << code << " processing request: " << text << endl;
+                     }
+                     responseOK = true;
                   }
-                  if(xml.firstChild())
+                  else if (isEqualNoCase(xml.getTag(), "Data"))
                   {
-                     text = xml.getValue();
-                     xml.parent();
+                     if (xml.firstChild())
+                     {
+                        cout << xml.getValue().xmlCharDataDecode() << endl;
+                        xml.parent();
+                     }
                   }
-                  if(code >= 200 && code < 300)
+                  if (!xml.nextSibling())
                   {
-                     // Success
-                     cout << text << endl;
+                     // break on no more sibilings
+                     break;
                   }
-                  else
-                  {
-                     cout << "Error " << code << " processing request: " << text << endl;
-                  }
-                  responseOK = true;
-               }
-               else if(isEqualNoCase(xml.getTag(), "Data"))
-               {
-                  if(xml.firstChild())
-                  {
-                     cout << xml.getValue().xmlCharDataDecode() << endl;
-                     xml.parent();
-                  }
-               }
-               if(!xml.nextSibling())
-               {
-                  // break on no more sibilings
-                  break;
                }
             }
+            if (!responseOK)
+            {
+               cout << "Unable to parse response:" << endl << response << endl;
+            }
+            closeSocket(sd);
+            break;
          }
-         if(!responseOK)
-         {
-            cout << "Unable to parse response:" << endl << response << endl;
-         }
-
-         closeSocket(sd); 
-         break;
       }
    }
 }

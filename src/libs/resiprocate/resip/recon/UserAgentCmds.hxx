@@ -26,7 +26,7 @@ class UserAgentShutdownCmd  : public resip::DumCommand
       {
          mUserAgent->shutdownImpl();
       }
-      resip::Message* clone() const { assert(0); return 0; }
+      resip::Message* clone() const { resip_assert(0); return 0; }
       EncodeStream& encode(EncodeStream& strm) const { strm << " UserAgentShutdownCmd: "; return strm; }
       EncodeStream& encodeBrief(EncodeStream& strm) const { return encode(strm); }
    private:
@@ -48,7 +48,7 @@ class AddConversationProfileCmd  : public resip::DumCommand
       {
          mUserAgent->addConversationProfileImpl(mHandle, mConversationProfile, mDefaultOutgoing);
       }
-      resip::Message* clone() const { assert(0); return 0; }
+      resip::Message* clone() const { resip_assert(0); return 0; }
       EncodeStream& encode(EncodeStream& strm) const { strm << " AddConversationProfileCmd: "; return strm; }
       EncodeStream& encodeBrief(EncodeStream& strm) const { return encode(strm); }
    private:
@@ -69,7 +69,7 @@ class SetDefaultOutgoingConversationProfileCmd  : public resip::DumCommand
       {
          mUserAgent->setDefaultOutgoingConversationProfileImpl(mHandle);
       }
-      resip::Message* clone() const { assert(0); return 0; }
+      resip::Message* clone() const { resip_assert(0); return 0; }
       EncodeStream& encode(EncodeStream& strm) const { strm << " SetDefaultOutgoingConversationProfileCmd: "; return strm; }
       EncodeStream& encodeBrief(EncodeStream& strm) const { return encode(strm); }
    private:
@@ -88,7 +88,7 @@ class DestroyConversationProfileCmd  : public resip::DumCommand
       {
          mUserAgent->destroyConversationProfileImpl(mHandle);
       }
-      resip::Message* clone() const { assert(0); return 0; }
+      resip::Message* clone() const { resip_assert(0); return 0; }
       EncodeStream& encode(EncodeStream& strm) const { strm << " DestroyConversationProfileCmd: "; return strm; }
       EncodeStream& encodeBrief(EncodeStream& strm) const { return encode(strm); }
    private:
@@ -141,7 +141,7 @@ class CreateSubscriptionCmd  : public resip::DumCommand
       {
          mUserAgent->createSubscriptionImpl(mHandle, mEventType, mTarget, mSubscriptionTime, mMimeType);
       }
-      resip::Message* clone() const { assert(0); return 0; }
+      resip::Message* clone() const { resip_assert(0); return 0; }
       EncodeStream& encode(EncodeStream& strm) const { strm << " CreateSubscriptionCmd: "; return strm; }
       EncodeStream& encodeBrief(EncodeStream& strm) const { return encode(strm); }
    private:
@@ -164,12 +164,65 @@ class DestroySubscriptionCmd  : public resip::DumCommand
       {
          mUserAgent->destroySubscriptionImpl(mHandle);
       }
-      resip::Message* clone() const { assert(0); return 0; }
+      resip::Message* clone() const { resip_assert(0); return 0; }
       EncodeStream& encode(EncodeStream& strm) const { strm << " DestroySubscriptionCmd: "; return strm; }
       EncodeStream& encodeBrief(EncodeStream& strm) const { return encode(strm); }
    private:
       UserAgent* mUserAgent;
       SubscriptionHandle mHandle;
+};
+
+class CreatePublicationCmd  : public resip::DumCommand
+{
+   public:  
+      CreatePublicationCmd(UserAgent* userAgent,
+			   PublicationHandle handle,
+			   const resip::Data& status,
+			   const resip::Data& eventType, 
+			   const resip::NameAddr& target, 
+			   unsigned int publicationTime, 
+			   const resip::Mime& mimeType)
+         : mUserAgent(userAgent),
+           mHandle(handle),
+           mStatus(status),
+           mEventType(eventType),
+           mTarget(target),
+           mPublicationTime(publicationTime),
+           mMimeType(mimeType) {}
+      virtual void executeCommand()
+      {
+         mUserAgent->createPublicationImpl(mHandle, mStatus, mEventType, mTarget, mPublicationTime, mMimeType);
+      }
+      resip::Message* clone() const { resip_assert(0); return 0; }
+      EncodeStream& encode(EncodeStream& strm) const { strm << " CreatePublicationCmd: "; return strm; }
+      EncodeStream& encodeBrief(EncodeStream& strm) const { return encode(strm); }
+   private:
+      UserAgent* mUserAgent;
+      PublicationHandle mHandle;
+      resip::Data mStatus;
+      resip::Data mEventType;
+      resip::NameAddr mTarget;
+      unsigned int mPublicationTime;
+      resip::Mime mMimeType;
+};
+
+class DestroyPublicationCmd  : public resip::DumCommand
+{
+   public:  
+      DestroyPublicationCmd(UserAgent* userAgent,
+                            PublicationHandle handle)
+         : mUserAgent(userAgent),
+           mHandle(handle) {}
+      virtual void executeCommand()
+      {
+         mUserAgent->destroyPublicationImpl(mHandle);
+      }
+      resip::Message* clone() const { resip_assert(0); return 0; }
+      EncodeStream& encode(EncodeStream& strm) const { strm << " DestroyPublicationCmd: "; return strm; }
+      EncodeStream& encodeBrief(EncodeStream& strm) const { return encode(strm); }
+   private:
+      UserAgent* mUserAgent;
+      PublicationHandle mHandle;
 };
 
 }

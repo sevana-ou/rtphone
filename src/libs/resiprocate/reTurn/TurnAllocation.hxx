@@ -3,7 +3,11 @@
 
 #include <map>
 #include <boost/noncopyable.hpp>
+#include <boost/shared_ptr.hpp>
 #include <asio.hpp>
+#ifdef USE_SSL
+#include <asio/ssl.hpp>
+#endif
 
 #include "StunTuple.hxx"
 #include "StunAuth.hxx"
@@ -16,6 +20,7 @@ namespace reTurn {
 
 class TurnPermission;
 class TurnManager;
+class TurnAllocationManager;
 class AsyncSocketBase;
 class UdpRelayServer;
 
@@ -25,6 +30,7 @@ class TurnAllocation
 {
 public:
    explicit TurnAllocation(TurnManager& turnManager,
+                           TurnAllocationManager& turnAllocationManager,
                            AsyncSocketBase* localTurnSocket,
                            const StunTuple& clientLocalTuple, 
                            const StunTuple& clientRemoteTuple,
@@ -32,6 +38,9 @@ public:
                            const StunTuple& requestedTuple, 
                            unsigned int lifetime);
    ~TurnAllocation();
+
+   bool startRelay();
+   void stopRelay();
 
    const TurnAllocationKey& getKey() { return mKey; }
    void  refresh(unsigned int lifetime);  // update expiration time
@@ -73,12 +82,18 @@ private:
    TurnPermissionMap mTurnPermissionMap;
 
    TurnManager& mTurnManager;
-   asio::deadline_timer mAllocationTimer;
+   TurnAllocationManager& mTurnAllocationManager;
+   asio::steady_timer mAllocationTimer;
 
    AsyncSocketBase* mLocalTurnSocket;
    boost::shared_ptr<UdpRelayServer> mUdpRelayServer;
 
    ChannelManager mChannelManager;
+
+   // Flags to control logging on Data channel/relay.  Used so that errors only print at Warning level once
+   bool mBadChannelErrorLogged;
+   bool mNoPermissionToPeerLogged;
+   bool mNoPermissionFromPeerLogged;
 };
 
 } 

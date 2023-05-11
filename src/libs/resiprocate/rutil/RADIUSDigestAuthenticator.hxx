@@ -6,9 +6,21 @@
 #include "config.h"
 #endif
 
+#include "compat.hxx"
+
 #ifdef USE_RADIUS_CLIENT
 
+#ifdef RESIP_HAVE_RADCLI
+#include <radcli/radcli.h>
+typedef UInt32 UINT4;
+#else
+#ifdef RESIP_HAVE_FREERADIUS_CLIENT
+#include <freeradius-client.h>
+typedef UInt32 UINT4;
+#else
 #include <radiusclient-ng.h>
+#endif
+#endif
 
 #include "rutil/Data.hxx"
 #include "rutil/ThreadIf.hxx"

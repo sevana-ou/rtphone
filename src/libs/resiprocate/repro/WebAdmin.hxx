@@ -13,6 +13,7 @@
 namespace resip
 {
 class RegistrationPersistenceManager;
+class PublicationPersistenceManager;
 class Security;
 class DataStream;
 }
@@ -30,11 +31,27 @@ class WebAdmin : public HttpBase,
                  public resip::GetDnsCacheDumpHandler
 {
    public:
+      class ConfigException : public resip::BaseException
+      {
+         public:
+            ConfigException(const resip::Data& msg,
+                      const resip::Data& file,
+                      const int line)
+               : BaseException(msg, file, line) {}
+         protected:
+            virtual const char* name() const { return "WebAdmin::ConfigException"; }
+      };
+
       WebAdmin(Proxy& proxy,
                resip::RegistrationPersistenceManager& regDb,
+               resip::PublicationPersistenceManager& pubDb,
                const resip::Data& realm, // this realm is used for http challenges
                int port=5080,
-               resip::IpVersion version=resip::V4);
+               resip::IpVersion version=resip::V4,
+               const resip::Data& ipAddr = resip::Data::Empty);
+
+      // (Re)load the users.txt file
+      void parseUserFile();
       
    protected:
       virtual void buildPage( const resip::Data& uri, 
@@ -65,14 +82,18 @@ class WebAdmin : public HttpBase,
       void buildShowRoutesSubPage(resip::DataStream& s);
 
       void buildRegistrationsSubPage(resip::DataStream& s);
+      void buildPublicationsSubPage(resip::DataStream& s);
       void buildSettingsSubPage(resip::DataStream& s);
       void buildRestartSubPage(resip::DataStream& s);
+      void buildLogLevelSubPage(resip::DataStream& s);
+      void buildReloadCertsSubPage(resip::DataStream& s);
 
       resip::Data buildCertPage(const resip::Data& domain);
 
       Proxy& mProxy;
       Store& mStore;
       resip::RegistrationPersistenceManager& mRegDb;
+      resip::PublicationPersistenceManager& mPubDb;
 
       resip::Data mDnsCache;
       resip::Mutex mDnsCacheMutex;
@@ -95,6 +116,9 @@ class WebAdmin : public HttpBase,
 
       resip::Data mPageOutlinePre;
       resip::Data mPageOutlinePost;
+
+      resip::Data mUserFile;
+      std::map<resip::Data,resip::Data> mUsers;
 };
 
 

@@ -11,7 +11,33 @@
    @ingroup data_structures
 */
 
-#  if ( (__GNUC__ == 4) && (__GNUC_MINOR__ >= 3) ) || ( __GNUC__ > 4 )
+// For GNU libstdc++ the decision which hashmap implementation to use must be
+// done on the version of libstdc++ and not on the compiler version.
+// Otherwise for example mixing RHEL6 GCC (4.4.7) and Clang 3.4 on RHEL6 will produce
+// ABI incompatible results.
+// The version encodings are described here:
+//   https://gcc.gnu.org/onlinedocs/libstdc++/manual/abi.html
+#include <map> // force include of nonstandard <bits/c++config.h>
+
+#  if (defined(__cplusplus) && (__cplusplus >= 201103L)) || (defined(WIN32) && defined(_MSC_VER) && (_MSC_VER >= 1900)) || (defined(_LIBCPP_VERSION) && (_LIBCPP_VERSION >= 1000))
+#    include <unordered_map>
+#    include <unordered_set>
+#    define HASH_MAP_NAMESPACE std
+#    define HashMap std::unordered_map
+#    define HashSet std::unordered_set
+#    define HashMultiMap std::unordered_multimap
+
+#    define HashValue(type)                            \
+     namespace std                                     \
+     {                                                 \
+        template <>                                    \
+        struct hash<type>                              \
+        {                                              \
+           size_t operator()(const type& data) const;  \
+        };                                             \
+     }
+#    define HashValueImp(type, ret) size_t HASH_MAP_NAMESPACE::hash<type>::operator()(const type& data) const { return ret; }
+#  elif ( defined(__GLIBCXX__) && (__GLIBCXX__ >= 20080306) ) // >= 4.3.0
 #    include <tr1/unordered_map>
 #    include <tr1/unordered_set>
 #    define HASH_MAP_NAMESPACE std::tr1
@@ -19,55 +45,49 @@
 #    define HashSet std::tr1::unordered_set
 #    define HashMultiMap std::tr1::unordered_multimap
 
-#define HashValue(type)                           \
-namespace std                                     \
-{                                                 \
-namespace tr1                                     \
-{                                                 \
-template <>                                       \
-struct hash<type>                                 \
-{                                                 \
-      size_t operator()(const type& data) const;  \
-};                                                \
-}                                                 \
-}
-#define HashValueImp(type, ret) size_t HASH_MAP_NAMESPACE::hash<type>::operator()(const type& data) const { return ret; }
-
-#  elif ( (__GNUC__ == 3) && (__GNUC_MINOR__ >= 1) ) || ( __GNUC__ > 3 )
+#    define HashValue(type)                                \
+     namespace std                                         \
+     {                                                     \
+        namespace tr1                                      \
+        {                                                  \
+           template <>                                     \
+           struct hash<type>                               \
+           {                                               \
+               size_t operator()(const type& data) const;  \
+           };                                              \
+        }                                                  \
+     }
+     #define HashValueImp(type, ret) size_t HASH_MAP_NAMESPACE::hash<type>::operator()(const type& data) const { return ret; }
+#  elif ( ( defined(__GLIBCPP__) && (__GLIBCPP__ >= 20020514) ) || ( defined(__GLIBCXX__) && (__GLIBCXX__ >= 20020514) ) || defined(_LIBCPP_VERSION) ) // >= 3.1.0 or libc++
 #    include <ext/hash_map>
 #    include <ext/hash_set>
 #    define HASH_MAP_NAMESPACE __gnu_cxx
 #    define HashMap __gnu_cxx::hash_map
 #    define HashSet __gnu_cxx::hash_set
 #    define HashMultiMap __gnu_cxx::hash_multimap
-// this allows us to hash on a pointer as the key 
-namespace HASH_MAP_NAMESPACE
-{
-/**
-@internal
-*/
-template <class T>
-struct hash<T*>
-{
-      size_t operator()(const T* t) const
-      {
-         return size_t(t);
-      }
-};
- 
-}
+     // this allows us to hash on a pointer as the key 
+     namespace HASH_MAP_NAMESPACE
+     { 
+        template <class T>
+        struct hash<T*>
+        {
+           size_t operator()(const T* t) const
+           {
+              return size_t(t);
+           }
+        };
+     }
 
-#define HashValue(type)                           \
-namespace HASH_MAP_NAMESPACE                      \
-{                                                 \
-template <>                                       \
-struct hash<type>                                 \
-{                                                 \
-      size_t operator()(const type& data) const;  \
-};                                                \
-}                                   
-#define HashValueImp(type, ret) size_t HASH_MAP_NAMESPACE::hash<type>::operator()(const type& data) const { return ret; }
-
+#    define HashValue(type)                           \
+     namespace HASH_MAP_NAMESPACE                     \
+     {                                                \
+        template <>                                   \
+        struct hash<type>                             \
+        {                                             \
+           size_t operator()(const type& data) const; \
+        };                                            \
+     }                                   
+#    define HashValueImp(type, ret) size_t HASH_MAP_NAMESPACE::hash<type>::operator()(const type& data) const { return ret; }
 #  elif  defined(__INTEL_COMPILER )
 #    include <hash_map>
 #    define HASH_MAP_NAMESPACE std

@@ -1,9 +1,8 @@
 # $Id$
 
 EXTRA_DIST = readme.txt
-EXTRA_DIST += *.vcproj
 EXTRA_DIST += *.sln
-EXTRA_DIST += recon_10_0.vcxproj recon_10_0.vcxproj.filters
+EXTRA_DIST += *.vcxproj *.vcxproj.filters
 EXTRA_DIST += doc
 
 SUBDIRS = .
@@ -15,8 +14,15 @@ SUBDIRS += MOHParkServer
 lib_LTLIBRARIES = librecon.la
 librecon_la_LIBADD = ../../reflow/libreflow.la
 librecon_la_LIBADD += ../../reTurn/client/libreTurnClient.la
+librecon_la_LIBADD += ../dum/libdum.la
+librecon_la_LIBADD += ../stack/libresip.la
 librecon_la_LIBADD += ../../rutil/librutil.la
+librecon_la_LIBADD += -lsipXmediaProcessing
+librecon_la_LIBADD += -lsipXmedia
+librecon_la_LIBADD += -lsipXsdp
+librecon_la_LIBADD += -lsipXport
 librecon_la_LIBADD += @LIBSSL_LIBADD@ -lsrtp
+librecon_la_LIBADD += @LIBPTHREAD_LIBADD@
 librecon_la_LDFLAGS = @LIBTOOL_VERSION_RELEASE@ -export-dynamic
 
 librecon_la_SOURCES = BridgeMixer.cxx \
@@ -27,6 +33,7 @@ librecon_la_SOURCES = BridgeMixer.cxx \
         DefaultDialogSet.cxx \
         DtmfEvent.cxx \
         FlowManagerSipXSocket.cxx \
+        InstantMessage.cxx \
         LocalParticipant.cxx \
         MediaEvent.cxx \
                 MediaInterface.cxx \
@@ -38,8 +45,10 @@ librecon_la_SOURCES = BridgeMixer.cxx \
         RelatedConversationSet.cxx \
         RemoteParticipant.cxx \
         RemoteParticipantDialogSet.cxx \
+        SipXHelper.cxx \
         UserAgent.cxx \
         UserAgentClientSubscription.cxx \
+        UserAgentClientPublication.cxx \
         UserAgentDialogSetFactory.cxx \
         UserAgentMasterProfile.cxx \
         UserAgentRegistration.cxx \
@@ -58,8 +67,10 @@ nobase_reconinclude_HEADERS = ReconSubsystem.hxx \
         RelatedConversationSet.hxx \
         UserAgentServerAuthManager.hxx \
         ConversationManagerCmds.hxx \
+        InstantMessage.hxx \
         UserAgentMasterProfile.hxx \
         RemoteParticipantDialogSet.hxx \
+        SipXHelper.hxx \
         Conversation.hxx \
         UserAgentDialogSetFactory.hxx \
         sdp/SdpMediaLine.hxx \
@@ -75,6 +86,7 @@ nobase_reconinclude_HEADERS = ReconSubsystem.hxx \
         DefaultDialogSet.hxx \
         Participant.hxx \
         UserAgentClientSubscription.hxx \
+        UserAgentClientPublication.hxx \
         UserAgent.hxx \
         ConversationParticipantAssignment.hxx \
         RemoteParticipant.hxx \

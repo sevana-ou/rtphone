@@ -14,6 +14,7 @@
 #include "resip/stack/Transport.hxx"
 
 #include "rutil/Logger.hxx"
+#include "rutil/TransportType.hxx"
 
 #define RESIPROCATE_SUBSYSTEM resip::Subsystem::REPRO
 
@@ -29,7 +30,8 @@ using resip::p_comp;
 namespace repro
 {
 RRDecorator::RRDecorator(const Proxy& proxy,
-                         const resip::Transport* receivedTransport,
+                         const resip::Tuple& receivedTransportTuple,
+                         const resip::NameAddr &receivedTransportRecordRoute,
                          bool alreadySingleRecordRouted,
                          bool hasInboundFlowToken,
                          bool forceRecordRouteEnabled,
@@ -42,7 +44,8 @@ RRDecorator::RRDecorator(const Proxy& proxy,
    mForceRecordRouteEnabled(forceRecordRouteEnabled),
    mDoPath(doPath),
    mIsOriginalSenderBehindNAT(isOriginalSenderBehindNAT),
-   mReceivedTransport(receivedTransport)
+   mReceivedTransportTuple(receivedTransportTuple),
+   mReceivedTransportRecordRoute(receivedTransportRecordRoute)
 {}
 
 RRDecorator::~RRDecorator()
@@ -75,7 +78,7 @@ RRDecorator::decorateMessage(resip::SipMessage& request,
       if(outboundFlowTokenNeeded(request, source, destination, sigcompId) ||
          mHasInboundFlowToken)  // or we have an inbound flow
       {
-         assert(mAlreadySingleRecordRouted);
+         resip_assert(mAlreadySingleRecordRouted);
          singleRecordRoute(request, source, destination, sigcompId);
       }
    }
@@ -120,32 +123,37 @@ RRDecorator::singleRecordRoute(resip::SipMessage& request,
    // just downstream will remain in the call-path throughout the dialog.
    if(outboundFlowTokenNeeded(request, source, destination, sigcompId))
    {
-      if(destination.getType()==resip::TLS || 
-         destination.getType()==resip::DTLS)
+      if(isSecure(destination.getType()))
       {
-         rt = mProxy.getRecordRoute(destination.transport);
+         rt = mProxy.getRecordRoute(destination.mTransportKey);
          rt.uri().scheme()="sips";
       }
       else
       {
-         // .bwc. It is safe to put ip+port+proto here, since we have an 
-         // existing flow to the next hop.
-         rt.uri().host()=resip::Tuple::inet_ntop(source);
-         rt.uri().port()=source.getPort();
-         rt.uri().param(resip::p_transport)=resip::Tuple::toDataLower(source.getType());
+         bool transportSpecificRecordRoute;
+         rt = mProxy.getRecordRoute(destination.mTransportKey, &transportSpecificRecordRoute);
+         // If record-route is not transport specific (ie: global record route setting), then generate appropriate one from source
+         if (!transportSpecificRecordRoute)
+         {
+            // .bwc. It is safe to put ip+port+proto here, since we have an 
+            // existing flow to the next hop.
+            rt.uri().host() = resip::Tuple::inet_ntop(source);
+            rt.uri().port() = source.getPort();
+            rt.uri().param(resip::p_transport) = resip::Tuple::toDataLower(source.getType());
+         }
       }
       // .bwc. If our target has an outbound flow to us, we need to put a flow
       // token in a Record-Route.
       resip::Helper::massageRoute(request,rt);
       resip::Data binaryFlowToken;
-      resip::Tuple::writeBinaryToken(destination,binaryFlowToken, Proxy::FlowTokenSalt);
+      resip::Tuple::writeBinaryToken(destination, binaryFlowToken, Proxy::FlowTokenSalt);
       
       rt.uri().user()=binaryFlowToken.base64encode();
    }
    else
    {
       // No need for a flow-token; just use an ordinary record-route.
-      rt = mProxy.getRecordRoute(destination.transport);
+      rt = mProxy.getRecordRoute(destination.mTransportKey);
       resip::Helper::massageRoute(request,rt);
    }
 
@@ -171,6 +179,7 @@ RRDecorator::singleRecordRoute(resip::SipMessage& request,
       InfoLog(<< "Adding outbound Record-Route: " << rt);
    }
 
+   resip_assert(routes->size() > 0);
    routes->front().uri().param(p_drr);
    routes->push_front(rt);
    ++mAddedRecordRoute;
@@ -185,7 +194,7 @@ RRDecorator::doubleRecordRoute(resip::SipMessage& request,
    // We only use this on transport switch when we have not yet Record-Routed.
    // If we needed a flow-token in the inbound Record-Route, it would have been 
    // added already.
-   resip::NameAddr rt(mProxy.getRecordRoute(mReceivedTransport));
+   resip::NameAddr rt(mReceivedTransportRecordRoute);
    resip::Helper::massageRoute(request,rt);
    if(mDoPath)
    {
@@ -205,15 +214,15 @@ RRDecorator::isTransportSwitch(const resip::Tuple& sendingFrom)
    if(mForceRecordRouteEnabled)
    {
       // If we are forcing record routes to be added, then DRR on any transport switch
-      return mReceivedTransport != sendingFrom.transport;
+      return mReceivedTransportTuple.mTransportKey != sendingFrom.mTransportKey;
    }
    else
    {
       // If record routing is not forced then only DRR if we are switching transport types or
       // protocol versions, since the interfaces themselves may all be equally reachable
       // !slg! - could make this behavior more configurable
-      return sendingFrom.getType() != mReceivedTransport->getTuple().getType() ||
-             sendingFrom.ipVersion() != mReceivedTransport->getTuple().ipVersion();
+      return sendingFrom.getType() != mReceivedTransportTuple.getType() ||
+             sendingFrom.ipVersion() != mReceivedTransportTuple.ipVersion();
    }
 }
 
@@ -247,7 +256,7 @@ RRDecorator::rollbackMessage(resip::SipMessage& request)
 
    while(mAddedRecordRoute--)
    {
-      assert(!routes->empty());
+      resip_assert(!routes->empty());
       routes->pop_front();
    }
 

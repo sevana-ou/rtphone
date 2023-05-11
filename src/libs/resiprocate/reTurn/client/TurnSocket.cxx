@@ -1,6 +1,5 @@
 #include "TurnSocket.hxx"
 #include "ErrorCode.hxx"
-#include <boost/bind.hpp>
 #include <rutil/Lock.hxx>
 #include <rutil/WinLeakCheck.hxx>
 #include <rutil/Logger.hxx>
@@ -22,6 +21,13 @@ using namespace resip;
 #define TURN_CHANNEL_BINDING_REFRESH_SECONDS 240   // 4 minuntes - this is one minute before the permission will expire, Note:  ChannelBinding refreshes also refresh permissions
 
 #define SOFTWARE_STRING "reTURN Sync Client 0.3 - RFC5389/turn-12"
+
+#ifdef BOOST_ASIO_HAS_STD_CHRONO
+using namespace std::chrono;
+#else
+#include <boost/chrono.hpp>
+using namespace boost::chrono;
+#endif
 
 namespace reTurn {
 
@@ -414,7 +420,7 @@ TurnSocket::setActiveDestination(const asio::ip::address& address, unsigned shor
    {
       // No remote peer yet (ie. not data sent or received from remote peer) - so create one
       mActiveDestination = mChannelManager.createChannelBinding(remoteTuple);
-      assert(mActiveDestination);
+      resip_assert(mActiveDestination);
       errorCode = channelBind(*mActiveDestination);
    }
 
@@ -573,7 +579,7 @@ TurnSocket::sendTo(RemotePeer& remotePeer, const char* buffer, unsigned int size
       if(remotePeer.getPeerTuple().getAddress().is_v6())
       {
          ind.mTurnXorPeerAddress[0].family = StunMessage::IPv6Family;
-         memcpy(&ind.mTurnXorPeerAddress[0].addr.ipv6, remotePeer.getPeerTuple().getAddress().to_v6().to_bytes().c_array(), sizeof(ind.mTurnXorPeerAddress[0].addr.ipv6));
+         memcpy(&ind.mTurnXorPeerAddress[0].addr.ipv6, remotePeer.getPeerTuple().getAddress().to_v6().to_bytes().data(), sizeof(ind.mTurnXorPeerAddress[0].addr.ipv6));
       }
       else
       {
@@ -636,6 +642,7 @@ TurnSocket::receive(char* buffer, unsigned int& size, unsigned int timeout, asio
             {
                size = tempsize;
             }
+            delete stunMsg;
          }
          else // Channel Data Message
          {
@@ -852,7 +859,7 @@ TurnSocket::startReadTimer(unsigned int timeout)
 {
    if(timeout != 0)
    {
-      mReadTimer.expires_from_now(boost::posix_time::milliseconds(timeout));
+      mReadTimer.expires_from_now(milliseconds(timeout));
       mReadTimer.async_wait(boost::bind(&TurnSocket::handleRawReadTimeout, this, asio::placeholders::error));
    }
 }

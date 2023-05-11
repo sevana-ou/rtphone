@@ -23,7 +23,7 @@ class StoreReq : public ResourceMessage
          mReplicaNamber = number;
       }
 
-      std::unique_ptr<Event> event()
+      std::auto_ptr<Event> event()
       {
          return wrap(this);
       }

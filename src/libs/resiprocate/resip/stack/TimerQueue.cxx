@@ -3,7 +3,7 @@
 #include "config.h"
 #endif
 
-#include <cassert>
+#include "rutil/ResipAssert.h"
 #include <limits.h>
 
 #include "resip/stack/TimerQueue.hxx"
@@ -31,6 +31,15 @@ DtlsTimerQueue::DtlsTimerQueue( Fifo<DtlsMessage>& fifo )
 {
 }
 
+DtlsTimerQueue::~DtlsTimerQueue()
+{
+   while(!mTimers.empty())
+   {
+      delete mTimers.top().getMessage();
+      mTimers.pop();
+   }
+}
+
 #endif
 
 UInt64
@@ -54,10 +63,19 @@ DtlsTimerQueue::add( SSL *ssl, unsigned long msOffset )
 
 #endif
 
+BaseTimeLimitTimerQueue::~BaseTimeLimitTimerQueue()
+{
+   while(!mTimers.empty())
+   {
+      delete mTimers.top().getMessage();
+      mTimers.pop();
+   }
+}
+
 UInt64
 BaseTimeLimitTimerQueue::add(unsigned int timeMs,Message* payload)
 {
-   assert(payload);
+   resip_assert(payload);
    DebugLog(<< "Adding application timer: " << payload->brief() << " ms=" << timeMs);
    mTimers.push(TimerWithPayload(timeMs,payload));
    return mTimers.top().getWhen();
@@ -66,7 +84,7 @@ BaseTimeLimitTimerQueue::add(unsigned int timeMs,Message* payload)
 void
 BaseTimeLimitTimerQueue::processTimer(const TimerWithPayload& timer)
 {
-   assert(timer.getMessage());
+   resip_assert(timer.getMessage());
    addToFifo(timer.getMessage(), TimeLimitFifo<Message>::InternalElement);
 }
 
@@ -90,10 +108,19 @@ TimeLimitTimerQueue::addToFifo(Message*msg, TimeLimitFifo<Message>::DepthUsage d
 TuSelectorTimerQueue::TuSelectorTimerQueue(TuSelector& sel) : mFifoSelector(sel)
 {}
 
+TuSelectorTimerQueue::~TuSelectorTimerQueue()
+{
+   while(!mTimers.empty())
+   {
+      delete mTimers.top().getMessage();
+      mTimers.pop();
+   }
+}
+
 UInt64
 TuSelectorTimerQueue::add(unsigned int timeMs,Message* payload)
 {
-   assert(payload);
+   resip_assert(payload);
    DebugLog(<< "Adding application timer: " << payload->brief() << " ms=" << timeMs);
    mTimers.push(TimerWithPayload(timeMs,payload));
    return mTimers.top().getWhen();

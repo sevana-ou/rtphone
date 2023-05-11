@@ -42,15 +42,18 @@ ServerPagerMessage::end()
 class ServerPagerMessageEndCommand : public DumCommandAdapter
 {
 public:
-   ServerPagerMessageEndCommand(ServerPagerMessage& serverPagerMessage)
-      : mServerPagerMessage(serverPagerMessage)
+   ServerPagerMessageEndCommand(const ServerPagerMessageHandle& serverPagerMessageHandle)
+      : mServerPagerMessageHandle(serverPagerMessageHandle)
    {
 
    }
 
    virtual void executeCommand()
    {
-      mServerPagerMessage.end();
+      if(mServerPagerMessageHandle.isValid())
+      {
+         mServerPagerMessageHandle->end();
+      }
    }
 
    virtual EncodeStream& encodeBrief(EncodeStream& strm) const
@@ -58,18 +61,18 @@ public:
       return strm << "ServerPagerMessageEndCommand";
    }
 private:
-   ServerPagerMessage& mServerPagerMessage;
+   ServerPagerMessageHandle mServerPagerMessageHandle;
 };
 
 void ServerPagerMessage::endCommand()
 {
-   mDum.post(new ServerPagerMessageEndCommand(*this));
+   mDum.post(new ServerPagerMessageEndCommand(getHandle()));
 }
 
 void 
 ServerPagerMessage::dispatch(const SipMessage& msg)
 {
-	assert(msg.isRequest());
+	resip_assert(msg.isRequest());
     ServerPagerMessageHandler* handler = mDum.mServerPagerMessageHandler;
     
     //?dcm? check in DialogUsageManager
@@ -91,7 +94,7 @@ ServerPagerMessage::dispatch(const DumTimeout& msg)
 void 
 ServerPagerMessage::send(SharedPtr<SipMessage> response)
 {
-   assert(response->isResponse());
+   resip_assert(response->isResponse());
    mDum.send(response);
    delete this;
 }
@@ -108,15 +111,18 @@ ServerPagerMessage::accept(int statusCode)
 class ServerPagerMessageAcceptCommand : public DumCommandAdapter
 {
 public:
-   ServerPagerMessageAcceptCommand(ServerPagerMessage& serverPagerMessage, int statusCode)
-      : mServerPagerMessage(serverPagerMessage),
+   ServerPagerMessageAcceptCommand(const ServerPagerMessageHandle& serverPagerMessageHandle, int statusCode)
+      : mServerPagerMessageHandle(serverPagerMessageHandle),
         mStatusCode(statusCode)
    {
    }
 
    virtual void executeCommand()
    {
-      mServerPagerMessage.accept(mStatusCode);
+      if(mServerPagerMessageHandle.isValid())
+      {
+         mServerPagerMessageHandle->send(mServerPagerMessageHandle->accept(mStatusCode));
+      }
    }
 
    virtual EncodeStream& encodeBrief(EncodeStream& strm) const
@@ -124,14 +130,14 @@ public:
       return strm << "ServerPagerMessageAcceptCommand";
    }
 private:
-   ServerPagerMessage& mServerPagerMessage;
+   ServerPagerMessageHandle mServerPagerMessageHandle;
    int mStatusCode;
 };
 
 void
 ServerPagerMessage::acceptCommand(int statusCode)
 {   
-   mDum.post(new ServerPagerMessageAcceptCommand(*this, statusCode));
+   mDum.post(new ServerPagerMessageAcceptCommand(getHandle(), statusCode));
 }
 
 SharedPtr<SipMessage>
@@ -145,15 +151,18 @@ ServerPagerMessage::reject(int statusCode)
 class ServerPagerMessageRejectCommand : public DumCommandAdapter
 {
 public:
-   ServerPagerMessageRejectCommand(ServerPagerMessage& serverPagerMessage, int statusCode)
-      : mServerPagerMessage(serverPagerMessage),
+   ServerPagerMessageRejectCommand(const ServerPagerMessageHandle& serverPagerMessageHandle, int statusCode)
+      : mServerPagerMessageHandle(serverPagerMessageHandle),
         mStatusCode(statusCode)
    {
    }
 
    virtual void executeCommand()
    {
-      mServerPagerMessage.reject(mStatusCode);
+      if(mServerPagerMessageHandle.isValid())
+      {
+         mServerPagerMessageHandle->send(mServerPagerMessageHandle->reject(mStatusCode));
+      }
    }
 
    virtual EncodeStream& encodeBrief(EncodeStream& strm) const
@@ -161,14 +170,14 @@ public:
       return strm << "ServerPagerMessageRejectCommand";
    }
 private:
-   ServerPagerMessage& mServerPagerMessage;
+   ServerPagerMessageHandle mServerPagerMessageHandle;
    int mStatusCode;
 };
 
 void
 ServerPagerMessage::rejectCommand(int statusCode)
 {
-   mDum.post(new ServerPagerMessageRejectCommand(*this, statusCode));
+   mDum.post(new ServerPagerMessageRejectCommand(getHandle(), statusCode));
 }
 
 EncodeStream& 
@@ -178,7 +187,6 @@ ServerPagerMessage::dump(EncodeStream& strm) const
    mRequest.encodeBrief(strm);
    return strm;
 }
-
 
 
 /* ====================================================================

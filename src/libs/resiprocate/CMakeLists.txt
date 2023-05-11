@@ -10,29 +10,30 @@ set (CMAKE_CXX_STANDARD_REQUIRED ON)
 
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
+set (DIR_ARES rutil/dns/ares)
 set (ARES_SOURCES
-    contrib/ares/ares_timeout.c
-    contrib/ares/ares_strerror.c
-    contrib/ares/ares_send.c
-    contrib/ares/ares_search.c
-    contrib/ares/ares_query.c
-    contrib/ares/ares_process.c
-    contrib/ares/ares_parse_ptr_reply.c
-    contrib/ares/ares_parse_a_reply.c
-    contrib/ares/ares_mkquery.c
-    contrib/ares/ares_local.c
-    contrib/ares/ares_init.c
-    contrib/ares/ares_gethostbyname.c
-    contrib/ares/ares_gethostbyaddr.c
-    contrib/ares/ares_free_string.c
-    contrib/ares/ares_free_hostent.c
-    contrib/ares/ares_free_errmem.c
-    contrib/ares/ares_fds.c
-    contrib/ares/ares_expand_name.c
-    contrib/ares/ares_destroy.c
-    contrib/ares/ares__read_line.c
-    contrib/ares/ares__get_hostent.c
-    contrib/ares/ares__close_sockets.c
+    ${DIR_ARES}/ares_timeout.c
+    ${DIR_ARES}/ares_strerror.c
+    ${DIR_ARES}/ares_send.c
+    ${DIR_ARES}/ares_search.c
+    ${DIR_ARES}/ares_query.c
+    ${DIR_ARES}/ares_process.c
+    ${DIR_ARES}/ares_parse_ptr_reply.c
+    ${DIR_ARES}/ares_parse_a_reply.c
+    ${DIR_ARES}/ares_mkquery.c
+    ${DIR_ARES}/ares_local.c
+    ${DIR_ARES}/ares_init.c
+    ${DIR_ARES}/ares_gethostbyname.c
+    ${DIR_ARES}/ares_gethostbyaddr.c
+    ${DIR_ARES}/ares_free_string.c
+    ${DIR_ARES}/ares_free_hostent.c
+    ${DIR_ARES}/ares_free_errmem.c
+    ${DIR_ARES}/ares_fds.c
+    ${DIR_ARES}/ares_expand_name.c
+    ${DIR_ARES}/ares_destroy.c
+    ${DIR_ARES}/ares__read_line.c
+    ${DIR_ARES}/ares__get_hostent.c
+    ${DIR_ARES}/ares__close_sockets.c
 )
 
 set (STACK_SOURCES
@@ -68,13 +69,13 @@ set (STACK_SOURCES
     resip/stack/EventStackThread.cxx
     resip/stack/Embedded.cxx
     resip/stack/DtlsMessage.cxx
-    resip/stack/HeaderHash.cxx
+    # resip/stack/HeaderHash.cxx
     resip/stack/HeaderFieldValueList.cxx
     resip/stack/HeaderFieldValue.cxx
     resip/stack/MsgHeaderScanner.cxx
     resip/stack/Mime.cxx
     resip/stack/MethodTypes.cxx
-    resip/stack/MethodHash.cxx
+    # resip/stack/MethodHash.cxx
     resip/stack/MessageWaitingContents.cxx
     resip/stack/MessageFilterRule.cxx
     resip/stack/Message.cxx
@@ -89,7 +90,7 @@ set (STACK_SOURCES
     resip/stack/Helper.cxx
     resip/stack/HeaderTypes.cxx
     resip/stack/Headers.cxx
-    resip/stack/ParameterHash.cxx
+    # resip/stack/ParameterHash.cxx
     resip/stack/Parameter.cxx
     resip/stack/OctetContents.cxx
     resip/stack/NonceHelper.cxx
@@ -157,8 +158,8 @@ set (STACK_SOURCES
     resip/stack/StatelessHandler.cxx
     resip/stack/StackThread.cxx
     resip/stack/ssl/Security.cxx
-    resip/stack/ssl/MacSecurity.cxx
-    resip/stack/ssl/WinSecurity.cxx
+    #resip/stack/ssl/MacSecurity.cxx
+    #resip/stack/ssl/WinSecurity.cxx
     resip/stack/ssl/TlsConnection.cxx
     resip/stack/ssl/TlsTransport.cxx
     )
@@ -305,8 +306,8 @@ SET (RUTIL_SOURCES
     rutil/KeyValueStore.cxx
     rutil/HeapInstanceCounter.cxx
     rutil/GeneralCongestionManager.cxx
-    rutil/AtomicCounter.cxx
-    rutil/WinCompat.cxx
+    # rutil/AtomicCounter.cxx
+    # rutil/WinCompat.cxx
     )
 
 
@@ -314,7 +315,7 @@ add_library(resiprocate ${ARES_SOURCES} ${RUTIL_SOURCES} ${STACK_SOURCES} ${DUM_
 
 target_include_directories(resiprocate PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}
-    ${CMAKE_CURRENT_SOURCE_DIR}/contrib/ares
+    ${DIR_ARES}
     ${OPENSSL_INCLUDE}
     )
 target_compile_definitions(resiprocate PUBLIC -DUSE_ARES -DUSE_SSL)

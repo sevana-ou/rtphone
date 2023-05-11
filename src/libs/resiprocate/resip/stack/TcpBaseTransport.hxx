@@ -19,10 +19,9 @@ class TcpBaseTransport : public InternalTransport, public FdPollItemIf
                        const Data& interfaceName,
                        AfterSocketCreationFuncPtr socketFunc,
                        Compression &compression,
-                       unsigned transportFlags = 0);
+                       unsigned transportFlags = 0,
+                       const Data& netNs = Data::Empty);
       virtual  ~TcpBaseTransport();
-
-
 
       virtual void processPollEvent(FdPollEventMask mask);
       virtual void process(FdSet& fdset);
@@ -35,6 +34,8 @@ class TcpBaseTransport : public InternalTransport, public FdPollItemIf
 
       ConnectionManager& getConnectionManager() {return mConnectionManager;}
       const ConnectionManager& getConnectionManager() const {return mConnectionManager;}
+
+      virtual void invokeAfterSocketCreationFunc() const;
 
    protected:
       /** Performs constructor activities that depend on virtual

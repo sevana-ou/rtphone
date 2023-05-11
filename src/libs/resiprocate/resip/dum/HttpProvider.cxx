@@ -4,13 +4,13 @@
 using namespace resip;
 
 HttpProvider* HttpProvider::mInstance = 0;
-std::unique_ptr<HttpProviderFactory> HttpProvider::mFactory;
+std::auto_ptr<HttpProviderFactory> HttpProvider::mFactory;
 Mutex HttpProvider::mMutex;      
 
 void 
-HttpProvider::setFactory(std::unique_ptr<HttpProviderFactory> fact)
+HttpProvider::setFactory(std::auto_ptr<HttpProviderFactory> fact)
 {
-   mFactory = std::move(fact);
+   mFactory = fact;
 }
 
 HttpProvider* 

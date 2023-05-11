@@ -1,7 +1,9 @@
 #include "rutil/FileSystem.hxx"
 #include "rutil/Logger.hxx"
 
-#include <cassert>
+#include <sys/stat.h>
+
+#include "rutil/ResipAssert.h"
 using namespace resip;
 
 #define RESIPROCATE_SUBSYSTEM Subsystem::SIP
@@ -25,15 +27,22 @@ FileSystem::Directory::iterator::iterator() : mNixDir(0), mDirent(0)
 
 FileSystem::Directory::iterator::iterator(const Directory& dir)
 {
-   assert(!dir.getPath().empty());   
+   resip_assert(!dir.getPath().empty());   
    //InfoLog(<< "FileSystem::Directory::iterator::iterator: " << dir.getPath());   
+   mPath = dir.getPath();
    if ((mNixDir = opendir( dir.getPath().c_str() )))
    {
+      errno = 0;
       mDirent = readdir(mNixDir);
+      if(errno != 0)
+      {
+         throw Exception("Failed readdir", __FILE__, __LINE__);
+      }
       if (mDirent)
       {
          //InfoLog(<< "FileSystem::Directory::iterator::iterator, first file " << mFile);   
          mFile = mDirent->d_name;
+         mFullFilename = mPath + '/' + mFile;
       }
    }
    else
@@ -57,10 +66,16 @@ FileSystem::Directory::iterator::operator++()
 {
    if (mDirent)
    {
+      errno = 0;
       mDirent = readdir(mNixDir);
+      if(errno != 0)
+      {
+         throw Exception("Failed readdir", __FILE__, __LINE__);
+      }
       if (mDirent)
       {
          mFile = mDirent->d_name;
+         mFullFilename = mPath + '/' + mFile;
          //InfoLog(<< "FileSystem::Directory::iterator::iterator, next file " << mFile);   
       }
    }
@@ -103,7 +118,18 @@ FileSystem::Directory::iterator::operator->() const
 bool
 FileSystem::Directory::iterator::is_directory() const
 {
+#if HAVE_STRUCT_DIRENT_D_TYPE
    return mDirent->d_type == DT_DIR;
+#else
+   struct stat s;
+   StackLog(<<"calling stat() for " << mDirent->d_name);
+   if(stat(mFullFilename.c_str(), &s) < 0)
+   {
+      ErrLog(<<"Error calling stat() for " << mFullFilename.c_str() << ": " << strerror(errno));
+      throw Exception("stat() failed", __FILE__, __LINE__);
+   }
+   return S_ISDIR(s.st_mode);
+#endif
 }
 
 int 
@@ -127,7 +153,7 @@ FileSystem::Directory::iterator::iterator() :
 FileSystem::Directory::iterator::iterator(const Directory& dir)
 {
    Data searchPath;
-   if (dir.getPath().postfix("/") || dir.getPath().postfix("\\"))
+   if (dir.getPath().empty() || dir.getPath().postfix("/") || dir.getPath().postfix("\\"))
    {
       searchPath = dir.getPath() + Data("*");
    }
@@ -145,6 +171,7 @@ FileSystem::Directory::iterator::iterator(const Directory& dir)
    else
    {
       mFile = fileData.cFileName;
+      mFullFilename = mPath + '/' + mFile;
    }
 }
 
@@ -174,6 +201,7 @@ FileSystem::Directory::iterator::operator++()
    else
    {
       mFile = fileData.cFileName;
+      mFullFilename = mPath + '/' + mFile;
       mIsDirectory = (fileData.dwFileAttributes & FILE_ATTRIBUTE_DEVICE) > 0;
    }  
    return *this;

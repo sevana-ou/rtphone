@@ -29,7 +29,7 @@ AsyncTcpSocketBase::~AsyncTcpSocketBase()
 unsigned int 
 AsyncTcpSocketBase::getSocketDescriptor() 
 { 
-   return mSocket.native(); 
+   return (unsigned int)mSocket.native_handle(); 
 }
 
 asio::error_code 
@@ -52,7 +52,11 @@ AsyncTcpSocketBase::connect(const std::string& address, unsigned short port)
    // Start an asynchronous resolve to translate the address
    // into a list of endpoints.
    resip::Data service(port);
+#ifdef USE_IPV6
    asio::ip::tcp::resolver::query query(address, service.c_str());   
+#else
+   asio::ip::tcp::resolver::query query(asio::ip::tcp::v4(), address, service.c_str());   
+#endif
    mResolver.async_resolve(query,
         boost::bind(&AsyncSocketBase::handleTcpResolve, shared_from_this(),
                     asio::placeholders::error,
@@ -178,7 +182,7 @@ AsyncTcpSocketBase::handleReadHeader(const asio::error_code& e)
       }
       else
       {
-         WarningLog(<< "Receive buffer (" << RECEIVE_BUFFER_SIZE << ") is not large enough to accomdate incoming framed data (" << dataLen+4 << ") closing connection.");
+         WarningLog(<< "Receive buffer (" << RECEIVE_BUFFER_SIZE << ") is not large enough to accommodate incoming framed data (" << dataLen+4 << ") closing connection.");
          close();
       }
    }
@@ -199,6 +203,11 @@ AsyncTcpSocketBase::handleReadHeader(const asio::error_code& e)
 void 
 AsyncTcpSocketBase::transportClose()
 {
+   if (mOnBeforeSocketCloseFp)
+   {
+      mOnBeforeSocketCloseFp((unsigned int)mSocket.native_handle());
+   }
+
    asio::error_code ec;
    mSocket.close(ec);
 }
@@ -209,6 +218,7 @@ AsyncTcpSocketBase::transportClose()
 /* ====================================================================
 
  Copyright (c) 2007-2008, Plantronics, Inc.
+ Copyright (c) 2008-2018, SIP Spectrum, Inc.
  All rights reserved.
 
  Redistribution and use in source and binary forms, with or without

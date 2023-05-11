@@ -6,11 +6,12 @@
 #include "rutil/FdSetIOObserver.hxx"
 #include "rutil/ProducerFifoBuffer.hxx"
 #include "resip/stack/TransportFailure.hxx"
+#include "resip/stack/TcpConnectState.hxx"
 #include "resip/stack/Tuple.hxx"
 #include "resip/stack/NameAddr.hxx"
 #include "resip/stack/Compression.hxx"
 #include "resip/stack/SendData.hxx"
-
+#include "rutil/SharedPtr.hxx"
 namespace resip
 {
 
@@ -73,7 +74,21 @@ class Transport : public FdSetIOObserver
 {
    public:
 
-  
+    class SipMessageLoggingHandler
+      {
+      public:
+          virtual ~SipMessageLoggingHandler(){}
+          virtual void outboundMessage(const Tuple &source, const Tuple &destination, const SipMessage &msg) = 0;
+          // Note:  retranmissions store already encoded messages, so callback doesn't send SipMessage it sends
+          //        the encoded version of the SipMessage instead.  If you need a SipMessage you will need to
+          //        re-parse back into a SipMessage in the callback handler.
+          virtual void outboundRetransmit(const Tuple &source, const Tuple &destination, const SendData &data) {}
+          virtual void inboundMessage(const Tuple& source, const Tuple& destination, const SipMessage &msg) = 0;
+      };
+
+      void setSipMessageLoggingHandler(SharedPtr<SipMessageLoggingHandler> handler) { mSipMessageLoggingHandler = handler; }
+      SipMessageLoggingHandler* getSipMessageLoggingHandler() { return 0 != mSipMessageLoggingHandler.get() ? mSipMessageLoggingHandler.get() : 0; }
+
       /**
          @brief General exception class for Transport.
 
@@ -132,10 +147,12 @@ class Transport : public FdSetIOObserver
                 const Data& tlsDomain = Data::Empty,
                 AfterSocketCreationFuncPtr socketFunc = 0,
                 Compression &compression = Compression::Disabled,
-                unsigned transportFlags = 0
-         );
+                unsigned transportFlags = 0,
+                const Data& netNs = Data::Empty);
 
       virtual ~Transport();
+
+      virtual void onReload();
 
       /**
          @note Subclasses override this method by checking whether
@@ -144,7 +161,7 @@ class Transport : public FdSetIOObserver
       */
       virtual bool isFinished() const=0;
       
-      std::unique_ptr<SendData> makeSendData( const Tuple& tuple, const Data& data, const Data& tid, const Data &sigcompId = Data::Empty);
+      std::auto_ptr<SendData> makeSendData( const Tuple& tuple, const Data& data, const Data& tid, const Data &sigcompId = Data::Empty);
       
       /**
          @todo !bwc! What we do with a SendData is flexible. It might make a
@@ -154,7 +171,7 @@ class Transport : public FdSetIOObserver
          @todo !bch! Should this be protected and not public?
                !bwc! TransportSelector uses this directly for retransmissions.
       */
-      virtual void send(std::unique_ptr<SendData> data)=0;
+      virtual void send(std::auto_ptr<SendData> data)=0;
 
       /**
          Called when a writer is done adding messages to the TxFifo; this is
@@ -213,6 +230,11 @@ class Transport : public FdSetIOObserver
             int subCode = 0);
 
       /**
+         Posts a TcpConnectState to the TransactionMessage Fifo.
+      */
+      void setTcpConnectState(const Data& tid, TcpConnectState::State state);
+
+      /**
          Generates a generic log for the platform specific socket
          error number.
 
@@ -240,9 +262,12 @@ class Transport : public FdSetIOObserver
       const Tuple& getTuple() const { return mTuple; }
     
       /// @return This transport's TransportType.
-      virtual TransportType transport() const =0 ;
+      const TransportType transport() const { return mTuple.getType(); }
       virtual bool isReliable() const =0;
       virtual bool isDatagram() const =0;
+
+      /// @return net namespace in which Transport is bound
+      const Data& netNs() const { return(mTuple.getNetNs()); }
 
       /**
          @return true here if the subclass has a specific contact
@@ -263,10 +288,10 @@ class Transport : public FdSetIOObserver
       void makeFailedResponse(const SipMessage& msg,
                               int responseCode = 400,
                               const char * warning = 0);
-      std::unique_ptr<SendData> make503(SipMessage& msg,
+      std::auto_ptr<SendData> make503(SipMessage& msg,
                                       UInt16 retryAfter);
 
-      std::unique_ptr<SendData> make100(SipMessage& msg);
+      std::auto_ptr<SendData> make100(SipMessage& msg);
       void setRemoteSigcompId(SipMessage&msg, Data& id);
       // mark the received= and rport parameters if necessary
       static void stampReceived(SipMessage* request);
@@ -312,6 +337,7 @@ class Transport : public FdSetIOObserver
          // !jf! should use the fifo to pass this in
          mShuttingDown = true;
       }
+      virtual bool isShuttingDown() { return mShuttingDown; }
 
       // also used by the TransportSelector.
       // requires that the two transports be
@@ -321,6 +347,7 @@ class Transport : public FdSetIOObserver
       virtual unsigned int getFifoSize() const=0;
 
       void callSocketFunc(Socket sock);
+      virtual void invokeAfterSocketCreationFunc() const = 0;  //used to invoke the after socket creation func immeidately for all existing sockets - can be used to modify QOS settings at runtime
 
       virtual void setCongestionManager(CongestionManager* manager)
       {
@@ -336,40 +363,29 @@ class Transport : public FdSetIOObserver
          return CongestionManager::NORMAL;
       }
 
+      void flushStateMacFifo()
+      {
+          mStateMachineFifo.flush();
+      }
+
       UInt32 getExpectedWaitForIncoming() const
       {
          return (UInt32)mStateMachineFifo.getFifo().expectedWaitTimeMilliSec()/1000;
       }
 
       // called by Connection to deliver a received message
-      virtual void pushRxMsgUp(TransactionMessage* msg);
+      virtual void pushRxMsgUp(SipMessage* msg);
 
       // set the receive buffer length (SO_RCVBUF)
       virtual void setRcvBufLen(int buflen) { };	// make pure?
 
-      // Storing and retrieving transport specific record-route header
-      virtual void setRecordRoute(const NameAddr& recordRoute) { mRecordRoute = recordRoute; mHasRecordRoute = true; }
-      virtual bool hasRecordRoute() const { return mHasRecordRoute; }
-      virtual const NameAddr& getRecordRoute() const { assert(mHasRecordRoute); return mRecordRoute; }
-
-      inline unsigned int getKey() const {return mKey;} 
-
-      int getConnectionsDeleted() const;
-      void resetConnectionsDeleted();
-      void increaseConnectionsDeleted();
+      inline unsigned int getKey() const {return mTuple.mTransportKey;} 
+      inline void setKey(unsigned int pKey) { mTuple.mTransportKey = pKey;} // should only be called once after creation
 
    protected:
-      friend class TransportSelector;
-      inline void setKey(unsigned int pKey) { mKey = pKey;}
 
       Data mInterface;
       Tuple mTuple;
-      NameAddr mRecordRoute;
-      bool mHasRecordRoute;
-      unsigned int mKey;
-
-      /** Number of connections delete in last processFdSet() call */
-      int mConnectionsDeleted;
 
       CongestionManager* mCongestionManager;
       ProducerFifoBuffer<TransactionMessage> mStateMachineFifo; // passed in
@@ -381,6 +397,8 @@ class Transport : public FdSetIOObserver
       friend EncodeStream& operator<<(EncodeStream& strm, const Transport& rhs);
 
       Data mTlsDomain;
+      SharedPtr<SipMessageLoggingHandler> mSipMessageLoggingHandler;
+
    protected:
       AfterSocketCreationFuncPtr mSocketFunc;
       Compression &mCompression;

@@ -1,4 +1,4 @@
-#include <cassert>
+#include "rutil/ResipAssert.h"
 
 #include "resip/dum/ChallengeInfo.hxx"
 #include "resip/dum/DumFeature.hxx"
@@ -16,9 +16,10 @@
 using namespace resip;
 using namespace std;
 
-ServerAuthManager::ServerAuthManager(DialogUsageManager& dum, TargetCommand::Target& target, bool challengeThirdParties) :
+ServerAuthManager::ServerAuthManager(DialogUsageManager& dum, TargetCommand::Target& target, bool challengeThirdParties, const Data& staticRealm) :
    DumFeature(dum, target),
-   mChallengeThirdParties(challengeThirdParties)
+   mChallengeThirdParties(challengeThirdParties),
+   mStaticRealm(staticRealm)
 {
 }
 
@@ -64,8 +65,8 @@ ServerAuthManager::process(Message* msg)
    {
       InfoLog(<< "ServerAuth got ChallengeInfo " << challengeInfo->brief());
       MessageMap::iterator it = mMessages.find(challengeInfo->getTransactionId());
-      assert(it != mMessages.end());
-      std::unique_ptr<SipMessage> sipMsg(it->second);
+      resip_assert(it != mMessages.end());
+      std::auto_ptr<SipMessage> sipMsg(it->second);
       mMessages.erase(it);
 
       if(challengeInfo->isFailed()) 
@@ -88,7 +89,7 @@ ServerAuthManager::process(Message* msg)
       else 
       {
         // challenge is not required, re-instate original message
-        postCommand(std::move(sipMsg));
+        postCommand(auto_ptr<Message>(sipMsg));
         return FeatureDoneAndEventDone;
       }
    }
@@ -103,7 +104,7 @@ ServerAuthManager::process(Message* msg)
          Message* result = handleUserAuthInfo(userAuth);
          if (result)
          {
-            postCommand(unique_ptr<Message>(result));
+            postCommand(auto_ptr<Message>(result));
             return FeatureDoneAndEventDone;
          }
          else
@@ -119,10 +120,10 @@ ServerAuthManager::process(Message* msg)
 SipMessage*
 ServerAuthManager::handleUserAuthInfo(UserAuthInfo* userAuth)
 {
-   assert(userAuth);
+   resip_assert(userAuth);
 
    MessageMap::iterator it = mMessages.find(userAuth->getTransactionId());
-   assert(it != mMessages.end());
+   resip_assert(it != mMessages.end());
    SipMessage* requestWithAuth = it->second;
    mMessages.erase(it);
 
@@ -269,7 +270,7 @@ ServerAuthManager::rejectBadNonces() const
 }
 
 
-ServerAuthManager::AsyncBool
+AsyncBool
 ServerAuthManager::requiresChallenge(const SipMessage& msg)
 {
    if(!mChallengeThirdParties)
@@ -300,7 +301,7 @@ ServerAuthManager::authorizedForThisIdentity(const resip::Data &user,
    // header is the full fromUri, e.g.
    //    Proxy-Authorization: Digest username="user@domain" ...
    //
-   if ((fromUri.getAorNoPort() == user) && (fromUri.host() == realm))
+   if (fromUri.getAorNoPort() == user)
       return true;
 
    // catch-all: access denied
@@ -311,6 +312,19 @@ ServerAuthManager::authorizedForThisIdentity(const resip::Data &user,
 const Data& 
 ServerAuthManager::getChallengeRealm(const SipMessage& msg)
 {
+   // (1) Check if static realm is defined
+   if (!mStaticRealm.empty())
+   {
+      return mStaticRealm;
+   }
+
+   // (2) Check From domain
+   if (mDum.isMyDomain(msg.header(h_From).uri().host()))
+   {
+      return msg.header(h_From).uri().host();
+   }
+
+   // (3) Punt: Use Request URI
    return msg.header(h_RequestLine).uri().host();
 }
 
@@ -318,6 +332,10 @@ ServerAuthManager::getChallengeRealm(const SipMessage& msg)
 bool
 ServerAuthManager::isMyRealm(const Data& realm)
 {
+   if(!mStaticRealm.empty())
+   {
+      return mStaticRealm == realm;
+   }
    return mDum.isMyDomain(realm);
 }
 
@@ -327,58 +345,93 @@ ServerAuthManager::Result
 ServerAuthManager::handle(SipMessage* sipMsg)
 {
    //InfoLog( << "trying to do auth" );
-   if (sipMsg->isRequest() && 
-       sipMsg->header(h_RequestLine).method() != ACK && 
-       sipMsg->header(h_RequestLine).method() != CANCEL)  // Do not challenge ACKs or CANCELs
+   if (sipMsg->isRequest())
    {
-      ParserContainer<Auth>* auths;
-      if (proxyAuthenticationMode())
+      if(sipMsg->method() == CANCEL)
       {
-         if(!sipMsg->exists(h_ProxyAuthorizations))
+         // If we receive a cancel - check to see if we have the matching INVITE in our message map.
+         // If we do, then we haven't created a DUM dialog for it yet, since we are still waiting
+         // for the credential information to arrive.  We need to properly respond to the CANCEL here
+         // since it won't be handled externally.
+         MessageMap::iterator it = mMessages.find(sipMsg->getTransactionId());
+         if(it != mMessages.end())
          {
-            return issueChallengeIfRequired(sipMsg);
-         }
-         auths = &sipMsg->header(h_ProxyAuthorizations);
-      }
-      else
-      {
-         if(!sipMsg->exists(h_Authorizations))
-         {
-            return issueChallengeIfRequired(sipMsg);
-         }
-         auths = &sipMsg->header(h_Authorizations);
-      }
- 
-      try
-      {
-         for(Auths::iterator it = auths->begin(); it != auths->end(); it++)
-         {
-            if (isMyRealm(it->param(p_realm)))
+            // Ensure message is an INVITE - if not then something fishy is going on.  Either
+            // someone has cancelled a non-INVITE transaction or we have a tid collision.
+            if(it->second->isRequest() && it->second->method() == INVITE)
             {
-               InfoLog (<< "Requesting credential for " 
-                        << it->param(p_username) << " @ " << it->param(p_realm));
-               
-               requestCredential(it->param(p_username),
-                                 it->param(p_realm), 
-                                 *sipMsg,
-                                  *it,
-                                 sipMsg->getTransactionId());
-               mMessages[sipMsg->getTransactionId()] = sipMsg;
-               return RequestedCredentials;
+               std::auto_ptr<SipMessage> inviteMsg(it->second);
+               mMessages.erase(it);  // Remove the INVITE from the message map and respond to it
+
+               InfoLog (<< "Received a CANCEL for an INVITE request that we are still waiting on auth "
+                        << "info for, responding appropriately, tid=" 
+                        << sipMsg->getTransactionId());
+
+               // Send 487/Inv
+               SharedPtr<SipMessage> inviteResponse(new SipMessage);
+               Helper::makeResponse(*inviteResponse, *inviteMsg, 487);  // Request Cancelled
+               mDum.send(inviteResponse);
+
+               // Send 200/Cancel
+               SharedPtr<SipMessage> cancelResponse(new SipMessage);
+               Helper::makeResponse(*cancelResponse, *sipMsg, 200);  
+               mDum.send(cancelResponse);
+
+               return Rejected; // Use rejected since handling is what we want - stop DUM from processing the cancel any further
             }
          }
-
-         InfoLog (<< "Didn't find matching realm ");
-         return issueChallengeIfRequired(sipMsg);
       }
-      catch(BaseException& e)
+      else if(sipMsg->method() != ACK)  // Do not challenge ACKs or CANCELs (picked off above)
       {
-         InfoLog (<< "Invalid auth header provided " << e);
-         SharedPtr<SipMessage> response(new SipMessage);
-         Helper::makeResponse(*response, *sipMsg, 400, "Invalid auth header");
-         mDum.send(response);
-         onAuthFailure(InvalidRequest, *sipMsg);
-         return Rejected;
+         ParserContainer<Auth>* auths;
+         if (proxyAuthenticationMode())
+         {
+            if(!sipMsg->exists(h_ProxyAuthorizations))
+            {
+               return issueChallengeIfRequired(sipMsg);
+            }
+            auths = &sipMsg->header(h_ProxyAuthorizations);
+         }
+         else
+         {
+            if(!sipMsg->exists(h_Authorizations))
+            {
+               return issueChallengeIfRequired(sipMsg);
+            }
+            auths = &sipMsg->header(h_Authorizations);
+         }
+ 
+         try
+         {
+            for(Auths::iterator it = auths->begin(); it != auths->end(); it++)
+            {
+               if (isMyRealm(it->param(p_realm)))
+               {
+                  InfoLog (<< "Requesting credential for " 
+                           << it->param(p_username) << " @ " << it->param(p_realm));
+               
+                  requestCredential(it->param(p_username),
+                                    it->param(p_realm), 
+                                    *sipMsg,
+                                     *it,
+                                    sipMsg->getTransactionId());
+                  mMessages[sipMsg->getTransactionId()] = sipMsg;
+                  return RequestedCredentials;
+               }
+            }
+
+            InfoLog (<< "Didn't find matching realm ");
+            return issueChallengeIfRequired(sipMsg);
+         }
+         catch(BaseException& e)
+         {
+            InfoLog (<< "Invalid auth header provided " << e);
+            SharedPtr<SipMessage> response(new SipMessage);
+            Helper::makeResponse(*response, *sipMsg, 400, "Invalid auth header");
+            mDum.send(response);
+            onAuthFailure(InvalidRequest, *sipMsg);
+            return Rejected;
+         }
       }
    }
    return Skipped;

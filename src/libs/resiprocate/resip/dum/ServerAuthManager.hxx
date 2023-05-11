@@ -3,6 +3,7 @@
 
 #include <map>
 
+#include "rutil/AsyncBool.hxx"
 #include "resip/stack/Auth.hxx"
 #include "resip/stack/SipMessage.hxx"
 #include "DumFeature.hxx"
@@ -26,7 +27,7 @@ class ServerAuthManager : public DumFeature
          Rejected
       };
 
-      ServerAuthManager(DialogUsageManager& dum, TargetCommand::Target& target, bool challengeThirdParties = true);
+      ServerAuthManager(DialogUsageManager& dum, TargetCommand::Target& target, bool challengeThirdParties = true, const resip::Data& staticRealm = "");
       virtual ~ServerAuthManager();
 
       virtual ProcessingResult process(Message* msg);      
@@ -42,13 +43,6 @@ class ServerAuthManager : public DumFeature
       virtual Result handle(SipMessage* sipMsg);
       
    protected:
-
-      enum AsyncBool
-      {
-           True,  // response is true
-           False, // response is false
-           Async  // response will be sent asynchronously
-      };
 
       enum AuthFailureReason
       {
@@ -100,8 +94,8 @@ class ServerAuthManager : public DumFeature
       virtual void onAuthSuccess(const SipMessage& msg);
       virtual void onAuthFailure(AuthFailureReason reason, const SipMessage& msg);
 
-   private:
       bool mChallengeThirdParties;
+      resip::Data mStaticRealm;
 };
 
  

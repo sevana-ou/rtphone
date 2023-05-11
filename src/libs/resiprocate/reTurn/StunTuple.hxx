@@ -1,7 +1,23 @@
 #ifndef STUNTUPLE_HXX
 #define STUNTUPLE_HXX
 
+#include <memory>
+
+#ifndef WIN32
+#include <netinet/in.h>
+#else
+#include <winsock2.h>
+#include <Ws2tcpip.h>
+#endif
+
+#include "rutil/Socket.hxx"
+#include "rutil/compat.hxx"
+
+
 #include <asio.hpp>
+#ifdef USE_SSL
+#include <asio/ssl.hpp>
+#endif
 #include <rutil/resipfaststreams.hxx>
 
 namespace reTurn {
@@ -32,6 +48,8 @@ public:
 
    unsigned int getPort() const { return mPort; }
    void setPort(unsigned int port) { mPort = port; }
+
+   void toSockaddr(sockaddr* addr) const;
 
 private:
    TransportType mTransport;

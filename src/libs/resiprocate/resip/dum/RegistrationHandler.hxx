@@ -37,6 +37,11 @@ class ClientRegistrationHandler
       /// supports RFC5626 (outbound).
       /// Default implementation is to immediately re-Register in an attempt to form a new flow.
       virtual void onFlowTerminated(ClientRegistrationHandle);
+
+      /// Called before attempting to refresh a registration
+      /// Return true if the refresh should go ahead or false otherwise
+      /// Default implementation always returns true
+      virtual bool onRefreshRequired(ClientRegistrationHandle, const SipMessage& lastRequest);
 };
 
 class ServerRegistrationHandler
@@ -102,8 +107,8 @@ class ServerRegistrationHandler
        */
       virtual void asyncUpdateContacts(ServerRegistrationHandle,
                                        const Uri& aor,
-                                       std::unique_ptr<ContactPtrList> modifiedContactList, 
-                                       std::unique_ptr<ContactRecordTransactionLog> transactionLog)
+                                       std::auto_ptr<ContactPtrList> modifiedContactList, 
+                                       std::auto_ptr<ContactRecordTransactionLog> transactionLog)
       {
       }
 
@@ -112,7 +117,7 @@ class ServerRegistrationHandler
       */
       virtual void asyncRemoveExpired(ServerRegistrationHandle, 
                                       const resip::Uri& aor,
-                                      std::unique_ptr<resip::ContactPtrList> contacts)
+                                      std::auto_ptr<resip::ContactPtrList> contacts)
       {
       }
 };

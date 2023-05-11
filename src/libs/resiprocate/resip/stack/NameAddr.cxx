@@ -84,7 +84,7 @@ NameAddr::operator=(const NameAddr& rhs)
 {
    if (this != &rhs)
    {
-      assert( &rhs != 0 );
+      resip_assert( &rhs != 0 );
       
       ParserCategory::operator=(rhs);
       mAllContacts = rhs.mAllContacts;
@@ -97,7 +97,9 @@ NameAddr::operator=(const NameAddr& rhs)
 bool 
 NameAddr::operator==(const NameAddr& other) const
 {
-    return uri() == other.uri() && displayName() == other.displayName();
+    return mAllContacts == other.mAllContacts &&
+           uri() == other.uri() &&
+           displayName() == other.displayName();
 }
 
 bool
@@ -246,7 +248,7 @@ NameAddr::parse(ParseBuffer& pb)
       {
          if(mUri.mUnknownParameters.size() > 0)
          {
-            assert(!mUnknownUriParametersBuffer);
+            resip_assert(!mUnknownUriParametersBuffer);
             mUnknownUriParametersBuffer = new Data;
             {  // Scope stream
                oDataStream str(*mUnknownUriParametersBuffer);
@@ -496,6 +498,10 @@ defineParam(tempGruu, "temp-gruu", QuotedDataParameter, "RFC 5627");
 defineParam(expires, "expires", UInt32Parameter, "RFC 3261");
 defineParam(q, "q", QValueParameter, "RFC 3261");
 defineParam(tag, "tag", DataParameter, "RFC 3261");
+defineParam(index, "index", DataParameter, "RFC 4244");
+defineParam(rc, "rc", DataParameter, "RFC 4244-bis");
+defineParam(mp, "mp", DataParameter, "RFC 4244-bis");
+defineParam(np, "np", DataParameter, "RFC 4244-bis");
 
 #undef defineParam
 

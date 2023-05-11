@@ -57,7 +57,7 @@ QValueTargetHandler::process(RequestContext &rc)
    bool bail=false;
 
    resip::Message* msg = rc.getCurrentEvent();
-   assert(msg);
+   resip_assert(msg);
 
    if(msg)
    {
@@ -73,8 +73,8 @@ QValueTargetHandler::process(RequestContext &rc)
          //to try)
          if(mCancelBetweenForkGroups && rsp.hasCandidateTransactions())
          {
-            std::vector<resip::Data>& cancelTids=fc->mTransactionsToCancel;
-            for(i=cancelTids.begin();i!=cancelTids.end();i++)
+            std::vector<resip::Data>& cancelTids = fc->mTransactionsToCancel;
+            for(i = cancelTids.begin(); i != cancelTids.end(); i++)
             {
                //Calling cancelClientTransaction on an already cancelled
                //target is safe, and usually more efficient than checking
@@ -215,7 +215,7 @@ QValueTargetHandler::process(RequestContext &rc)
          outer++;
       }
    
-      assert(activeTargets || !startedTargets);
+      resip_assert(activeTargets || !startedTargets);
    }
    
    //Do we have anything to schedule for later?

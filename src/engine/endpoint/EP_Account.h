@@ -135,7 +135,7 @@ protected:
 #pragma endregion
 
   static int generateId();
-  static resip::AtomicCounter IdGenerator;
+  static std::atomic_int IdGenerator;
 };
 
 typedef std::shared_ptr<Account> PAccount;

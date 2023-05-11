@@ -7,8 +7,6 @@
 #include "resip/dum/UserProfile.hxx"
 #include "resip/dum/BaseUsage.hxx"
 #include "resip/dum/Handles.hxx"
-#include <map>
-#include <string>
 
 namespace resip
 {
@@ -37,11 +35,11 @@ class DialogUsage : public BaseUsage
       const NameAddr& myAddr() const;
       const NameAddr& peerAddr() const;
       const NameAddr& remoteTarget() const;
+      const NameAddrs& getRouteSet() const;
       const DialogId& getDialogId() const;
       const Data& getCallId() const;
       SharedPtr<UserProfile> getUserProfile();
-      void setUserHeaders(const std::map<std::string, std::string>& headers);
-
+      
    protected:
       friend class DialogSet;
       friend class DialogUsageManager;
@@ -82,14 +80,7 @@ class DialogUsage : public BaseUsage
       DialogUsage(DialogUsageManager& dum, Dialog& dialog);
       virtual ~DialogUsage();
 
-      //virtual void sendToDialog(SharedPtr<SipMessage> msg);
-
-      virtual void dialogDestroyed(const SipMessage& msg) = 0;
-      
       Dialog& mDialog;
-
-      // Custom headers
-      std::map<std::string, std::string> mUserHeaders;
 };
  
 }

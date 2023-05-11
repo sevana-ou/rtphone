@@ -2,15 +2,16 @@
 #define ProxyConfig_hxx
 
 #include <map>
+#include "repro/AbstractDb.hxx"
 #include "repro/Store.hxx"
+#include <resip/stack/SipConfigParse.hxx>
 #include <resip/stack/Uri.hxx>
-#include <rutil/ConfigParse.hxx>
 #include <rutil/Data.hxx>
 
 namespace repro
 {
 
-class ProxyConfig : public resip::ConfigParse
+class ProxyConfig : public resip::SipConfigParse
 {
 public:
    ProxyConfig();
@@ -21,9 +22,7 @@ public:
    void createDataStore(AbstractDb* db, AbstractDb* runtimedb=0);
    Store* getDataStore() { return mStore; }
 
-   using resip::ConfigParse::getConfigValue;
-   bool getConfigValue(const resip::Data& name, resip::Uri &value);
-   resip::Uri getConfigUri(const resip::Data& name, const resip::Uri defaultValue, bool useDefaultIfEmpty=false);
+   virtual AbstractDb *getDatabase(int configIndex) { return 0; }
 
 protected:
 

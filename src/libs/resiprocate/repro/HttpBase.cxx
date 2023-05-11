@@ -2,7 +2,7 @@
 #include "config.h"
 #endif
 
-#include <cassert>
+#include "rutil/ResipAssert.h"
 
 #include "rutil/Data.hxx"
 #include "rutil/Socket.hxx"
@@ -45,10 +45,10 @@ HttpBase::~HttpBase()
 }
 
 
-HttpBase::HttpBase( int port, IpVersion ipVer, const Data& realm ):
+HttpBase::HttpBase( int port, IpVersion ipVer, const Data& realm, const resip::Data& ipAddr ):
    mRealm(realm),
    nextConnection(0),
-   mTuple(Data::Empty,port,ipVer,TCP,Data::Empty)
+   mTuple(ipAddr,port,ipVer,TCP,Data::Empty)
 {
    // !rwm! [TODO] check that this works for IPv6   
    //assert( ipVer == V4 );
@@ -89,7 +89,22 @@ HttpBase::HttpBase( int port, IpVersion ipVer, const Data& realm ):
       sane = false;
       return;
    }
-   
+
+#ifdef USE_IPV6
+#ifdef __linux__
+   if (ipVer == V6)
+   {
+      if ( ::setsockopt(mFd, IPPROTO_IPV6, IPV6_V6ONLY, &on, sizeof(on)) )
+      {
+          int e = getErrno();
+          ErrLog(<< "HttpBase::HttpBase: Couldn't set sockoptions IPV6_V6ONLY: " << strerror(e));
+          sane = false;
+          return;
+      }
+   }
+#endif
+#endif
+
    DebugLog (<< "Binding to " << Tuple::inet_ntop(mTuple));
    
    if ( ::bind( mFd, &mTuple.getMutableSockaddr(), mTuple.length()) == SOCKET_ERROR )
@@ -159,7 +174,10 @@ HttpBase::process(FdSet& fdset)
          int e = getErrno();
          switch (e)
          {
-            case EWOULDBLOCK:
+            case EAGAIN:
+#if EAGAIN != EWOULDBLOCK
+            case EWOULDBLOCK:  // Treat EGAIN and EWOULDBLOCK as the same: http://stackoverflow.com/questions/7003234/which-systems-define-eagain-and-ewouldblock-as-different-values
+#endif
                // !jf! this can not be ready in some cases 
                return;
             default:

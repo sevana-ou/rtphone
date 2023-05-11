@@ -8,6 +8,7 @@
 
 namespace repro
 {
+class ProcessorChain;
 class RequestContext;
 
 class Processor
@@ -50,6 +51,8 @@ class Processor
       std::vector<short> mAddress;
       ChainType mType;
       resip::Data mName;
+
+   friend class ProcessorChain;
 };
 
 EncodeStream &operator<<(EncodeStream &os, const repro::Processor &rp);

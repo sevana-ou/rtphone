@@ -3,6 +3,10 @@
 #endif
 
 // sipX includes
+#if (_MSC_VER >= 1600)
+#include <stdint.h>       // Use Visual Studio's stdint.h
+#define _MSC_STDINT_H_    // This define will ensure that stdint.h in sipXport tree is not used
+#endif
 #include <CpTopologyGraphInterface.h>
 
 #include "ConversationManager.hxx"
@@ -15,9 +19,9 @@
 #include "FlowManagerSipXSocket.hxx"
 
 // Flowmanager Includes
-#include "FlowManager.hxx"
-#include "Flow.hxx"
-#include "MediaStream.hxx"
+#include "reflow/FlowManager.hxx"
+#include "reflow/Flow.hxx"
+#include "reflow/MediaStream.hxx"
 
 #include "sdp/SdpHelperResip.hxx"
 #include "sdp/Sdp.hxx"
@@ -33,12 +37,6 @@
 //#define DISABLE_FLOWMANAGER_IF_NO_NAT_TRAVERSAL
 #include <rutil/WinLeakCheck.hxx>
 
-#ifdef WIN32
-   #define sleepMs(t) Sleep(t)
-#else
-   #define sleepMs(t) usleep(t*1000)
-#endif
-
 using namespace recon;
 using namespace resip;
 using namespace std;
@@ -46,14 +44,18 @@ using namespace std;
 #define RESIPROCATE_SUBSYSTEM ReconSubsystem::RECON
 
 RemoteParticipantDialogSet::RemoteParticipantDialogSet(ConversationManager& conversationManager,        
-                                                       ConversationManager::ParticipantForkSelectMode forkSelectMode) :
+                                                       ConversationManager::ParticipantForkSelectMode forkSelectMode,
+                                                       SharedPtr<ConversationProfile> conversationProfile) :
    AppDialogSet(conversationManager.getUserAgent()->getDialogUsageManager()),
    mConversationManager(conversationManager),
    mUACOriginalRemoteParticipant(0),
    mNumDialogs(0),
+   mPeerExpectsSAVPF(false),
    mLocalRTPPort(0),
    mAllocateLocalRTPPortFailed(false),
    mForkSelectMode(forkSelectMode),
+   mConversationProfile(conversationProfile),
+   mFlowContext(new FlowContext()),
    mUACConnectedDialogId(Data::Empty, Data::Empty, Data::Empty),
    mActiveRemoteParticipantHandle(0),
    mNatTraversalMode(flowmanager::MediaStream::NoNatTraversal),
@@ -98,7 +100,6 @@ RemoteParticipantDialogSet::getLocalRTPPort()
 {
    if(mLocalRTPPort == 0 && !mAllocateLocalRTPPortFailed)
    {
-      bool isUAC = false;
       mLocalRTPPort = mConversationManager.allocateRTPPort();
       if(mLocalRTPPort == 0)
       {
@@ -115,13 +116,20 @@ RemoteParticipantDialogSet::getLocalRTPPort()
       ConversationProfile* profile = dynamic_cast<ConversationProfile*>(getUserProfile().get());
       if(!profile)
       {
+         DebugLog(<<"no ConversationProfile in DialogSet::mUserProfile");
+         profile = mConversationProfile.get();
+      }
+      if(!profile)
+      {
+         DebugLog(<<"no ConversationProfile in RemoteParticipantDialogSet::mConversationProfile, falling back to default for UAC");
          profile = mConversationManager.getUserAgent()->getDefaultOutgoingConversationProfile().get();
-         isUAC = true;
       }
 
       OsStatus ret;
+      Data connectionAddr = profile->sessionCaps().session().connection().getAddress();
+      DebugLog(<< "getLocalRTPPort: Using local connection address: " << connectionAddr);
       // Create localBinding Tuple - note:  transport may be changed depending on NAT traversal mode
-      StunTuple localBinding(StunTuple::UDP, asio::ip::address::from_string(profile->sessionCaps().session().connection().getAddress().c_str()), mLocalRTPPort); 
+      StunTuple localBinding(StunTuple::UDP, asio::ip::address::from_string(connectionAddr.c_str()), mLocalRTPPort);
 
       switch(profile->natTraversalMode())
       {
@@ -192,7 +200,9 @@ RemoteParticipantDialogSet::getLocalRTPPort()
                      profile->natTraversalServerHostname().c_str(), 
                      profile->natTraversalServerPort(), 
                      profile->stunUsername().c_str(), 
-                     profile->stunPassword().c_str()); 
+                     profile->stunPassword().c_str(),
+                     profile->forceCOMedia(),
+                     mFlowContext);
 
          // New Remote Participant - create media Interface connection
          mRtpSocket = new FlowManagerSipXSocket(mMediaStream->getRtpFlow(), mConversationManager.mSipXTOSValue);
@@ -204,7 +214,7 @@ RemoteParticipantDialogSet::getLocalRTPPort()
       else
       {
          ret = getMediaInterface()->getInterface()->createConnection(mMediaConnectionId,
-                                                     profile->sessionCaps().session().connection().getAddress().c_str(),
+                                                     connectionAddr.c_str(),
                                                      mLocalRTPPort);
          mRtpTuple = localBinding;  // Just treat media stream as immediately ready using the localBinding in the SDP
       }
@@ -284,7 +294,7 @@ RemoteParticipantDialogSet::processMediaStreamReadyEvent(const StunTuple& rtpTup
                            mPendingOfferAnswer.mInviteSessionHandle, 
                            mPendingOfferAnswer.mPostOfferAnswerAccept, 
                            mPendingOfferAnswer.mPostAnswerAlert);
-      assert(mPendingOfferAnswer.mSdp.get() == 0);
+      resip_assert(mPendingOfferAnswer.mSdp.get() == 0);
    }
 }
 
@@ -376,7 +386,7 @@ RemoteParticipantDialogSet::provideOffer(std::auto_ptr<resip::SdpContents> offer
    }
    else
    {
-      assert(mPendingOfferAnswer.mSdp.get() == 0);
+      resip_assert(mPendingOfferAnswer.mSdp.get() == 0);
       mPendingOfferAnswer.mOffer = true;
       mPendingOfferAnswer.mSdp = offer;
       mPendingOfferAnswer.mInviteSessionHandle = inviteSessionHandle;
@@ -394,7 +404,7 @@ RemoteParticipantDialogSet::provideAnswer(std::auto_ptr<resip::SdpContents> answ
    }
    else
    {
-      assert(mPendingOfferAnswer.mSdp.get() == 0);
+      resip_assert(mPendingOfferAnswer.mSdp.get() == 0);
       mPendingOfferAnswer.mOffer = false;
       mPendingOfferAnswer.mSdp = answer;
       mPendingOfferAnswer.mInviteSessionHandle = inviteSessionHandle;
@@ -476,11 +486,11 @@ RemoteParticipantDialogSet::getMediaInterface()
       else if(mDialogs.size() > 0)
       {
          // All participants in the set will have the same media interface - query from first
-         assert(mDialogs.begin()->second);
+         resip_assert(mDialogs.begin()->second);
          mMediaInterface = mDialogs.begin()->second->getMediaInterface();
       }
    }
-   assert(mMediaInterface);
+   resip_assert(mMediaInterface);
    return mMediaInterface;
 }
 
@@ -536,6 +546,9 @@ RemoteParticipantDialogSet::setActiveDestination(const char* address, unsigned s
 #ifdef DISABLE_FLOWMANAGER_IF_NO_NAT_TRAVERSAL
    if(mNatTraversalMode != MediaStream::NoNatTraversal)
    {
+#else
+   if(!mMediaStream)
+      WarningLog(<<"mMediaStream == NULL, no RTP will be transmitted");
 #endif
    if(mMediaStream && mMediaStream->getRtpFlow())
    {
@@ -596,13 +609,14 @@ RemoteParticipantDialogSet::createSRTPSession(MediaStream::SrtpCryptoSuite crypt
       mMediaStream->createOutboundSRTPSession(cryptoSuite, mLocalSrtpSessionKey.data(), mLocalSrtpSessionKey.size());
       return mMediaStream->createInboundSRTPSession(cryptoSuite, remoteKey, remoteKeyLen);
    }
+   WarningLog(<<"createSRTPSession: can't create SRTP session without media stream, mMediaStream = " << mMediaStream);
    return false;
 }
 
 RemoteParticipant* 
 RemoteParticipantDialogSet::createUACOriginalRemoteParticipant(ParticipantHandle handle)
 {
-   assert(!mUACOriginalRemoteParticipant);
+   resip_assert(!mUACOriginalRemoteParticipant);
    RemoteParticipant *participant = new RemoteParticipant(handle, mConversationManager, mDum, *this);  
    mUACOriginalRemoteParticipant = participant;
    mActiveRemoteParticipantHandle = participant->getParticipantHandle();  // Store this since it may not be safe to access mUACOriginalRemoteParticipant pointer after corresponding Dialog has been created
@@ -613,6 +627,11 @@ AppDialog*
 RemoteParticipantDialogSet::createAppDialog(const SipMessage& msg)
 {
    mNumDialogs++;
+
+   if(mFlowContext->getSipCallId().empty())
+   {
+      mFlowContext->setSipCallId(msg.header(h_CallId).value());
+   }
 
    if(mUACOriginalRemoteParticipant)  // UAC DialogSet
    {
@@ -674,7 +693,7 @@ RemoteParticipantDialogSet::setProposedSdp(ParticipantHandle handle, const resip
 void 
 RemoteParticipantDialogSet::setUACConnected(const DialogId& dialogId, ParticipantHandle partHandle)
 {
-   assert(mUACConnectedDialogId.getCallId().empty());
+   resip_assert(mUACConnectedDialogId.getCallId().empty());
    mUACConnectedDialogId = dialogId;
    mActiveRemoteParticipantHandle = partHandle;
    if(mForkSelectMode == ConversationManager::ForkSelectAutomatic)
@@ -742,7 +761,7 @@ RemoteParticipantDialogSet::onTrying(AppDialogSetHandle, const SipMessage& msg)
 void 
 RemoteParticipantDialogSet::onNonDialogCreatingProvisional(AppDialogSetHandle, const SipMessage& msg)
 {
-   assert(msg.header(h_StatusLine).responseCode() != 100);
+   resip_assert(msg.header(h_StatusLine).responseCode() != 100);
    // It possible to get a provisional from another fork after receiving a 200 - if so, don't generate an event
    if(!isUACConnected() && mUACOriginalRemoteParticipant)
    {

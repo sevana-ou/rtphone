@@ -526,12 +526,12 @@ class Helper
       struct ContentsSecAttrs
       {
             ContentsSecAttrs();
-            ContentsSecAttrs(std::unique_ptr<Contents> contents,
-                             std::unique_ptr<SecurityAttributes> attributes);
+            ContentsSecAttrs(std::auto_ptr<Contents> contents,
+                             std::auto_ptr<SecurityAttributes> attributes);
             ContentsSecAttrs(const ContentsSecAttrs& rhs);
             ContentsSecAttrs& operator=(const ContentsSecAttrs& rhs);
-            mutable std::unique_ptr<Contents> mContents;
-            mutable std::unique_ptr<SecurityAttributes> mAttributes;
+            mutable std::auto_ptr<Contents> mContents;
+            mutable std::auto_ptr<SecurityAttributes> mAttributes;
       };
 
       static ContentsSecAttrs extractFromPkcs7(const SipMessage& message, Security& security);
@@ -540,11 +540,12 @@ class Helper
       enum FailureMessageEffect{ DialogTermination, TransactionTermination, UsageTermination, 
                                  RetryAfter, OptionalRetryAfter, ApplicationDependant };
       
-      static FailureMessageEffect determineFailureMessageEffect(const SipMessage& response);      
+      static FailureMessageEffect determineFailureMessageEffect(const SipMessage& response,
+          const std::set<int>* additionalTransactionTerminatingResponses = NULL);
 
       // Just simply walk the contents tree and return the first SdpContents in
       // the tree.
-      static std::unique_ptr<SdpContents> getSdp(Contents* tree);
+      static std::auto_ptr<SdpContents> getSdp(Contents* tree);
 
       /** Looks at SIP headers and message source for a mismatch to make an
           assumption that the sender is behind a NAT device.

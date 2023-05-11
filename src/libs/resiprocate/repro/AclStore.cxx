@@ -8,6 +8,7 @@
 #include "rutil/ParseBuffer.hxx"
 #include "rutil/DnsUtil.hxx"
 #include "rutil/Lock.hxx"
+#include "rutil/TransportType.hxx"
 #include "resip/stack/Uri.hxx"
 #include "resip/stack/ConnectionManager.hxx"
 #include "resip/stack/SipMessage.hxx"
@@ -53,11 +54,9 @@ AclStore::AclStore(AbstractDb& db):
    mAddressCursor = mAddressList.begin();
 }
 
-
 AclStore::~AclStore()
 {
 }
-
 
 bool
 AclStore::addAcl(const resip::Data& tlsPeerName,
@@ -70,6 +69,27 @@ AclStore::addAcl(const resip::Data& tlsPeerName,
    Data key = buildKey(tlsPeerName, address, mask, port, family, transport);
    InfoLog( << "Add ACL: key=" << key);
    
+   // Check if key exists already
+   if(key.prefix(":"))  // a key that starts with a : has no peer name - thus a Address key
+   {
+      ReadLock lock(mMutex);
+      if(findAddressKey(key))
+      {
+         // Key already exists - don't add again
+         return false;
+      }
+   }
+   else
+   {
+      ReadLock lock(mMutex);
+      if(findTlsPeerNameKey(key))
+      {
+         // Key already exists - don't add again
+         return false;
+      }
+   }
+
+   // Key doesn't exist - add it
    AbstractDb::AclRecord rec;
    rec.mTlsPeerName = tlsPeerName;
    rec.mAddress = address;
@@ -89,20 +109,22 @@ AclStore::addAcl(const resip::Data& tlsPeerName,
    {
       AddressRecord addressRecord(rec.mAddress, rec.mPort, (resip::TransportType)rec.mTransport);
       addressRecord.mMask = rec.mMask;
-      addressRecord.key = buildKey(Data::Empty, rec.mAddress, rec.mMask, rec.mPort, rec.mFamily, rec.mTransport);
+      addressRecord.key = key;
       {
          WriteLock lock(mMutex);
          mAddressList.push_back(addressRecord);
+         mAddressCursor = mAddressList.begin();  // Put cursor back at start
       }
    }
    else
    {
       TlsPeerNameRecord tlsPeerNameRecord;
       tlsPeerNameRecord.mTlsPeerName = rec.mTlsPeerName;
-      tlsPeerNameRecord.key = buildKey(rec.mTlsPeerName, Data::Empty, 0, 0, 0, 0);
+      tlsPeerNameRecord.key = key;
       {
          WriteLock lock(mMutex);
          mTlsPeerNameList.push_back(tlsPeerNameRecord); 
+         mTlsPeerNameCursor = mTlsPeerNameList.begin(); // Put cursor back at start
       }
    }
    return true;
@@ -264,6 +286,17 @@ AclStore::addAcl(const resip::Data& tlsPeerNameOrAddress,
    return false;
 }
 
+void AclStore::eraseAcl(const resip::Data& tlsPeerName,
+                        const resip::Data& address,
+                        const short& mask,
+                        const short& port,
+                        const short& family,
+                        const short& transport)
+{
+   Data key = buildKey(tlsPeerName, address, mask, port, family, transport);
+   InfoLog( << "Erase ACL: key=" << key);
+   eraseAcl(key);
+}
 
 void 
 AclStore::eraseAcl(const resip::Data& key)
@@ -277,7 +310,7 @@ AclStore::eraseAcl(const resip::Data& key)
       WriteLock lock(mMutex);
       if(findAddressKey(key))
       {
-         mAddressList.erase(mAddressCursor);
+         mAddressCursor = mAddressList.erase(mAddressCursor);
       }
    }
    else
@@ -503,19 +536,12 @@ AclStore::isRequestTrusted(const SipMessage& request)
    
    // check if the request came over a secure channel and sucessfully authenticated 
    // (ex: TLS or DTLS)
-   const Data& receivedTransport = request.header(h_Vias).front().transport();
+   TransportType receivedTransport = toTransportType(
+      request.header(h_Vias).front().transport());
 #ifdef USE_SSL
-   if(receivedTransport == Symbols::TLS
-#ifdef USE_DTLS
-      || receivedTransport == Symbols::DTLS
-#endif
-      )
+   if(isSecure(receivedTransport))
    {
-      const std::list<Data>& tlsPeerNames = request.getTlsPeerNames();
-      if(!tlsPeerNames.empty() && isTlsPeerNameTrusted(tlsPeerNames))
-      {
-         trusted = true;
-      }
+      StackLog(<<"Not checking the TLS peer certificate names, that is now done by CertificateAuthenticator if enabled");
    }
 #endif
 

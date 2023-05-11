@@ -28,15 +28,14 @@
 #include "rutil/Logger.hxx"
 #include "rutil/Random.hxx"
 #include "rutil/WinLeakCheck.hxx"
-#include "rutil/AtomicCounter.hxx"
 
 #include "../ice/ICEBox.h"
 
 #include <sstream>
+#include <atomic>
 #include <time.h>
 
 #include "../config.h"
-#include "EP_Session.h"
 #include "EP_Account.h"
 #include "EP_DataProvider.h"
 #include "EP_AudioProvider.h"
@@ -318,8 +317,8 @@ public:
    void enqueueOffer();
    void processQueuedOffer();
    static int generateId();
-   static resip::AtomicCounter IdGenerator;
-   static resip::AtomicCounter InstanceCounter;
+   static std::atomic_int IdGenerator;
+   static std::atomic_int InstanceCounter;
 };
 
 typedef std::shared_ptr<Session> PSession;
@@ -354,7 +353,7 @@ public:
     Type_Call,
     Type_Auto
   };
-  static resip::AtomicCounter InstanceCounter;
+  static std::atomic_int InstanceCounter;
 
 
   ResipSession(resip::DialogUsageManager& dum);

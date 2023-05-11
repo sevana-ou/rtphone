@@ -95,13 +95,13 @@ XMLCursor::XMLCursor(const ParseBuffer& pb)
             }
          }
       }
-      mRoot = new Node(ParseBuffer(mData.data(), mData.size()));
+      mRoot.reset(new Node(ParseBuffer(mData.data(), mData.size())));
    }
    else
    {
-      mRoot = new Node(ParseBuffer(start, pb.end() - start));
+      mRoot.reset(new Node(ParseBuffer(start, pb.end() - start)));
    }
-   mCursor = mRoot;
+   mCursor = mRoot.get();
 
    if (mRoot->extractTag())
    {
@@ -122,26 +122,22 @@ XMLCursor::XMLCursor(const ParseBuffer& pb)
    {
       pbtemp.skipWhitespace();
    }
-   //if (!pbtemp.eof())
+   if (*pbtemp.position() == LA_QUOTE[0] &&
+       *(pbtemp.position()+1) == SLASH[0])
    {
-     if (*pbtemp.position() == LA_QUOTE[0] &&
-         *(pbtemp.position()+1) == SLASH[0])
-     {
-        pbtemp.skipChar();
-        pbtemp.skipChar();
-        if (strncmp(mRoot->mTag.data(), pbtemp.position(), mRoot->mTag.size()) == 0)
-        {
-           // no children ever
-           mRoot->mPb.reset(mRoot->mPb.end());
-           return;
-        }
-     }
+      pbtemp.skipChar();
+      pbtemp.skipChar();
+      if (strncmp(mRoot->mTag.data(), pbtemp.position(), mRoot->mTag.size()) == 0)
+      {
+         // no children ever
+         mRoot->mPb.reset(mRoot->mPb.end());
+         return;
+      }
    }
 }
 
 XMLCursor::~XMLCursor()
 {
-   delete mRoot;
 }
 
 void
@@ -210,8 +206,8 @@ XMLCursor::parseNextRootChild()
          pb.skipChar();
          // CodeWarrior isn't helpful enough to pick the "obvious" operator definition
          // so we add volatile here so CW is completely unconfused what to do.
-		 // second note - MSVC 7.0 won't compile the volatile - tried the following to fix
-		 const char* end = pb.position();
+         // second note - MSVC 7.0 won't compile the volatile - tried the following to fix
+         const char* end = pb.position();
          if ( (const char*)pb.end() < end + mTag.size() )
          {
             InfoLog(<< "XML: unexpected end");
@@ -261,7 +257,7 @@ XMLCursor::nextSibling()
    }
 
    StackLog(<< "XMLCursor::nextSibling" << *this->mCursor << " " << *this->mCursor->mParent);
-   if (mCursor->mParent == mRoot)
+   if (mCursor->mParent == mRoot.get())
    {
       parseNextRootChild();
    }
@@ -318,14 +314,14 @@ XMLCursor::parent()
 void
 XMLCursor::reset()
 {
-   mCursor = mRoot;
+   mCursor = mRoot.get();
    mAttributesSet = false;
 }
 
 bool
 XMLCursor::atRoot() const
 {
-   return mCursor == mRoot;
+   return mCursor == mRoot.get();
 }
 
 bool
@@ -416,7 +412,7 @@ XMLCursor::getValue() const
    {
       ParseBuffer pb(mCursor->mPb);
       pb.skipToEnd();
-      mValue = pb.data(pb.start());
+      pb.data(mValue, pb.start());
       XMLCursor::decode(mValue);
    }
    else
@@ -474,7 +470,11 @@ bool
 XMLCursor::Node::extractTag()
 {
    ParseBuffer pb(mPb);
-   const char* anchor = pb.skipChar();
+   if (!WhitespaceSignificant)
+   {
+       pb.skipWhitespace();
+   }
+   const char* anchor = pb.skipChar(LA_QUOTE[0]);
    pb.skipToOneOf(ParseBuffer::Whitespace, SLASH_RA_QUOTE);
    pb.assertNotEof();
    pb.data(mTag, anchor);
@@ -552,8 +552,8 @@ XMLCursor::Node::skipToEndTag()
          mPb.skipChar();
          // CodeWarrior isn't helpful enough to pick the "obvious" operator definition
          // so we add volatile here so CW is completely unconfused what to do.
-		 // second note - MSVC 7.0 won't compile the volatile - tried the following to fix
-		 const char* end = mPb.position();
+         // second note - MSVC 7.0 won't compile the volatile - tried the following to fix
+         const char* end = mPb.position();
          if ( (const char*)mPb.end() < end + mTag.size() )
          {
             InfoLog(<< "XML: unexpected end");

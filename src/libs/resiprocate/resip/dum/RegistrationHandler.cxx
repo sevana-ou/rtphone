@@ -15,6 +15,13 @@ ClientRegistrationHandler::onFlowTerminated(ClientRegistrationHandle h)
    h->requestRefresh();
 }
 
+bool
+ClientRegistrationHandler::onRefreshRequired(ClientRegistrationHandle h, const SipMessage& lastRequest)
+{
+   InfoLog(<<"ClientRegistrationHandler::onRefreshRequired, returning true");
+   return true;
+}
+
 void
 ServerRegistrationHandler::getGlobalExpires(const SipMessage& msg, SharedPtr<MasterProfile> masterProfile,
       UInt32 &expires, UInt32 &returnCode)
@@ -22,7 +29,7 @@ ServerRegistrationHandler::getGlobalExpires(const SipMessage& msg, SharedPtr<Mas
    if (!masterProfile)
    {
       returnCode = 500;
-      assert(0);
+      resip_assert(0);
       return;
    }
 
@@ -68,7 +75,7 @@ ServerRegistrationHandler::getContactExpires(const NameAddr &contact, SharedPtr<
    if (!masterProfile)
    {
       returnCode = 500;
-      assert(0);
+      resip_assert(0);
       return;
    }
    

@@ -1,3 +1,7 @@
+#if defined(HAVE_CONFIG_H)
+#include "config.h"
+#endif
+
 #ifdef WIN32
 #pragma warning(disable : 4267)
 #endif
@@ -5,7 +9,9 @@
 #include <iostream>
 #include <string>
 #include <asio.hpp>
+#ifdef USE_SSL
 #include <asio/ssl.hpp>
+#endif
 #include <rutil/ThreadIf.hxx>
 
 #include "../../StunTuple.hxx"
@@ -25,7 +31,7 @@ using namespace std;
 #define RESIPROCATE_SUBSYSTEM resip::Subsystem::TEST
 //#define CONTINUOUSTESTMODE 
 
-resip::Data address = resip::DnsUtil::getLocalIpAddress();
+resip::Data address;
 
 void sleepSeconds(unsigned int seconds)
 {
@@ -110,18 +116,18 @@ public:
       InfoLog( << "MyTurnAsyncSocketHandler::onSharedSecretFailure: socketDest=" << socketDesc << " error=" << e.value() << "(" << e.message() << ").");
    }
 
-   virtual void onBindSuccess(unsigned int socketDesc, const StunTuple& reflexiveTuple)
+   virtual void onBindSuccess(unsigned int socketDesc, const StunTuple& reflexiveTuple, const StunTuple& stunServerTuple)
    {
-      InfoLog( << "MyTurnAsyncSocketHandler::onBindingSuccess: socketDest=" << socketDesc << ", reflexive=" << reflexiveTuple);
+      InfoLog( << "MyTurnAsyncSocketHandler::onBindingSuccess: socketDest=" << socketDesc << ", reflexive=" << reflexiveTuple << ", serverTuple=" << stunServerTuple);
       mTurnAsyncSocket->createAllocation(30,       // TurnAsyncSocket::UnspecifiedLifetime, 
                                          TurnAsyncSocket::UnspecifiedBandwidth, 
                                          StunMessage::PropsPortPair,
                                          TurnAsyncSocket::UnspecifiedToken,
                                          StunTuple::UDP);  
    }
-   virtual void onBindFailure(unsigned int socketDesc, const asio::error_code& e)
+   virtual void onBindFailure(unsigned int socketDesc, const asio::error_code& e, const StunTuple& stunServerTuple)
    {
-      InfoLog( << "MyTurnAsyncSocketHandler::onBindingFailure: socketDest=" << socketDesc << " error=" << e.value() << "(" << e.message() << ").");
+      InfoLog( << "MyTurnAsyncSocketHandler::onBindingFailure: socketDest=" << socketDesc << " error=" << e.value() << "(" << e.message() << ").  serverTuple=" << stunServerTuple);
    }
 
    virtual void onAllocationSuccess(unsigned int socketDesc, const StunTuple& reflexiveTuple, const StunTuple& relayTuple, unsigned int lifetime, unsigned int bandwidth, UInt64 reservationToken)
@@ -177,6 +183,19 @@ public:
       InfoLog( << "MyTurnAsyncSocketHandler::onClearActiveDestinationFailure: socketDest=" << socketDesc << " error=" << e.value() << "(" << e.message() << ").");
    }
 
+   virtual void onChannelBindRequestSent(unsigned int socketDesc, unsigned short channelNumber)
+   {
+      InfoLog( << "MyTurnAsyncSocketHandler::onChannelBindRequestSent: socketDest=" << socketDesc << " channelNumber=" << channelNumber);
+   }
+   virtual void onChannelBindSuccess(unsigned int socketDesc, unsigned short channelNumber)
+   {
+      InfoLog( << "MyTurnAsyncSocketHandler::onChannelBindSuccess: socketDest=" << socketDesc << " channelNumber=" << channelNumber);
+   }
+   virtual void onChannelBindFailure(unsigned int socketDesc, const asio::error_code& e)
+   {
+      WarningLog( << "MyTurnAsyncSocketHandler::onChannelBindFailure: socketDest=" << socketDesc << " error=" << e.value() << "(" << e.message() << ").");
+   }
+
    virtual void onSendSuccess(unsigned int socketDesc)
    {
       //InfoLog( << "MyTurnAsyncSocketHandler::onSendSuccess: socketDest=" << socketDesc);
@@ -222,6 +241,11 @@ public:
       InfoLog( << "MyTurnAsyncSocketHandler::onReceiveFailure: socketDest=" << socketDesc << " error=" << e.value() << "(" << e.message() << ").");
    }
 
+   virtual void onIncomingBindRequestProcessed(unsigned int socketDesc, const StunTuple& sourceTuple)
+   {
+      InfoLog( << "MyTurnAsyncSocketHandler::onIncomingBindRequestProcessed: socketDest=" << socketDesc << ", sourceTuple=" << sourceTuple);
+   }
+
    void setTurnAsyncSocket(TurnAsyncSocket* turnAsyncSocket) { mTurnAsyncSocket = turnAsyncSocket; }
 
 private:
@@ -238,6 +262,7 @@ int main(int argc, char* argv[])
 
   try
   {
+    address = resip::DnsUtil::getLocalIpAddress();  // default
     if (argc != 3 && argc != 4)
     {
       std::cerr << "Usage: TestAsyncClient <turn host> <turn port> [<local address>]\n";
@@ -259,16 +284,20 @@ int main(int argc, char* argv[])
     asio::io_service ioService;
     MyTurnAsyncSocketHandler handler;
 
+#ifdef USE_SSL
     // Setup SSL context
-    asio::ssl::context sslContext(ioService, asio::ssl::context::tlsv1);
+    asio::ssl::context sslContext(asio::ssl::context::tlsv1);
     // Enable certificate validation
     sslContext.set_verify_mode(asio::ssl::context::verify_peer |   // Verify the peer.
                                asio::ssl::context::verify_fail_if_no_peer_cert);  // Fail verification if the peer has no certificate.
     sslContext.load_verify_file("ca.pem");
+#endif
 
     boost::shared_ptr<TurnAsyncSocket> turnSocket(new TurnAsyncUdpSocket(ioService, &handler, asio::ip::address::from_string(address.c_str()), 0));
     //boost::shared_ptr<TurnAsyncSocket> turnSocket(new TurnAsyncTcpSocket(ioService, &handler, asio::ip::address::from_string(address.c_str()), 0));
+#ifdef USE_SSL
     //boost::shared_ptr<TurnAsyncSocket> turnSocket(new TurnAsyncTlsSocket(ioService, sslContext, false /* validateServerCertificateHostname */, &handler, asio::ip::address::from_string(address.c_str()), 0));
+#endif
     //port=5349;
 
     handler.setTurnAsyncSocket(turnSocket.get());
@@ -296,6 +325,7 @@ int main(int argc, char* argv[])
 /* ====================================================================
 
  Copyright (c) 2007-2008, Plantronics, Inc.
+ Copyright (c) 2008-2018, SIP Spectrum, Inc.
  All rights reserved.
 
  Redistribution and use in source and binary forms, with or without

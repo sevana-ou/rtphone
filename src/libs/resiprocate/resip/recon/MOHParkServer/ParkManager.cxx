@@ -1,8 +1,8 @@
+#include "../UserAgent.hxx"
 #include "AppSubsystem.hxx"
 #include "ParkManager.hxx"
 #include "ParkOrbit.hxx"
 #include "Server.hxx"
-#include "../UserAgent.hxx"
 
 #include <resip/stack/ExtensionParameter.hxx>
 #include <resip/stack/SipMessage.hxx>
@@ -15,6 +15,8 @@ using namespace resip;
 using namespace std;
 
 #define RESIPROCATE_SUBSYSTEM AppSubsystem::MOHPARKSERVER
+
+#define PARKLOG_PREFIX << "ParkManager[" << mParkUri << "] "
 
 static const resip::ExtensionParameter p_orbit("orbit");
 static const resip::ExtensionParameter p_automaton("automaton");
@@ -38,16 +40,21 @@ ParkManager::~ParkManager()
 }
 
 void
-ParkManager::startup()
+ParkManager::startup(ConfigParser::ParkSettings& settings)
 {
    // Initialize park settings
-   initializeParkSettings(mServer.mConfig.mMaxParkTime, mServer.mConfig.mParkMOHFilenameUrl);
+   initializeParkSettings(settings.mMaxParkTime, settings.mMOHFilenameUrl);
 
-   // Setup Park ConversationProfile
-   initializeConversationProfile(mServer.mConfig.mParkUri, mServer.mConfig.mParkPassword, mServer.mConfig.mParkRegistrationTime, mServer.mConfig.mOutboundProxy);
+   // Setup ConversationProfile - If Park setting specific outbound proxy is not specified, then use global 
+   // outbound proxy setting.
+   initializeConversationProfile(settings.mUri, settings.mPassword, settings.mRegistrationTime,
+      !settings.mOutboundProxy.uri().host().empty() ? settings.mOutboundProxy : mServer.mConfig.mOutboundProxy);
 
    // Create Orbit Profiles
-   initializeOrbitConversationProfiles(mServer.mConfig.mParkOrbitRangeStart, mServer.mConfig.mParkNumOrbits, mServer.mConfig.mParkUri, mServer.mConfig.mParkOrbitPassword, mServer.mConfig.mParkOrbitRegistrationTime, mServer.mConfig.mOutboundProxy);
+   initializeOrbitConversationProfiles(settings.mOrbitRangeStart, settings.mNumOrbits, settings.mUri, settings.mOrbitPassword, settings.mOrbitRegistrationTime, 
+      !settings.mOutboundProxy.uri().host().empty() ? settings.mOutboundProxy : mServer.mConfig.mOutboundProxy); 
+
+   InfoLog(PARKLOG_PREFIX << "startup: MOHFilenameUrl=" << settings.mMOHFilenameUrl);
 }
 
 void 
@@ -112,7 +119,7 @@ ParkManager::initializeOrbitConversationProfiles(unsigned long orbitStart,
    for(unsigned long orbit = mOrbitRangeStart; orbit < mOrbitRangeStart + mNumOrbits; orbit++)
    {
       SharedPtr<ConversationProfile> orbitConversationProfile = SharedPtr<ConversationProfile>(new ConversationProfile(mServer.mUserAgentMasterProfile));
-      Data orbitData(orbit);
+      Data orbitData((UInt64)orbit);
       orbitConversationProfile->setDefaultRegistrationTime(registrationTime);  
       orbitConversationProfile->setDefaultRegistrationRetryTime(120);  // 2 mins
       orbitConversationProfile->setDefaultFrom(uri);
@@ -184,6 +191,7 @@ ParkManager::shutdown(bool shuttingDownServer)
       }
       mOrbitProfiles.clear();
    }
+   InfoLog(PARKLOG_PREFIX << "shutdown");
 }
 
 bool 
@@ -212,7 +220,7 @@ ParkManager::isMyProfile(recon::ConversationProfile& profile)
 ParkOrbit* 
 ParkManager::getOrbit(unsigned long orbit)
 {
-   assert((orbit >= mOrbitRangeStart) && 
+   resip_assert((orbit >= mOrbitRangeStart) && 
           (orbit < (mOrbitRangeStart + mNumOrbits)));
 
    // Check if Orbit is created or not yet
@@ -271,7 +279,7 @@ ParkManager::parkParticipant(ParticipantHandle participantHandle, const SipMessa
    Lock lock(mMutex);
 
    unsigned long orbit = 0;
-   assert(msg.method() == REFER);
+   resip_assert(msg.method() == REFER);
 
    // Check if Orbit parameter has been specified on the To header
    if(msg.header(h_To).uri().exists(p_orbit))
@@ -284,8 +292,9 @@ ParkManager::parkParticipant(ParticipantHandle participantHandle, const SipMessa
    {
       // Park call at specified orbit
       ParkOrbit* parkOrbit = getOrbit(orbit);
-      assert(parkOrbit);
+      resip_assert(parkOrbit);
       addParticipantToOrbit(parkOrbit, participantHandle, msg.header(h_ReferTo).uri().getAorAsUri(), msg.header(h_From).uri());
+      InfoLog(PARKLOG_PREFIX << "parkParticipant: parked at orbit=" << orbit);
    }
    else
    {
@@ -296,15 +305,15 @@ ParkManager::parkParticipant(ParticipantHandle participantHandle, const SipMessa
          // Move free item to end of list, to reduce chance it will be double allocated
          mFreeOrbitList.pop_front();  
          mFreeOrbitList.push_back(freeorbit);
-         InfoLog(<< "ParkManager::parkParticipant no valid orbit specified (orbit=" << orbit << ") redirecting to free orbit=" << freeorbit);
+         InfoLog(PARKLOG_PREFIX << "parkParticipant: no valid orbit specified (orbit=" << orbit << ") redirecting to free orbit=" << freeorbit);
          NameAddr destination(mParkUri);
-         destination.uri().param(p_orbit) = Data(freeorbit);
+         destination.uri().param(p_orbit) = Data((UInt64)freeorbit);
          mServer.redirectParticipant(participantHandle, destination);
       }
       else
       {
          // No free orbits
-         WarningLog(<< "ParkManager::parkParticipant no free orbits available, rejecing with 486 busy.");
+         WarningLog(PARKLOG_PREFIX << "parkParticipant: no free orbits available, rejecing with 486 busy.");
          mServer.rejectParticipant(participantHandle, 486 /* Busy */);
       }
    }
@@ -334,8 +343,9 @@ ParkManager::incomingParticipant(ParticipantHandle participantHandle, const SipM
          // If a Referred-By header is present then this was a transferred call - park it
          // Park call at specified orbit
          ParkOrbit* parkOrbit = getOrbit(orbit);
-         assert(parkOrbit);
+         resip_assert(parkOrbit);
          addParticipantToOrbit(parkOrbit, participantHandle, msg.header(h_From).uri(), msg.header(h_ReferredBy).uri());
+         InfoLog(PARKLOG_PREFIX << "incomingParticipant: parked at orbit=" << orbit);
       }
       else  // Direct call - retrieval attempt
       {
@@ -350,18 +360,18 @@ ParkManager::incomingParticipant(ParticipantHandle participantHandle, const SipM
             mServer.answerParticipant(participantHandle);
             mServer.redirectToParticipant(participantHandle, participantToRetrieve);
 
-            InfoLog(<< "ParkManager::incomingParticipant retrieving participant " << participantToRetrieve << " from orbit " << orbit);
+            InfoLog(PARKLOG_PREFIX << "incomingParticipant: retrieving participant " << participantToRetrieve << " from orbit " << orbit);
          }
          else
          {
-            WarningLog(<< "ParkManager::incomingParticipant orbit " << orbit << " has no call to retrieve, rejecting with 404.");
+            WarningLog(PARKLOG_PREFIX << "incomingParticipant: orbit " << orbit << " has no call to retrieve, rejecting with 404.");
             mServer.rejectParticipant(participantHandle, 404 /* Not Found */);
          }
       }
    }
    else
    {
-      WarningLog(<< "ParkManager::incomingParticipant valid orbit not found in To header (" << msg.header(h_To).uri() << "), rejecting with 404.");
+      WarningLog(PARKLOG_PREFIX << "incomingParticipant: valid orbit not found in To header (" << msg.header(h_To).uri() << "), rejecting with 404.");
       mServer.rejectParticipant(participantHandle, 404 /* Not Found */);
    }
 }
@@ -376,6 +386,7 @@ ParkManager::removeParticipant(ParticipantHandle participantHandle)
       mOrbitsByParticipant.erase(participantHandle);  // Remove participant from orbit index
       if(orbit->removeParticipant(participantHandle))
       {
+         InfoLog(PARKLOG_PREFIX << "removeParticipant: from orbit " << orbit->getOrbit() << " with " << orbit->getNumParticipants() << " remaining participants");
          if(orbit->getNumParticipants() == 0)
          {
             // Last participant just left orbit - destroy it
@@ -408,14 +419,14 @@ ParkManager::getActiveCallsInfo(CallInfoList& callInfos)
        {
           callInfos.push_back(ActiveCallInfo((*it2)->mParkedUri, 
                                              (*it2)->mParkerUri, 
-                                             Data("Parked at " + Data(it->first)), 
+                                             Data("Parked at " + Data((UInt64)(it->first))), 
                                              (*it2)->mParticipantHandle, 
                                              it->second->mConversationHandle));
        }
    }
 }
 
-void 
+bool 
 ParkManager::onMaxParkTimeout(recon::ParticipantHandle participantHandle)
 {
    Lock lock(mMutex);
@@ -425,7 +436,9 @@ ParkManager::onMaxParkTimeout(recon::ParticipantHandle participantHandle)
    if(orbit)
    {
       orbit->onMaxParkTimeout(participantHandle);
+      return true;
    }
+   return false;
 }
 
 
@@ -433,7 +446,7 @@ ParkManager::onMaxParkTimeout(recon::ParticipantHandle participantHandle)
 
 /* ====================================================================
 
- Copyright (c) 2011, SIP Spectrum, Inc.
+ Copyright (c) 2011-2016, SIP Spectrum, Inc.
  All rights reserved.
 
  Redistribution and use in source and binary forms, with or without

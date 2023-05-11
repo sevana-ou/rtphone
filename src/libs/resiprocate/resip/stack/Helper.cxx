@@ -21,6 +21,7 @@
 #include "rutil/DnsUtil.hxx"
 #include "rutil/compat.hxx"
 #include "rutil/ParseBuffer.hxx"
+#include "rutil/TransportType.hxx"
 #include "resip/stack/SipMessage.hxx"
 #include "resip/stack/Pkcs7Contents.hxx"
 #include "resip/stack/MultipartSignedContents.hxx"
@@ -116,7 +117,7 @@ unsigned int Helper::hex2integer(const char* _s)
 SipMessage*
 Helper::makeRequest(const NameAddr& target, const NameAddr& from, const NameAddr& contact, MethodTypes method)
 {
-   std::unique_ptr<SipMessage> request(new SipMessage);
+   std::auto_ptr<SipMessage> request(new SipMessage);
    RequestLine rLine(method);
    rLine.uri() = target.uri();
    request->header(h_To) = target;
@@ -153,7 +154,7 @@ Helper::makeRegister(const NameAddr& to, const NameAddr& from)
 SipMessage*
 Helper::makeRegister(const NameAddr& to, const NameAddr& from, const NameAddr& contact)
 {
-   std::unique_ptr<SipMessage> request(new SipMessage);
+   std::auto_ptr<SipMessage> request(new SipMessage);
    RequestLine rLine(REGISTER);
 
    rLine.uri().scheme() = to.uri().scheme();
@@ -172,7 +173,7 @@ Helper::makeRegister(const NameAddr& to, const NameAddr& from, const NameAddr& c
    request->header(h_From) = from;
    request->header(h_From).param(p_tag) = Helper::computeTag(Helper::tagSize);
    request->header(h_CallId).value() = Helper::computeCallId();
-   assert(!request->exists(h_Contacts) || request->header(h_Contacts).empty());
+   resip_assert(!request->exists(h_Contacts) || request->header(h_Contacts).empty());
    request->header(h_Contacts).push_back( contact );
    
    Via via;
@@ -192,7 +193,7 @@ Helper::makeRegister(const NameAddr& to,const Data& transport)
 SipMessage*
 Helper::makeRegister(const NameAddr& to, const Data& transport, const NameAddr& contact)
 {
-   std::unique_ptr<SipMessage> request(new SipMessage);
+   std::auto_ptr<SipMessage> request(new SipMessage);
    RequestLine rLine(REGISTER);
 
    rLine.uri().scheme() = to.uri().scheme();
@@ -211,7 +212,7 @@ Helper::makeRegister(const NameAddr& to, const Data& transport, const NameAddr& 
    request->header(h_From) = to;
    request->header(h_From).param(p_tag) = Helper::computeTag(Helper::tagSize);
    request->header(h_CallId).value() = Helper::computeCallId();
-   assert(!request->exists(h_Contacts) || request->header(h_Contacts).empty());
+   resip_assert(!request->exists(h_Contacts) || request->header(h_Contacts).empty());
    request->header(h_Contacts).push_back( contact );
    
    Via via;
@@ -231,7 +232,7 @@ Helper::makePublish(const NameAddr& target, const NameAddr& from)
 SipMessage*
 Helper::makePublish(const NameAddr& target, const NameAddr& from, const NameAddr& contact)
 {
-   std::unique_ptr<SipMessage> request(new SipMessage);
+   std::auto_ptr<SipMessage> request(new SipMessage);
    RequestLine rLine(PUBLISH);
    rLine.uri() = target.uri();
 
@@ -243,7 +244,7 @@ Helper::makePublish(const NameAddr& target, const NameAddr& from, const NameAddr
    request->header(h_From) = from;
    request->header(h_From).param(p_tag) = Helper::computeTag(Helper::tagSize);
    request->header(h_CallId).value() = Helper::computeCallId();
-   assert(!request->exists(h_Contacts) || request->header(h_Contacts).empty());
+   resip_assert(!request->exists(h_Contacts) || request->header(h_Contacts).empty());
    request->header(h_Contacts).push_back( contact );
    Via via;
    request->header(h_Vias).push_back(via);
@@ -261,7 +262,7 @@ Helper::makeMessage(const NameAddr& target, const NameAddr& from)
 SipMessage*
 Helper::makeMessage(const NameAddr& target, const NameAddr& from, const NameAddr& contact)
 {
-   std::unique_ptr<SipMessage> request(new SipMessage);
+   std::auto_ptr<SipMessage> request(new SipMessage);
    RequestLine rLine(MESSAGE);
    rLine.uri() = target.uri();
 
@@ -273,7 +274,7 @@ Helper::makeMessage(const NameAddr& target, const NameAddr& from, const NameAddr
    request->header(h_From) = from;
    request->header(h_From).param(p_tag) = Helper::computeTag(Helper::tagSize);
    request->header(h_CallId).value() = Helper::computeCallId();
-   assert(!request->exists(h_Contacts) || request->header(h_Contacts).empty());
+   resip_assert(!request->exists(h_Contacts) || request->header(h_Contacts).empty());
    request->header(h_Contacts).push_back( contact );
    Via via;
    request->header(h_Vias).push_back(via);
@@ -292,7 +293,7 @@ Helper::makeSubscribe(const NameAddr& target, const NameAddr& from)
 SipMessage*
 Helper::makeSubscribe(const NameAddr& target, const NameAddr& from, const NameAddr& contact)
 {
-   std::unique_ptr<SipMessage> request(new SipMessage);
+   std::auto_ptr<SipMessage> request(new SipMessage);
    RequestLine rLine(SUBSCRIBE);
    rLine.uri() = target.uri();
 
@@ -304,7 +305,7 @@ Helper::makeSubscribe(const NameAddr& target, const NameAddr& from, const NameAd
    request->header(h_From) = from;
    request->header(h_From).param(p_tag) = Helper::computeTag(Helper::tagSize);
    request->header(h_CallId).value() = Helper::computeCallId();
-   assert(!request->exists(h_Contacts) || request->header(h_Contacts).empty());
+   resip_assert(!request->exists(h_Contacts) || request->header(h_Contacts).empty());
    request->header(h_Contacts).push_front( contact );
    Via via;
    request->header(h_Vias).push_front(via);
@@ -315,7 +316,7 @@ Helper::makeSubscribe(const NameAddr& target, const NameAddr& from, const NameAd
 int
 Helper::jitterValue(int input, int lowerPercentage, int upperPercentage, int minimum)
 {
-   assert(upperPercentage >= lowerPercentage);
+   resip_assert(upperPercentage >= lowerPercentage);
    if (input < minimum)
    {
       return input;
@@ -430,6 +431,8 @@ Helper::makeResponse(SipMessage& response,
    }
    else
    {
+       // This makes a response to an internally generated request look like it's 
+       // external even though it isn't
        response.setFromExternal();
    }
 
@@ -453,7 +456,7 @@ Helper::makeResponse(const SipMessage& request,
 {
    // .bwc. Exception safety. Catch/rethrow is dicey because we can't rethrow
    // resip::BaseException, since it is abstract.
-   std::unique_ptr<SipMessage> response(new SipMessage);
+   std::auto_ptr<SipMessage> response(new SipMessage);
 
    makeResponse(*response, request, responseCode, reason, hostname, warning);
 
@@ -475,7 +478,7 @@ Helper::makeResponse(const SipMessage& request,
 {
    // .bwc. Exception safety. Catch/rethrow is dicey because we can't rethrow
    // resip::BaseException, since it is abstract.
-   std::unique_ptr<SipMessage> response(new SipMessage);
+   std::auto_ptr<SipMessage> response(new SipMessage);
    
    makeResponse(*response, request, responseCode, reason, hostname, warning);
    return response.release();
@@ -572,9 +575,9 @@ Helper::getResponseCodeReason(int responseCode, Data& reason)
 SipMessage*
 Helper::makeCancel(const SipMessage& request)
 {
-   assert(request.isRequest());
-   assert(request.header(h_RequestLine).getMethod() == INVITE);
-   std::unique_ptr<SipMessage> cancel(new SipMessage);
+   resip_assert(request.isRequest());
+   resip_assert(request.header(h_RequestLine).getMethod() == INVITE);
+   std::auto_ptr<SipMessage> cancel(new SipMessage);
 
    RequestLine rLine(CANCEL, request.header(h_RequestLine).getSipVersion());
    rLine.uri() = request.header(h_RequestLine).uri();
@@ -608,10 +611,10 @@ Helper::makeCancel(const SipMessage& request)
 SipMessage*
 Helper::makeFailureAck(const SipMessage& request, const SipMessage& response)
 {
-   assert (request.header(h_Vias).size() >= 1);
-   assert (request.header(h_RequestLine).getMethod() == INVITE);
+   resip_assert (request.header(h_Vias).size() >= 1);
+   resip_assert (request.header(h_RequestLine).getMethod() == INVITE);
    
-   std::unique_ptr<SipMessage> ack(new SipMessage);
+   std::auto_ptr<SipMessage> ack(new SipMessage);
 
    RequestLine rLine(ACK, request.header(h_RequestLine).getSipVersion());
    rLine.uri() = request.header(h_RequestLine).uri();
@@ -644,15 +647,10 @@ Helper::computeUniqueBranch()
    return result;
 }
 
-
-// It is overwritten by Dmytro; because doing getLocalHostName() during initialization is not best idea.
-static Data localhostname = "localhost";
-//DnsUtil::getLocalHostName();
-
 Data
 Helper::computeCallId()
 {
-   Data hostAndSalt(localhostname + Random::getRandomHex(16));
+   Data hostAndSalt(DnsUtil::getLocalHostName() + Random::getRandomHex(16));
 #ifndef USE_SSL // .bwc. None of this is neccessary if we're using openssl
 #if defined(__linux__) || defined(__APPLE__)
    pid_t pid = getpid();
@@ -708,7 +706,12 @@ Helper::makeResponseMD5WithA1(const Data& a1,
                               const Data& qop, const Data& cnonce, const Data& cnonceCount,
                               const Contents* entityBody)
 {
+#ifdef RESIP_DIGEST_LOGGING
+   Data _a2;
+   DataStream a2(_a2);
+#else
    MD5Stream a2;
+#endif
    a2 << method
       << Symbols::COLON
       << digestUri;
@@ -720,14 +723,25 @@ Helper::makeResponseMD5WithA1(const Data& a1,
          MD5Stream eStream;
          eStream << *entityBody;
          a2 << Symbols::COLON << eStream.getHex();
+#ifdef RESIP_DIGEST_LOGGING
+         StackLog(<<"auth-int, body length = " << eStream.bytesTaken());
+#endif
       }
       else
       {
          a2 << Symbols::COLON << noBody;
+#ifdef RESIP_DIGEST_LOGGING
+         StackLog(<<"auth-int, no body");
+#endif
       }
    }
    
+#ifdef RESIP_DIGEST_LOGGING
+   Data _r;
+   DataStream r(_r);
+#else
    MD5Stream r;
+#endif
    r << a1
      << Symbols::COLON
      << nonce
@@ -742,9 +756,22 @@ Helper::makeResponseMD5WithA1(const Data& a1,
         << qop
         << Symbols::COLON;
    }
+#ifdef RESIP_DIGEST_LOGGING
+   a2.flush();
+   StackLog(<<"A2 = " << _a2);
+   MD5Stream a2md5;
+   a2md5 << _a2;
+   r << a2md5.getHex();
+   r.flush();
+   StackLog(<<"response to be hashed (HA1:nonce:HA2) = " << _r);
+   MD5Stream rmd5;
+   rmd5 << _r;
+   return rmd5.getHex();
+#else
    r << a2.getHex();
 
    return r.getHex();
+#endif
 }
 
 //RFC 2617 3.2.2.1
@@ -1032,8 +1059,8 @@ Helper::authenticateRequest(const SipMessage& request,
                                                             i->param(p_nonce),
                                                             i->param(p_qop),
                                                             i->param(p_cnonce),
-                                                            i->param(p_nc)),
-                                                            request.getContents())
+                                                            i->param(p_nc),
+                                                            request.getContents()))
                   {
                      return Authenticated;
                   }
@@ -1245,7 +1272,7 @@ Helper::make405(const SipMessage& request,
             int last = 0;
 
             // ENUMS must be contiguous in order for this to work.
-            assert( i - last <= 1);
+            resip_assert( i - last <= 1);
             Token t;
             t.value() = getMethodName(static_cast<resip::MethodTypes>(i));
             resp->header(h_Allows).push_back(t);
@@ -1366,9 +1393,9 @@ Helper::makeChallengeResponseAuth(const SipMessage& request,
 {
    auth.scheme() = Symbols::Digest;
    auth.param(p_username) = username;
-   assert(challenge.exists(p_realm));
+   resip_assert(challenge.exists(p_realm));
    auth.param(p_realm) = challenge.param(p_realm);
-   assert(challenge.exists(p_nonce));
+   resip_assert(challenge.exists(p_nonce));
    auth.param(p_nonce) = challenge.param(p_nonce);
    Data digestUri;
    {
@@ -1396,7 +1423,7 @@ Helper::makeChallengeResponseAuth(const SipMessage& request,
    }
    else
    {
-      assert(challenge.exists(p_realm));
+      resip_assert(challenge.exists(p_realm));
       auth.param(p_response) = Helper::makeResponseMD5(username, 
                                                        password,
                                                        challenge.param(p_realm), 
@@ -1498,9 +1525,9 @@ Helper::makeChallengeResponseAuthWithA1(const SipMessage& request,
 {
    auth.scheme() = Symbols::Digest;
    auth.param(p_username) = username;
-   assert(challenge.exists(p_realm));
+   resip_assert(challenge.exists(p_realm));
    auth.param(p_realm) = challenge.param(p_realm);
-   assert(challenge.exists(p_nonce));
+   resip_assert(challenge.exists(p_nonce));
    auth.param(p_nonce) = challenge.param(p_nonce);
    Data digestUri;
    {
@@ -1526,7 +1553,7 @@ Helper::makeChallengeResponseAuthWithA1(const SipMessage& request,
    }
    else
    {
-      assert(challenge.exists(p_realm));
+      resip_assert(challenge.exists(p_realm));
       auth.param(p_response) = Helper::makeResponseMD5WithA1(passwordHashA1,
                                                              getMethodName(request.header(h_RequestLine).getMethod()),
                                                              digestUri, 
@@ -1574,8 +1601,8 @@ Helper::addAuthorization(SipMessage& request,
 {
    Data nonceCountString = Data::Empty;
    
-   assert(challenge.isResponse());
-   assert(challenge.header(h_StatusLine).responseCode() == 401 ||
+   resip_assert(challenge.isResponse());
+   resip_assert(challenge.header(h_StatusLine).responseCode() == 401 ||
           challenge.header(h_StatusLine).responseCode() == 407);
 
    if (challenge.exists(h_ProxyAuthenticates))
@@ -1604,8 +1631,8 @@ Helper::addAuthorization(SipMessage& request,
 Uri
 Helper::makeUri(const Data& aor, const Data& scheme)
 {
-   assert(!aor.prefix("sip:"));
-   assert(!aor.prefix("sips:"));
+   resip_assert(!aor.prefix("sip:"));
+   resip_assert(!aor.prefix("sips:"));
    
    Data tmp(aor.size() + scheme.size() + 1, Data::Preallocate);
    tmp += scheme;
@@ -1628,7 +1655,7 @@ Helper::processStrictRoute(SipMessage& request)
       request.header(h_Routes).push_back(NameAddr(request.const_header(h_RequestLine).uri()));
       request.header(h_RequestLine).uri() = request.const_header(h_Routes).front().uri();
       request.header(h_Routes).pop_front(); // !jf!
-      assert(!request.hasForceTarget());
+      resip_assert(!request.hasForceTarget());
       request.setForceTarget(request.const_header(h_RequestLine).uri());
    }
 }
@@ -1636,7 +1663,7 @@ Helper::processStrictRoute(SipMessage& request)
 void
 Helper::massageRoute(const SipMessage& request, NameAddr& rt)
 {
-   assert(request.isRequest());
+   resip_assert(request.isRequest());
    // .bwc. Let's not record-route with a tel uri or something, shall we?
    // If the topmost route header is malformed, we can get along without.
    if (!request.empty(h_Routes) && 
@@ -1658,10 +1685,11 @@ Helper::massageRoute(const SipMessage& request, NameAddr& rt)
 int
 Helper::getPortForReply(SipMessage& request)
 {
-   assert(request.isRequest());
+   resip_assert(request.isRequest());
    int port = 0;
-   if(request.const_header(h_Vias).front().transport() == Symbols::TCP ||
-      request.const_header(h_Vias).front().transport() == Symbols::TLS)
+   TransportType transportType = toTransportType(
+      request.const_header(h_Vias).front().transport());
+   if(isReliable(transportType))
    {
       // 18.2.2 - bullet 1 and 2 
       port = request.getSource().getPort();
@@ -1685,8 +1713,8 @@ Helper::getPortForReply(SipMessage& request)
    // If we haven't got a valid port yet, then use the default
    if (port <= 0 || port > 65535) 
    {
-      if(request.const_header(h_Vias).front().transport() == Symbols::TLS ||
-         request.const_header(h_Vias).front().transport() == Symbols::DTLS)
+      if(transportType == TLS ||
+         transportType == DTLS)
       {
          port = Symbols::DefaultSipsPort;
       }
@@ -1765,7 +1793,7 @@ Helper::validateMessage(const SipMessage& message,resip::Data* reason)
    }
 }
 
-#if defined(USE_SSL)
+#if defined(USE_SSL) && !defined(OPENSSL_NO_BF)
 #include <openssl/blowfish.h>
 
 static const Data sep("[]");
@@ -1800,7 +1828,7 @@ Helper::gruuUserPart(const Data& instanceId,
                                          sep.size() + 1 
                                          + aor.size() ) % 8))
                                % 8));
-   unique_ptr <unsigned char> out(new unsigned char[token.size()]);
+   auto_ptr <unsigned char> out(new unsigned char[token.size()]);
    BF_cbc_encrypt((const unsigned char*)token.data(),
                   out.get(),
                   (long)token.size(),
@@ -1840,7 +1868,7 @@ Helper::fromGruuUserPart(const Data& gruuUserPart,
 
    const Data decoded = gruu.base64decode();
 
-   unique_ptr <unsigned char> out(new unsigned char[gruuUserPart.size()+1]);
+   auto_ptr <unsigned char> out(new unsigned char[gruuUserPart.size()+1]);
    BF_cbc_encrypt((const unsigned char*)decoded.data(),
                   out.get(),
                   (long)decoded.size(),
@@ -1860,21 +1888,21 @@ Helper::fromGruuUserPart(const Data& gruuUserPart,
 }
 #endif
 Helper::ContentsSecAttrs::ContentsSecAttrs()
-   : mContents(nullptr),
-     mAttributes(nullptr)
+   : mContents(0),
+     mAttributes(0)
 {}
 
-Helper::ContentsSecAttrs::ContentsSecAttrs(std::unique_ptr<Contents> contents,
-                                           std::unique_ptr<SecurityAttributes> attributes)
-   : mContents(std::move(contents)),
-     mAttributes(std::move(attributes))
+Helper::ContentsSecAttrs::ContentsSecAttrs(std::auto_ptr<Contents> contents,
+                                           std::auto_ptr<SecurityAttributes> attributes)
+   : mContents(contents),
+     mAttributes(attributes)
 {}
 
 // !!bwc!! Yikes! Destructive copy c'tor! Are we _sure_ this is the 
 // intended behavior?
 Helper::ContentsSecAttrs::ContentsSecAttrs(const ContentsSecAttrs& rhs)
-   : mContents(std::move(rhs.mContents)),
-     mAttributes(std::move(rhs.mAttributes))
+   : mContents(rhs.mContents),
+     mAttributes(rhs.mAttributes)
 {}
 
 Helper::ContentsSecAttrs& 
@@ -1884,8 +1912,8 @@ Helper::ContentsSecAttrs::operator=(const ContentsSecAttrs& rhs)
    {
       // !!bwc!! Yikes! Destructive assignment operator! Are we _sure_ this is 
       // the intended behavior?
-      mContents = std::move(rhs.mContents);
-      mAttributes = std::move(rhs.mAttributes);
+      mContents = rhs.mContents;
+      mAttributes = rhs.mAttributes;
    }
    return *this;
 }
@@ -1990,18 +2018,25 @@ Helper::extractFromPkcs7(const SipMessage& message,
          b = extractFromPkcs7Recurse(b, toAor, fromAor, attr, security);
       }
    }
-   std::unique_ptr<Contents> c(b);
-   std::unique_ptr<SecurityAttributes> a(attr);
-   return ContentsSecAttrs(std::move(c), std::move(a));
+   std::auto_ptr<Contents> c(b);
+   std::auto_ptr<SecurityAttributes> a(attr);
+   return ContentsSecAttrs(c, a);
 }
 
 Helper::FailureMessageEffect 
-Helper::determineFailureMessageEffect(const SipMessage& response)
+Helper::determineFailureMessageEffect(const SipMessage& response,
+    const std::set<int>* additionalTransactionTerminatingResponses)
 {
-   assert(response.isResponse());
+   resip_assert(response.isResponse());
    int code = response.header(h_StatusLine).statusCode();
-   assert(code >= 400);
+   resip_assert(code >= 400);
    
+   if (additionalTransactionTerminatingResponses &&
+       (additionalTransactionTerminatingResponses->end() != additionalTransactionTerminatingResponses->find(code)))
+   {
+      return Helper::TransactionTermination;
+   }
+
    switch(code)
    {
       case 404:
@@ -2161,8 +2196,8 @@ SdpContents* getSdpRecurse(Contents* tree)
    return 0;
 }
 
-static std::unique_ptr<SdpContents> emptysdp;
-unique_ptr<SdpContents> Helper::getSdp(Contents* tree)
+static std::auto_ptr<SdpContents> emptysdp;
+auto_ptr<SdpContents> Helper::getSdp(Contents* tree)
 {
    if (tree) 
    {
@@ -2171,19 +2206,19 @@ unique_ptr<SdpContents> Helper::getSdp(Contents* tree)
       if (sdp)
       {
          DebugLog(<< "Got sdp" << endl);
-         return unique_ptr<SdpContents>(static_cast<SdpContents*>(sdp->clone()));
+         return auto_ptr<SdpContents>(static_cast<SdpContents*>(sdp->clone()));
       }
    }
 
    //DebugLog(<< "No sdp" << endl);
-   return std::unique_ptr<SdpContents>();
+   return emptysdp;
 }
 
 bool 
 Helper::isClientBehindNAT(const SipMessage& request, bool privateToPublicOnly)
 {
-   assert(request.isRequest());
-   assert(!request.header(h_Vias).empty());
+   resip_assert(request.isRequest());
+   resip_assert(!request.header(h_Vias).empty());
 
    // If received parameter is on top Via, then the source of the message doesn't match
    // the address provided in the via.  Assume this is because the sender is behind a NAT.
@@ -2193,14 +2228,28 @@ Helper::isClientBehindNAT(const SipMessage& request, bool privateToPublicOnly)
    {
       if(privateToPublicOnly)
       {
-         if(Tuple(request.header(h_Vias).front().sentHost(), 0, UNKNOWN_TRANSPORT).isPrivateAddress() &&
-            !Tuple(request.header(h_Vias).front().param(p_received), 0, UNKNOWN_TRANSPORT).isPrivateAddress())
+         // Ensure the via host is an IP address (note: web-rtc uses hostnames here instead)
+         if(DnsUtil::isIpV4Address(request.header(h_Vias).front().sentHost()) 
+#ifdef USE_IPV6
+             || DnsUtil::isIpV6Address(request.header(h_Vias).front().sentHost())
+#endif
+             )
          {
-            return true;
+            if(Tuple(request.header(h_Vias).front().sentHost(), 0, UNKNOWN_TRANSPORT).isPrivateAddress() &&
+                !Tuple(request.header(h_Vias).front().param(p_received), 0, UNKNOWN_TRANSPORT).isPrivateAddress())
+            {
+                return true;
+            }
+            else
+            {
+                return false;
+            }
          }
          else
          {
-            return false;
+             // In this case the via host is likely a hostname (possible with web-rtc) and we will assume the
+             // client is behind a NAT, even though we don't know for sure
+             return !Tuple(request.header(h_Vias).front().param(p_received), 0, UNKNOWN_TRANSPORT).isPrivateAddress();
          }
       }
       return true;
@@ -2208,12 +2257,11 @@ Helper::isClientBehindNAT(const SipMessage& request, bool privateToPublicOnly)
    return false;
 }
 
-
 Tuple
 Helper::getClientPublicAddress(const SipMessage& request)
 {
-   assert(request.isRequest());
-   assert(!request.header(h_Vias).empty());
+   resip_assert(request.isRequest());
+   resip_assert(!request.header(h_Vias).empty());
 
    // Iterate through Via's starting at the bottom (closest to the client).  Return the first
    // public address found from received parameter if present, or Via host.
@@ -2234,12 +2282,19 @@ Helper::getClientPublicAddress(const SipMessage& request)
       }
 
       // Check IP from Via sentHost
-      Tuple address(it->sentHost(), 0, UNKNOWN_TRANSPORT);
-      if(!address.isPrivateAddress())
+      if(DnsUtil::isIpV4Address(it->sentHost())  // Ensure the via host is an IP address (note: web-rtc uses hostnames here instead)
+#ifdef USE_IPV6
+          || DnsUtil::isIpV6Address(it->sentHost())
+#endif
+          )
       {
-         address.setPort(it->exists(p_rport) ? it->param(p_rport).port() : it->sentPort());
-         address.setType(Tuple::toTransport(it->transport()));
-         return address;
+         Tuple address(it->sentHost(), 0, UNKNOWN_TRANSPORT);
+         if(!address.isPrivateAddress())
+         {
+            address.setPort(it->exists(p_rport) ? it->param(p_rport).port() : it->sentPort());
+            address.setType(Tuple::toTransport(it->transport()));
+            return address;
+         }
       }
 
       if(it == request.header(h_Vias).begin()) break;

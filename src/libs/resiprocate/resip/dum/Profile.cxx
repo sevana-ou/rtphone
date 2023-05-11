@@ -16,7 +16,7 @@ Profile::Profile(SharedPtr<Profile> baseProfile) :
    mHasOutboundDecorator(false),
    mBaseProfile(baseProfile)
 {
-   assert(baseProfile.get());
+   resip_assert(baseProfile.get());
 
    reset();  // default all settings to fallthrough to mBaseProfile
 }
@@ -38,6 +38,7 @@ Profile::reset()
    unsetDefaultSessionTime(); 
    unsetDefaultSessionTimerMode();   
    unset1xxRetransmissionTime();   
+   unset1xxRelResubmitTime();
    unsetOverrideHostAndPort(); 
    unsetAdvertisedCapabilities();
    unsetOutboundProxy(); 
@@ -377,6 +378,38 @@ Profile::unset1xxRetransmissionTime()
    }
 }
 
+void
+Profile::set1xxRelResubmitTime(int secs)
+{
+   m1xxRelResubmitTime = secs;
+   mHas1xxRelResubmitTime = true;
+}
+
+int 
+Profile::get1xxRelResubmitTime() const
+{
+   // Fall through seting (if required)
+   if(!mHas1xxRelResubmitTime && mBaseProfile.get())
+   {
+       return mBaseProfile->get1xxRelResubmitTime();
+   }
+   return m1xxRelResubmitTime;
+}
+
+void
+Profile::unset1xxRelResubmitTime()
+{
+   if(mBaseProfile.get()) 
+   {
+      mHas1xxRelResubmitTime = false;
+   }
+   else // No Base profile - so return to default setting
+   {
+      mHas1xxRelResubmitTime = true;
+      m1xxRelResubmitTime = 150;  // RFC3262 section says the UAS SHOULD send provisional reliable responses once every two and half minutes
+   }
+}
+
 void 
 Profile::setOverrideHostAndPort(const Uri& hostPort)
 {
@@ -415,10 +448,11 @@ Profile::unsetOverrideHostAndPort()
 void 
 Profile::addAdvertisedCapability(const Headers::Type header)
 {
-   assert(header == Headers::Allow ||
-   header == Headers::AcceptEncoding ||
-   header == Headers::AcceptLanguage ||
-   header == Headers::Supported);
+   resip_assert(header == Headers::Allow ||
+          header == Headers::AcceptEncoding ||
+          header == Headers::AcceptLanguage ||
+          header == Headers::AllowEvents ||
+          header == Headers::Supported);
 
    mAdvertisedCapabilities.insert(header);
    mHasAdvertisedCapabilities = true;
@@ -474,7 +508,7 @@ Profile::getOutboundProxy() const
    {
        return mBaseProfile->getOutboundProxy();
    }
-   assert(mHasOutboundProxy);
+   resip_assert(mHasOutboundProxy);
    return mOutboundProxy;
 }
 
@@ -606,7 +640,7 @@ Profile::getUserAgent() const
    {
        return mBaseProfile->getUserAgent();
    }
-   assert(mHasUserAgent);
+   resip_assert(mHasUserAgent);
    return mUserAgent;
 }
  
@@ -642,7 +676,7 @@ Profile::getProxyRequires() const
    {
        return mBaseProfile->getProxyRequires();
    }
-   assert(mHasProxyRequires);
+   resip_assert(mHasProxyRequires);
    return mProxyRequires;
 }
  
@@ -905,7 +939,7 @@ Profile::getUserAgentCapabilities() const
    {
        return mBaseProfile->getUserAgentCapabilities();
    }
-   assert(mHasUserAgentCapabilities);
+   resip_assert(mHasUserAgentCapabilities);
    return mUserAgentCapabilities;
 }
 

@@ -2,14 +2,20 @@
 #include "config.h"
 #endif
 
+// !slg! At least for builds in Visual Studio on windows this include needs to be above ASIO and boost includes since inlined shared_from_this has 
+// a different linkage signature if included after - haven't investigated the full details as to exactly why this happens
+#include <rutil/SharedPtr.hxx>  
+#include <boost/shared_ptr.hpp>
+
 #ifdef USE_SSL
+#include <asio.hpp>
+#include <asio/ssl.hpp>
+#include <boost/function.hpp>
+#include <iostream>
+
 #include <rutil/Log.hxx>
 #include <rutil/Logger.hxx>
 #include <rutil/Timer.hxx>
-
-#include <asio.hpp>
-#include <boost/function.hpp>
-#include <iostream>
 
 #include "FlowDtlsSocketContext.hxx"
 #include "FlowManagerSubsystem.hxx"
@@ -85,12 +91,13 @@ FlowDtlsSocketContext::handshakeCompleted()
       InfoLog(<< "SRTP Extension negotiated profile=" << srtp_profile->name << "  ComponentId=" << mFlow.getComponentId());
    }
 
+   // !slg! TODO - we should probably be basing the policy creation off of what is returned from getSrtpProfile
    mSocket->createSrtpSessionPolicies(mSRTPPolicyOut, mSRTPPolicyIn);
 
    r=srtp_create(&mSRTPSessionIn, &mSRTPPolicyIn);   
-   assert(r==0);
+   resip_assert(r==0);
    r=srtp_create(&mSRTPSessionOut, &mSRTPPolicyOut);
-   assert(r==0);
+   resip_assert(r==0);
    mSrtpInitialized = true;
 }
  
@@ -152,6 +159,7 @@ FlowDtlsSocketContext::srtpUnprotect(void* data, int* size, bool rtcp)
 /* ====================================================================
 
  Copyright (c) 2007-2008, Plantronics, Inc.
+ Copyright (c) 2008-2018, SIP Spectrum, Inc.
  All rights reserved.
 
  Redistribution and use in source and binary forms, with or without

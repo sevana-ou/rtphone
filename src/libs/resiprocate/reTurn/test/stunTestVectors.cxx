@@ -1,8 +1,10 @@
-// This file implements test vectors from: draft-ietf-behave-stun-test-vectors-04
+// This file implements test vectors from: RFC5769
 
 #include <iostream>
 #include <string>
 #include <asio.hpp>
+
+#include <rutil/MD5Stream.hxx>
 
 #include "../StunTuple.hxx"
 #include "../StunMessage.hxx"
@@ -43,7 +45,10 @@ int main(int argc, char* argv[])
 
    assert(reqMessage.isValid());
    assert(reqMessage.mHasMagicCookie);
-   assert(reqMessage.mUnknownRequiredAttributes.numAttributes == 1);  // Test vector includes comprehension required Priority ICE attribute - we don't support this yet
+   assert(reqMessage.mHasIcePriority);
+   assert(reqMessage.mIcePriority == 1845494271);
+   assert(reqMessage.mHasIceControlled);
+   assert(reqMessage.mIceControlledTieBreaker == 10605970187446795062ULL);
    assert(reqMessage.mHasSoftware);
    assert(*reqMessage.mSoftware == "STUN test client");
    assert(reqMessage.mHasUsername);
@@ -152,6 +157,12 @@ int main(int argc, char* argv[])
    assert(reqltcMessage.mHasMessageIntegrity);
    resip::Data hmacKey;
    reqltcMessage.calculateHmacKey(hmacKey, password);
+   assert(reqltcMessage.checkMessageIntegrity(hmacKey));
+
+   resip::MD5Stream r;
+   r << username << ":example.org:" << password;
+   resip::Data password_ha1 = r.getBin();
+   reqltcMessage.calculateHmacKeyForHa1(hmacKey, password_ha1);
    assert(reqltcMessage.checkMessageIntegrity(hmacKey));  
 
    InfoLog(<< "All tests passed!");

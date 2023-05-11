@@ -4,13 +4,21 @@
 #include "rutil/Data.hxx"
 #include "rutil/ServerProcess.hxx"
 #include "resip/dum/TlsPeerAuthManager.hxx"
+#include "resip/stack/StatisticsHandler.hxx"
+#include "resip/stack/DomainMatcher.hxx"
 #include <memory>
+
+#include "repro/AuthenticatorFactory.hxx"
+#include "repro/Plugin.hxx"
+
 
 namespace resip
 {
    class TransactionUser;
    class SipStack;
+   class Dispatcher;
    class RegistrationPersistenceManager;
+   class PublicationPersistenceManager;
    class FdPollGrp;
    class AsyncProcessHandler;
    class ThreadIf;
@@ -22,7 +30,6 @@ namespace repro
 {
 class ProxyConfig;
 class ProcessorChain;
-class Dispatcher;
 class AbstractDb;
 class ProcessorChain;
 class Proxy;
@@ -36,8 +43,11 @@ class RegSyncServerThread;
 class CommandServer;
 class CommandServerThread;
 class Processor;
+class PresenceServer;
 
-class ReproRunner : public resip::ServerProcess
+class ReproRunner : public resip::ServerProcess,
+                    public resip::ExternalStatsHandler
+
 {
 public:
    ReproRunner();
@@ -46,30 +56,36 @@ public:
    virtual bool run(int argc, char** argv);
    virtual void shutdown();
    virtual void restart();  // brings everydown and then backup again - leaves InMemoryRegistrationDb intact
+   virtual void onReload();
 
    virtual Proxy* getProxy() { return mProxy; }
+
+   // External Stats handler
+   virtual bool operator()(resip::StatisticsMessage &statsMessage);
 
 protected:
    virtual void cleanupObjects();
 
+   virtual bool loadPlugins();
+   virtual void setOpenSSLCTXOptionsFromConfig(const resip::Data& configVar, long& opts);
    virtual bool createSipStack();
    virtual bool createDatastore();
    virtual bool createProxy();
    virtual void populateRegistrations();
    virtual bool createWebAdmin();
+   virtual void createAuthenticatorFactory();
    virtual void createDialogUsageManager();
    virtual void createRegSync();
    virtual void createCommandServer();
 
-   virtual resip::Data addDomains(resip::TransactionUser& tu, bool log);
+   virtual void initDomainMatcher();
+   virtual void addDomains(resip::TransactionUser& tu);
    virtual bool addTransports(bool& allTransportsSpecifyRecordRoute);
    // Override this and examine the processor name to selectively add custom processors before or after the standard ones
-   virtual void addProcessor(repro::ProcessorChain& chain, std::unique_ptr<repro::Processor> processor);
+   virtual void addProcessor(repro::ProcessorChain& chain, std::auto_ptr<repro::Processor> processor);
    virtual void makeRequestProcessorChain(repro::ProcessorChain& chain);
    virtual void makeResponseProcessorChain(repro::ProcessorChain& chain);
    virtual void makeTargetProcessorChain(repro::ProcessorChain& chain);
-
-   virtual void loadCommonNameMappings();
 
    bool mRunning;
    bool mRestarting;
@@ -77,7 +93,6 @@ protected:
    char** mArgv;
    bool mThreadedStack;
    resip::Data mHttpRealm;
-   bool mSipAuthDisabled;
    bool mUseV4;
    bool mUseV6;
    int mRegSyncPort;
@@ -89,27 +104,33 @@ protected:
    AbstractDb* mAbstractDb;
    AbstractDb* mRuntimeAbstractDb;
    resip::RegistrationPersistenceManager* mRegistrationPersistenceManager;
-   Dispatcher* mAuthRequestDispatcher;
-   Dispatcher* mAsyncProcessorDispatcher;
+   resip::PublicationPersistenceManager* mPublicationPersistenceManager;
+   AuthenticatorFactory* mAuthFactory;
+   resip::Dispatcher* mAsyncProcessorDispatcher;
    ProcessorChain* mMonkeys;
    ProcessorChain* mLemurs;
    ProcessorChain* mBaboons;
    Proxy* mProxy;
-   WebAdmin* mWebAdmin;
+   std::list<WebAdmin*> mWebAdminList;
    WebAdminThread* mWebAdminThread;
    Registrar* mRegistrar;
+   PresenceServer* mPresenceServer;
    resip::DialogUsageManager* mDum;
    resip::ThreadIf* mDumThread;
    CertServer* mCertServer;
    RegSyncClient* mRegSyncClient;
    RegSyncServer* mRegSyncServerV4;
    RegSyncServer* mRegSyncServerV6;
+   RegSyncServer* mRegSyncServerAMQP;
    RegSyncServerThread* mRegSyncServerThread;
-   CommandServer* mCommandServerV4;
-   CommandServer* mCommandServerV6;
+   std::list<CommandServer*> mCommandServerList;
    CommandServerThread* mCommandServerThread;
    resip::CongestionManager* mCongestionManager;
-   resip::CommonNameMappings mCommonNameMappings;
+   std::vector<Plugin*> mPlugins;
+   typedef std::map<unsigned int, resip::NameAddr> TransportRecordRouteMap;
+   TransportRecordRouteMap mStartupTransportRecordRoutes;
+   resip::SharedPtr<resip::DomainMatcher> mDomainMatcher;
+   resip::Data mDefaultRealm;
 };
 
 }

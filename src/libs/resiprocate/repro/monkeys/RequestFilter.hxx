@@ -12,13 +12,13 @@ namespace resip
 
 namespace repro
 {
-class MySqlDb;
+class SqlDb;
 class FilterStore;
 
 class RequestFilter : public AsyncProcessor
 {
    public:
-      RequestFilter(ProxyConfig& config, Dispatcher* asyncDispatcher);
+      RequestFilter(ProxyConfig& config, resip::Dispatcher* asyncDispatcher);
       ~RequestFilter();
 
       // Processor virutal method
@@ -32,7 +32,7 @@ class RequestFilter : public AsyncProcessor
       processor_action_t applyActionResult(RequestContext &rc, const resip::Data& actionResult);
 
       FilterStore& mFilterStore;
-      MySqlDb* mMySqlDb;
+      SqlDb* mSqlDb;
       resip::Data mDefaultNoMatchBehavior;
       resip::Data mDefaultDBErrorBehavior;
 };

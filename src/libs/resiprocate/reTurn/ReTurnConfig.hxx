@@ -3,19 +3,37 @@
 
 #include <map>
 #include <asio.hpp>
+#ifdef USE_SSL
+#include <asio/ssl.hpp>
+#endif
 #include <rutil/ConfigParse.hxx>
 #include <rutil/Data.hxx>
 #include <rutil/Log.hxx>
+#include <rutil/BaseException.hxx>
+#include <rutil/RWMutex.hxx>
+#include <rutil/Lock.hxx>
 
 #include <reTurn/UserAuthData.hxx>
 
 namespace reTurn {
 
 typedef std::map<resip::Data,reTurn::UserAuthData> RealmUsers;
+typedef std::pair<resip::Data, resip::Data> RealmUserPair;
 
 class ReTurnConfig : public resip::ConfigParse
 {
 public:
+   class Exception : public resip::BaseException
+   {
+      public:
+         Exception(const resip::Data& msg,
+                   const resip::Data& file,
+                   const int line)
+            : resip::BaseException(msg, file, line) {}            
+      protected:
+         virtual const char* name() const { return "ReTurnConfig::Exception"; }
+   };
+   
    ReTurnConfig();
    virtual ~ReTurnConfig();
 
@@ -23,24 +41,27 @@ public:
 
    void printHelpText(int argc, char **argv);
    using resip::ConfigParse::getConfigValue;
-
+   
    typedef enum
    {
-      NoAuthentication = 0,
-      ShortTermPassword = 1,
-      LongTermPassword = 2
-   } AuthenticationMode;
+      AUTHORIZED,
+      RESTRICTED,
+      REFUSED 
+   } AccountState;
+
+   resip::Data mSoftwareName;
+   bool mPadSoftwareName;
 
    unsigned short mTurnPort;
    unsigned short mTlsTurnPort;
    unsigned short mAltStunPort;  
    asio::ip::address mTurnAddress;
+   asio::ip::address mTurnV6Address;
    asio::ip::address mAltStunAddress;
 
-   AuthenticationMode mAuthenticationMode;
    resip::Data mAuthenticationRealm;
-   std::map<resip::Data,resip::Data> mAuthenticationCredentials;
-   std::map<resip::Data,RealmUsers> mUsers;
+   int mUserDatabaseCheckInterval;
+   mutable resip::RWMutex mUserDataMutex;
    unsigned long mNonceLifetime;
 
    unsigned short mAllocationPortRangeMin;
@@ -50,22 +71,54 @@ public:
    unsigned long mMaxAllocationsPerUser;  // TODO - enforcement needs to be implemented
 
    resip::Data mTlsServerCertificateFilename;
+   resip::Data mTlsServerPrivateKeyFilename;
    resip::Data mTlsTempDhFilename;
    resip::Data mTlsPrivateKeyPassword;
 
+   resip::Data mUsersDatabaseFilename;
+   bool mUserDatabaseHashedPasswords;
+
    resip::Data mLoggingType;
+   resip::Data mSyslogFacility;
    resip::Data mLoggingLevel;
    resip::Data mLoggingFilename;
    unsigned int mLoggingFileMaxLineCount;
    bool mDaemonize;
    resip::Data mPidFile;
+   resip::Data mRunAsUser;
+   resip::Data mRunAsGroup;
 
-   bool isUserNameValid(const resip::Data& username) const;
-   const resip::Data& getPasswordForUsername(const resip::Data& username) const;
-   const UserAuthData* getUser(const resip::Data& userName, const resip::Data& realm) const;
+   bool isUserNameValid(const resip::Data& username,  const resip::Data& realm) const;
+   resip::Data getHa1ForUsername(const resip::Data& username, const resip::Data& realm) const;
+   std::auto_ptr<UserAuthData> getUser(const resip::Data& userName, const resip::Data& realm) const;
+   void addUser(const resip::Data& username, const resip::Data& password, const resip::Data& realm);
+   void authParse(const resip::Data& accountDatabaseFilename);
 
-protected:
-   void calcUserAuthData();
+private:
+   std::map<resip::Data,RealmUsers> mUsers;
+   std::map<RealmUserPair, resip::Data> mRealmUsersAuthenticaionCredentials;
+
+   friend class ReTurnUserFileScanner;
+};
+
+class ReTurnUserFileScanner
+{
+   public:
+      ReTurnUserFileScanner(asio::io_service& ioService, ReTurnConfig& reTurnConfig);
+      void start();
+
+   private:
+      time_t mLoadedTime;
+      ReTurnConfig& mReTurnConfig;
+      static bool mHup;
+      int mLoopInterval;
+      time_t mNextFileCheck;
+      asio::steady_timer mTimer;
+
+      bool hasUserFileChanged();
+      void timeout(const asio::error_code& e);
+
+      static void onSignal(int signum);
 };
 
 } // namespace

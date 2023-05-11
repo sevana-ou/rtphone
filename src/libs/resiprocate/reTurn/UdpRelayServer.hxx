@@ -1,7 +1,10 @@
 #ifndef UDP_RELAY_SERVER_HXX
-#define UDP_REALY_SERVER_HXX
+#define UDP_RELAY_SERVER_HXX
 
 #include <asio.hpp>
+#ifdef USE_SSL
+#include <asio/ssl.hpp>
+#endif
 #include <string>
 #include <boost/noncopyable.hpp>
 #include "RequestHandler.hxx"
@@ -21,7 +24,7 @@ public:
    ~UdpRelayServer();
 
    /// Starts processing
-   void start();
+   bool startReceiving();
 
    /// Causes this object to destroy itself safely (ie. waiting for ayncronous callbacks to finish)
    void stop();
@@ -37,6 +40,8 @@ private:
 
    TurnAllocation& mTurnAllocation;
    bool mStopping;
+   bool mBindSuccess;
+   asio::error_code mLastSendErrorCode;  // Use to ensure we only log at Warning level once for a particular send error
 };
 
 typedef boost::shared_ptr<UdpRelayServer> UdpRelayServerPtr;

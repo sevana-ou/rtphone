@@ -12,11 +12,10 @@ using namespace repro;
 using namespace std;
 
 
-WebAdminThread::WebAdminThread(WebAdmin& web)
-   : mWeb(web)
+WebAdminThread::WebAdminThread(const std::list<WebAdmin*>& webAdminList)
+   : mWebAdminList(webAdminList)
 {
 }
-
 
 void
 WebAdminThread::thread()
@@ -25,16 +24,24 @@ WebAdminThread::thread()
    {
       try
       {
-           FdSet fdset; 
-     
-           mWeb.buildFdSet(fdset);
-           fdset.selectMilliSeconds( 10*1000 );
+           FdSet fdset;
            
-           mWeb.process(fdset);
+           std::list<WebAdmin*>::const_iterator it = mWebAdminList.begin();
+           for(;it!=mWebAdminList.end();it++)
+           {
+              (*it)->buildFdSet(fdset);
+           }
+           fdset.selectMilliSeconds( 2*1000 );
+           
+           it = mWebAdminList.begin();
+           for(;it!=mWebAdminList.end();it++)
+           {
+              (*it)->process(fdset);
+           }
       }
       catch (...)
       {
-         ErrLog (<< "Unhandled exception: " );
+         ErrLog (<< "WebAdminThread::thread: Unhandled exception: " );
       }
    }
 }

@@ -1,4 +1,8 @@
 // sipX includes
+#if (_MSC_VER >= 1600)
+#include <stdint.h>       // Use Visual Studio's stdint.h
+#define _MSC_STDINT_H_    // This define will ensure that stdint.h in sipXport tree is not used
+#endif
 #include <sdp/SdpCodec.h>
 #include <os/OsConfigDb.h>
 #include <mp/MpCodecFactory.h>
@@ -48,6 +52,25 @@ ConversationManager::ConversationManager(bool localAudioEnabled, MediaInterfaceM
   mBridgeMixer(0),
   mSipXTOSValue(0)
 {
+   init();
+}
+
+ConversationManager::ConversationManager(bool localAudioEnabled, MediaInterfaceMode mediaInterfaceMode, int defaultSampleRate, int maxSampleRate)
+: mUserAgent(0),
+  mCurrentConversationHandle(1),
+  mCurrentParticipantHandle(1),
+  mLocalAudioEnabled(localAudioEnabled),
+  mMediaInterfaceMode(mediaInterfaceMode),
+  mMediaFactory(0),
+  mBridgeMixer(0),
+  mSipXTOSValue(0)
+{
+   init(defaultSampleRate, maxSampleRate);
+}
+
+void
+ConversationManager::init(int defaultSampleRate, int maxSampleRate)
+{
 #ifdef _DEBUG
    UtlString codecPaths[] = {".", "../../../../sipXtapi/sipXmediaLib/bin"};
 #else
@@ -55,29 +78,39 @@ ConversationManager::ConversationManager(bool localAudioEnabled, MediaInterfaceM
 #endif
    int codecPathsNum = sizeof(codecPaths)/sizeof(codecPaths[0]);
    OsStatus rc = CpMediaInterfaceFactory::addCodecPaths(codecPathsNum, codecPaths);
-   assert(OS_SUCCESS == rc);
+   resip_assert(OS_SUCCESS == rc);
 
    if(mMediaInterfaceMode == sipXConversationMediaInterfaceMode)
    {
       OsConfigDb sipXconfig;
       sipXconfig.set("PHONESET_MAX_ACTIVE_CALLS_ALLOWED",300);  // This controls the maximum number of flowgraphs allowed - default is 16
-      mMediaFactory = sipXmediaFactoryFactory(&sipXconfig, 0, 0, 0, mLocalAudioEnabled);
+      mMediaFactory = sipXmediaFactoryFactory(&sipXconfig, 0, defaultSampleRate, maxSampleRate, mLocalAudioEnabled);
    }
    else
    {
-      mMediaFactory = sipXmediaFactoryFactory(NULL, 0, 0, 0, mLocalAudioEnabled);
+      mMediaFactory = sipXmediaFactoryFactory(NULL, 0, defaultSampleRate, maxSampleRate, mLocalAudioEnabled);
    }
 
    // Create MediaInterface
    MpCodecFactory *pCodecFactory = MpCodecFactory::getMpCodecFactory();
+   // For dynamic loading, we need to force the codecs to be loaded
+   // somehow, this should be exposed through the API
+   //pCodecFactory->loadAllDynCodecs("/tmp/codecs", "");
    unsigned int count = 0;
    const MppCodecInfoV1_1 **codecInfoArray;
    pCodecFactory->getCodecInfoArray(count, codecInfoArray);
 
    if(count == 0)
    {
-      ErrLog( << "No codec plugins found.  Cannot start.");
-      exit(-1);
+      // Try to load plugin modules, if possible...
+      InfoLog(<<"No statically linked codecs, trying to load codec plugin modules with dlopen()");
+      pCodecFactory->loadAllDynCodecs(NULL, "");
+      pCodecFactory->getCodecInfoArray(count, codecInfoArray);
+      if(count == 0)
+      {
+         ErrLog( << "No codec plugins found.  Cannot start.");
+         exit(-1);
+      }
    }
 
    InfoLog( << "Loaded codecs are:");
@@ -102,8 +135,8 @@ ConversationManager::ConversationManager(bool localAudioEnabled, MediaInterfaceM
 
 ConversationManager::~ConversationManager()
 {
-   assert(mConversations.empty());
-   assert(mParticipants.empty());
+   resip_assert(mConversations.empty());
+   resip_assert(mParticipants.empty());
    delete mBridgeMixer;
    if(mMediaInterface) mMediaInterface.reset();  // Make sure inteface is destroyed before factory
    sipxDestroyMediaFactoryFactory();
@@ -172,9 +205,16 @@ ConversationManager::joinConversation(ConversationHandle sourceConvHandle, Conve
 ParticipantHandle 
 ConversationManager::createRemoteParticipant(ConversationHandle convHandle, const NameAddr& destination, ParticipantForkSelectMode forkSelectMode)
 {
+   SharedPtr<UserProfile> profile;
+   return createRemoteParticipant(convHandle, destination, forkSelectMode, profile, std::multimap<resip::Data,resip::Data>());
+}
+
+ParticipantHandle
+ConversationManager::createRemoteParticipant(ConversationHandle convHandle, const resip::NameAddr& destination, ParticipantForkSelectMode forkSelectMode, SharedPtr<UserProfile>& callerProfile, const std::multimap<resip::Data,resip::Data>& extraHeaders)
+{
    ParticipantHandle partHandle = getNewParticipantHandle();
 
-   CreateRemoteParticipantCmd* cmd = new CreateRemoteParticipantCmd(this, partHandle, convHandle, destination, forkSelectMode);
+   CreateRemoteParticipantCmd* cmd = new CreateRemoteParticipantCmd(this, partHandle, convHandle, destination, forkSelectMode, callerProfile, extraHeaders);
    post(cmd);
 
    return partHandle;
@@ -294,6 +334,13 @@ ConversationManager::redirectToParticipant(ParticipantHandle partHandle, Partici
    post(cmd);
 }
 
+void
+ConversationManager::holdParticipant(ParticipantHandle partHandle, bool hold)
+{
+   HoldParticipantCmd* cmd = new HoldParticipantCmd(this, partHandle, hold);
+   post(cmd);
+}
+
 ConversationHandle 
 ConversationManager::getNewConversationHandle()
 {
@@ -371,7 +418,7 @@ ConversationManager::allocateRTPPort()
 void
 ConversationManager::freeRTPPort(unsigned int port)
 {
-   assert(port >= mUserAgent->getUserAgentMasterProfile()->rtpPortRangeMin() && port <= mUserAgent->getUserAgentMasterProfile()->rtpPortRangeMax());
+   resip_assert(port >= mUserAgent->getUserAgentMasterProfile()->rtpPortRangeMin() && port <= mUserAgent->getUserAgentMasterProfile()->rtpPortRangeMax());
    mRTPPortFreeList.push_back(port);
 }
 
@@ -388,8 +435,8 @@ ConversationManager::buildSdpOffer(ConversationProfile* profile, SdpContents& of
 
    // Set local port in offer
    // for now we only allow 1 audio media
-   assert(offer.session().media().size() == 1);
-   assert(offer.session().media().front().name() == "audio");
+   resip_assert(offer.session().media().size() == 1);
+   resip_assert(offer.session().media().front().name() == "audio");
 }
 
 void
@@ -458,7 +505,7 @@ ConversationManager::enableNoiseReduction(bool enable)
    OsStatus status =  mMediaFactory->getFactoryImplementation()->setAudioNoiseReductionMode(enable ? MEDIA_NOISE_REDUCTION_MEDIUM /* arbitrary */ : MEDIA_NOISE_REDUCTION_DISABLED);
    if(status != OS_SUCCESS)
    {
-      WarningLog(<< "enableAutoGainControl failed: status=" << status);
+      WarningLog(<< "enableNoiseReduction failed: status=" << status);
    }
    if(mMediaInterfaceMode == sipXGlobalMediaInterfaceMode)  // Note for sipXConversationMediaInterfaceMode - setting will apply on next conversation given focus
    {
@@ -556,8 +603,30 @@ ConversationManager::buildSessionCapabilities(const resip::Data& ipaddress, unsi
             sdpcodec->getEncodingName(mimeSubType);
             //mimeSubType.toUpper();
             
-            SdpContents::Session::Codec codec(mimeSubType.data(), sdpcodec->getSampleRate());
-            codec.payloadType() = sdpcodec->getCodecPayloadFormat();
+            int capabilityRate = sdpcodec->getSampleRate();
+            if(mimeSubType == "G722")
+            {
+               capabilityRate = 8000;
+            }
+
+            Data codecName(mimeSubType.data());
+#ifdef RECON_SDP_ENCODING_NAMES_CASE_HACK
+            // The encoding names are not supposed to be case sensitive.
+            // However, some phones, including Polycom, don't recognize
+            // telephone-event if it is not lowercase.
+            // sipXtapi is writing all codec names in uppercase.
+            // (see sipXtapi macro SDP_MIME_SUBTYPE_TO_CASE) and this
+            // hack works around that.
+            if(mimeSubType.compareTo("telephone-event", UtlString::ignoreCase) == 0)
+            {
+               codecName = "telephone-event";
+            }
+#endif
+            SdpContents::Session::Codec codec(codecName, sdpcodec->getCodecPayloadFormat(), capabilityRate);
+            if(sdpcodec->getNumChannels() > 1)
+            {
+               codec.encodingParameters() = Data(sdpcodec->getNumChannels());
+            }
 
             // Check for telephone-event and add fmtp manually
             if(mimeSubType.compareTo("telephone-event", UtlString::ignoreCase) == 0)
@@ -602,7 +671,7 @@ ConversationManager::buildSessionCapabilities(const resip::Data& ipaddress, unsi
 void 
 ConversationManager::notifyMediaEvent(ConversationHandle conversationHandle, int mediaConnectionId, MediaEvent::MediaEventType eventType)
 {
-   assert(eventType == MediaEvent::PLAY_FINISHED);
+   resip_assert(eventType == MediaEvent::PLAY_FINISHED);
 
    if(conversationHandle == 0) // sipXGlobalMediaInterfaceMode
    {
@@ -985,8 +1054,15 @@ ConversationManager::onNewSubscriptionFromRefer(ServerSubscriptionHandle ss, con
 
          // Notify application
          ConversationProfile* profile = dynamic_cast<ConversationProfile*>(ss->getUserProfile().get());
-         assert(profile);
-         onRequestOutgoingParticipant(participant->getParticipantHandle(), msg, *profile);
+         if(profile)
+         {
+            onRequestOutgoingParticipant(participant->getParticipantHandle(), msg, *profile);
+         }
+         else
+         {
+            // FIXME - could we do something else here?
+            WarningLog(<<"not an instance of ConversationProfile, not calling onRequestOutgoingParticipant");
+         }
       }
       else
       {
@@ -1123,8 +1199,16 @@ ConversationManager::onReceivedRequest(ServerOutOfDialogReqHandle ood, const Sip
 
             // Notify application
             ConversationProfile* profile = dynamic_cast<ConversationProfile*>(ood->getUserProfile().get());
-            assert(profile);
-            onRequestOutgoingParticipant(participant->getParticipantHandle(), msg, *profile);
+            resip_assert(profile);
+            if(profile)
+            {
+               onRequestOutgoingParticipant(participant->getParticipantHandle(), msg, *profile);
+            }
+            else
+            {
+               // FIXME - could we do something else here?
+               WarningLog(<<"not an instance of ConversationProfile, not calling onRequestOutgoingParticipant");
+            }
          }
          else
          {

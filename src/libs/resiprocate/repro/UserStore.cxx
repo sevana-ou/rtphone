@@ -1,6 +1,6 @@
 
 
-#include <cassert>
+#include "rutil/ResipAssert.h"
 
 #include "rutil/Data.hxx"
 #include "rutil/MD5Stream.hxx"
@@ -21,8 +21,9 @@ using namespace std;
 
 #define RESIPROCATE_SUBSYSTEM Subsystem::REPRO
 
-UserStore::UserStore(AbstractDb& db ):
-   mDb(db)
+const resip::Data UserStore::SEPARATOR("@");
+
+UserStore::UserStore(AbstractDb& db ) : mDb(db)
 { 
 }
 
@@ -30,13 +31,11 @@ UserStore::~UserStore()
 { 
 }
 
-
 AbstractDb::UserRecord
 UserStore::getUserInfo( const Key& key ) const
 {
    return mDb.getUser(key);
 }
-
 
 Data 
 UserStore::getUserAuthInfo(  const resip::Data& user, 
@@ -45,7 +44,6 @@ UserStore::getUserAuthInfo(  const resip::Data& user,
    Key key =  buildKey(user, realm);
    return mDb.getUserAuthInfo( key );
 }
-
 
 bool 
 UserStore::addUser( const Data& username,
@@ -96,7 +94,6 @@ UserStore::addUser( const Data& username,
    return mDb.addUser( buildKey(username,domain), rec);
 }
 
-
 void 
 UserStore::eraseUser( const Key& key )
 { 
@@ -124,13 +121,11 @@ UserStore::updateUser( const Key& originalKey,
    return ret;
 }
 
-
 UserStore::Key
 UserStore::getFirstKey()
 {
    return mDb.firstUserKey();
 }
-
 
 UserStore::Key
 UserStore::getNextKey()
@@ -138,16 +133,24 @@ UserStore::getNextKey()
    return mDb.nextUserKey();
 }
 
-
 UserStore::Key
-UserStore::buildKey( const resip::Data& user, 
-                     const resip::Data& realm) const
+UserStore::buildKey( const resip::Data& user, const resip::Data& realm)
 {
-   Data ret = user + Data("@") + realm;
+   Data ret = user + Data(SEPARATOR) + realm;
    return ret;
 }
 
-
+void
+UserStore::getUserAndDomainFromKey(const Key& key, Data& user, Data& domain)
+{
+   ParseBuffer pb(key);
+   const char* start = pb.position();
+   pb.skipToOneOf(SEPARATOR);
+   pb.data(user, start);
+   const char* anchor = pb.skipChar();
+   pb.skipToEnd();
+   pb.data(domain, anchor);
+}
 
 
 /* ====================================================================

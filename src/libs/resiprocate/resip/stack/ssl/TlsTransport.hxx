@@ -5,7 +5,7 @@
   #include "config.h"
 #endif
 
-
+#include "resip/stack/ssl/TlsBaseTransport.hxx"
 #include "resip/stack/TcpBaseTransport.hxx"
 #include "resip/stack/SecurityTypes.hxx"
 #include "rutil/HeapInstanceCounter.hxx"
@@ -20,7 +20,7 @@ class Connection;
 class Message;
 class Security;
 
-class TlsTransport : public TcpBaseTransport
+class TlsTransport : public TlsBaseTransport
 {
    public:
       RESIP_HeapCount(TlsTransport);
@@ -35,28 +35,11 @@ class TlsTransport : public TcpBaseTransport
                    Compression &compression = Compression::Disabled,
                    unsigned transportFlags = 0,
                    SecurityTypes::TlsClientVerificationMode cvm = SecurityTypes::None,
-                   bool useEmailAsSIP = false);
+                   bool useEmailAsSIP = false,
+                   const Data& certificateFilename = "", 
+                   const Data& privateKeyFilename = "",
+                   const Data& privateKeyPassPhrase = "");
       virtual  ~TlsTransport();
-
-      TransportType transport() const { return TLS; }
-      SSL_CTX* getCtx() const;
-
-      SecurityTypes::TlsClientVerificationMode getClientVerificationMode() 
-         { return mClientVerificationMode; };
-      bool isUseEmailAsSIP()
-         { return mUseEmailAsSIP; };
-
-   protected:
-      Connection* createConnection(const Tuple& who, Socket fd, bool server=false);
-
-      Security* mSecurity;
-      SecurityTypes::SSLType mSslType;
-      SSL_CTX* mDomainCtx;
-      SecurityTypes::TlsClientVerificationMode mClientVerificationMode;
-      /* If true, we will accept the email address in a client's subjectAltName
-         as if it were a SIP URI.  This is convenient because many commercial
-         CAs offer email certificates but not sip: certificates */
-      bool mUseEmailAsSIP;
 };
 
 }

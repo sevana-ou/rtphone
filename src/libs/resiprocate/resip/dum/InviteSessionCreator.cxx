@@ -29,7 +29,7 @@ InviteSessionCreator::InviteSessionCreator(DialogUsageManager& dum,
    DumHelper::setOutgoingEncryptionLevel(*mLastRequest, level);
    if(mDum.getMasterProfile()->getSupportedOptionTags().find(Token(Symbols::Timer)))
    {
-      assert(userProfile.get());
+      resip_assert(userProfile.get());
       if(userProfile->getDefaultSessionTime() >= 90)
       {
          getLastRequest()->header(h_SessionExpires).value() = userProfile->getDefaultSessionTime();
@@ -37,7 +37,7 @@ InviteSessionCreator::InviteSessionCreator(DialogUsageManager& dum,
       }
    }
 
-   std::unique_ptr<Contents> initialOffer;
+   std::auto_ptr<Contents> initialOffer;
    if (initial)
    {
       if (alternative)
@@ -51,7 +51,7 @@ InviteSessionCreator::InviteSessionCreator(DialogUsageManager& dum,
       {
          initialOffer.reset(initial->clone());
       }
-      getLastRequest()->setContents(std::move(initialOffer));
+      getLastRequest()->setContents(initialOffer);
    }
    //100rel 
    switch(mDum.getMasterProfile()->getUacReliableProvisionalMode())
@@ -60,13 +60,14 @@ InviteSessionCreator::InviteSessionCreator(DialogUsageManager& dum,
          //no support, do nothing
          break;
       case MasterProfile::Supported:
+      case MasterProfile::SupportedEssential:
          getLastRequest()->header(h_Supporteds).push_back(Token(Symbols::C100rel));
          break;
       case MasterProfile::Required:
          getLastRequest()->header(h_Requires).push_back(Token(Symbols::C100rel));
          break;
       default:
-         assert(0);
+         resip_assert(0);
    }
 }
 
@@ -77,7 +78,7 @@ InviteSessionCreator::~InviteSessionCreator()
 void
 InviteSessionCreator::end()
 {
-   assert(0);
+   resip_assert(0);
 }
 
 void

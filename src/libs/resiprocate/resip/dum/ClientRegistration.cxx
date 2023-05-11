@@ -2,7 +2,6 @@
 #include <iterator>
 
 #include "resip/stack/Helper.hxx"
-#include "resip/stack/ExtensionHeader.hxx"
 #include "resip/dum/BaseCreator.hxx"
 #include "resip/dum/ClientAuthManager.hxx"
 #include "resip/dum/ClientRegistration.hxx"
@@ -15,19 +14,20 @@
 #include "rutil/Inserter.hxx"
 #include "rutil/Random.hxx"
 #include "rutil/ParseBuffer.hxx"
+#include "rutil/TransportType.hxx"
 #include "rutil/WinLeakCheck.hxx"
-#include "rutil/AtomicCounter.hxx"
+
 #define RESIPROCATE_SUBSYSTEM Subsystem::DUM
 
 using namespace resip;
+
+static const UInt32 UnreasonablyLowExpirationThreshold = 7;  // The threshold before which we consider a contacts expiry to be unreasonably low
 
 ClientRegistrationHandle
 ClientRegistration::getHandle()
 {
    return ClientRegistrationHandle(mDum, getBaseHandle().getId());
 }
-
-AtomicCounter ClientRegistration::InstanceCounter;
 
 ClientRegistration::ClientRegistration(DialogUsageManager& dum,
                                        DialogSet& dialogSet,
@@ -36,19 +36,25 @@ ClientRegistration::ClientRegistration(DialogUsageManager& dum,
      mLastRequest(request),
      mTimerSeq(0),
      mState(mLastRequest->exists(h_Contacts) ? Adding : Querying),
+     mEnding(false),
      mEndWhenDone(false),
      mUserRefresh(false),
      mRegistrationTime(mDialogSet.mUserProfile->getDefaultRegistrationTime()),
      mExpires(0),
+     mRefreshTime(0),
      mQueuedState(None),
-     mQueuedRequest(new SipMessage),
-     mCustomHeader(false)
+     mQueuedRequest(new SipMessage)
 {
-   InstanceCounter.increment();
    // If no Contacts header, this is a query
    if (mLastRequest->exists(h_Contacts))
    {
-      mMyContacts = mLastRequest->header(h_Contacts);
+      NameAddr all;
+      all.setAllContacts();
+      if(!(mLastRequest->header(h_Contacts).front() == all))
+      {
+         // store if not special all contacts header
+         mMyContacts = mLastRequest->header(h_Contacts);
+      }
    }
 
    if(mLastRequest->exists(h_Expires) && 
@@ -67,7 +73,6 @@ ClientRegistration::~ClientRegistration()
 
    // !dcm! Will not interact well with multiple registrations from the same AOR
    mDialogSet.mUserProfile->setServiceRoute(NameAddrs());
-   InstanceCounter.decrement();
 }
 
 void
@@ -100,7 +105,7 @@ ClientRegistration::tryModification(ClientRegistration::State state)
       }
    }
 
-   assert(mQueuedState == None);
+   resip_assert(mQueuedState == None);
    mState = state;
 
    return mLastRequest;
@@ -117,8 +122,6 @@ ClientRegistration::addBinding(const NameAddr& contact, UInt32 registrationTime)
    mRegistrationTime = registrationTime;
    next->header(h_Expires).value() = mRegistrationTime;
    next->header(h_CSeq).sequence()++;
-   updateWithCustomHeader(next);
-
    // caller prefs
 
    if (mQueuedState == None)
@@ -145,7 +148,6 @@ ClientRegistration::removeBinding(const NameAddr& contact)
          next->header(h_Contacts).push_back(*i);
          next->header(h_Expires).value() = 0;
          next->header(h_CSeq).sequence()++;
-         updateWithCustomHeader(next);
 
          if (mQueuedState == None)
          {
@@ -182,7 +184,7 @@ ClientRegistration::removeAll(bool stopRegisteringWhenDone)
    next->header(h_Expires).value() = 0;
    next->header(h_CSeq).sequence()++;
    mEndWhenDone = stopRegisteringWhenDone;
-   updateWithCustomHeader(next);
+
    if (mQueuedState == None)
    {
       send(next);
@@ -226,6 +228,13 @@ ClientRegistration::removeMyBindings(bool stopRegisteringWhenDone)
 
    if (mQueuedState == None)
    {
+      if(mEnding && whenExpires() == 0)
+      {
+         resip_assert(mEndWhenDone);  // will always be true when mEnding is true
+         // We are not actually registered, and we are ending - no need to send un-register - just terminate now
+         stopRegistering();
+         return;
+      }
       send(next);
    }
 }
@@ -233,15 +242,18 @@ ClientRegistration::removeMyBindings(bool stopRegisteringWhenDone)
 class ClientRegistrationRemoveMyBindings : public DumCommandAdapter
 {
 public:
-   ClientRegistrationRemoveMyBindings(ClientRegistration& clientRegistration, bool stopRegisteringWhenDone)
-      : mClientRegistration(clientRegistration),
+   ClientRegistrationRemoveMyBindings(const ClientRegistrationHandle& clientRegistrationHandle, bool stopRegisteringWhenDone)
+      : mClientRegistrationHandle(clientRegistrationHandle),
         mStopRegisteringWhenDone(stopRegisteringWhenDone)
    {
    }
 
    virtual void executeCommand()
    {
-      mClientRegistration.removeMyBindings(mStopRegisteringWhenDone);
+      if(mClientRegistrationHandle.isValid())
+      {
+         mClientRegistrationHandle->removeMyBindings(mStopRegisteringWhenDone);
+      }
    }
 
    virtual EncodeStream& encodeBrief(EncodeStream& strm) const
@@ -249,14 +261,14 @@ public:
       return strm << "ClientRegistrationRemoveMyBindings";
    }
 private:
-   ClientRegistration& mClientRegistration;
+   ClientRegistrationHandle mClientRegistrationHandle;
    bool mStopRegisteringWhenDone;
 };
 
 void
 ClientRegistration::removeMyBindingsCommand(bool stopRegisteringWhenDone)
 {
-   mDum.post(new ClientRegistrationRemoveMyBindings(*this, stopRegisteringWhenDone));
+   mDum.post(new ClientRegistrationRemoveMyBindings(getHandle(), stopRegisteringWhenDone));
 }
 
 void 
@@ -277,7 +289,7 @@ ClientRegistration::requestRefresh(UInt32 expires)
 void
 ClientRegistration::internalRequestRefresh(UInt32 expires)
 {
-   if(mState == RetryAdding && mState == RetryRefreshing)
+   if(mState == RetryAdding || mState == RetryRefreshing)
    {
       // disable retry time and try refresh immediately
       ++mTimerSeq;
@@ -288,14 +300,19 @@ ClientRegistration::internalRequestRefresh(UInt32 expires)
       return;
    }
 
+   // check if refresh really required
+   if(!mDum.mClientRegistrationHandler->onRefreshRequired(getHandle(), *mLastRequest))
+   {
+      InfoLog (<< "application doesn't want to refresh " << *this);
+      end();
+      return;
+   }
+
    InfoLog (<< "requesting refresh of " << *this);
    
    mState = Refreshing;
    mLastRequest->header(h_CSeq).sequence()++;
    mLastRequest->header(h_Contacts)=mMyContacts;
-   
-   updateWithCustomHeader(mLastRequest);
-
    if(expires > 0)
    {
       mRegistrationTime = expires;
@@ -320,30 +337,41 @@ ClientRegistration::allContacts()
 UInt32
 ClientRegistration::whenExpires() const
 {
-// !cj! - TODO - I'm suspisious these time are getting confused on what units they are in 
    UInt64 now = Timer::getTimeSecs();
-   UInt64 ret = mExpires - now;
-   return (UInt32)ret;
+   if(mExpires > now)
+   {
+       return (UInt32)(mExpires - now);
+   }
+   else
+   {
+       return 0;
+   }
 }
 
 void
 ClientRegistration::end()
 {
-   removeMyBindings(true);
+   if(!mEnding)
+   {
+      mEnding = true;
+      removeMyBindings(true);
+   }
 }
 
 class ClientRegistrationEndCommand : public DumCommandAdapter
 {
 public:
-   ClientRegistrationEndCommand(ClientRegistration& clientRegistration)
-      : mClientRegistration(clientRegistration)
+   ClientRegistrationEndCommand(const ClientRegistrationHandle& clientRegistrationHandle)
+      : mClientRegistrationHandle(clientRegistrationHandle)
    {
-
    }
 
    virtual void executeCommand()
    {
-      mClientRegistration.end();
+      if(mClientRegistrationHandle.isValid())
+      {
+         mClientRegistrationHandle->end();
+      }
    }
 
    virtual EncodeStream& encodeBrief(EncodeStream& strm) const
@@ -351,13 +379,13 @@ public:
       return strm << "ClientRegistrationEndCommand";
    }
 private:
-   ClientRegistration& mClientRegistration;
+   ClientRegistrationHandle mClientRegistrationHandle;
 };
 
 void
 ClientRegistration::endCommand()
 {
-   mDum.post(new ClientRegistrationEndCommand(*this));
+   mDum.post(new ClientRegistrationEndCommand(getHandle()));
 }
 
 EncodeStream& 
@@ -373,7 +401,7 @@ ClientRegistration::dispatch(const SipMessage& msg)
    try
    {
       // !jf! there may be repairable errors that we can handle here
-      assert(msg.isResponse());
+      resip_assert(msg.isResponse());
       const int& code = msg.header(h_StatusLine).statusCode();
       bool nextHopSupportsOutbound = false;
       int keepAliveTime = 0;
@@ -405,14 +433,13 @@ ClientRegistration::dispatch(const SipMessage& msg)
          }
       }
 
-      if(msg.isExternal())
+      if(msg.isFromWire())
       {
-         const Data& receivedTransport = msg.header(h_Vias).front().transport();
+         resip::TransportType receivedTransport = toTransportType(
+            msg.header(h_Vias).front().transport());
          if(keepAliveTime == 0)
          {
-            if(receivedTransport == Symbols::TCP ||
-               receivedTransport == Symbols::TLS ||
-               receivedTransport == Symbols::SCTP)
+            if(isReliable(receivedTransport))
             {
                keepAliveTime = mDialogSet.mUserProfile->getKeepAliveTimeForStream();
             }
@@ -485,7 +512,9 @@ ClientRegistration::dispatch(const SipMessage& msg)
          // !ah! take list of ctcs and push into mMy or mOther as required.
 
          // make timers to re-register
+         UInt64 nowSecs = Timer::getTimeSecs();
          UInt32 expiry = calculateExpiry(msg);
+         mExpires = nowSecs + expiry;
          if(msg.exists(h_Contacts))
          {
             mAllContacts = msg.header(h_Contacts);
@@ -497,10 +526,10 @@ ClientRegistration::dispatch(const SipMessage& msg)
 
          if (expiry != 0 && expiry != UINT_MAX)
          {
-            if(expiry>=7)
+            if(expiry >= UnreasonablyLowExpirationThreshold)
             {
                int exp = Helper::aBitSmallerThan(expiry);
-               mExpires = exp + Timer::getTimeSecs();
+               mRefreshTime = exp + nowSecs;
                mDum.addTimer(DumTimeout::Registration,
                              exp,
                              getBaseHandle(),
@@ -571,6 +600,13 @@ ClientRegistration::dispatch(const SipMessage& msg)
 
          if (mQueuedState != None)
          {
+            if(mQueuedState == Removing && mEnding && whenExpires() == 0)
+            {
+               resip_assert(mEndWhenDone);  // will always be true when mEnding is true
+               // We are not actually registered, and we are ending - no need to send un-register - just terminate now
+               stopRegistering();
+               return;
+            }
             InfoLog (<< "Sending queued request: " << *mQueuedRequest);
             mState = mQueuedState;
             mQueuedState = None;
@@ -595,7 +631,7 @@ ClientRegistration::dispatch(const SipMessage& msg)
                   return;
                }
             }
-            else if (code == 408 || (code == 503 && msg.getReceivedTransport() == 0))
+            else if (code == 408 || (code == 503 && !msg.isFromWire()))
             {
                int retry = mDum.mClientRegistrationHandler->onRequestRetry(getHandle(), 0, msg);
             
@@ -615,7 +651,7 @@ ClientRegistration::dispatch(const SipMessage& msg)
                else
                {
                   DebugLog(<< "Application requested delayed retry on 408 or internal 503: " << retry);
-                  mExpires = 0;
+                  mRefreshTime = 0;
                   switch(mState)
                   {
                   case Adding:
@@ -625,7 +661,7 @@ ClientRegistration::dispatch(const SipMessage& msg)
                      mState = RetryRefreshing;
                      break;
                   default:
-                     assert(false);
+                     resip_assert(false);
                      break;
                   }
                   if(mDum.mClientAuthManager.get()) mDum.mClientAuthManager.get()->clearAuthenticationState(DialogSetId(*mLastRequest));
@@ -777,19 +813,54 @@ ClientRegistration::calculateExpiry(const SipMessage& reg200) const
 
    const NameAddrs& contacts(reg200.header(h_Contacts));
 
+   // We are going to track two things here:
+   // 1. expiry - the lowest expiration value of all of our contacts
+   // 2. reasonableExpiry - the lowest expiration value of all of our contacts
+   //                       that is above the UnreasonablyLowExpirationThreshold (7 seconds)
+   // Before we return, if expiry is less than UnreasonablyLowExpirationThreshold
+   // but we had another contact that had a reasonable expiry value, then return
+   // that value instead.  This logic covers a very interesting scenario:
+   //
+   // Consider the case where we are registered over TCP due to DNS SRV record
+   // configuration.  Let's say an administrator reconfigures the DNS records to
+   // now make UDP the preferred transport.  When we re-register we will now
+   // send the re-registration message over UDP.  This will cause our contact
+   // address to be changed (ie: ;tranport=tcp will no longer exist).  So for a
+   // short period of time the registrar will return two contacts to us, both 
+   // belonging to us, one for TCP and one for UDP.  The TCP one will expire in
+   // a short amount of time, and if we return this expiry to the dispatch() 
+   // method then it will cause the ClientRegistration to end (see logic in 
+   // dispatch() that prints out the error "Server is using an unreasonably low 
+   // expiry: "...
+   unsigned long reasonableExpiry = 0xFFFFFFFF;
+
    for(NameAddrs::const_iterator c=contacts.begin();c!=contacts.end();++c)
    {
       // Our expiry is never going to increase if we find one of our contacts, 
       // so if the expiry is not lower, we just ignore it. For registrars that
       // leave our requested expiry alone, this code ends up being pretty quick,
-      // especially if there aren't contacts from other endpoints laying around.
-      if(c->isWellFormed() &&
-         c->exists(p_expires) && 
-         c->param(p_expires) < expiry &&
-         contactIsMine(*c))
+      // especially if there aren't contacts from other endpoints laying around.     
+      if(c->isWellFormed() && c->exists(p_expires))
       {
-         expiry=c->param(p_expires);
+         unsigned long contactExpires = c->param(p_expires);
+         if((contactExpires < expiry ||
+             contactExpires < reasonableExpiry) &&
+            contactIsMine(*c))
+         {
+            expiry = contactExpires;
+            if(contactExpires >= UnreasonablyLowExpirationThreshold)
+            {
+                reasonableExpiry = contactExpires;
+            }
+         }
       }
+   }
+   // If expiry is less than UnreasonablyLowExpirationThreshold and we have another
+   // contact that has a reasonable expiry value, then return that value instead.
+   // See large comment above for more details.
+   if(expiry < UnreasonablyLowExpirationThreshold && reasonableExpiry != 0xFFFFFFFF)
+   {
+       expiry = reasonableExpiry;
    }
    return expiry;
 }
@@ -863,7 +934,7 @@ ClientRegistration::checkProfileRetry(const SipMessage& msg)
          // Use retry interval from error response
          retryInterval = msg.header(h_RetryAfter).value();
       }
-      mExpires = 0;
+      mRefreshTime = 0;
       switch(mState)
       {
       case Adding:
@@ -873,7 +944,7 @@ ClientRegistration::checkProfileRetry(const SipMessage& msg)
          mState = RetryRefreshing;
          break;
       default:
-         assert(false);
+         resip_assert(false);
          break;
       }
 
@@ -916,7 +987,7 @@ ClientRegistration::dispatch(const DumTimeout& timer)
                mState = Refreshing;
                break;
             default:
-              assert(false);
+              resip_assert(false);
               break;
             }
 
@@ -943,31 +1014,6 @@ ClientRegistration::flowTerminated()
    mDum.mClientRegistrationHandler->onFlowTerminated(getHandle());
 }
 
-void
-ClientRegistration::setCustomHeader(const resip::Data& name, const resip::Data& value)
-{
-  mCustomHeader = true;
-  mCustomHeaderName = name;
-  mCustomHeaderValue = value;
-}
-
-void
-ClientRegistration::unsetCustomHeader()
-{
-  mCustomHeader = false;
-}
-
-void 
-ClientRegistration::updateWithCustomHeader(SharedPtr<SipMessage> msg)
-{
-  if (mCustomHeader)
-  {
-    ExtensionHeader hdr(mCustomHeaderName);
-    msg->header(hdr).clear();
-    StringCategory sc(mCustomHeaderValue);
-    msg->header(hdr).push_back(sc);
-  }
-}
 
 /* ====================================================================
  * The Vovida Software License, Version 1.0
@@ -1019,4 +1065,3 @@ ClientRegistration::updateWithCustomHeader(SharedPtr<SipMessage> msg)
  * <http://www.vovida.org/>.
  *
  */
-

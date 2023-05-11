@@ -337,6 +337,11 @@ public:
       InfoLog(<< mLogPrefix << "onParticipantRedirectFailure: handle=" << partHandle << " statusCode=" << statusCode);
    }
 
+   virtual void onParticipantRequestedHold(recon::ParticipantHandle partHandle, bool held)
+   {
+      InfoLog(<< "onParticipantRequestedHold: handle=" << partHandle << " held=" << held);
+   }
+
    virtual void onDtmfEvent(ParticipantHandle partHandle, int dtmf, int duration, bool up) {}
 
 private:
@@ -577,6 +582,11 @@ public:
       }
    }
 
+   virtual void onParticipantRequestedHold(recon::ParticipantHandle partHandle, bool held)
+   {
+      InfoLog(<< "onParticipantRequestedHold: handle=" << partHandle << " held=" << held);
+   }
+
    virtual void onDtmfEvent(ParticipantHandle partHandle, int dtmf, int duration, bool up) {}
 
 private:
@@ -615,7 +625,7 @@ public:
       InfoLog(<< "onSubscriptionTerminated: handle=" << handle << " statusCode=" << statusCode);
    }
 
-   virtual void onSubscriptionNotify(SubscriptionHandle handle, Data& notifyData)
+   virtual void onSubscriptionNotify(SubscriptionHandle handle, const Data& notifyData)
    {
       InfoLog(<< "onSubscriptionNotify: handle=" << handle << " data=" << endl << notifyData);
    }

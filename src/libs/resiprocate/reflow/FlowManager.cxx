@@ -2,16 +2,23 @@
 #include "config.h"
 #endif
 
+// !slg! At least for builds in Visual Studio on windows this include needs to be above ASIO and boost includes since inlined shared_from_this has 
+// a different linkage signature if included after - haven't investigated the full details as to exactly why this happens
+#include <rutil/SharedPtr.hxx>
+
+#include <asio.hpp>
+#ifdef USE_SSL
+#include <asio/ssl.hpp>
+#endif
+#include <boost/function.hpp>
+#include <boost/shared_ptr.hpp>
+#include <map>
+
 #include <rutil/Log.hxx>
 #include <rutil/Logger.hxx>
 #include <rutil/ThreadIf.hxx>
 #include <rutil/Random.hxx>
-#include <rutil/SharedPtr.hxx>
 #include <rutil/Timer.hxx>
-
-#include <asio.hpp>
-#include <boost/function.hpp>
-#include <map>
 
 #ifdef WIN32
 #include <srtp.h>
@@ -58,7 +65,7 @@ private:
 FlowManager::FlowManager()
 #ifdef USE_SSL
    : 
-   mSslContext(mIOService, asio::ssl::context::tlsv1),
+   mSslContext(asio::ssl::context::sslv23),
    mClientCert(0),
    mClientKey(0),
    mDtlsFactory(0)
@@ -120,7 +127,7 @@ FlowManager::initializeDtlsFactory(const char* certAor)
    {
       FlowDtlsTimerContext* timerContext = new FlowDtlsTimerContext(mIOService);
       mDtlsFactory = new DtlsFactory(std::auto_ptr<DtlsTimerContext>(timerContext), mClientCert, mClientKey);
-      assert(mDtlsFactory);
+      resip_assert(mDtlsFactory);
    }
    else
    {
@@ -158,7 +165,9 @@ FlowManager::createMediaStream(MediaStreamHandler& mediaStreamHandler,
                                const char* natTraversalServerHostname, 
                                unsigned short natTraversalServerPort, 
                                const char* stunUsername,
-                               const char* stunPassword)
+                               const char* stunPassword,
+                               bool forceCOMedia,
+                               SharedPtr<FlowContext> context)
 {
    MediaStream* newMediaStream = 0;
    if(rtcpEnabled)
@@ -178,7 +187,10 @@ FlowManager::createMediaStream(MediaStreamHandler& mediaStreamHandler,
                                        natTraversalServerHostname, 
                                        natTraversalServerPort, 
                                        stunUsername, 
-                                       stunPassword);
+                                       stunPassword,
+                                       forceCOMedia,
+                                       mRtcpEventLoggingHandler,
+                                       context);
    }
    else
    {
@@ -197,7 +209,10 @@ FlowManager::createMediaStream(MediaStreamHandler& mediaStreamHandler,
                                        natTraversalServerHostname, 
                                        natTraversalServerPort, 
                                        stunUsername, 
-                                       stunPassword);
+                                       stunPassword,
+                                       forceCOMedia,
+                                       SharedPtr<RTCPEventLoggingHandler>(),
+                                       context);
    }
    return newMediaStream;
 }
@@ -211,18 +226,18 @@ FlowManager::createCert(const resip::Data& pAor, int expireDays, int keyLen, X50
    Data aor = "sip:" + pAor;
    
    // Make sure that necessary algorithms exist:
-   assert(EVP_sha1());
+   resip_assert(EVP_sha1());
 
    RSA* rsa = RSA_generate_key(keyLen, RSA_F4, NULL, NULL);
-   assert(rsa);    // couldn't make key pair
+   resip_assert(rsa);    // couldn't make key pair
    
    EVP_PKEY* privkey = EVP_PKEY_new();
-   assert(privkey);
+   resip_assert(privkey);
    ret = EVP_PKEY_set1_RSA(privkey, rsa);
-   assert(ret);
+   resip_assert(ret);
 
    X509* cert = X509_new();
-   assert(cert);
+   resip_assert(cert);
    
    X509_NAME* subject = X509_NAME_new();
    X509_EXTENSION* ext = X509_EXTENSION_new();
@@ -231,29 +246,29 @@ FlowManager::createCert(const resip::Data& pAor, int expireDays, int keyLen, X50
    X509_set_version(cert, 2L);
    
    int serial = Random::getRandom();  // get an int worth of randomness
-   assert(sizeof(int)==4);
+   resip_assert(sizeof(int)==4);
    ASN1_INTEGER_set(X509_get_serialNumber(cert),serial);
    
 //    ret = X509_NAME_add_entry_by_txt( subject, "O",  MBSTRING_ASC, 
 //                                      (unsigned char *) domain.data(), domain.size(), 
 //                                      -1, 0);
-   assert(ret);
+   resip_assert(ret);
    ret = X509_NAME_add_entry_by_txt( subject, "CN", MBSTRING_ASC, 
                                      (unsigned char *) aor.data(), aor.size(), 
                                      -1, 0);
-   assert(ret);
+   resip_assert(ret);
    
    ret = X509_set_issuer_name(cert, subject);
-   assert(ret);
+   resip_assert(ret);
    ret = X509_set_subject_name(cert, subject);
-   assert(ret);
+   resip_assert(ret);
    
    const long duration = 60*60*24*expireDays;   
    X509_gmtime_adj(X509_get_notBefore(cert),0);
    X509_gmtime_adj(X509_get_notAfter(cert), duration);
    
    ret = X509_set_pubkey(cert, privkey);
-   assert(ret);
+   resip_assert(ret);
    
    Data subjectAltNameStr = Data("URI:sip:") + aor
       + Data(",URI:im:")+aor
@@ -266,13 +281,13 @@ FlowManager::createCert(const resip::Data& pAor, int expireDays, int keyLen, X50
    static char CA_FALSE[] = "CA:FALSE";
    ext = X509V3_EXT_conf_nid(NULL, NULL, NID_basic_constraints, CA_FALSE);
    ret = X509_add_ext( cert, ext, -1);
-   assert(ret);
+   resip_assert(ret);
    X509_EXTENSION_free(ext);
    
    // TODO add extensions NID_subject_key_identifier and NID_authority_key_identifier
    
    ret = X509_sign(cert, privkey, EVP_sha1());
-   assert(ret);
+   resip_assert(ret);
 
    outCert = cert;
    outKey = privkey;
@@ -283,6 +298,7 @@ FlowManager::createCert(const resip::Data& pAor, int expireDays, int keyLen, X50
 /* ====================================================================
 
  Copyright (c) 2007-2008, Plantronics, Inc.
+ Copyright (c) 2008-2018, SIP Spectrum, Inc.
  All rights reserved.
 
  Redistribution and use in source and binary forms, with or without

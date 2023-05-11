@@ -1,7 +1,7 @@
 #ifndef __P2P_Message_hxx
 #define __P2P_Message_hxx
 
-#include <cassert>
+#include "rutil/ResipAssert.h"
 #include <memory>
 #include "rutil/Data.hxx"
 
@@ -121,7 +121,7 @@ class Message : public Signable
       DestinationId nextDestination() const;
       void popNextDestinationId(); 
       
-      virtual std::unique_ptr<Event> event() = 0;
+      virtual std::auto_ptr<Event> event() = 0;
       
       virtual resip::Data brief() const =0;
       

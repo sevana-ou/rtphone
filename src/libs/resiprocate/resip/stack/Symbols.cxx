@@ -51,6 +51,8 @@ const char* Symbols::TCP = "TCP";
 const char* Symbols::TLS = "TLS";
 const char* Symbols::DTLS = "DTLS";
 const char* Symbols::SCTP = "SCTP";
+const char* Symbols::WS = "WS";
+const char* Symbols::WSS = "WSS";
 const char* Symbols::SRVUDP = "_udp.";
 const char* Symbols::SRVTCP = "_tcp.";
 const char* Symbols::SRVTLS = "_tls.";
@@ -72,9 +74,12 @@ const char* Symbols::Basic = "Basic";
 
 const char * const Symbols::MagicCookie = "z9hG4bK";
 const char * const Symbols::resipCookie= "-524287-";
+const char * const Symbols::WebsocketMagicGUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
 
 const int Symbols::DefaultSipPort = 5060;
 const int Symbols::SipTlsPort = 5061;
+const int Symbols::SipWsPort = 80;
+const int Symbols::SipWssPort = 443;
 const int Symbols::DefaultSipsPort = 5061;
 
 const char* Symbols::SrvSip = "_sip";
@@ -88,7 +93,9 @@ const char* Symbols::NaptrTcp = "D2T";
 
 const char* Symbols::audio = "audio";
 const char* Symbols::RTP_AVP = "RTP/AVP";
+const char* Symbols::RTP_AVPF = "RTP/AVPF";
 const char* Symbols::RTP_SAVP = "RTP/SAVP"; // used for SRTP
+const char* Symbols::RTP_SAVPF = "RTP/SAVPF"; // used for SRTP, usually WebRTC
 const char* Symbols::UDP_TLS_RTP_SAVP = "UDP/TLS/RTP/SAVP";  // used for DTLS-SRTP
 
 const char* Symbols::Presence = "presence";
@@ -114,10 +121,14 @@ const char* Symbols::Credential = "credential";
 
 const char* Symbols::SipProfile = "sip-profile";
 
-const char* Symbols::id = "id"; // from RFC 3323
+const char* Symbols::id = "id"; // from RFC 3325
 
 const char* Symbols::Gruu = "gruu";
 
+const char* Symbols::Uui = "uui";
+const char* Symbols::Hex = "hex";
+const char* Symbols::IsdnInterwork = "isdn-interwork";
+const char* Symbols::IsdnUui = "isdn-uui";
 
 #if defined(WIN32)
 const char *Symbols::pathSep = "\\";

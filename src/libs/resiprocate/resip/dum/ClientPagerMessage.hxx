@@ -23,24 +23,34 @@ class ClientPagerMessage : public NonDialogUsage
       //I don't know how this would interact with the queuing mechanism.
       //Will come back to re-visit this in the future.
       SipMessage& getMessageRequest();
+      SharedPtr<SipMessage> getMessageRequestSharedPtr() { return mRequest; }
 
       //!kh!
       //queues the message if there is one sent but not yet received a response
       //for it.
       //asserts if contents->get() is NULL.
-      virtual void page(std::unique_ptr<Contents> contents, DialogUsageManager::EncryptionLevel level=DialogUsageManager::None);
+      virtual void page(std::auto_ptr<Contents> contents, DialogUsageManager::EncryptionLevel level=DialogUsageManager::None);
       virtual void end();
+
+      // Use this API if the application has ongoing pending messages and it is using
+      // getMessageRequest to modify the target routing information for messages (ie:
+      // requestUri or Route headers).  This will cause the current pending message to
+      // be re-sent immediately using the new information that the application just set.
+      // Any onSuccess or onFailure callbacks that might result from the active pending
+      // message at the time this is called will be suppressed.  Any messages queued 
+      // behind that message will be dispatched sequentially to the new target.
+      void newTargetInfoSet();
 
       /**
        * Provide asynchronous method access by using command
        */
       virtual void endCommand();
-      virtual void pageCommand(std::unique_ptr<Contents> contents, DialogUsageManager::EncryptionLevel level=DialogUsageManager::None);
+      virtual void pageCommand(std::auto_ptr<Contents> contents, DialogUsageManager::EncryptionLevel level=DialogUsageManager::None);
 
       virtual void dispatch(const SipMessage& msg);
       virtual void dispatch(const DumTimeout& timer);
 
-      size_t       msgQueued () const;
+      size_t       msgQueued() const;
 
       virtual EncodeStream& dump(EncodeStream& strm) const;
 
@@ -68,8 +78,8 @@ class ClientPagerMessage : public NonDialogUsage
       ClientPagerMessage(const ClientPagerMessage&);
       ClientPagerMessage& operator=(const ClientPagerMessage&);
 
-      void pageFirstMsgQueued ();
-      void clearMsgQueued ();
+      void pageFirstMsgQueued();
+      void clearMsgQueued();
 };
 
 }

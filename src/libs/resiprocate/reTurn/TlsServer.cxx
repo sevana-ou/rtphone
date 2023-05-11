@@ -1,5 +1,12 @@
+#if defined(HAVE_CONFIG_H)
+#include "config.h"
+#endif
+
+#ifdef USE_SSL
+
 #include "TlsServer.hxx"
 #include <boost/bind.hpp>
+#include <rutil/Data.hxx>
 #include <rutil/WinLeakCheck.hxx>
 #include <rutil/Logger.hxx>
 #include "ReTurnSubsystem.hxx"
@@ -11,7 +18,7 @@ namespace reTurn {
 TlsServer::TlsServer(asio::io_service& ioService, RequestHandler& requestHandler, const asio::ip::address& address, unsigned short port)
 : mIOService(ioService),
   mAcceptor(ioService),
-  mContext(ioService, asio::ssl::context::tlsv1),  // TLSv1.0
+  mContext(asio::ssl::context::sslv23),  // SSLv23 (actually chooses TLS version dynamically)
   mConnectionManager(),
   mRequestHandler(requestHandler)
 {
@@ -28,13 +35,20 @@ TlsServer::TlsServer(asio::io_service& ioService, RequestHandler& requestHandler
    if(ec)
    {
       ErrLog(<< "Unable to load server cert chain file: " << mRequestHandler.getConfig().mTlsServerCertificateFilename << ", error=" << ec.value() << "(" << ec.message() << ")");
+      throw asio::system_error(ec);
    }
 
    // Use a private key from a file.
-   mContext.use_private_key_file(mRequestHandler.getConfig().mTlsServerCertificateFilename.c_str(), asio::ssl::context::pem, ec);
+   resip::Data keyFilename = mRequestHandler.getConfig().mTlsServerPrivateKeyFilename;
+   if(keyFilename.empty())
+   {
+      keyFilename = mRequestHandler.getConfig().mTlsServerCertificateFilename;
+   }
+   mContext.use_private_key_file(keyFilename.c_str(), asio::ssl::context::pem, ec);
    if(ec)
    {
-      ErrLog(<< "Unable to load server private key file: " << mRequestHandler.getConfig().mTlsServerCertificateFilename << ", error=" << ec.value() << "(" << ec.message() << ")");
+      ErrLog(<< "Unable to load server private key file: " << keyFilename << ", error=" << ec.value() << "(" << ec.message() << ")");
+      throw asio::system_error(ec);
    }
 
    // Use the specified file to obtain the temporary Diffie-Hellman parameters.
@@ -42,6 +56,7 @@ TlsServer::TlsServer(asio::io_service& ioService, RequestHandler& requestHandler
    if(ec)
    {
       ErrLog(<< "Unable to load temporary Diffie-Hellman parameters file: " << mRequestHandler.getConfig().mTlsTempDhFilename << ", error=" << ec.value() << "(" << ec.message() << ")");
+      throw asio::system_error(ec);
    }
 
    // Open the acceptor with the option to reuse the address (i.e. SO_REUSEADDR).
@@ -49,6 +64,15 @@ TlsServer::TlsServer(asio::io_service& ioService, RequestHandler& requestHandler
 
    mAcceptor.open(endpoint.protocol());
    mAcceptor.set_option(asio::ip::tcp::acceptor::reuse_address(true));
+#ifdef USE_IPV6
+#ifdef __linux__
+   if(address.is_v6())
+   {
+      asio::ip::v6_only v6_opt(true);
+      mAcceptor.set_option(v6_opt);
+   }
+#endif
+#endif
    mAcceptor.bind(endpoint);
    mAcceptor.listen();
 
@@ -81,14 +105,23 @@ TlsServer::handleAccept(const asio::error_code& e)
    else
    {
       ErrLog(<< "Error in handleAccept: " << e.value() << "-" << e.message());
+      if(e == asio::error::no_descriptors)
+      {
+         // Retry if too many open files (ie. out of socket descriptors)
+         mNewConnection.reset(new TlsConnection(mIOService, mConnectionManager, mRequestHandler, mContext));
+         mAcceptor.async_accept(((TlsConnection*)mNewConnection.get())->socket(), boost::bind(&TlsServer::handleAccept, this, asio::placeholders::error));
+      }
    }
 }
 
 }
 
+#endif
+
 /* ====================================================================
 
  Copyright (c) 2007-2008, Plantronics, Inc.
+ Copyright (c) 2008-2018, SIP Spectrum, Inc.
  All rights reserved.
 
  Redistribution and use in source and binary forms, with or without

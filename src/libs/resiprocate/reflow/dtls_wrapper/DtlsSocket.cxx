@@ -5,14 +5,18 @@
 #ifdef USE_SSL
 
 #include <iostream>
-#include <cassert>
+#include "rutil/ResipAssert.h"
 #include <string.h>
 
 #include "DtlsFactory.hxx"
 #include "DtlsSocket.hxx"
-#include "bf_dwrap.h"
+#include "bf_dwrap.hxx"
 using namespace std;
 using namespace dtls;
+
+const int SRTP_MASTER_KEY_BASE64_LEN = SRTP_MASTER_KEY_LEN * 4 / 3;
+const int SRTP_MASTER_KEY_KEY_LEN = 16;
+const int SRTP_MASTER_KEY_SALT_LEN = 14;
 
 // Our local timers
 class dtls::DtlsSocketTimer : public DtlsTimer
@@ -45,9 +49,9 @@ DtlsSocket::DtlsSocket(std::auto_ptr<DtlsSocketContext> socketContext, DtlsFacto
 {  
    mSocketContext->setDtlsSocket(this);
 
-   assert(factory->mContext);
+   resip_assert(factory->mContext);
    mSsl=SSL_new(factory->mContext);
-   assert(mSsl!=0);
+   resip_assert(mSsl!=0);
 
    switch(type)
    {
@@ -59,7 +63,7 @@ DtlsSocket::DtlsSocket(std::auto_ptr<DtlsSocketContext> socketContext, DtlsFacto
       SSL_set_verify(mSsl,SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT, dummy_cb);
       break;
    default:
-      assert(0);
+      resip_assert(0);
    }
 
    mInBio=BIO_new(BIO_f_dwrap());
@@ -93,7 +97,7 @@ DtlsSocket::expired(DtlsSocketTimer* timer)
 void 
 DtlsSocket::startClient()
 {
-   assert(mSocketType == Client);
+   resip_assert(mSocketType == Client);
 
    doHandshakeIteration();
 }
@@ -111,7 +115,7 @@ DtlsSocket::handlePacketMaybe(const unsigned char* bytes, unsigned int len)
    BIO_reset(mOutBio);
 
    r=BIO_write(mInBio,bytes,len);
-   assert(r==(int)len);  // Can't happen
+   resip_assert(r==(int)len);  // Can't happen
 
    // Note: we must catch any below exceptions--if there are any
    doHandshakeIteration();
@@ -235,20 +239,31 @@ SrtpSessionKeys
 DtlsSocket::getSrtpSessionKeys()
 {
    //TODO: probably an exception candidate
-   assert(mHandshakeCompleted);
+   resip_assert(mHandshakeCompleted);
+
    SrtpSessionKeys keys;
 
-   memset(&keys, 0x00, sizeof(keys));
+   unsigned char material[SRTP_MASTER_KEY_LEN << 1];
+   if (!SSL_export_keying_material(
+      mSsl,
+      material,
+      sizeof(material),
+      "EXTRACTOR-dtls_srtp", 19, NULL, 0, 0))
+   {
+      return keys;
+   }
 
-   SSL_get_srtp_key_info(mSsl, 
-      &keys.clientMasterKey,
-      &keys.clientMasterKeyLen,
-      &keys.serverMasterKey,
-      &keys.serverMasterKeyLen,
-      &keys.clientMasterSalt,
-      &keys.clientMasterSaltLen,
-      &keys.serverMasterSalt,
-      &keys.serverMasterSaltLen);
+   size_t offset = 0;
+
+   keys.clientMasterKey.assign(material + offset, material + offset + SRTP_MASTER_KEY_KEY_LEN);
+   offset += keys.clientMasterKey.size();
+   keys.serverMasterKey.assign(material + offset, material + offset + SRTP_MASTER_KEY_KEY_LEN);
+   offset += keys.serverMasterKey.size();
+   keys.clientMasterSalt.assign(material + offset, material + offset + SRTP_MASTER_KEY_SALT_LEN);
+   offset += keys.clientMasterSalt.size();
+   keys.serverMasterSalt.assign(material + offset, material + offset + SRTP_MASTER_KEY_SALT_LEN);
+   offset += keys.serverMasterSalt.size();
+
    return keys;   
 }
 
@@ -256,7 +271,7 @@ SRTP_PROTECTION_PROFILE*
 DtlsSocket::getSrtpProfile()
 {
    //TODO: probably an exception candidate
-   assert(mHandshakeCompleted);
+   resip_assert(mHandshakeCompleted);
    return SSL_get_selected_srtp_profile(mSsl);
 }
 
@@ -268,8 +283,9 @@ DtlsSocket::computeFingerprint(X509 *cert, char *fingerprint)
    int r;
    unsigned int i,n;
 
-   r=X509_digest(cert,EVP_sha1(),md,&n);
-   assert(r==1);
+   //r=X509_digest(cert,EVP_sha1(),md,&n);
+   r=X509_digest(cert,EVP_sha256(),md,&n);  // !slg! TODO - is sha1 vs sha256 supposed to come from DTLS handshake? fixing to to SHA-256 for compatibility with current web-rtc implementations
+   resip_assert(r==1);
 
    for(i=0;i<n;i++)
    {
@@ -287,7 +303,7 @@ DtlsSocket::computeFingerprint(X509 *cert, char *fingerprint)
 void
 DtlsSocket::createSrtpSessionPolicies(srtp_policy_t& outboundPolicy, srtp_policy_t& inboundPolicy)
 {
-   assert(mHandshakeCompleted);
+   resip_assert(mHandshakeCompleted);
 
    /* we assume that the default profile is in effect, for now */
    srtp_profile_t profile = srtp_profile_aes128_cm_sha1_80;
@@ -298,61 +314,67 @@ DtlsSocket::createSrtpSessionPolicies(srtp_policy_t& outboundPolicy, srtp_policy
    uint8_t *client_master_key_and_salt=new uint8_t[SRTP_MAX_KEY_LEN];
    uint8_t *server_master_key_and_salt=new uint8_t[SRTP_MAX_KEY_LEN];
    srtp_policy_t client_policy;
+   memset(&client_policy, 0, sizeof(srtp_policy_t));
+   client_policy.window_size = 128;
+   client_policy.allow_repeat_tx = 1;
    srtp_policy_t server_policy;
+   memset(&server_policy, 0, sizeof(srtp_policy_t));
+   server_policy.window_size = 128;
+   server_policy.allow_repeat_tx = 1;
 
    SrtpSessionKeys srtp_key = getSrtpSessionKeys();   
    /* set client_write key */  
    client_policy.key = client_master_key_and_salt;
-   if (srtp_key.clientMasterKeyLen != key_len)
+   if (srtp_key.clientMasterKey.size() != key_len)
    {
       cout << "error: unexpected client key length" << endl;
-      assert(0);
+      resip_assert(0);
    }
-   if (srtp_key.clientMasterSaltLen != salt_len)
+   if (srtp_key.clientMasterSalt.size() != salt_len)
    {
       cout << "error: unexpected client salt length" << endl;
-      assert(0);      
+      resip_assert(0);      
    }
 
-   memcpy(client_master_key_and_salt, srtp_key.clientMasterKey, key_len);
-   memcpy(client_master_key_and_salt + key_len, srtp_key.clientMasterSalt, salt_len);
+   memcpy(client_master_key_and_salt, &srtp_key.clientMasterKey.front(), key_len);
+   memcpy(client_master_key_and_salt + key_len, &srtp_key.clientMasterSalt.front(), salt_len);
 
    //cout << "client master key and salt: " << 
    //   octet_string_hex_string(client_master_key_and_salt, key_len + salt_len) << endl;
 
    /* initialize client SRTP policy from profile  */
-   err_status_t err = crypto_policy_set_from_profile_for_rtp(&client_policy.rtp, profile);
-   if (err) assert(0);
+   err_status_t err = crypto_policy_set_from_profile_for_rtp(&client_policy.rtp, profile);   
+   if (err) resip_assert(0);
 
    err = crypto_policy_set_from_profile_for_rtcp(&client_policy.rtcp, profile);
-   if (err) assert(0);
+   if (err) resip_assert(0);
    client_policy.next = NULL;
 
    /* set server_write key */
    server_policy.key = server_master_key_and_salt;
 
-   if (srtp_key.serverMasterKeyLen != key_len)
+   if (srtp_key.serverMasterKey.size() != key_len)
    {
       cout << "error: unexpected server key length" << endl;
-      assert(0);
+      resip_assert(0);
    }
-   if (srtp_key.serverMasterSaltLen != salt_len)
+   if (srtp_key.serverMasterSalt.size() != salt_len)
    {
       cout << "error: unexpected salt length" << endl;
-      assert(0);      
+      resip_assert(0);      
    }
 
-   memcpy(server_master_key_and_salt, srtp_key.serverMasterKey, key_len);
-   memcpy(server_master_key_and_salt + key_len, srtp_key.serverMasterSalt, salt_len);
+   memcpy(server_master_key_and_salt, &srtp_key.serverMasterKey.front(), key_len);
+   memcpy(server_master_key_and_salt + key_len, &srtp_key.serverMasterSalt.front(), salt_len);
    //cout << "server master key and salt: " << 
    //   octet_string_hex_string(server_master_key_and_salt, key_len + salt_len) << endl;
 
    /* initialize server SRTP policy from profile  */
    err = crypto_policy_set_from_profile_for_rtp(&server_policy.rtp, profile);
-   if (err) assert(0);
+   if (err) resip_assert(0);
 
    err = crypto_policy_set_from_profile_for_rtcp(&server_policy.rtcp, profile);
-   if (err) assert(0);
+   if (err) resip_assert(0);
    server_policy.next = NULL;
 
    if (mSocketType == Client) 

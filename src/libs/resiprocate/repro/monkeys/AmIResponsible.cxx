@@ -17,8 +17,9 @@ using namespace resip;
 using namespace repro;
 using namespace std;
 
-AmIResponsible::AmIResponsible() : 
-   Processor("AmIResponsible")
+AmIResponsible::AmIResponsible(bool alwaysAllowRelaying) :
+   Processor("AmIResponsible"),
+   mAlwaysAllowRelaying(alwaysAllowRelaying)
 {}
 
 AmIResponsible::~AmIResponsible()
@@ -38,22 +39,17 @@ AmIResponsible::process(RequestContext& context)
 
    // There should be no Routes on the request at this point, if there was a route, then
    // the StrictRouteFixup monkey would have routed to it already
-   assert (!request.exists(h_Routes) || 
+   resip_assert (!request.exists(h_Routes) || 
            request.header(h_Routes).empty());
   
    // Topmost route had a flow-token; this is our problem
-   if(!context.getTopRoute().uri().user().empty())
+   if(context.isTopRouteFlowTupleSet())
    {
-      resip::Tuple dest(Tuple::makeTupleFromBinaryToken(context.getTopRoute().uri().user().base64decode(), Proxy::FlowTokenSalt));
-      if(!(dest==resip::Tuple()))
-      {
-         // .bwc. Valid flow token
-         std::auto_ptr<Target> target(new Target(request.header(h_RequestLine).uri()));
-         target->rec().mReceivedFrom = dest;
-         target->rec().mUseFlowRouting = true;
-         context.getResponseContext().addTarget(target);
-         return SkipThisChain;
-      }
+      std::auto_ptr<Target> target(new Target(request.header(h_RequestLine).uri()));
+      target->rec().mReceivedFrom = context.getTopRouteFlowTuple();
+      target->rec().mUseFlowRouting = true;
+      context.getResponseContext().addTarget(target);
+      return SkipThisChain;
    }
 
    // this if is just to be safe
@@ -83,7 +79,7 @@ AmIResponsible::process(RequestContext& context)
          // !bwc! Um, then all anyone has to do to get us to be their relay
          //       is throw in a spurious to-tag...
          //       This smells funny. I am commenting it out.
-         // .slg. Putting the ood check back in and clarifying the funny smell...
+         // .slg. Putting the old check back in and clarifying the funny smell...
          //       We only want to do this check for out of dialog requests, since 
          //       mid-dialog requests could be 403'd otherwise.  Consider
          //       an INVITE request from a repro domain user to a user in 
@@ -104,7 +100,7 @@ AmIResponsible::process(RequestContext& context)
          //       I-don't-want-to-be-used-as-a-relay problem is crypto; specifically 
          //       Record-Route with crypto that states "Yeah, I set up this dialog, 
          //       let it through".
-         if (!request.header(h_To).exists(p_tag))
+         if (!request.header(h_To).exists(p_tag) && !mAlwaysAllowRelaying)
          {
             // Ensure From header is well formed
             if(!request.header(h_From).isWellFormed())
@@ -124,7 +120,8 @@ AmIResponsible::process(RequestContext& context)
 
             // .slg. Allow trusted nodes to relay
             if (!context.getKeyValueStore().getBoolValue(IsTrustedNode::mFromTrustedNodeKey) && 
-                !context.getProxy().isMyUri(request.header(h_From).uri()))
+                !context.getProxy().isMyUri(request.header(h_From).uri()) &&
+                !request.hasForceTarget())
             {
                // make 403, send, dispose of memory
                resip::SipMessage response;
@@ -136,10 +133,10 @@ AmIResponsible::process(RequestContext& context)
             }
          }
          
-         std::auto_ptr<Target> target(new Target(request.header(h_RequestLine).uri()));
+         std::auto_ptr<Target> target(new Target(uri));
          context.getResponseContext().addTarget(target);
 
-         InfoLog (<< "Sending to requri: " << request.header(h_RequestLine).uri());
+         InfoLog (<< "Sending to requri: " << uri);
          // skip the rest of the monkeys
          return Processor::SkipThisChain;	
       }

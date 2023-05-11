@@ -2,9 +2,11 @@
 #define RESIP_DIGEST_AUTHENTICATOR_HXX 
 
 #include "rutil/Data.hxx"
+#include "resip/stack/Auth.hxx"
 #include "repro/Processor.hxx"
-#include "repro/Dispatcher.hxx"
+#include "resip/stack/Dispatcher.hxx"
 #include "repro/ProxyConfig.hxx"
+#include "repro/UserInfoMessage.hxx"
 
 namespace resip
 {
@@ -16,19 +18,23 @@ namespace repro
   class DigestAuthenticator : public Processor
   {
     public:
-      DigestAuthenticator(ProxyConfig& config, Dispatcher* authRequestDispatcher);
+      DigestAuthenticator(ProxyConfig& config, resip::Dispatcher* authRequestDispatcher, const resip::Data& staticRealm = resip::Data::Empty);
       ~DigestAuthenticator();
 
       virtual processor_action_t process(RequestContext &);
 
-    private:
-      bool authorizedForThisIdentity(const resip::Data &user, const resip::Data &realm, resip::Uri &fromUri);
-      resip::NameAddr getDefaultIdentity(const resip::Data &user, const resip::Data &realm, resip::NameAddr &from);
-      void challengeRequest(RequestContext &, bool stale = false);
-      processor_action_t requestUserAuthInfo(RequestContext &, resip::Data & realm);
+    protected:
+      virtual bool authorizedForThisIdentity(const resip::Data &user, const resip::Data &realm, resip::Uri &fromUri);
+      virtual resip::NameAddr getDefaultIdentity(const resip::Data &user, const resip::Data &realm, resip::NameAddr &from);
+      virtual void challengeRequest(RequestContext &, bool stale = false);
+      virtual processor_action_t requestUserAuthInfo(RequestContext &, resip::Data & realm);
+      virtual processor_action_t requestUserAuthInfo(RequestContext &, const resip::Auth& auth, UserInfoMessage *userInfo);
       virtual resip::Data getRealm(RequestContext &);
+      virtual bool isMyRealm(RequestContext &, const resip::Data& realm);
       
-      Dispatcher* mAuthRequestDispatcher;
+    protected:
+      resip::Dispatcher* mAuthRequestDispatcher;
+      resip::Data mStaticRealm;
       bool mNoIdentityHeaders;
       resip::Data mHttpHostname;  // Used in identity headers
       int  mHttpPort;

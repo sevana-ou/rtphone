@@ -2,6 +2,7 @@
 #include <fstream>
 #include <iterator>
 #include <stdexcept>
+#include <sstream>
 #include <map>
 
 #include "rutil/ConfigParse.hxx"
@@ -26,6 +27,12 @@ ConfigParse::~ConfigParse()
 {
 }
 
+void
+ConfigParse::parseConfig(int argc, char** argv, const resip::Data& defaultConfigFilename)
+{
+   ConfigParse::parseConfig(argc, argv, defaultConfigFilename, 0);
+}
+
 void 
 ConfigParse::parseConfig(int argc, char** argv, const resip::Data& defaultConfigFilename, int skipCount)
 {
@@ -38,6 +45,20 @@ ConfigParse::parseConfig(int argc, char** argv, const resip::Data& defaultConfig
    {
       parseConfigFile(mCmdLineConfigFilename);
    }
+   mConfigValues = mFileConfigValues;
+   // Overlay the command line config options on top of the config options from the file
+   // The command line config options take precedence / override anything in the file
+   for(
+      ConfigValuesMap::iterator it = mCmdLineConfigValues.begin();
+      it != mCmdLineConfigValues.end();
+      it++)
+   {
+      if(mConfigValues.find(it->first) != mConfigValues.end())
+      {
+         mConfigValues.erase(it->first);
+      }
+      mConfigValues.insert(ConfigValuesMap::value_type(it->first, it->second));
+   } 
 }
 
 void 
@@ -68,7 +89,7 @@ ConfigParse::parseCommandLine(int argc, char** argv, int skipCount)
          isEqualNoCase(argData, "/?"))
       {
          printHelpText(argc, argv);
-         exit(1);
+         throw Exception("Help text requested - process stopping", __FILE__, __LINE__);
       }
       else if(argData.at(0) == '-' || argData.at(0) == '/')
       {
@@ -90,27 +111,32 @@ ConfigParse::parseCommandLine(int argc, char** argv, int skipCount)
                pb.data(value, anchor);
 
                //cout << "Command line Name='" << name << "' value='" << value << "'" << endl;
-               insertConfigValue(name, value);
+               insertConfigValue("command line", mCmdLineConfigValues, name, value);
             }
             else
             {
                cerr << "Invalid command line parameters:"  << endl;
                cerr << " Name/Value pairs must contain an = or a : between the name and the value" << endl;
-               exit(-1);  // todo - should convert this stuff to exceptions and let user decide to exit or not
+               cerr << " Bad argument: " << argData << endl;
+               Data exceptionString("Name/Value pairs must contain an = or a : between the name and the value (Bad argument: " + argData + ")");
+               throw Exception(exceptionString, __FILE__, __LINE__);
             }
          }
          catch(BaseException& ex)
          {
             cerr << "Invalid command line parameters:"  << endl;
             cerr << " Exception parsing Name/Value pairs: " << ex << endl;
-            exit(-1); // todo - should convert this stuff to exceptions and let user decide to exit or not
+            cerr << " Bad argument: " << argData << endl;
+            throw;
          }
       }
       else
       {
          cerr << "Invalid command line parameters:"  << endl;
          cerr << " Name/Value pairs must be prefixed with either a -, --, or a /" << endl;
-         exit(-1); // todo - should convert this stuff to exceptions and let user decide to exit or not
+         cerr << " Bad argument: " << argData << endl;
+         Data exceptionString("Name/Value pairs must be prefixed with either a -, --, or a / (Bad argument: " + argData + ")");
+         throw Exception(exceptionString,  __FILE__, __LINE__);
       }
    }
 }
@@ -118,21 +144,30 @@ ConfigParse::parseCommandLine(int argc, char** argv, int skipCount)
 void
 ConfigParse::parseConfigFile(const Data& filename)
 {
+   // Store off base config path
+   ParseBuffer pb(filename);
+   const char* anchor = pb.start();
+   pb.skipToEnd();
+   pb.skipBackToOneOf("/\\");
+   if(!pb.bof())
+   {
+      mConfigBasePath = pb.data(pb.start());
+   }
+
    ifstream configFile(filename.c_str());
    
    if(!configFile)
    {
-      throw Exception("Error opening/reading configuration file", __FILE__, __LINE__);
+      Data exceptionString("Error opening/reading configuration file: " + filename);
+      throw Exception(exceptionString,  __FILE__, __LINE__);
    }
 
    string sline;
-   const char * anchor;
    while(getline(configFile, sline)) 
    {
-      Data line(sline);
       Data name;
       Data value;
-      ParseBuffer pb(line);
+      ParseBuffer pb(sline.c_str(), sline.size());
 
       pb.skipWhitespace();
       anchor = pb.position();
@@ -154,15 +189,51 @@ ConfigParse::parseConfigFile(const Data& filename)
          pb.data(value, anchor);
       }
       //cout << "Config file Name='" << name << "' value='" << value << "'" << endl;
-      insertConfigValue(name, value);
+      Data lowerName(name);
+      lowerName.lowercase();
+      if(lowerName == "include")
+      {
+         parseConfigFile(value);
+      }
+      else
+      {
+         insertConfigValue("config file", mFileConfigValues, name, value);
+      }
+   }
+}
+
+void
+ConfigParse::getConfigIndexKeys(const resip::Data& indexName, std::set<Data>& keys)
+{
+   Data::size_type numPos = indexName.size();
+   Data indexNameLower(indexName);
+   indexNameLower.lowercase();
+   ConfigValuesMap::iterator it = mConfigValues.begin();
+   for(; it != mConfigValues.end(); it++)
+   {
+      const Data& keyName = it->first;
+      if(keyName.prefix(indexNameLower) && keyName.size() > numPos
+         && isdigit(keyName[numPos]))
+      {
+         Data::size_type i = numPos + 1;
+         while(i < keyName.size() && isdigit(keyName[i]))
+         {
+            i++;
+         }
+         Data indexFullName = keyName.substr(0, i);
+         if(keys.find(indexFullName) == keys.end())
+         {
+            keys.insert(indexFullName);
+         }
+      }
    }
 }
 
 bool 
-ConfigParse::getConfigValue(const resip::Data& name, resip::Data &value)
+ConfigParse::getConfigValue(const resip::Data& name, resip::Data &value) const
 {
    Data lowerName(name);  lowerName.lowercase();
-   ConfigValuesMap::iterator it = mConfigValues.find(lowerName);
+   ConfigValuesMap::const_iterator it = mConfigValues.find(lowerName);
    if(it != mConfigValues.end())
    {
       value = it->second;
@@ -173,7 +244,7 @@ ConfigParse::getConfigValue(const resip::Data& name, resip::Data &value)
 }
 
 Data 
-ConfigParse::getConfigData(const resip::Data& name, const resip::Data& defaultValue, bool useDefaultIfEmpty)
+ConfigParse::getConfigData(const resip::Data& name, const resip::Data& defaultValue, bool useDefaultIfEmpty) const
 {
    Data ret(defaultValue);
    if(getConfigValue(name, ret) && ret.empty() && useDefaultIfEmpty)
@@ -317,12 +388,88 @@ ConfigParse::getConfigValue(const resip::Data& name, std::vector<resip::Data> &v
    return found;
 }
 
+bool
+ConfigParse::getConfigValue(const resip::Data& name, std::set<resip::Data> &value)
+{
+   Data lowerName(name);  lowerName.lowercase();
+   std::pair<ConfigValuesMap::iterator,ConfigValuesMap::iterator> valuesIts = mConfigValues.equal_range(lowerName);
+   bool found = false;
+   for (ConfigValuesMap::iterator it=valuesIts.first; it!=valuesIts.second; ++it)
+   {
+      found = true;
+      ParseBuffer pb(it->second);
+      Data item;
+      while(!it->second.empty() && !pb.eof())
+      {
+         pb.skipWhitespace();
+         const char *start = pb.position();
+         pb.skipToOneOf(ParseBuffer::Whitespace, ",");  // allow white space
+         pb.data(item, start);
+         value.insert(item);
+         if(!pb.eof())
+         {
+            pb.skipChar();
+         }
+      }
+   }
+
+   return found;
+}
+
+ConfigParse::NestedConfigMap
+ConfigParse::getConfigNested(const resip::Data& mapsPrefix)
+{
+   NestedConfigMap m;
+   Data::size_type numPos = mapsPrefix.size();
+   Data mapsPrefixLower(mapsPrefix);
+   mapsPrefixLower.lowercase();
+   ConfigValuesMap::iterator it = mConfigValues.begin();
+   for(; it != mConfigValues.end(); it++)
+   {
+      const Data& keyName = it->first;
+      if(keyName.prefix(mapsPrefixLower) && keyName.size() > numPos
+         && isdigit(keyName[numPos]))
+      {
+         Data::size_type i = numPos + 1;
+         while(i < keyName.size() && isdigit(keyName[i]))
+         {
+            i++;
+         }
+         if(keyName.size() - i < 1)
+         {
+            stringstream err_text;
+            err_text << "Configuration key " << keyName << " missing subkey name";
+            Data err_data(err_text.str());
+            throw Exception(err_data, __FILE__, __LINE__);
+         }
+         Data index = keyName.substr(numPos, i - numPos);
+         Data nestedKey = keyName.substr(i, keyName.size() - i);
+         NestedConfigParse& nested = m[index.convertInt()];
+         nested.insertConfigValue(nestedKey, it->second);
+      }
+   }
+   return m;
+}
+
 void 
-ConfigParse::insertConfigValue(const resip::Data& name, const resip::Data& value)
+ConfigParse::insertConfigValue(const Data& source, ConfigValuesMap& configValues, const resip::Data& name, const resip::Data& value)
 {
    resip::Data lowerName(name);
    lowerName.lowercase();
-   mConfigValues.insert(ConfigValuesMap::value_type(lowerName, value));
+   if(configValues.find(lowerName) != configValues.end())
+   {
+      stringstream err_text;
+      err_text << "Duplicate configuration key " << name << " while parsing " << source;
+      Data err_data(err_text.str());
+      throw Exception(err_data, __FILE__, __LINE__);
+   }
+   configValues.insert(ConfigValuesMap::value_type(lowerName, value));
+}
+
+void 
+ConfigParse::insertConfigValue(const resip::Data& name, const resip::Data& value)
+{
+    insertConfigValue("manually added setting", mConfigValues, name, value);
 }
 
 resip::Data
@@ -338,6 +485,24 @@ ConfigParse::removePath(const resip::Data& fileAndPath)
    }
    pb.data(filenameOnly, anchor);
    return filenameOnly;
+}
+
+bool 
+ConfigParse::AddBasePathIfRequired(Data& filename)
+{
+   if(!filename.empty())
+   {
+      // If filename already has a path specified, then don't touch it
+      ParseBuffer pb(filename);
+      pb.skipToOneOf("/\\");
+      if(pb.eof())
+      {
+         // No slashes in filename, so no path present
+         filename = mConfigBasePath + filename;
+         return true;
+      }
+   }
+   return false;
 }
 
 EncodeStream& 

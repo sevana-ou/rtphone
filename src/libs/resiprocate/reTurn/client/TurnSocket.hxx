@@ -7,14 +7,20 @@
 #error You must define ASIO_ENABLE_CANCELIO in your build settings.
 #endif
 
-#include <vector>
 #include <asio.hpp>
+#ifdef USE_SSL
+#include <asio/ssl.hpp>
+#endif
+#include <boost/bind.hpp>
+
+#include <vector>
+
 #include <rutil/Data.hxx>
 #include <rutil/Mutex.hxx>
 
-#include "../StunTuple.hxx"
-#include "../StunMessage.hxx"
-#include "../ChannelManager.hxx"
+#include "reTurn/StunTuple.hxx"
+#include "reTurn/StunMessage.hxx"
+#include "reTurn/ChannelManager.hxx"
 
 namespace reTurn {
 
@@ -111,7 +117,7 @@ protected:
    asio::io_service mIOService;
 
    // handlers and timers required to do a timed out read
-   asio::deadline_timer mReadTimer;
+   asio::steady_timer mReadTimer;
    size_t mBytesRead;
    asio::error_code mReadErrorCode;
    void startReadTimer(unsigned int timeout);

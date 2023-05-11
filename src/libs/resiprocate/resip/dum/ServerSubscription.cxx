@@ -4,6 +4,7 @@
 #include "resip/dum/ServerSubscription.hxx"
 #include "resip/dum/SubscriptionHandler.hxx"
 #include "resip/dum/UsageUseException.hxx"
+#include "resip/dum/MasterProfile.hxx"
 #include "resip/stack/Helper.hxx"
 #include "rutil/Logger.hxx"
 
@@ -73,7 +74,9 @@ ServerSubscription::getTimeLeft()
 SharedPtr<SipMessage>
 ServerSubscription::accept(int statusCode)
 {
-   mDialog.makeResponse(*mLastResponse, mLastSubscribe, statusCode);
+   // Response is built in dispatch when request arrives, just need to adjust the status code here
+   mLastResponse->header(h_StatusLine).responseCode() = statusCode;
+   Helper::getResponseCodeReason(statusCode, mLastResponse->header(h_StatusLine).reason());
    mLastResponse->header(h_Expires).value() = mExpires;
    return mLastResponse;
 }
@@ -85,18 +88,27 @@ ServerSubscription::reject(int statusCode)
    {
       throw UsageUseException("Must reject with a code greater than or equal to 300", __FILE__, __LINE__);
    }
-   mDialog.makeResponse(*mLastResponse, mLastSubscribe, statusCode);
+   // Response is built in dispatch when request arrives, just need to adjust the status code here
+   mLastResponse->header(h_StatusLine).responseCode() = statusCode;
+   Helper::getResponseCodeReason(statusCode, mLastResponse->header(h_StatusLine).reason());
+   mLastResponse->remove(h_Contacts);  // Remove any contact header for non-success response
    return mLastResponse;
 }
 
+void ServerSubscription::terminateSubscription(ServerSubscriptionHandler* handler)
+{
+   handler->onTerminated(getHandle());
+   delete this;
+}
 
 void 
 ServerSubscription::send(SharedPtr<SipMessage> msg)
 {
    ServerSubscriptionHandler* handler = mDum.getServerSubscriptionHandler(mEventType);
-   assert(handler);   
+   resip_assert(handler);   
    if (msg->isResponse())
    {
+      mLastResponse.reset();  // Release ref count on memory - so message goes away when send is done
       int code = msg->header(h_StatusLine).statusCode();
       if (code < 200)
       {
@@ -119,8 +131,7 @@ ServerSubscription::send(SharedPtr<SipMessage> msg)
       else if (code < 400)
       {
          DialogUsage::send(msg);
-         handler->onTerminated(getHandle());
-         delete this;
+         terminateSubscription(handler);
          return;
       }
       else
@@ -128,8 +139,7 @@ ServerSubscription::send(SharedPtr<SipMessage> msg)
          if (shouldDestroyAfterSendingFailure(*msg))
          {
             DialogUsage::send(msg);
-            handler->onTerminated(getHandle());
-            delete this;
+            terminateSubscription(handler);
             return;
          }
          else
@@ -143,8 +153,7 @@ ServerSubscription::send(SharedPtr<SipMessage> msg)
       DialogUsage::send(msg);
       if (mSubscriptionState == Terminated)
       {
-         handler->onTerminated(getHandle());
-         delete this;
+         terminateSubscription(handler);
       }
    }
 }
@@ -158,7 +167,7 @@ ServerSubscription::shouldDestroyAfterSendingFailure(const SipMessage& msg)
       case SubDlgInitial:
          return true;
       case SubDlgTerminating: //terminated state not using in ServerSubscription
-         assert(0);
+         resip_assert(0);
          return true;
       case SubDlgEstablished:
       {
@@ -166,7 +175,7 @@ ServerSubscription::shouldDestroyAfterSendingFailure(const SipMessage& msg)
          {
             return true;
          }
-         switch (Helper::determineFailureMessageEffect(*mLastResponse))
+         switch (Helper::determineFailureMessageEffect(msg))
          {
             case Helper::TransactionTermination:
             case Helper::RetryAfter:
@@ -187,9 +196,8 @@ ServerSubscription::shouldDestroyAfterSendingFailure(const SipMessage& msg)
          break;
       }
       default: // !jf!
-         assert(0);
+         resip_assert(0);
          break;
-         
    }
    return false;   
 }
@@ -197,23 +205,31 @@ ServerSubscription::shouldDestroyAfterSendingFailure(const SipMessage& msg)
 void 
 ServerSubscription::setSubscriptionState(SubscriptionState state)
 {
-   mSubscriptionState = state;
+   // Don't allow a transition out of Terminated state
+   if (mSubscriptionState != Terminated)
+   {
+      mSubscriptionState = state;
+   }
 }
 
 void 
 ServerSubscription::dispatch(const SipMessage& msg)
 {
-   DebugLog( << "ServerSubscriptionHandler::dispatch: " << msg.brief());
+   DebugLog( << "ServerSubscription::dispatch: " << msg.brief());
 
    ServerSubscriptionHandler* handler = mDum.getServerSubscriptionHandler(mEventType);
-   assert(handler);
+   resip_assert(handler);
 
    if (msg.isRequest())
    {      
       //!dcm! -- need to have a mechanism to retrieve default & acceptable
       //expiration times for an event package--part of handler API?
       //added to handler for now.
-      mLastSubscribe = msg;      
+      if (mLastResponse.get() == 0)
+      {
+          mLastResponse.reset(new SipMessage);
+      }
+      mDialog.makeResponse(*mLastResponse, msg, 200);  // Generate response now and wait for user to accept or reject, then adjust status code
    
       int errorResponseCode = 0;
       handler->getExpires(msg,mExpires,errorResponseCode);
@@ -244,7 +260,11 @@ ServerSubscription::dispatch(const SipMessage& msg)
           */
          if (mSubscriptionState == Invalid)
          {
+            // Move to terminated state - application is not allowed to switch out of this state.  This
+            // allows applications to treat polling requests just like normal subscriptions.  Any attempt
+            // to call setSubscriptionState will NoOp.
             mSubscriptionState = Terminated;
+
             if (mEventType != "refer" )
             {
                handler->onNewSubscription(getHandle(), msg);
@@ -253,16 +273,21 @@ ServerSubscription::dispatch(const SipMessage& msg)
             {
                handler->onNewSubscriptionFromRefer(getHandle(), msg);
             }
+            // note:  it might be nice to call onExpiredByClient here, but it's dangerous, since inline calls 
+            //        to reject or the inline sending of a Notify in the onNewSubscription handler will cause 
+            //        'this' to be deleted
+            return;
          }
 
-         makeNotifyExpires();
+         makeNotifyExpires();  // builds a NOTIFY message into mLastRequest
          handler->onExpiredByClient(getHandle(), msg, *mLastRequest);
-         
-         mDialog.makeResponse(*mLastResponse, mLastSubscribe, 200);
+
+         // Send 200 response to sender
          mLastResponse->header(h_Expires).value() = mExpires;
          send(mLastResponse);
 
-         send(mLastRequest);  // Send Notify Expires
+         // Send Notify Expires
+         send(mLastRequest);
          return;
       }
       if (mSubscriptionState == Invalid)
@@ -289,25 +314,33 @@ ServerSubscription::dispatch(const SipMessage& msg)
    else
    {     
       //.dcm. - will need to change if retry-afters are reaching here
-      mLastRequest->releaseContents();
+      //mLastRequest->releaseContents();
+      mLastRequest.reset();   // Release ref count on memory - so message goes away when send is done
       int code = msg.header(h_StatusLine).statusCode();
-      if (code < 300)
-      { 
+
+      if(code < 200)
+      {
+         return;
+      }
+      else if (code < 300)
+      {
+         handler->onNotifyAccepted(getHandle(), msg);
          return;
       }
       else if (code < 400)
       {
          //in dialog NOTIFY got redirected? Bizarre...
          handler->onError(getHandle(), msg);
-         handler->onTerminated(getHandle());
-         delete this;         
+         terminateSubscription(handler);
       }
       else
       {
-         switch(Helper::determineFailureMessageEffect(msg))
+         switch(Helper::determineFailureMessageEffect(msg,
+             (mDum.getMasterProfile()->additionalTransactionTerminatingResponsesEnabled()) ?
+             &mDum.getMasterProfile()->getAdditionalTransactionTerminatingResponses() : NULL))
          {
             case Helper::TransactionTermination:
-               DebugLog( << "ServerSubscriptionHandler::TransactionTermination: " << msg.brief());
+               DebugLog( << "ServerSubscription::TransactionTermination: " << msg.brief());
                handler->onNotifyRejected(getHandle(), msg);
                break;
             case Helper::UsageTermination:
@@ -315,10 +348,9 @@ ServerSubscription::dispatch(const SipMessage& msg)
             case Helper::OptionalRetryAfter:
             case Helper::ApplicationDependant: 
             case Helper::DialogTermination:
-               DebugLog( << "ServerSubscriptionHandler::UsageTermination: " << msg.brief());
+               DebugLog( << "ServerSubscription::UsageTermination: " << msg.brief());
                handler->onError(getHandle(), msg);
-               handler->onTerminated(getHandle());
-               delete this;
+               terminateSubscription(handler);
                break;
          }
       }
@@ -336,6 +368,10 @@ ServerSubscription::makeNotifyExpires()
 void
 ServerSubscription::makeNotify()
 {
+   if (mLastRequest.get() == 0)
+   {
+      mLastRequest.reset(new SipMessage);
+   }
    mDialog.makeRequest(*mLastRequest, NOTIFY);
    mLastRequest->header(h_SubscriptionState).value() = getSubscriptionStateString(mSubscriptionState);
    if (mSubscriptionState == Terminated)
@@ -356,16 +392,23 @@ ServerSubscription::makeNotify()
 
 
 void
-ServerSubscription::end(TerminateReason reason, const Contents* document)
+ServerSubscription::end(TerminateReason reason, const Contents* document, int retryAfter)
 {
-   mSubscriptionState = Terminated;
-   makeNotify();
-   mLastRequest->header(h_SubscriptionState).param(p_reason) = getTerminateReasonString(reason);   
-   if (document)
+   if (mSubscriptionState != Terminated)  // NoOp if called twice or already ending
    {
-      mLastRequest->setContents(document);
+      mSubscriptionState = Terminated;
+      makeNotify();
+      mLastRequest->header(h_SubscriptionState).param(p_reason) = getTerminateReasonString(reason);
+      if (document)
+      {
+         mLastRequest->setContents(document);
+      }
+      if (retryAfter != 0)
+      {
+         mLastRequest->header(h_SubscriptionState).param(p_retryAfter) = retryAfter;
+      }
+      send(mLastRequest);
    }
-   send(mLastRequest);
 }
 
 void
@@ -377,11 +420,11 @@ ServerSubscription::end()
 void
 ServerSubscription::dispatch(const DumTimeout& timeout)
 {
-   assert(timeout.type() == DumTimeout::Subscription);
+   resip_assert(timeout.type() == DumTimeout::Subscription);
    if (timeout.seq() == mTimerSeq)
    {
       ServerSubscriptionHandler* handler = mDum.getServerSubscriptionHandler(mEventType);
-      assert(handler);
+      resip_assert(handler);
       makeNotifyExpires();
       handler->onExpired(getHandle(), *mLastRequest);
       send(mLastRequest);
@@ -405,20 +448,10 @@ ServerSubscription::neutralNotify()
 }
 
 void 
-ServerSubscription::dialogDestroyed(const SipMessage& msg)
-{
-   ServerSubscriptionHandler* handler = mDum.getServerSubscriptionHandler(mEventType);
-   assert(handler);   
-   handler->onError(getHandle(), msg);
-   handler->onTerminated(getHandle());
-   delete this;
-}
-
-void 
 ServerSubscription::onReadyToSend(SipMessage& msg)
 {
    ServerSubscriptionHandler* handler = mDum.getServerSubscriptionHandler(mEventType);
-   assert(handler);
+   resip_assert(handler);
    handler->onReadyToSend(getHandle(), msg);
 }
 
@@ -427,7 +460,7 @@ ServerSubscription::flowTerminated()
 {
    // notify handler
    ServerSubscriptionHandler* handler = mDum.getServerSubscriptionHandler(mEventType);
-   assert(handler);
+   resip_assert(handler);
    handler->onFlowTerminated(getHandle());
 }
 
@@ -437,7 +470,6 @@ ServerSubscription::dump(EncodeStream& strm) const
    strm << "ServerSubscription " << mSubscriber;
    return strm;
 }
-
 
 /* ====================================================================
  * The Vovida Software License, Version 1.0 

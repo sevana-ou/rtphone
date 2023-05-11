@@ -98,10 +98,10 @@ IdentityHandler::queueForIdentityCheck(SipMessage* sipMsg)
    }
 #endif
 
-   std::unique_ptr<SecurityAttributes> sec(new SecurityAttributes);
+   std::auto_ptr<SecurityAttributes> sec(new SecurityAttributes);
    sec->setIdentity(sipMsg->header(h_From).uri().getAor());
    sec->setIdentityStrength(SecurityAttributes::From);
-   sipMsg->setSecurityAttributes(std::move(sec));
+   sipMsg->setSecurityAttributes(sec);
    return false;
 }
 
@@ -114,7 +114,7 @@ IdentityHandler::processIdentityCheckResponse(const HttpGetMessage& msg)
    if (it != mRequiresCerts.end())
    {
       mDum.getSecurity()->checkAndSetIdentity( *it->second, msg.getBodyData() );
-      postCommand(unique_ptr<Message>(it->second));
+      postCommand(auto_ptr<Message>(it->second));
       mRequiresCerts.erase(it);
    }
 #endif

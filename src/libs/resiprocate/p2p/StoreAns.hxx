@@ -27,7 +27,7 @@ class StoreAns : public ResourceMessage
       }
 
       // call Event->dispatch(consumer) when you want to dispatch this
-      std::unique_ptr<Event> event()
+      std::auto_ptr<Event> event()
       {
          return wrap(this);
       }

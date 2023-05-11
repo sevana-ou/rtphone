@@ -39,7 +39,7 @@ OutboundTargetHandler::process(RequestContext & rc)
       const resip::Data& tid=sip->getTransactionId();
       DebugLog(<<"Looking for tid " << tid);
       Target* target = rsp.getTarget(tid);
-      assert(target);
+      resip_assert(target);
       OutboundTarget* ot = dynamic_cast<OutboundTarget*>(target);
       if(ot)
       {
@@ -53,7 +53,7 @@ OutboundTargetHandler::process(RequestContext & rc)
             flowDeadCode=410;
          }
          if(sip->header(resip::h_StatusLine).responseCode()==flowDeadCode ||  // Remote or locally(stack) generate 430
-            (sip->getReceivedTransport() == 0 &&
+            (!sip->isFromWire() &&
              (sip->header(resip::h_StatusLine).responseCode()==408 ||         // Locally (stack) generated 408 or 503
               sip->header(resip::h_StatusLine).responseCode()==503)))
          {

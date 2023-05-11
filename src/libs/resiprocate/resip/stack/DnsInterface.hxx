@@ -19,7 +19,6 @@ class DnsResultSink;
 class DnsResult;
 class Uri;
 class Via;
-//class ExternalDns;
 class DnsRawSink;
 
 class DnsInterface
@@ -37,7 +36,7 @@ class DnsInterface
       // DnsResult be in the same thread that is processing the async results
       // since there is no locking on the DnsResult
       // Will throw DnsInterface::Exception if the Dns provider fails to initialize
-      DnsInterface(DnsStub& dnsStub);
+      DnsInterface(DnsStub& dnsStub, bool useDnsVip=false);
 
       virtual ~DnsInterface();
 
@@ -45,7 +44,8 @@ class DnsInterface
 
       // set the supported set of types that a UAC wishes to use
       void addTransportType(TransportType type, IpVersion version);
-      
+      void removeTransportType(TransportType type, IpVersion version);
+
       // return if the client supports the specified service (e.g. SIP+D2T)
       bool isSupported(const Data& service);
       bool isSupported(TransportType t, IpVersion version);
@@ -72,28 +72,38 @@ class DnsInterface
       DnsResult* createDnsResult(DnsHandler* handler=0);
       void lookup(DnsResult* res, const Uri& uri);
 
-      //DnsResult* lookup(const Uri& url, DnsHandler* handler=0);
-      //DnsResult* lookup(const Via& via, DnsHandler* handler=0);
-
-      //void lookupRecords(const Data& target, unsigned short type, DnsRawSink* sink);
-      //virtual void handleDnsRaw(ExternalDnsRawResult);
       TupleMarkManager& getMarkManager(){return mMarkManager;}
 
+      bool setUdpOnlyOnNumeric(bool value)
+      {
+         mUdpOnlyOnNumeric = value;
+         return mUdpOnlyOnNumeric;
+      }
+
+      bool getUdpOnlyOnNumeric() const
+      {
+         return mUdpOnlyOnNumeric;
+      }
+
    protected: 
+      const Data* getSupportedNaptrType(TransportType type);
+      void logSupportedTransports();
+
       // When complete or partial results are ready, call DnsHandler::process()
       // For synchronous DnsInterface, set to 0
       friend class DnsResult;
-      // DnsHandler* mHandler;		// .kw. not used anymore?
-      std::set<Data> mSupportedNaptrs;
-      typedef std::vector<std::pair<TransportType, IpVersion> > TransportMap;
+      Mutex mSupportedMutex; // Protects mSupportedNaptrs and mSupportTransports
+      typedef std::map<Data, unsigned int> SupportedNaptrMap; // second is for RefCount
+      SupportedNaptrMap mSupportedNaptrs;  
+      typedef std::map<std::pair<TransportType, IpVersion>, unsigned int> TransportMap; // second is for RefCount
       TransportMap mSupportedTransports;
-      //std::set<TransportType> mSupportedTransportTypes;
+      // Whether transport failover should be disabled on URIs with only a numeric
+      // IP address (only UDP will ever be attempted).
+      bool mUdpOnlyOnNumeric;
 
-      //ExternalDns* mDnsProvider;
-
-      DnsStub& mDnsStub;
-      RRVip mVip;
-      TupleMarkManager mMarkManager;
+      DnsStub& mDnsStub;  
+      RRVip mVip;                      // Ensure all access is from DnsThread/DnsStub fifo for thread safety
+      TupleMarkManager mMarkManager;   // Ensure all access is from DnsThread/DnsStub fifo for thread safety
 };
 
 }
@@ -150,4 +160,5 @@ class DnsInterface
  *
  */
 
+// vim: softtabstop=3:shiftwidth=3:expandtab
 

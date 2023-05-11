@@ -1,4 +1,4 @@
-#include <cassert>
+#include "rutil/ResipAssert.h"
 
 #include "resip/stack/ParserContainerBase.hxx"
 #include "resip/stack/Embedded.hxx"
@@ -57,7 +57,7 @@ ParserContainerBase::operator=(const ParserContainerBase& rhs)
 void
 ParserContainerBase::pop_front() 
 {
-   assert(!mParsers.empty());
+   resip_assert(!mParsers.empty());
    freeParser(mParsers.front());
    mParsers.erase(mParsers.begin());
 }
@@ -65,7 +65,7 @@ ParserContainerBase::pop_front()
 void
 ParserContainerBase::pop_back() 
 {
-   assert(!mParsers.empty());
+   resip_assert(!mParsers.empty());
    freeParser(mParsers.back());
    mParsers.pop_back(); 
 }
@@ -118,7 +118,7 @@ EncodeStream&
 ParserContainerBase::encodeEmbedded(const Data& headerName, 
                                     EncodeStream& str) const
 {
-   assert(!headerName.empty());
+   resip_assert(!headerName.empty());
 
    if (!mParsers.empty())
    {
@@ -154,11 +154,18 @@ ParserContainerBase::copyParsers(const Parsers& parsers)
    mParsers.reserve(mParsers.size() + parsers.size());
    for(Parsers::const_iterator p=parsers.begin(); p!=parsers.end(); ++p)
    {
-      mParsers.push_back(*p);
+      // Copy c'tor and assignment operator for HeaderKit are actually poor
+      // man's move semantics, so we have to implement real copy semantics here.
+      mParsers.push_back(HeaderKit::Empty);
+
       HeaderKit& kit(mParsers.back());
-      if(kit.pc)
+      if(p->pc)
       {
-         kit.pc = makeParser(*kit.pc);
+         kit.pc = makeParser(*(p->pc));
+      } 
+      else 
+      {
+         kit.hfv = p->hfv;
       }
    }
 }

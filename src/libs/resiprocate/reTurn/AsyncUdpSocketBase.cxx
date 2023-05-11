@@ -25,7 +25,7 @@ AsyncUdpSocketBase::~AsyncUdpSocketBase()
 unsigned int 
 AsyncUdpSocketBase::getSocketDescriptor() 
 { 
-   return mSocket.native(); 
+   return (unsigned int)mSocket.native_handle(); 
 }
 
 asio::error_code 
@@ -35,7 +35,18 @@ AsyncUdpSocketBase::bind(const asio::ip::address& address, unsigned short port)
    mSocket.open(address.is_v6() ? asio::ip::udp::v6() : asio::ip::udp::v4(), errorCode);
    if(!errorCode)
    {
+#ifdef USE_IPV6
+#ifdef __linux__
+      if(address.is_v6())
+      {
+         asio::ip::v6_only v6_opt(true);
+         mSocket.set_option(v6_opt);
+      }
+#endif
+#endif
       mSocket.set_option(asio::ip::udp::socket::reuse_address(true), errorCode);
+      mSocket.set_option(asio::socket_base::receive_buffer_size(66560));
+      //mSocket.set_option(asio::socket_base::send_buffer_size(66560));
       mSocket.bind(asio::ip::udp::endpoint(address, port), errorCode);
    }
    return errorCode;
@@ -47,7 +58,11 @@ AsyncUdpSocketBase::connect(const std::string& address, unsigned short port)
    // Start an asynchronous resolve to translate the address
    // into a list of endpoints.
    resip::Data service(port);
-   asio::ip::udp::resolver::query query(address, service.c_str());   
+#ifdef USE_IPV6
+   asio::ip::udp::resolver::query query(address, service.c_str());
+#else
+   asio::ip::udp::resolver::query query(asio::ip::udp::v4(), address, service.c_str());   
+#endif
    mResolver.async_resolve(query,
         boost::bind(&AsyncSocketBase::handleUdpResolve, shared_from_this(),
                     asio::placeholders::error,
@@ -112,6 +127,11 @@ AsyncUdpSocketBase::transportFramedReceive()
 void 
 AsyncUdpSocketBase::transportClose()
 {
+   if (mOnBeforeSocketCloseFp)
+   {
+      mOnBeforeSocketCloseFp((unsigned int)mSocket.native_handle());
+   }
+
    asio::error_code ec;
    mSocket.close(ec);
 }
@@ -122,6 +142,7 @@ AsyncUdpSocketBase::transportClose()
 /* ====================================================================
 
  Copyright (c) 2007-2008, Plantronics, Inc.
+ Copyright (c) 2008-2018, SIP Spectrum, Inc.
  All rights reserved.
 
  Redistribution and use in source and binary forms, with or without

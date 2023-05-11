@@ -2,12 +2,16 @@
 #define TCP_CONNECTION_HXX
 
 #include <asio.hpp>
+#ifdef USE_SSL
+#include <asio/ssl.hpp>
+#endif
 #include <boost/array.hpp>
 #include <boost/noncopyable.hpp>
 #include <boost/shared_ptr.hpp>
 #include "RequestHandler.hxx"
 #include "StunTuple.hxx"
 #include "AsyncTcpSocketBase.hxx"
+#include "TurnAllocationManager.hxx"
 
 namespace reTurn {
 
@@ -44,11 +48,18 @@ protected:
    virtual void onSendSuccess();
    virtual void onSendFailure(const asio::error_code& e);
 
-   /// The manager for this connection.
+   /// The connection manager for this connection.
    ConnectionManager& mConnectionManager;
+
+   /// Manages turn allocations
+   TurnAllocationManager mTurnAllocationManager;
 
    /// The handler used to process the incoming request.
    RequestHandler& mRequestHandler;
+
+   // Stores the local address and port
+   asio::ip::address mLocalAddress;
+   unsigned short mLocalPort;
 
 private:
 };

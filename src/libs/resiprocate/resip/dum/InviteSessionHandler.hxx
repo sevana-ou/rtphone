@@ -67,6 +67,9 @@ class InviteSessionHandler
       /// called when ACK (with out an answer) is received for initial invite (UAS)
       virtual void onConnectedConfirmed(InviteSessionHandle, const SipMessage &msg);
 
+      /// called when PRACK is received for a reliable provisional answer (UAS)
+      virtual void onPrack(ServerInviteSessionHandle, const SipMessage &msg);
+
       /** UAC gets no final response within the stale call timeout (default is 3
        * minutes). This is just a notification. After the notification is
        * called, the InviteSession will then call
@@ -91,7 +94,7 @@ class InviteSessionHandler
          LocalCancel,
          RemoteCancel,
          Rejected, //Only as UAS, UAC has distinct onFailure callback
-         Referred
+         Referred  //!slg! - This is really Redirected - not sure why it is called Referred.  Only gets used when we send a redirect (ie: 302).
       };
             
       virtual void onTerminated(InviteSessionHandle, InviteSessionHandler::TerminatedReason reason, const SipMessage* related=0)=0;
@@ -141,6 +144,8 @@ class InviteSessionHandler
       virtual void onOfferRejected(InviteSessionHandle, const SipMessage* msg)=0;
       
       /// called when INFO message is received 
+      /// the application must call acceptNIT() or rejectNIT()
+      /// once it is ready for another message.
       virtual void onInfo(InviteSessionHandle, const SipMessage& msg)=0;
 
       /// called when response to INFO message is received 

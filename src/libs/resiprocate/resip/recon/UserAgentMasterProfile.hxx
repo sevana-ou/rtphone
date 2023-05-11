@@ -1,10 +1,13 @@
 #if !defined(UserAgentMasterProfile_hxx)
 #define UserAgentMasterProfile_hxx
 
+#include <rutil/SharedPtr.hxx>
 #include <rutil/TransportType.hxx>
 #include <rutil/dns/DnsStub.hxx>
 #include <resip/stack/SecurityTypes.hxx> 
+#include <resip/stack/Transport.hxx>
 #include <resip/dum/MasterProfile.hxx>
+#include <reflow/RTCPEventLoggingHandler.hxx>
 #include <vector>
 
 namespace recon
@@ -28,10 +31,26 @@ public:
       resip::TransportType mProtocol;
       int mPort;
       resip::IpVersion mIPVersion;
+      resip::StunSetting mStunEnabled;
       resip::Data mIPInterface;
       resip::Data mSipDomainname;
+      resip::Data mTlsPrivateKeyPassPhrase;
       resip::SecurityTypes::SSLType mSslType;
+      unsigned mTransportFlags;
+      resip::Data mTlsCertificate;
+      resip::Data mTlsPrivateKey;
+      resip::SecurityTypes::TlsClientVerificationMode mCvm;
+      bool mUseEmailAsSIP;
+      unsigned int mRcvBufLen;
    };
+
+   void setTransportSipMessageLoggingHandler(resip::SharedPtr<resip::Transport::SipMessageLoggingHandler> handler);
+
+   const resip::SharedPtr<resip::Transport::SipMessageLoggingHandler> getTransportSipMessageLoggingHandler() const;
+
+   void setRTCPEventLoggingHandler(resip::SharedPtr<flowmanager::RTCPEventLoggingHandler> handler);
+
+   const resip::SharedPtr<flowmanager::RTCPEventLoggingHandler> getRTCPEventLoggingHandler() const;
 
    /**
      Adds a network transport to use for send/receiving SIP messages.
@@ -50,9 +69,17 @@ public:
    void addTransport( resip::TransportType protocol,
                       int port, 
                       resip::IpVersion version=resip::V4,
+                      resip::StunSetting stun=resip::StunDisabled,
                       const resip::Data& ipInterface = resip::Data::Empty, 
                       const resip::Data& sipDomainname = resip::Data::Empty, // TLS only
-                      resip::SecurityTypes::SSLType sslType = resip::SecurityTypes::TLSv1 );
+                      const resip::Data& privateKeyPassPhrase = resip::Data::Empty,
+                      resip::SecurityTypes::SSLType sslType = resip::SecurityTypes::SSLv23,
+                      unsigned transportFlags = 0,
+                      const resip::Data& certificateFilename = resip::Data::Empty,
+                      const resip::Data& privateKeyFilename = resip::Data::Empty,
+                      resip::SecurityTypes::TlsClientVerificationMode cvm = resip::SecurityTypes::None,
+                      bool useEmailAsSIP = false,
+                      unsigned int rcvBufLen = 0);
 
    /**
      Gets a vector of the transports previously added.
@@ -109,6 +136,28 @@ public:
    virtual const resip::Data certPath() const; 
 
    /**
+     Get/Set the locations where the SIP stack will look for X.509
+     trusted root certificates.
+
+     @note This MUST be called before the UserAgent is created
+
+     @return Data root cert directory location
+   */
+   virtual std::vector<resip::Data>& rootCertDirectories();
+   virtual const std::vector<resip::Data>& rootCertDirectories() const;
+
+   /**
+     Get/Set the names of files containing bundles of X.509 trusted
+     root certificates
+
+     @note This MUST be called before the UserAgent is created
+
+     @return Data cert path location
+   */
+   virtual std::vector<resip::Data>& rootCertBundles();
+   virtual const std::vector<resip::Data>& rootCertBundles() const;
+
+   /**
      Get/Set wether SIP message statistics are send to logging subsystem
 
      @return bool Set to true to enable statistics
@@ -151,7 +200,11 @@ public:
 
 private:            
    resip::Data mCertPath;
+   std::vector<resip::Data> mRootCertDirectories;
+   std::vector<resip::Data> mRootCertBundles;
    bool mStatisticsManagerEnabled;
+   resip::SharedPtr<resip::Transport::SipMessageLoggingHandler> mTransportSipMessageLoggingHandler;
+   resip::SharedPtr<flowmanager::RTCPEventLoggingHandler> mRTCPEventLoggingHandler;
    std::vector<TransportInfo> mTransports;
    std::vector<resip::Data> mEnumSuffixes;
    resip::DnsStub::NameserverList mAdditionalDnsServers;

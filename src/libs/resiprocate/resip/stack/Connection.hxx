@@ -43,7 +43,7 @@ class Connection : public ConnectionBase,
       friend EncodeStream& operator<<(EncodeStream& strm, const resip::Connection& c);
 
    public:
-      Connection(Transport* transport,const Tuple& who, Socket socket, Compression &compression);
+      Connection(Transport* transport,const Tuple& who, Socket socket, Compression &compression, bool isServer);
       virtual ~Connection();
       
       /*!
@@ -58,7 +58,8 @@ class Connection : public ConnectionBase,
       /// always true -- always add to fdset as read ready
       virtual bool hasDataToRead();
       /// has valid connection
-      virtual bool isGood(); 
+      virtual bool isGood();
+      virtual bool checkConnectionTimedout();
       virtual bool isWritable();
       virtual bool transportWrite(){return false;}
 
@@ -99,10 +100,10 @@ class Connection : public ConnectionBase,
       void enableFlowTimer();
       bool isFlowTimerEnabled() { return mFlowTimerEnabled; }
 
-      bool mRequestPostConnectSocketFuncCall;
+      bool mFirstWriteAfterConnectedPending;
       static volatile bool mEnablePostConnectSocketFuncCall;
       static void setEnablePostConnectSocketFuncCall(bool enabled = true) { mEnablePostConnectSocketFuncCall = enabled; }
-
+      bool isServer()const;
    protected:
       /// pure virtual, but need concrete Connection for book-ends of lists
       virtual int read(char* /* buffer */, const int /* count */) { return 0; }
@@ -113,6 +114,8 @@ class Connection : public ConnectionBase,
 
       /* callback method of FdPollItemIf */
       virtual void processPollEvent(FdPollEventMask mask);
+
+      virtual void invokeAfterSocketCreationFunc() const;
 
    private:
       ConnectionManager& getConnectionManager() const;
@@ -127,6 +130,7 @@ class Connection : public ConnectionBase,
       /// no value semantics
       Connection(const Connection&);
       Connection& operator=(const Connection&);
+      bool mIsServer;
 };
 
 EncodeStream& 

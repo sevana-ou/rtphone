@@ -16,7 +16,7 @@
 #include "repro/Proxy.hxx"
 #include "repro/UserInfoMessage.hxx"
 #include "repro/UserStore.hxx"
-#include "repro/Dispatcher.hxx"
+#include "resip/stack/Dispatcher.hxx"
 #include "resip/stack/SipStack.hxx"
 #include "rutil/ParseBuffer.hxx"
 #include "rutil/WinLeakCheck.hxx"
@@ -28,9 +28,11 @@ using namespace repro;
 using namespace std;
 
 DigestAuthenticator::DigestAuthenticator(ProxyConfig& config,
-                                         Dispatcher* authRequestDispatcher) :
+                                         Dispatcher* authRequestDispatcher,
+                                         const Data& staticRealm) :
    Processor("DigestAuthenticator"),
    mAuthRequestDispatcher(authRequestDispatcher),
+   mStaticRealm(staticRealm),
    mNoIdentityHeaders(config.getConfigBool("DisableIdentity", false)),
    mHttpHostname(config.getConfigData("HttpHostname", "")),
    mHttpPort(config.getConfigInt("HttpPort", 5080)),
@@ -71,8 +73,7 @@ DigestAuthenticator::process(repro::RequestContext &rc)
          // asynchronously fetch the relevant userAuthInfo from the database
          for (Auths::iterator i = authHeaders.begin() ; i != authHeaders.end() ; ++i)
          {
-            // !rwm!  TODO sometime we need to have a separate isMyRealm() function
-            if (proxy.isMyDomain(i->param(p_realm)))
+            if (isMyRealm(rc, i->param(p_realm)))
             {
                return requestUserAuthInfo(rc, i->param(p_realm));
             }
@@ -98,8 +99,8 @@ DigestAuthenticator::process(repro::RequestContext &rc)
       {
          if (!rc.getKeyValueStore().getBoolValue(IsTrustedNode::mFromTrustedNodeKey))
          {
-               challengeRequest(rc, false);
-               return SkipAllChains;
+            challengeRequest(rc, false);
+            return SkipAllChains;
          }
       }
    }
@@ -107,17 +108,51 @@ DigestAuthenticator::process(repro::RequestContext &rc)
    {
       // Handle response from user authentication database
       sipMessage = &rc.getOriginalRequest();
-      const Data& a1 = userInfo->A1();
       const Data& realm = userInfo->realm();
       const Data& user = userInfo->user();
-      InfoLog (<< "Received user auth info for " << user << " at realm " << realm 
-               <<  " a1 is " << a1);
+      InfoLog (<< "Received user auth info for " << user << " at realm " << realm);
+      Helper::AuthResult authResult = Helper::Failed;
+      switch(userInfo->getMode())
+      {
+         case UserAuthInfo::UserUnknown:
+            authResult = Helper::Failed;
+            break;
 
-      pair<Helper::AuthResult,Data> result =
-         Helper::advancedAuthenticateRequest(*sipMessage, realm, a1, 3000); // was 15
+         case UserAuthInfo::RetrievedA1:
+            {
+               const Data& a1 = userInfo->A1();
+               StackLog (<< "Received user auth info for " << user << " at realm " << realm 
+                         <<  " a1 is " << a1);
 
-//      Auths &authHeaders = sipMessage->header(h_ProxyAuthorizations);
-      switch (result.first)
+               pair<Helper::AuthResult,Data> result =
+                  Helper::advancedAuthenticateRequest(*sipMessage, realm, a1, 3000); // was 15
+               authResult = result.first;
+            }
+            break;
+
+         case UserAuthInfo::Stale:
+            authResult = Helper::Expired;
+            break;
+
+         case UserAuthInfo::DigestAccepted:
+            authResult = Helper::Authenticated;
+            break;
+
+         case UserAuthInfo::DigestNotAccepted:
+            authResult = Helper::Failed;
+            break;
+
+         case UserAuthInfo::Error:
+            authResult = Helper::Failed;
+            WarningLog(<<"UserInfoMessage mode == ERROR");
+            break;
+
+         default:
+            authResult = Helper::Failed;
+            ErrLog(<<"Unrecognised UserInfoMessage mode value: " << userInfo->getMode());
+      }
+
+      switch (authResult)
       {
          case Helper::Failed:
             InfoLog (<< "Authentication failed for " << user << " at realm " << realm << ". Sending 403");
@@ -133,24 +168,6 @@ DigestAuthenticator::process(repro::RequestContext &rc)
          case Helper::Authenticated:
             InfoLog (<< "Authentication ok for " << user);
             
-            // Delete the Proxy-Auth header for this realm.  
-            // other Proxy-Auth headers might be needed by a downsteram node
-/*            
-            Auths::iterator i = authHeaders.begin();
-            Auths::iterator j = authHeaders.begin();
-            while( i != authHeaders.end() )
-            {
-               if (proxy.isMyDomain(i->param(p_realm)))
-               {
-                  j = i++;
-                  authHeaders.erase(j);
-               }
-               else
-               {
-                  ++i;
-               }
-            }
-*/            
             if(!sipMessage->header(h_From).isWellFormed() ||
                sipMessage->header(h_From).isAllContacts())
             {
@@ -301,14 +318,18 @@ DigestAuthenticator::authorizedForThisIdentity(const resip::Data &user, const re
    if (fromUri.host() == realm)
    {
       if ((fromUri.user() == user) || (fromUri.user() == "anonymous"))
+      {
          return true;
+      }
+   }
 
-      // Now try the form where the username parameter in the auth
-      // header is the full fromUri, e.g.
-      //    Proxy-Authorization: Digest username="user@domain" ...
-      //
-      if (fromUri.getAorNoPort() == user)
-         return true;
+   // Now try the form where the username parameter in the auth
+   // header is the full fromUri, e.g.
+   //    Proxy-Authorization: Digest username="user@domain" ...
+   //
+   if (fromUri.getAorNoPort() == user)
+   {
+      return true;
    }
 
    // catch-all: access denied
@@ -327,8 +348,7 @@ DigestAuthenticator::getDefaultIdentity(const resip::Data &user, const resip::Da
 }
 
 void
-DigestAuthenticator::challengeRequest(repro::RequestContext &rc,
-                                      bool stale)
+DigestAuthenticator::challengeRequest(repro::RequestContext &rc, bool stale)
 {
    SipMessage &sipMessage = rc.getOriginalRequest();
    Data realm = getRealm(rc);
@@ -339,26 +359,23 @@ DigestAuthenticator::challengeRequest(repro::RequestContext &rc,
    delete challenge;
 }
 
-
 repro::Processor::processor_action_t
 DigestAuthenticator::requestUserAuthInfo(repro::RequestContext &rc, resip::Data &realm)
 {
    Message *message = rc.getCurrentEvent();
    SipMessage *sipMessage = dynamic_cast<SipMessage*>(message);
-   assert(sipMessage);
-
+   resip_assert(sipMessage);
 
    // Extract the user from the appropriate Proxy-Authorization header
    Auths &authorizationHeaders = sipMessage->header(h_ProxyAuthorizations); 
    Auths::iterator i;
    Data user;
 
-   for (i = authorizationHeaders.begin();
-        i != authorizationHeaders.end(); i++)
+   for (i = authorizationHeaders.begin(); i != authorizationHeaders.end(); i++)
    {
-      if (    i->exists(p_realm) && 
-              i->param(p_realm) == realm
-              &&  i->exists(p_username))
+      if (i->exists(p_realm) && 
+          i->param(p_realm) == realm
+          &&  i->exists(p_username))
       {
          user = i->param(p_username);
 
@@ -381,9 +398,8 @@ DigestAuthenticator::requestUserAuthInfo(repro::RequestContext &rc, resip::Data 
       {
          async->domain()=realm;
       }
-      std::auto_ptr<ApplicationMessage> app(async);
-      mAuthRequestDispatcher->post(app);
-      return WaitingForEvent;
+      Auth& auth = *i;
+      return requestUserAuthInfo(rc, auth, async);
    }
    else
    {
@@ -392,44 +408,33 @@ DigestAuthenticator::requestUserAuthInfo(repro::RequestContext &rc, resip::Data 
    }
 }
 
+Processor::processor_action_t
+DigestAuthenticator::requestUserAuthInfo(RequestContext &rc, const Auth& auth, UserInfoMessage *userInfo)
+{
+   std::auto_ptr<ApplicationMessage> app(userInfo);
+   mAuthRequestDispatcher->post(app);
+   return WaitingForEvent;
+}
+
 resip::Data
 DigestAuthenticator::getRealm(RequestContext &rc)
 {
-   Data realm;
+   if(!mStaticRealm.empty())
+   {
+      return mStaticRealm;
+   }
+   return rc.getDigestRealm();
+}
 
+bool
+DigestAuthenticator::isMyRealm(RequestContext &rc, const resip::Data& realm)
+{
+   if(!mStaticRealm.empty())
+   {
+      return mStaticRealm == realm;
+   }
    Proxy &proxy = rc.getProxy();
-   SipMessage& sipMessage = rc.getOriginalRequest();
-
-   // (1) Check Preferred Identity
-   if (sipMessage.exists(h_PPreferredIdentities))
-   {
-      // !abr! Add this when we get a chance
-      // find the fist sip or sips P-Preferred-Identity header
-      // for (;;)
-      // {
-      //    if ((i->uri().scheme() == Symbols::SIP) || (i->uri().scheme() == Symbols::SIPS))
-      //    {
-      //       return i->uri().host();
-      //    }
-      // }
-   }
-
-   // (2) Check From domain
-   if (proxy.isMyDomain(sipMessage.header(h_From).uri().host()))
-   {
-      return sipMessage.header(h_From).uri().host();
-   }
-
-   // (3) Check Top Route Header
-   if (sipMessage.exists(h_Routes) &&
-         sipMessage.header(h_Routes).size()!=0 &&
-         sipMessage.header(h_Routes).front().isWellFormed())
-   {
-      // !abr! Add this when we get a chance
-   }
-
-   // (4) Punt: Use Request URI
-   return sipMessage.header(h_RequestLine).uri().host();
+   return proxy.isMyDomain(realm);
 }
 
 

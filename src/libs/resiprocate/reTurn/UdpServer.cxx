@@ -10,6 +10,13 @@
 using namespace std;
 using namespace resip;
 
+#ifdef BOOST_ASIO_HAS_STD_CHRONO
+using namespace std::chrono;
+#else
+#include <boost/chrono.hpp>
+using namespace boost::chrono;
+#endif
+
 namespace reTurn {
 
 UdpServer::UdpServer(asio::io_service& ioService, RequestHandler& requestHandler, const asio::ip::address& address, unsigned short port)
@@ -23,6 +30,7 @@ UdpServer::UdpServer(asio::io_service& ioService, RequestHandler& requestHandler
    if(ec)
    {
       ErrLog(<< "Unable to start UdpServer listening on " << address.to_string() << ":" << port << ", error=" << ec.value() << " - " << ec.message());
+      throw asio::system_error(ec);
    }
    else
    {
@@ -43,15 +51,18 @@ UdpServer::~UdpServer()
 void 
 UdpServer::start()
 {
+   asio::error_code ec;
+   mLocalAddress = mSocket.local_endpoint(ec).address();
+   mLocalPort = mSocket.local_endpoint(ec).port();
    doReceive();
 }
 
 void 
 UdpServer::setAlternateUdpServers(UdpServer* alternatePort, UdpServer* alternateIp, UdpServer* alternateIpPort)
 {
-   assert(!mAlternatePortUdpServer);
-   assert(!mAlternateIpUdpServer);
-   assert(!mAlternateIpPortUdpServer);
+   resip_assert(!mAlternatePortUdpServer);
+   resip_assert(!mAlternateIpUdpServer);
+   resip_assert(!mAlternateIpPortUdpServer);
    mAlternatePortUdpServer = alternatePort;
    mAlternateIpUdpServer = alternateIp;
    mAlternateIpPortUdpServer = alternateIpPort;
@@ -87,7 +98,7 @@ UdpServer::onReceiveSuccess(const asio::ip::address& address, unsigned short por
       if(((*data)[0] & 0xC0) == 0)  // Stun/Turn Messages always have bits 0 and 1 as 00 - otherwise ChannelData message
       {
          // Try to parse stun message
-         StunMessage request(StunTuple(StunTuple::UDP, mSocket.local_endpoint().address(), mSocket.local_endpoint().port()),
+         StunMessage request(StunTuple(StunTuple::UDP, mLocalAddress, mLocalPort),
                              StunTuple(StunTuple::UDP, address, port),
                              (char*)&(*data)[0], data->size());
          if(request.isValid())
@@ -98,7 +109,7 @@ UdpServer::onReceiveSuccess(const asio::ip::address& address, unsigned short por
             if(it == mResponseMap.end())
             {
                response = new StunMessage;
-               RequestHandler::ProcessResult result = mRequestHandler.processStunMessage(this, request, *response, isRFC3489BackwardsCompatServer());
+               RequestHandler::ProcessResult result = mRequestHandler.processStunMessage(this, mTurnAllocationManager, request, *response, isRFC3489BackwardsCompatServer());
 
                switch(result)
                {
@@ -152,16 +163,17 @@ UdpServer::onReceiveSuccess(const asio::ip::address& address, unsigned short por
          dataLen = ntohs(dataLen);
 
          // Check if the UDP datagram size is too short to contain the claimed length of the ChannelData message, then discard
-         if(data->size() < dataLen + 4)
+         if(data->size() < (unsigned int)(dataLen + 4))
          {
             WarningLog(<< "ChannelData message size=" << dataLen+4 << " too larger for UDP packet size=" << data->size() <<".  Dropping.");
          }
          else
          {
-            mRequestHandler.processTurnData(channelNumber,
-                                          StunTuple(StunTuple::UDP, mSocket.local_endpoint().address(), mSocket.local_endpoint().port()),
-                                          StunTuple(StunTuple::UDP, address, port),
-                                          data);
+            mRequestHandler.processTurnData(mTurnAllocationManager,
+                                            channelNumber,
+                                            StunTuple(StunTuple::UDP, mLocalAddress, mLocalPort),
+                                            StunTuple(StunTuple::UDP, address, port),
+                                            data);
          }
       }
    }
@@ -204,7 +216,7 @@ UdpServer::ResponseEntry::ResponseEntry(UdpServer* requestUdpServer, UdpServer* 
    mCleanupTimer(requestUdpServer->mIOService)
 {
    // start timer
-   mCleanupTimer.expires_from_now(boost::posix_time::seconds(10));  // Transaction Responses are cached for 10 seconds
+   mCleanupTimer.expires_from_now(seconds(10));  // Transaction Responses are cached for 10 seconds
    mCleanupTimer.async_wait(boost::bind(&UdpServer::cleanupResponseMap, requestUdpServer, asio::placeholders::error, responseMessage->mHeader.magicCookieAndTid));
 }
 

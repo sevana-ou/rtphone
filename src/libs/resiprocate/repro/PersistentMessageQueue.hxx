@@ -1,6 +1,9 @@
 #if !defined(RESIP_PERSISTENTMESSAGEQUEUE_HXX)
 #define RESIP_PERSISTENTMESSAGEQUEUE_HXX 
 
+// Note: Using this define will remove the dependency on BerkeleyDB, however it will render the AccountingCollector useless
+#ifndef DISABLE_BERKELEYDB_USE
+
 #ifdef WIN32
 #include <db_cxx.h>
 #elif HAVE_CONFIG_H
@@ -10,6 +13,8 @@
 //#include <db42/db_cxx.h>
 #else
 #include <db_cxx.h>
+#endif
+
 #endif
 
 #include "rutil/Data.hxx"
@@ -90,7 +95,7 @@
 //         else
 //         {
 //            cout << "No records to pop." << endl;
-//            Sleep(1000);
+//            sleepMs(1000);
 //            //break;
 //         }
 //      }
@@ -115,7 +120,11 @@
 
 namespace repro
 {
+#ifndef DISABLE_BERKELEYDB_USE
 class PersistentMessageQueue : public DbEnv 
+#else
+class PersistentMessageQueue
+#endif
 { 
 public:     
    PersistentMessageQueue(const resip::Data& baseDir);
@@ -125,7 +134,9 @@ public:
    bool isRecoveryNeeded();
 
 protected:
+#ifndef DISABLE_BERKELEYDB_USE
    Db* mDb;
+#endif
    resip::Data mBaseDir;
    bool mRecoveryNeeded;
 };  

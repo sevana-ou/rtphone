@@ -152,8 +152,8 @@ class UserAgent:  public resip::ClientRegistrationHandler,
                   public resip::ServerSubscriptionHandler,
                   public resip::ClientPagerMessageHandler, 
                   public resip::ServerPagerMessageHandler,
-                  public resip::ClientPublicationHandler,
-                  public resip::InternalTransport::TransportLogger
+                  public resip::ClientPublicationHandler
+                  //public resip::InternalTransport::TransportLogger
 {
   friend class Account;
   friend class Session;
@@ -397,7 +397,7 @@ public:
 #pragma endregion
 
 #pragma region TransportLogger implementation
-    void onSipMessage(int flow, const char* msg, unsigned int length, const sockaddr* addr, unsigned int addrlen) override;
+    void onSipMessage(int flow, const char* msg, unsigned int length, const sockaddr* addr, unsigned int addrlen);
 #pragma  endregion
 
 #pragma region ClientPublicationHandler
@@ -437,7 +437,7 @@ public:
 
 #pragma region PagerHandler
   void onSuccess(resip::ClientPagerMessageHandle, const resip::SipMessage& status) override;
-  void onFailure(resip::ClientPagerMessageHandle, const resip::SipMessage& status, std::unique_ptr<resip::Contents> contents) override;
+  void onFailure(resip::ClientPagerMessageHandle, const resip::SipMessage& status, std::unique_ptr<resip::Contents> contents);
   void onMessageArrived(resip::ServerPagerMessageHandle, const resip::SipMessage& message) override;
 #pragma endregion
 

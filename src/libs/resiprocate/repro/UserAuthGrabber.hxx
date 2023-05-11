@@ -1,66 +1,24 @@
 #ifndef USER_AUTH_GRABBER
 #define USER_AUTH_GRABBER 1
 
-#include "repro/Worker.hxx"
-#include "repro/AbstractDb.hxx"
-#include "repro/UserStore.hxx"
-#include "resip/stack/Message.hxx"
-#include "repro/UserInfoMessage.hxx"
-#include "resip/dum/UserAuthInfo.hxx"
-
-#define RESIPROCATE_SUBSYSTEM resip::Subsystem::REPRO
-
+#include "repro/Store.hxx"
+#include "resip/stack/Worker.hxx"
+#include "resip/stack/ApplicationMessage.hxx"
 
 namespace repro
 {
 
-class UserAuthGrabber : public Worker
+class UserAuthGrabber : public resip::Worker
 {
    public:
-      UserAuthGrabber(repro::UserStore& userStore ):
-         mUserStore(userStore)
-      {}
+      UserAuthGrabber(repro::Store& dataStore);
+      virtual ~UserAuthGrabber();
       
-      virtual ~UserAuthGrabber(){}
-      
-      virtual bool process(resip::ApplicationMessage* msg)
-      {
-         repro::UserInfoMessage* uinf = dynamic_cast<UserInfoMessage*>(msg);    // auth for repro's DigestAuthenticator
-         resip::UserAuthInfo* uainf = dynamic_cast<resip::UserAuthInfo*>(msg);  // auth for DUM's ServerAuthManager
-         if(uinf)
-         {
-            uinf->mRec.passwordHash = mUserStore.getUserAuthInfo(uinf->user(), uinf->realm());
-            DebugLog(<<"Grabbed user info for " 
-                           << uinf->user() <<"@"<<uinf->realm()
-                           << " : " << uinf->A1());
-            return true;
-         }
-         else if(uainf)
-         {
-            uainf->setA1(mUserStore.getUserAuthInfo(uainf->getUser(), uainf->getRealm()));
-            if(uainf->getA1().empty())
-            {
-               uainf->setMode(resip::UserAuthInfo::UserUnknown);
-            }
-            DebugLog(<<"Grabbed user info for " 
-                           << uainf->getUser() <<"@"<<uainf->getRealm()
-                           << " : " << uainf->getA1());
-            return true;
-         }
-         else
-         {
-            WarningLog(<<"Did not recognize message type...");
-         }
-         return false;
-      }
-      
-      virtual UserAuthGrabber* clone() const
-      {
-         return new UserAuthGrabber(mUserStore);
-      }
+      virtual bool process(resip::ApplicationMessage* msg);
+      virtual UserAuthGrabber* clone() const;
       
    protected:
-      UserStore& mUserStore;
+      Store& mDataStore;
 };
 
 }

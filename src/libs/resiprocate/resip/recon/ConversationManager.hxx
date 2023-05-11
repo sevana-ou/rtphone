@@ -1,9 +1,8 @@
 #if !defined(ConversationManager_hxx)
 #define ConversationManager_hxx
 
-#ifdef WIN32
-#define BOOST__STDC_CONSTANT_MACROS_DEFINED  // elminate duplicate define warnings under windows
-#endif
+#include <boost/function.hpp>
+#include <boost/shared_ptr.hpp>
 
 #include "BridgeMixer.hxx"
 
@@ -21,7 +20,7 @@
 #include "HandleTypes.hxx"
 #include "MediaInterface.hxx"
 
-#include "FlowManager.hxx"
+#include "reflow/FlowManager.hxx"
 
 class CpMediaInterfaceFactory;
 
@@ -107,6 +106,7 @@ public:
    } MediaInterfaceMode;
 
    ConversationManager(bool localAudioEnabled=true, MediaInterfaceMode mediaInterfaceMode = sipXGlobalMediaInterfaceMode);
+   ConversationManager(bool localAudioEnabled, MediaInterfaceMode mediaInterfaceMode, int defaultSampleRate, int maxSampleRate);
    virtual ~ConversationManager();
 
    typedef enum 
@@ -173,6 +173,8 @@ public:
      @return A handle to the newly created remote participant
    */   
    virtual ParticipantHandle createRemoteParticipant(ConversationHandle convHandle, const resip::NameAddr& destination, ParticipantForkSelectMode forkSelectMode = ForkSelectAutomatic);
+
+   virtual ParticipantHandle createRemoteParticipant(ConversationHandle convHandle, const resip::NameAddr& destination, ParticipantForkSelectMode forkSelectMode, resip::SharedPtr<resip::UserProfile>& callerProfile, const std::multimap<resip::Data,resip::Data>& extraHeaders);
 
    /**
      Creates a new media resource participant in the specified conversation.  
@@ -336,7 +338,7 @@ public:
 
    /**
      This is used for attended transfer scenarios where both participants 
-     are no longer managed by the conversation manager  – for SIP this will 
+     are no longer managed by the conversation manager - for SIP this will 
      send a REFER with embedded Replaces header.  Note:  Replace option cannot 
      be used with early dialogs in SIP.  
 
@@ -344,6 +346,8 @@ public:
      @param destPartHandle Handle ot the participant to redirect to
    */
    virtual void redirectToParticipant(ParticipantHandle partHandle, ParticipantHandle destPartHandle);
+
+   virtual void holdParticipant(ParticipantHandle partHandle, bool hold);
 
    /**
      This function is used to add a chunk of memory to a media/prompt cache.
@@ -475,11 +479,13 @@ public:
      particular remote participant.
 
      @param partHandle Handle of the participant that received the digit
-     @param dtmf Integer representation of the DTMF tone received
-     @param duration Duration of the DTMF tone received
+     @param dtmf Integer representation of the DTMF tone received (from RFC2833 event codes)
+     @param duration Duration (in milliseconds) of the DTMF tone received
      @param up Set to true if the DTMF key is up (otherwise down)
    */
    virtual void onDtmfEvent(ParticipantHandle partHandle, int dtmf, int duration, bool up) = 0;
+
+   virtual void onParticipantRequestedHold(ParticipantHandle partHandle, bool held) = 0;
 
    ///////////////////////////////////////////////////////////////////////
    // Media Related Methods - this may not be the right spot for these - move to LocalParticipant?
@@ -562,6 +568,8 @@ protected:
    UserAgent* getUserAgent() { return mUserAgent; }
 
 private:
+   void init(int defaultSampleRate = 0, int maxSampleRate = 0);
+
    friend class DefaultDialogSet;
    friend class Subscription;
 
@@ -586,6 +594,17 @@ private:
    friend class DtmfEvent;
    friend class MediaEvent;
    void notifyMediaEvent(ConversationHandle conversationHandle, int mediaConnectionId, MediaEvent::MediaEventType eventType);
+
+   /**
+     Notifies ConversationManager when an RFC2833 DTMF event is received from a
+     particular remote participant.
+
+     @param conversationHandle Handle of the conversation that received the digit
+     @param mediaConnectionId sipX media connectionId for the participant who sent the signal
+     @param dtmf Integer representation of the DTMF tone received (from RFC2833 event codes)
+     @param duration Duration (in milliseconds) of the DTMF tone received
+     @param up Set to true if the DTMF key is up (otherwise down)
+   */
    void notifyDtmfEvent(ConversationHandle conversationHandle, int connectionId, int dtmf, int duration, bool up);
 
    friend class RemoteParticipantDialogSet;
@@ -618,6 +637,7 @@ private:
    friend class RejectParticipantCmd;
    friend class RedirectParticipantCmd;
    friend class RedirectToParticipantCmd;
+   friend class HoldParticipantCmd;
 
 private:  
    UserAgent* mUserAgent;
@@ -654,7 +674,7 @@ private:
    // sipX Media related members
    void createMediaInterfaceAndMixer(bool giveFocus, ConversationHandle ownerConversationHandle, 
                                      resip::SharedPtr<MediaInterface>& mediaInterface, BridgeMixer** bridgeMixer);
-   resip::SharedPtr<MediaInterface> getMediaInterface() const { assert(mMediaInterface.get()); return mMediaInterface; }
+   resip::SharedPtr<MediaInterface> getMediaInterface() const { resip_assert(mMediaInterface.get()); return mMediaInterface; }
    CpMediaInterfaceFactory* getMediaInterfaceFactory() { return mMediaFactory; }
    BridgeMixer* getBridgeMixer() { return mBridgeMixer; }
    CpMediaInterfaceFactory* mMediaFactory;

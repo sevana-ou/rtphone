@@ -1,3 +1,9 @@
+#if defined(HAVE_CONFIG_H)
+#include "config.h"
+#endif
+
+#ifdef USE_SSL
+
 #ifdef WIN32
 #pragma warning(disable : 4267)
 #endif
@@ -68,6 +74,9 @@ void
 TlsConnection::onServerHandshakeSuccess()
 {
    DebugLog(<< "TlsConnection handshake completed.");
+   asio::error_code ec;
+   mLocalAddress = mSocket.lowest_layer().local_endpoint().address();
+   mLocalPort = mSocket.lowest_layer().local_endpoint().port();
    doFramedReceive();
 }
  
@@ -96,13 +105,13 @@ TlsConnection::onReceiveSuccess(const asio::ip::address& address, unsigned short
       if(((*data)[0] & 0xC0) == 0)  // Stun/Turn Messages always have bits 0 and 1 as 00 - otherwise ChannelData message
       {
          // Try to parse stun message
-         StunMessage request(StunTuple(StunTuple::TLS, mSocket.lowest_layer().local_endpoint().address(), mSocket.lowest_layer().local_endpoint().port()),
+         StunMessage request(StunTuple(StunTuple::TLS, mLocalAddress, mLocalPort),
                              StunTuple(StunTuple::TLS, address, port),
                              (char*)&(*data)[0], data->size());
          if(request.isValid())
          {
             StunMessage response;
-            RequestHandler::ProcessResult result = mRequestHandler.processStunMessage(this, request, response);
+            RequestHandler::ProcessResult result = mRequestHandler.processStunMessage(this, mTurnAllocationManager, request, response);
 
             switch(result)
             {
@@ -114,7 +123,7 @@ TlsConnection::onReceiveSuccess(const asio::ip::address& address, unsigned short
             case RequestHandler::RespondFromAlternateIp:
             case RequestHandler::RespondFromAlternateIpPort:
                // These only happen for UDP server for RFC3489 backwards compatibility
-               assert(false);
+               resip_assert(false);
                break;
             case RequestHandler::RespondFromReceiving:
             default:
@@ -139,8 +148,9 @@ TlsConnection::onReceiveSuccess(const asio::ip::address& address, unsigned short
          memcpy(&channelNumber, &(*data)[0], 2);
          channelNumber = ntohs(channelNumber);
 
-         mRequestHandler.processTurnData(channelNumber,
-                                         StunTuple(StunTuple::TLS, mSocket.lowest_layer().local_endpoint().address(), mSocket.lowest_layer().local_endpoint().port()),
+         mRequestHandler.processTurnData(mTurnAllocationManager,
+                                         channelNumber,
+                                         StunTuple(StunTuple::TLS, mLocalAddress, mLocalPort),
                                          StunTuple(StunTuple::TLS, address, port),
                                          data);
       }
@@ -183,6 +193,7 @@ TlsConnection::onSendFailure(const asio::error_code& error)
 
 } 
 
+#endif
 
 /* ====================================================================
 

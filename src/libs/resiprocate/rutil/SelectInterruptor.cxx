@@ -1,6 +1,6 @@
 #include "rutil/SelectInterruptor.hxx"
 
-#include <cassert>
+#include "rutil/ResipAssert.h"
 #include "rutil/Logger.hxx"
 
 #ifndef WIN32
@@ -13,8 +13,9 @@ using namespace resip;
 
 SelectInterruptor::SelectInterruptor()
 {
-   return;
 #ifdef WIN32
+   initNetwork();  // Required for windows
+
    mSocket = ::socket(PF_INET, SOCK_DGRAM, IPPROTO_UDP);
 
    sockaddr_in loopback;
@@ -27,14 +28,14 @@ SelectInterruptor::SelectInterruptor()
    memset(&mWakeupAddr, 0, sizeof(mWakeupAddr));
    int len = sizeof(mWakeupAddr);
    int error = getsockname(mSocket, (sockaddr *)&mWakeupAddr, &len);
-   assert(error == 0);
+   resip_assert(error == 0);
    error= connect(mSocket, &mWakeupAddr, sizeof(mWakeupAddr));
-   assert(error == 0);
+   resip_assert(error == 0);
    mReadThing = mSocket;
 #else
    int x = pipe(mPipe);
    (void)x;
-   assert( x != -1 );
+   resip_assert( x != -1 );
    // make write-side non-blocking to avoid deadlock
    makeSocketNonBlocking(mPipe[1]);
    // make read-side non-blocking so safe to read out entire pipe
@@ -46,7 +47,6 @@ SelectInterruptor::SelectInterruptor()
 
 SelectInterruptor::~SelectInterruptor()
 {
-   return;
 #ifdef WIN32
    closesocket(mSocket);
 #else
@@ -58,16 +58,14 @@ SelectInterruptor::~SelectInterruptor()
 void
 SelectInterruptor::handleProcessNotification()
 {
-   return;
    interrupt();
 }
 
 void
 SelectInterruptor::buildFdSet(FdSet& fdset)
 {
-   return;
 #ifdef WIN32
-	fdset.setRead(mSocket);
+   fdset.setRead(mSocket);
 #else
    fdset.setRead(mPipe[0]);
 #endif
@@ -76,37 +74,32 @@ SelectInterruptor::buildFdSet(FdSet& fdset)
 void
 SelectInterruptor::processCleanup()
 {
-   return;
 #ifdef WIN32
-   {
-      char rdBuf[16];
-      recv(mSocket, rdBuf, sizeof(rdBuf), 0);
-   }
+  char rdBuf[16];
+  recv(mSocket, rdBuf, sizeof(rdBuf), 0);
 #else
-   {
-      char rdBuf[16];
-      int x;
-      while ( (x=read(mPipe[0], rdBuf, sizeof(rdBuf))) == sizeof(rdBuf) )
-         ;
-      // WATCHOUT: EWOULDBLOCK *will* happen above when the pending
-      // number of bytes is exactly size of rdBuf
-      // XXX: should check for certain errors (like fd closed) and die?
-   }
+  char rdBuf[16];
+  int x;
+  while ( (x=read(mPipe[0], rdBuf, sizeof(rdBuf))) == sizeof(rdBuf) )
+     ;
+  // WATCHOUT: EWOULDBLOCK *will* happen above when the pending
+  // number of bytes is exactly size of rdBuf
+  // XXX: should check for certain errors (like fd closed) and die?
 #endif
 }
 
 void
 SelectInterruptor::process(FdSet& fdset)
 {
-   return;
    if (fdset.readyToRead(mReadThing))
+   {
       processCleanup();
+   }
 }
 
 void 
 SelectInterruptor::processPollEvent(FdPollEventMask mask)
 {
-   return;
    if(mask & FPEM_Read)
    {
       processCleanup();
@@ -117,22 +110,29 @@ SelectInterruptor::processPollEvent(FdPollEventMask mask)
 void
 SelectInterruptor::interrupt()
 {
-   return;
-
    static char wakeUp[] = "w";
 #ifdef WIN32
-   int count = send(mSocket, wakeUp, sizeof(wakeUp), 0);
-   assert(count == sizeof(wakeUp));
+   u_long readSize = 0;
+   ioctlsocket(mSocket, FIONREAD, &readSize);
+   // Only bother signalling socket if there is no data on it already
+   if(readSize == 0)  
+   {
+      int count = send(mSocket, wakeUp, sizeof(wakeUp), 0);
+      resip_assert(count == sizeof(wakeUp));
+   }
 #else
    ssize_t res = write(mPipe[1], wakeUp, sizeof(wakeUp));
-   if ( res == -1 && errno==EAGAIN )
+
+   if ( res == -1 && (errno == EAGAIN || errno == EWOULDBLOCK) )   // Treat EGAIN and EWOULDBLOCK as the same: http://stackoverflow.com/questions/7003234/which-systems-define-eagain-and-ewouldblock-as-different-values
    {
       ; // this can happen when SipStack thread gets behind.
       // no need to block since our only purpose is to wake up the thread
       // also, this write can occur within the SipStack thread, in which
       // case we get dead-lock if this blocks
-   } else {
-      assert(res == sizeof(wakeUp));
+   } 
+   else 
+   {
+      resip_assert(res == sizeof(wakeUp));
    }
 #endif
 }

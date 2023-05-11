@@ -3,6 +3,14 @@
 
 #include <iostream>
 
+#if !defined(WIN32)
+#include <syslog.h>
+#else
+#define LOG_DAEMON 0
+#endif
+
+#include "rutil/Log.hxx"
+
 namespace resip
 {
 
@@ -10,6 +18,7 @@ class SysLogBuf : public std::streambuf
 {
    public:
       SysLogBuf();
+      SysLogBuf(const Data& ident, int facility);
       virtual ~SysLogBuf();
       
       int sync ();
@@ -20,9 +29,16 @@ class SysLogBuf : public std::streambuf
       //inline streamsize xsputn (char* text, streamsize n);
 
    private:
+      void init();
+      friend std::ostream& operator<< (std::ostream& os, const resip::Log::Level& level);
       enum { Size=4095 }; 
       char buffer[Size+1];
+      Log::Level mLevel;
+      Data mAppName;
+      int mFacility;
 };
+
+std::ostream& operator<< (std::ostream& os, const resip::Log::Level& level);
  
 }
 

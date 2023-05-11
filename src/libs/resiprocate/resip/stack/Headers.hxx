@@ -156,6 +156,10 @@ defineHeader(ReferSub, "Refer-Sub", Token, "RFC 4488");
 defineHeader(AnswerMode, "Answer-Mode", Token, "draft-ietf-answermode-01");
 defineHeader(PrivAnswerMode, "Priv-Answer-Mode", Token, "draft-ietf-answermode-01");
 
+defineMultiHeader(PAccessNetworkInfo, "P-Access-Network-Info", Token, "RFC 7315"); // section 5.4.
+defineHeader(PChargingVector, "P-Charging-Vector", Token, "RFC 3455");
+defineHeader(PChargingFunctionAddresses, "P-Charging-Function-Addresses", Token, "RFC 3455");
+
 //====================
 // Mime
 //====================
@@ -211,6 +215,13 @@ typedef ParserContainer<StringCategory> StringCategories;
 
 defineHeader(ContentTransferEncoding, "Content-Transfer-Encoding", StringCategory, "RFC ?");
 defineHeader(Organization, "Organization", StringCategory, "RFC 3261");
+defineHeader(SecWebSocketKey, "Sec-WebSocket-Key", StringCategory, "RFC 6455");
+defineHeader(SecWebSocketKey1, "Sec-WebSocket-Key1", StringCategory, "draft-hixie- thewebsocketprotocol-76");
+defineHeader(SecWebSocketKey2, "Sec-WebSocket-Key2", StringCategory, "draft-hixie- thewebsocketprotocol-76");
+defineHeader(Origin, "Origin", StringCategory, "draft-hixie- thewebsocketprotocol-76");
+defineHeader(Host, "Host", StringCategory, "draft-hixie- thewebsocketprotocol-76");
+defineHeader(SecWebSocketAccept, "Sec-WebSocket-Accept", StringCategory, "RFC 6455");
+defineMultiHeader(Cookie, "Cookie", StringCategory, "RFC 6265");
 defineHeader(Server, "Server", StringCategory, "RFC 3261");
 defineHeader(Subject, "Subject", StringCategory, "RFC 3261");
 defineHeader(UserAgent, "User-Agent", StringCategory, "RFC 3261");
@@ -290,6 +301,12 @@ defineMultiHeader(Via, "Via", Via, "RFC 3261");
 // RAckCategory
 //====================
 defineHeader(RAck, "RAck", RAckCategory, "RFC 3262");
+
+//============================
+// TokenOrQuotedStringCategory
+//============================
+defineMultiHeader(PVisitedNetworkID, "P-Visited-Network-ID", TokenOrQuotedStringCategory, "RFC 3455");
+defineMultiHeader(UserToUser, "User-to-User", TokenOrQuotedStringCategory, "draft-ietf-cuss-sip-uui-17");
 
 //====================
 // special first line accessors

@@ -3,10 +3,13 @@
 
 #include "rutil/Mutex.hxx"
 #include <limits.h>
-#include <cassert>
+#include "rutil/ResipAssert.h"
 
 namespace resip
 {
+
+void sleepMs(unsigned int ms);
+void sleepSeconds(unsigned int seconds);
 
 /** Clock used for timing in the Timer class and possibly other areas.  Depending on the OS and compile settings this clock
     may not be monotonic.  Define _RESIP_MONOTONIC_CLOCK to enable monotonic timers.
@@ -154,7 +157,7 @@ class ResipClock
                      __int64 maxWait = (__int64)UINT_MAX - mBaseTimeUpdateInterval - mBaseTimeCushion;
                      if (maxWait <= 0)
                      {
-                        assert(0);
+                        resip_assert(0);
                         const_cast<UInt32 &>(mBaseTimeUpdateInterval) = 60000;
                         const_cast<UInt32 &>(mBaseTimeCushion) = 120000;
                         return UINT_MAX - mBaseTimeUpdateInterval - mBaseTimeCushion;
@@ -166,11 +169,7 @@ class ResipClock
                   /** Last stored time. Using InterlockedExchange (CMPXCHG8B) the alignment is not necessary, but it shouldn't hurt.
                       Align it on a cache line since it is rarely written and read often (to avoid false-sharing).
                   */
-#ifdef _MSC_VER
                   static _declspec(align(128)) volatile UInt64 mBaseTime;
-#else
-                  static volatile UInt64 mBaseTime;
-#endif
                   /** Max elapsed time since last GTC64 call, in milliseconds, before writing mBaseTime.
                       Cannot exceed UINT_MAX - mBaseTimeCushion.
                   */

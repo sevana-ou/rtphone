@@ -28,6 +28,7 @@ class MasterProfile : public UserProfile
 
       /// Defaults are: INVITE, ACK, CANCEL, OPTIONS, BYE, UPDATE
       virtual void addSupportedMethod(const MethodTypes& method);   
+      virtual void removeSupportedMethod(const MethodTypes& method);   
       virtual bool isMethodSupported(MethodTypes method) const;
       virtual Tokens getAllowedMethods() const;
       virtual Data getAllowedMethodsData() const;
@@ -42,36 +43,48 @@ class MasterProfile : public UserProfile
 
       typedef enum
       {
-         Never,
-         Supported, 
-         Required
+         Never,     
+         SupportedEssential,  // If UAS - Only use reliable provisionals if sending a body and far end supports
+         Supported,           // If UAS - Always use reliable provisionals if far end supports
+         Required             // If UAS - Always use reliable provisionals
       } ReliableProvisionalMode;
-
 
       // UAC PRACK support.  UPDATE must be enabled(currently defaults to on, do
       // not disable w/out disabling UAC PRACK support).
       //
       // Flows where an an answer is received in a 180rel and subsequent O/A
       // exchanges using UPDATE occur in the early dialog
-      // have been tested.  
+      // have been tested.
       //
       // A subsequent O/A exchange using 180rel/PRACK is also supported. This is
       // a really bad idea, as an answer must be generated; the offer cannot be
       // rejected. UPDATE should always be used for O/A exchanges once the
       // dialog is established.
-      // Invite/18x(offer)/PRACK(ans) should work but has not been tested.
+      // 
+      // Invite/18x(offer)/PRACK(ans) also works
+      // 
+      // Invite(offer)/18x(ans)/PRACK(offer)/200P(ans) issupported, but not recommended.  
+      // The UAC MUST call provideOffer from the onAnswer callback in order to generate 
+      // the offer in the PRACK.
       //
       // Explicit limitations are:
-      // Overlapping reliable provisional responses that contain a body are not
-      // handled.
-      // Offers in a 200(PRACK) are not supported, and anyone who generates them
-      // should be summarily executed.
-
+      // - Overlapping reliable provisional responses that contain a body are not
+      //   handled.
+      //
+      // Note:  Using SupportedEssential is exactly the same as using Supported, 
+      //        SupportedEssential only effects UAS Prack implementation
       virtual void setUacReliableProvisionalMode(ReliableProvisionalMode mode);
       virtual ReliableProvisionalMode getUacReliableProvisionalMode() const;
 
-      //Not supported as UAS. Calling setUacReliableProvisionalMode will result
-      //in an assert.
+      // UAS PRACK support.  UPDATE must be enabled(currently defaults to on, do
+      // not disable w/out disabling UAS PRACK support).
+      //
+      // All flows and limitations mentioned in UAC Prack comments apply
+      //
+      // Modes work as follows:
+      // SupportedEssential - Only send reliable provisionals if sending a body and far end supports
+      // Supported - Always send reliable provisionals if far end supports
+      // Required - Always send reliable provisionals
       virtual void setUasReliableProvisionalMode(ReliableProvisionalMode mode);
       virtual ReliableProvisionalMode getUasReliableProvisionalMode() const;
 
@@ -151,6 +164,29 @@ class MasterProfile : public UserProfile
       virtual bool& checkReqUriInMergeDetectionEnabled();
       virtual bool checkReqUriInMergeDetectionEnabled() const;
 
+      /// Enabling this setting will allow the application layer to provide additional SIP responses, from class 4xx, 5xx, 6xx, 
+      /// that will lead to transaction termination instead of other failure effects like dialog termination, as defined by
+      /// method Helper::determineFailureMessageEffect. (See header Helper.hxx for all transaction failure effects).
+      /// A scenarui when this is useful is when, for a server subscription, a NOTIFY is responded with an error response due to a timeout
+      /// condition, but the application needs the subscription to be continued. Even though RFC 3265 prescribes the
+      /// notifier should remove the subscription in such cases, timeouts may occur for transient conditions like a
+      /// overloaded proxy, a slow network connection, eventually nobody would benefit if the subscription is terminated by the server.
+      /// With this setting enabled the subscription will be continued, but only until the subscription expires.
+      /// Currently, it is only used by ServerSubscriptions.
+      /// Default is to not allow additional transaction terminating responses
+      /// To enable it:
+      /// 1. Set additionalTransactionTerminatingResponsesEnabled() = true on master profile
+      /// 2. Call method addAdditionalTransactionTerminatingResponses(code) to provide SIP responses for which the application
+      /// need the transaction to be terminated
+      virtual bool& additionalTransactionTerminatingResponsesEnabled();
+      virtual bool additionalTransactionTerminatingResponsesEnabled() const;
+
+      virtual void addAdditionalTransactionTerminatingResponses(int code);
+      virtual bool isAdditionalTransactionTerminatingResponse(int code) const;
+
+      virtual const std::set<int>& getAdditionalTransactionTerminatingResponses() const;
+      virtual void clearAdditionalTransactionTerminatingResponses(void);
+
    private:
       virtual UserProfile* clone() const;
       std::set<Data> mSupportedSchemes;
@@ -173,6 +209,9 @@ class MasterProfile : public UserProfile
       UInt32 mServerRegistrationMinExpires;
       UInt32 mServerRegistrationMaxExpires;
       UInt32 mServerRegistrationDefaultExpires;
+
+      bool mAdditionalTransactionTerminatingResponsesEnabled;
+      std::set<int> mAdditionalTransactionTerminatingResponsess;
 };
    
 }

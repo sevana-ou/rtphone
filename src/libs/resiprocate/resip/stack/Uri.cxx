@@ -71,7 +71,10 @@ Uri::Uri(const Uri& rhs,
      mUserParameters(rhs.mUserParameters),
      mPort(rhs.mPort),
      mPassword(rhs.mPassword),
+     mNetNs(rhs.mNetNs),
+     mPath(rhs.mPath),
      mHostCanonicalized(rhs.mHostCanonicalized),
+     mCanonicalHost(rhs.mCanonicalHost),
      mEmbeddedHeadersText(rhs.mEmbeddedHeadersText.get() ? new Data(*rhs.mEmbeddedHeadersText) : 0),
      mEmbeddedHeaders(rhs.mEmbeddedHeaders.get() ? new SipMessage(*rhs.mEmbeddedHeaders) : 0)
 {}
@@ -85,7 +88,7 @@ Uri::~Uri()
 Uri
 Uri::fromTel(const Uri& tel, const Data& host)
 {
-   assert(tel.scheme() == Symbols::Tel);
+   resip_assert(tel.scheme() == Symbols::Tel);
 
    Uri u;
    u.scheme() = Symbols::Sip;
@@ -168,7 +171,7 @@ Uri::fromTel(const Uri& tel, const Data& host)
 Uri
 Uri::fromTel(const Uri& tel, const Uri& hostUri)
 {
-   assert(tel.scheme() == Symbols::Tel);
+   resip_assert(tel.scheme() == Symbols::Tel);
 
    Uri u(hostUri);
    u.scheme() = Symbols::Sip;
@@ -252,6 +255,12 @@ Uri::isEnumSearchable() const
    checkParsed();
    int digits = 0;
 
+   if(mScheme != Symbols::Tel)
+   {
+      StackLog(<< "not a tel Uri");
+      return false;
+   }
+
    if(mUser.size() < 4)
    {
       StackLog(<< "user part of Uri empty or too short for E.164");
@@ -269,14 +278,18 @@ Uri::isEnumSearchable() const
    // count the digits (skip the leading `+')
    for(const char* i=user().begin() + 1; i!= user().end(); i++)
    {
-      if(isdigit(*i))
+      if (isdigit(*i))
+      {
          digits++;
+      }
       else
-         if(*i != '-')
+      {
+         if (*i != '-')
          {
             StackLog(<< "user part of Uri contains non-digit: " << *i);
             return false; // Only digits and '-' permitted
          }
+      }
    }
    if(digits > 15)
    {
@@ -314,7 +327,6 @@ Uri::getEnumLookups(const std::vector<Data>& suffixes) const
    return results;
 }
 
-
 bool
 Uri::hasEmbedded() const
 {
@@ -330,8 +342,6 @@ Uri::removeEmbedded()
    mEmbeddedHeadersText.reset();
 }
 
-
-
 Uri&
 Uri::operator=(const Uri& rhs)
 {
@@ -340,11 +350,14 @@ Uri::operator=(const Uri& rhs)
       ParserCategory::operator=(rhs);
       mScheme = rhs.mScheme;
       mHost = rhs.mHost;
-      mHostCanonicalized=rhs.mHostCanonicalized;
+      mPath = rhs.mPath;
+      mHostCanonicalized = rhs.mHostCanonicalized;
+      mCanonicalHost = rhs.mCanonicalHost;
       mUser = rhs.mUser;
       mUserParameters = rhs.mUserParameters;
       mPort = rhs.mPort;
       mPassword = rhs.mPassword;
+      mNetNs = rhs.mNetNs;
       if (rhs.mEmbeddedHeaders.get() != 0)
       {
          mEmbeddedHeaders.reset(new SipMessage(*rhs.mEmbeddedHeaders));
@@ -409,24 +422,23 @@ Uri::operator==(const Uri& other) const
    if (DnsUtil::isIpV6Address(mHost) &&
        DnsUtil::isIpV6Address(other.mHost))
    {
-
       // compare canonicalized IPV6 addresses
 
       // update canonicalized if host changed
       if (!mHostCanonicalized)
       {
-         mHost = DnsUtil::canonicalizeIpV6Address(mHost);
+         mCanonicalHost = DnsUtil::canonicalizeIpV6Address(mHost);
          mHostCanonicalized=true;
       }
 
       // update canonicalized if host changed
       if (!other.mHostCanonicalized)
       {
-         other.mHost = DnsUtil::canonicalizeIpV6Address(other.mHost);
+         other.mCanonicalHost = DnsUtil::canonicalizeIpV6Address(other.mHost);
          other.mHostCanonicalized=true;
       }
 
-      if (mHost != other.mHost)
+      if (mCanonicalHost != other.mCanonicalHost)
       {
          return false;
       }
@@ -443,7 +455,9 @@ Uri::operator==(const Uri& other) const
        ((isEqualNoCase(mScheme, Symbols::Sip) || isEqualNoCase(mScheme, Symbols::Sips)) ? mUser == other.mUser : isEqualNoCase(mUser, other.mUser)) &&
        isEqualNoCase(mUserParameters,other.mUserParameters) &&
        mPassword == other.mPassword &&
-       mPort == other.mPort)
+       mPort == other.mPort &&
+       mNetNs == other.mNetNs &&
+       mPath == mPath)
    {
       for (ParameterList::const_iterator it = mParameters.begin(); it != mParameters.end(); ++it)
       {
@@ -485,8 +499,8 @@ Uri::operator==(const Uri& other) const
                   // ?bwc? It looks like we're just assuming the dynamic_cast 
                   // will succeed everywhere else; why are we bothering to 
                   // assert()?
-                  assert(dp1);
-                  assert(dp2);
+                  resip_assert(dp1);
+                  resip_assert(dp2);
                }
                if (!(otherParam &&
                      isEqualNoCase(dynamic_cast<DataParameter*>(*it)->value(),
@@ -696,11 +710,12 @@ Uri::operator<(const Uri& other) const
    {
       if(DnsUtil::isIpV6Address(mHost))
       {
-         mHost = DnsUtil::canonicalizeIpV6Address(mHost);
+         mCanonicalHost = DnsUtil::canonicalizeIpV6Address(mHost);
       }
       else
       {
-         mHost.lowercase();
+         mCanonicalHost = mHost;
+         mCanonicalHost.lowercase();
       }
       mHostCanonicalized=true;
    }
@@ -709,21 +724,22 @@ Uri::operator<(const Uri& other) const
    {
       if(DnsUtil::isIpV6Address(other.mHost))
       {
-         other.mHost = DnsUtil::canonicalizeIpV6Address(other.mHost);
+         other.mCanonicalHost = DnsUtil::canonicalizeIpV6Address(other.mHost);
       }
       else
       {
-         other.mHost.lowercase();
+         other.mCanonicalHost = other.mHost;
+         other.mCanonicalHost.lowercase();
       }
       other.mHostCanonicalized=true;
    }
 
-   if (mHost < other.mHost)
+   if (mCanonicalHost < other.mCanonicalHost)
    {
       return true;
    }
 
-   if (mHost > other.mHost)
+   if (mCanonicalHost > other.mCanonicalHost)
    {
       return false;
    }
@@ -741,11 +757,12 @@ Uri::aorEqual(const resip::Uri& rhs) const
    {
       if(DnsUtil::isIpV6Address(mHost))
       {
-         mHost = DnsUtil::canonicalizeIpV6Address(mHost);
+         mCanonicalHost = DnsUtil::canonicalizeIpV6Address(mHost);
       }
       else
       {
-         mHost.lowercase();
+         mCanonicalHost = mHost;
+         mCanonicalHost.lowercase();
       }
       mHostCanonicalized=true;
    }
@@ -754,17 +771,18 @@ Uri::aorEqual(const resip::Uri& rhs) const
    {
       if(DnsUtil::isIpV6Address(rhs.mHost))
       {
-         rhs.mHost = DnsUtil::canonicalizeIpV6Address(rhs.mHost);
+         rhs.mCanonicalHost = DnsUtil::canonicalizeIpV6Address(rhs.mHost);
       }
       else
       {
-         rhs.mHost.lowercase();
+         rhs.mCanonicalHost = rhs.mHost;
+         rhs.mCanonicalHost.lowercase();
       }
       rhs.mHostCanonicalized=true;
    }
    
-   return (mUser==rhs.mUser) && (mHost==rhs.mHost) && (mPort==rhs.mPort) && 
-            (isEqualNoCase(mScheme,rhs.mScheme));
+   return (mUser == rhs.mUser) && (mCanonicalHost == rhs.mCanonicalHost) && (mPort == rhs.mPort) &&
+           isEqualNoCase(mScheme, rhs.mScheme) && (mNetNs == rhs.mNetNs);
 }
 
 void 
@@ -775,18 +793,19 @@ Uri::getAorInternal(bool dropScheme, bool addPort, Data& aor) const
 
    addPort = addPort && mPort!=0;
 
-   bool hostIsIpV6Address = false;
+   bool hostIsIpV6Address = DnsUtil::isIpV6Address(mHost);
    if(!mHostCanonicalized)
    {
-      if (DnsUtil::isIpV6Address(mHost))
+      if (hostIsIpV6Address)
       {
-         mHost = DnsUtil::canonicalizeIpV6Address(mHost);
-         hostIsIpV6Address = true;
+         mCanonicalHost = DnsUtil::canonicalizeIpV6Address(mHost);
       }
       else
       {
-         mHost.lowercase();
+         mCanonicalHost = mHost;
+         mCanonicalHost.lowercase();
       }
+      mHostCanonicalized = true;
    }
 
    // !bwc! Maybe reintroduce caching of aor. (Would use a bool instead of the
@@ -794,7 +813,7 @@ Uri::getAorInternal(bool dropScheme, bool addPort, Data& aor) const
    //                                                  @:10000
    aor.clear();
    aor.reserve((dropScheme ? 0 : mScheme.size()+1)
-               + mUser.size() + mHost.size() + 7);
+       + mUser.size() + mCanonicalHost.size() + 7);
    if(!dropScheme)
    {
       aor += mScheme;
@@ -811,7 +830,7 @@ Uri::getAorInternal(bool dropScheme, bool addPort, Data& aor) const
 #else
       aor += mUser;
 #endif
-      if(!mHost.empty())
+      if(!mCanonicalHost.empty())
       {
          aor += Symbols::AT_SIGN;
       }
@@ -820,12 +839,12 @@ Uri::getAorInternal(bool dropScheme, bool addPort, Data& aor) const
    if(hostIsIpV6Address && addPort)
    {
       aor += Symbols::LS_BRACKET;
-      aor += mHost;
+      aor += mCanonicalHost;
       aor += Symbols::RS_BRACKET;
    }
    else
    {
-      aor += mHost;
+      aor += mCanonicalHost;
    }
 
    if(addPort)
@@ -978,6 +997,21 @@ Uri::parse(ParseBuffer& pb)
 {
    pb.skipWhitespace();
    const char* start = pb.position();
+
+   // Relative URLs (typically HTTP) start with a slash.  These
+   // are seen when parsing the WebSocket handshake.
+   if (*pb.position() == Symbols::SLASH[0])
+   {
+      mScheme.clear();
+      pb.skipToOneOf("?;", ParseBuffer::Whitespace);
+      pb.data(mPath, start);
+      if (!pb.eof() && !ParseBuffer::oneOf(*pb.position(), ParseBuffer::Whitespace))
+      {
+         parseParameters(pb);
+      }
+      return;
+   }
+
    pb.skipToOneOf(":@");
 
    pb.assertNotEof();
@@ -1056,6 +1090,11 @@ Uri::parse(ParseBuffer& pb)
       pb.reset(start);
    }
 
+   if (pb.eof())
+   {
+      return;
+   }
+
    mHostCanonicalized=false;
    static std::bitset<256> hostDelimiter(Data::toBitset("\r\n\t :;?>"));
    if (*start == '[')
@@ -1063,10 +1102,8 @@ Uri::parse(ParseBuffer& pb)
       start = pb.skipChar();
       pb.skipToChar(']');
       pb.data(mHost, start);
-      // .bwc. We do not save this canonicalization, since we weren't doing so
-      // before. This may change soon.
-      Data canonicalizedHost=DnsUtil::canonicalizeIpV6Address(mHost);
-      if(canonicalizedHost.empty())
+      mCanonicalHost = DnsUtil::canonicalizeIpV6Address(mHost);
+      if (mCanonicalHost.empty())
       {
          // .bwc. So the V6 addy is garbage.
          throw ParseException("Unparsable V6 address (note, this might"
@@ -1074,6 +1111,7 @@ Uri::parse(ParseBuffer& pb)
                                     " enabled)","Uri",__FILE__,
                                        __LINE__);
       }
+      mHostCanonicalized = true;
       pb.skipChar();
       pb.skipToOneOf(hostDelimiter);
    }
@@ -1136,7 +1174,12 @@ void Uri::setUriPasswordEncoding(unsigned char c, bool encode)
 EncodeStream& 
 Uri::encodeParsed(EncodeStream& str) const
 {
-   str << mScheme << Symbols::COLON; 
+   // Relative URIs may not have the scheme
+   if (!mScheme.empty())
+   {
+      str << mScheme << Symbols::COLON;
+   }
+
    if (!mUser.empty())
    {
 #ifdef HANDLE_CHARACTER_ESCAPING
@@ -1176,6 +1219,10 @@ Uri::encodeParsed(EncodeStream& str) const
    if (mPort != 0)
    {
       str << Symbols::COLON << mPort;
+   }
+   if (!mPath.empty())
+   {
+      str << mPath;
    }
    encodeParameters(str);
    encodeEmbeddedHeaders(str);
@@ -1357,6 +1404,8 @@ defineParam(extension, "ext", DataParameter, "RFC 3966"); // Token is used when 
 defineParam(sigcompId, "sigcomp-id", QuotedDataParameter, "RFC 5049");
 defineParam(rinstance, "rinstance", DataParameter, "proprietary (resip)");
 defineParam(addTransport, "addTransport", ExistsParameter, "RESIP INTERNAL");
+defineParam(wsSrcIp, "ws-src-ip", DataParameter, "RESIP INTERNAL (WebSocket)");
+defineParam(wsSrcPort, "ws-src-port", UInt32Parameter, "RESIP INTERNAL (WebSocket)");
 
 #undef defineParam
 

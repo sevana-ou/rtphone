@@ -17,6 +17,7 @@
 #include "repro/RequestContext.hxx"
 #include "repro/RRDecorator.hxx"
 #include "repro/Ack200DoneMessage.hxx"
+#include "rutil/TransportType.hxx"
 #include "rutil/WinLeakCheck.hxx"
 
 #define RESIPROCATE_SUBSYSTEM resip::Subsystem::REPRO
@@ -68,7 +69,7 @@ ResponseContext::addTarget(const NameAddr& addr, bool beginImmediately)
 }
 
 bool
-ResponseContext::addTarget(std::auto_ptr<repro::Target> target, bool beginImmediately)
+ResponseContext::addTarget(std::auto_ptr<repro::Target> target, bool beginImmediately, bool checkDuplicates)
 {
    if(mRequestContext.mHaveSentFinalResponse || !target.get())
    {
@@ -89,7 +90,7 @@ ResponseContext::addTarget(std::auto_ptr<repro::Target> target, bool beginImmedi
    
    if(beginImmediately)
    {
-      if(isDuplicate(target.get()))
+      if (checkDuplicates && isDuplicate(target.get()))
       {
          return false;
       }
@@ -237,7 +238,7 @@ ResponseContext::beginClientTransaction(const resip::Data& tid)
 }
 
 bool 
-ResponseContext::cancelActiveClientTransactions()
+ResponseContext::cancelActiveClientTransactions(const resip::Tokens* reasons)
 {
    if(mRequestContext.mHaveSentFinalResponse)
    {
@@ -256,7 +257,7 @@ ResponseContext::cancelActiveClientTransactions()
    for (TransactionMap::iterator i = mActiveTransactionMap.begin(); 
         i != mActiveTransactionMap.end(); ++i)
    {
-      cancelClientTransaction(i->second);
+      cancelClientTransaction(i->second, reasons);
    }
       
    return true;
@@ -264,7 +265,7 @@ ResponseContext::cancelActiveClientTransactions()
 }
 
 bool
-ResponseContext::cancelAllClientTransactions()
+ResponseContext::cancelAllClientTransactions(const resip::Tokens* reasons)
 {
 
    InfoLog (<< "Cancel ALL client transactions: " << mCandidateTransactionMap.size()
@@ -281,25 +282,25 @@ ResponseContext::cancelAllClientTransactions()
       for (TransactionMap::iterator i = mActiveTransactionMap.begin(); 
            i != mActiveTransactionMap.end(); ++i)
       {
-         cancelClientTransaction(i->second);
+         cancelClientTransaction(i->second, reasons);
       }
    }
 
-   clearCandidateTransactions();
+   clearCandidateTransactions(reasons);
    
    return true;
 
 }
 
 bool
-ResponseContext::clearCandidateTransactions()
+ResponseContext::clearCandidateTransactions(const resip::Tokens* reasons)
 {
    bool result=false;
    for (TransactionMap::iterator j = mCandidateTransactionMap.begin(); 
         j != mCandidateTransactionMap.end();)
    {
       result=true;
-      cancelClientTransaction(j->second);
+      cancelClientTransaction(j->second, reasons);
       mTerminatedTransactionMap[j->second->tid()] = j->second;
       TransactionMap::iterator temp = j;
       j++;
@@ -310,7 +311,7 @@ ResponseContext::clearCandidateTransactions()
 }
 
 bool 
-ResponseContext::cancelClientTransaction(const resip::Data& tid)
+ResponseContext::cancelClientTransaction(const resip::Data& tid, const resip::Tokens* reasons)
 {
 
    TransactionMap::iterator i = mActiveTransactionMap.find(tid);
@@ -318,7 +319,7 @@ ResponseContext::cancelClientTransaction(const resip::Data& tid)
    {
       if(i!=mActiveTransactionMap.end())
       {
-         cancelClientTransaction(i->second);      
+         cancelClientTransaction(i->second, reasons);
          return true;
       }
    }
@@ -326,7 +327,7 @@ ResponseContext::cancelClientTransaction(const resip::Data& tid)
    TransactionMap::iterator j = mCandidateTransactionMap.find(tid);
    if(j != mCandidateTransactionMap.end())
    {
-      cancelClientTransaction(j->second);
+      cancelClientTransaction(j->second, reasons);
       mTerminatedTransactionMap[tid] = j->second;
       mCandidateTransactionMap.erase(j);
       return true;
@@ -343,21 +344,21 @@ ResponseContext::getTarget(const resip::Data& tid) const
    TransactionMap::const_iterator pend = mCandidateTransactionMap.find(tid);
    if(pend != mCandidateTransactionMap.end())
    {
-      assert(pend->second->status()==Target::Candidate);
+      resip_assert(pend->second->status()==Target::Candidate);
       return pend->second;
    }
    
    TransactionMap::const_iterator act = mActiveTransactionMap.find(tid);
    if(act != mActiveTransactionMap.end())
    {
-      assert(!(act->second->status()==Target::Candidate || act->second->status()==Target::Terminated));
+      resip_assert(!(act->second->status()==Target::Candidate || act->second->status()==Target::Terminated));
       return act->second;
    }
 
    TransactionMap::const_iterator term = mTerminatedTransactionMap.find(tid);
    if(term != mTerminatedTransactionMap.end())
    {
-      assert(term->second->status()==Target::Terminated);
+      resip_assert(term->second->status()==Target::Terminated);
       return term->second;
    }
 
@@ -487,7 +488,7 @@ ResponseContext::beginClientTransaction(repro::Target* target)
 {
    // .bwc. This is a private function, and if anything calls this with a
    // target in an invalid state, it is a bug.
-   assert(target->status() == Target::Candidate);
+   resip_assert(target->status() == Target::Candidate);
 
    SipMessage& orig=mRequestContext.getOriginalRequest();
    SipMessage request(orig);
@@ -522,7 +523,9 @@ ResponseContext::beginClientTransaction(repro::Target* target)
    // stuff.
 
    // only add record route if configured to do so
-   if(!mRequestContext.mProxy.getRecordRoute(orig.getReceivedTransport()).uri().host().empty())
+   bool transportSpecificRecordRoute;
+   const NameAddr& receivedTransportRecordRoute = mRequestContext.mProxy.getRecordRoute(orig.getSource().mTransportKey, &transportSpecificRecordRoute);
+   if(!receivedTransportRecordRoute.uri().host().empty())
    {
       if (!inDialog &&  // only for dialog-creating request
           (request.method() == INVITE ||
@@ -530,13 +533,17 @@ ResponseContext::beginClientTransaction(repro::Target* target)
            request.method() == REFER))
       {
          insertRecordRoute(request,
-                           orig.getReceivedTransport(),
+                           orig.getReceivedTransportTuple(),
+                           receivedTransportRecordRoute,
+                           transportSpecificRecordRoute,
                            target);
       }
       else if(request.method()==REGISTER)
       {
          insertRecordRoute(request,
-                           orig.getReceivedTransport(),
+                           orig.getReceivedTransportTuple(),
+                           receivedTransportRecordRoute,
+                           transportSpecificRecordRoute,
                            target,
                            true /* do Path instead */);
       }
@@ -590,7 +597,9 @@ ResponseContext::beginClientTransaction(repro::Target* target)
 
 void
 ResponseContext::insertRecordRoute(SipMessage& outgoing,
-                                   const Transport* receivedTransport,
+                                   const resip::Tuple& receivedTransportTuple,
+                                   const resip::NameAddr& receivedTransportRecordRoute, 
+                                   bool transportSpecificRecordRoute,
                                    Target* target,
                                    bool doPathInstead)
 {
@@ -606,32 +615,33 @@ ResponseContext::insertRecordRoute(SipMessage& outgoing,
       resip::NameAddr rt;
       if(inboundFlowToken.empty())
       {
-         rt=mRequestContext.mProxy.getRecordRoute(receivedTransport);
+         rt = receivedTransportRecordRoute;
       }
       else
       {
-         if(receivedTransport->getTuple().getType()==TLS || 
-            receivedTransport->getTuple().getType()==DTLS)
+         if(isSecure(receivedTransportTuple.getType()))
          {
             // .bwc. Debatable. Should we be willing to reuse a TLS connection
             // at the behest of a Route header with no hostname in it?
-            rt=mRequestContext.mProxy.getRecordRoute(receivedTransport);
+            rt = receivedTransportRecordRoute;
             rt.uri().scheme() = "sips";
          }
          else
          {
-            if(receivedTransport->getTuple().isAnyInterface())
+            if(receivedTransportTuple.isAnyInterface() || transportSpecificRecordRoute)
             {
-               rt=mRequestContext.mProxy.getRecordRoute(receivedTransport);
+               rt = receivedTransportRecordRoute;
             }
             else
             {
-               rt.uri().host()=resip::Tuple::inet_ntop(receivedTransport->getTuple());
+               // If record-route is not transport specific (ie: global record route setting), then generate appropriate one from source
+               // as long as we are not bound to INADDR_ANY
+               rt.uri().host()=resip::Tuple::inet_ntop(receivedTransportTuple);
+               rt.uri().port() = receivedTransportTuple.getPort();
+               rt.uri().param(resip::p_transport) = resip::Tuple::toDataLower(receivedTransportTuple.getType());
             }
-            rt.uri().port()=receivedTransport->getTuple().getPort();
-            rt.uri().param(resip::p_transport)=resip::Tuple::toDataLower(receivedTransport->getTuple().getType());
          }
-         rt.uri().user()=inboundFlowToken;
+         rt.uri().user() = inboundFlowToken;
       }
       Helper::massageRoute(outgoing,rt);
 
@@ -678,7 +688,8 @@ ResponseContext::insertRecordRoute(SipMessage& outgoing,
    {
       std::auto_ptr<resip::MessageDecorator> rrDecorator(
                                  new RRDecorator(mRequestContext.mProxy,
-                                                receivedTransport,
+                                                receivedTransportTuple,
+                                                receivedTransportRecordRoute,
                                                 recordRouted,
                                                 !inboundFlowToken.empty(),
                                                 mRequestContext.mProxy.getRecordRouteForced(),
@@ -733,7 +744,7 @@ ResponseContext::getInboundFlowToken(bool doPathInstead)
       }
    }
 
-   if(flowToken.empty() && orig.header(h_Vias).size()==1)
+   if(flowToken.empty() && orig.header(h_Vias).size() == 1)
    {
       if(resip::InteropHelper::getRRTokenHackEnabled() ||
          mIsClientBehindNAT ||
@@ -748,6 +759,15 @@ ResponseContext::getInboundFlowToken(bool doPathInstead)
          Tuple::writeBinaryToken(orig.getSource(), binaryFlowToken, Proxy::FlowTokenSalt);
          flowToken = binaryFlowToken.base64encode();
       }
+   }
+
+   if (flowToken.empty() &&
+       resip::InteropHelper::getRRTokenHackEnabled() &&
+       InteropHelper::getAllowInboundFlowTokensForNonDirectClients())
+   {
+       resip::Data binaryFlowToken;
+       Tuple::writeBinaryToken(orig.getSource(), binaryFlowToken, Proxy::FlowTokenSalt);
+       flowToken = binaryFlowToken.base64encode();
    }
 
    return flowToken;
@@ -790,7 +810,7 @@ ResponseContext::needsFlowTokenToWork(const resip::NameAddr& contact) const
       if(contact.uri().exists(p_transport))
       {
          TransportType type = toTransportType(contact.uri().param(p_transport));
-         if(type==TLS || type == DTLS)
+         if(isSecure(type))
          {
             // TLS with no FQDN. Impossible without flow-token fixup, even if no 
             // NAT is involved.
@@ -829,7 +849,7 @@ ResponseContext::sendingToSelf(Target* target)
 void 
 ResponseContext::sendRequest(resip::SipMessage& request)
 {
-   assert (request.isRequest());
+   resip_assert (request.isRequest());
 
    // Do any required session accounting with this forward request - allows Session Routed event
    mRequestContext.getProxy().doSessionAccounting(request, false /* received */, mRequestContext);
@@ -847,39 +867,70 @@ ResponseContext::sendRequest(resip::SipMessage& request)
 //      }
    }
 
-   // TODO - P-Asserted-Identity Processing
-   // RFC3325 - section 5
-   // When a proxy forwards a message to another node, it must first
-   // determine if it trusts that node or not.  If it trusts the node, the
-   // proxy does not remove any P-Asserted-Identity header fields that it
-   // generated itself, or that it received from a trusted source.  If it
-   // does not trust the element, then the proxy MUST examine the Privacy
-   // header field (if present) to determine if the user requested that
-   // asserted identity information be kept private.
-
-   // Note:  Since we have no better mechanism to determine if destination is trusted or
-   //        not we will assume that all destinations outside our domain are not-trusted
-   //        and will remove the P-Asserted-Identity header, if Privacy is set to "id"
-   if(mRequestContext.getProxy().isPAssertedIdentityProcessingEnabled() &&
-      request.exists(h_Privacies) && 
-      request.header(h_Privacies).size() > 0 && 
-      request.exists(h_PAssertedIdentities) && 
-      !mRequestContext.getProxy().isMyUri(request.header(h_RequestLine).uri()))
+   // If this request is destined outside our domain then remove certain headers
+   bool isMyUri;
+   if(request.exists(h_Routes) &&
+      !request.const_header(h_Routes).empty())
    {
-      // Look for "id" token
-      bool found = false;
-      PrivacyCategories::iterator it = request.header(h_Privacies).begin();
-      for(; it != request.header(h_Privacies).end() && !found; it++)
+      isMyUri = mRequestContext.getProxy().isMyUri(request.const_header(h_Routes).front().uri());
+   }
+   else
+   {
+      isMyUri = mRequestContext.getProxy().isMyUri(request.const_header(h_RequestLine).uri());
+   }
+   if(!isMyUri)
+   {
+      // TODO - P-Asserted-Identity Processing
+      // RFC3325 - section 5
+      // When a proxy forwards a message to another node, it must first
+      // determine if it trusts that node or not.  If it trusts the node, the
+      // proxy does not remove any P-Asserted-Identity header fields that it
+      // generated itself, or that it received from a trusted source.  If it
+      // does not trust the element, then the proxy MUST examine the Privacy
+      // header field (if present) to determine if the user requested that
+      // asserted identity information be kept private.
+
+       // Note:  Since we have no better mechanism to determine if destination is trusted or
+      //        not we will assume that all destinations outside our domain are not-trusted
+      //        and will remove the P-Asserted-Identity header, if Privacy is set to "id"
+      if(mRequestContext.getProxy().isPAssertedIdentityProcessingEnabled() &&
+         request.exists(h_Privacies) && 
+         request.header(h_Privacies).size() > 0 && 
+         request.exists(h_PAssertedIdentities))
       {
-         std::vector<Data>::iterator itToken = it->value().begin();
-         for(; itToken != it->value().end() && !found; itToken++)
+         // Look for "id" token
+         bool found = false;
+         PrivacyCategories::iterator it = request.header(h_Privacies).begin();
+         for(; it != request.header(h_Privacies).end() && !found; it++)
          {
-            if(*itToken == "id")
+            std::vector<Data>::iterator itToken = it->value().begin();
+            for(; itToken != it->value().end() && !found; itToken++)
             {
-               request.remove(h_PAssertedIdentities); 
-               found = true;
+               if(*itToken == "id")
+               {
+                  request.remove(h_PAssertedIdentities); 
+                  found = true;
+               }
             }
          }
+      }
+
+      // Delete the Proxy-Auth header for this realm if forwarding outside our domain
+      // other Proxy-Auth headers might be needed by a downsteram node
+      if (request.exists(h_ProxyAuthorizations) && !mRequestContext.getProxy().isNeverStripProxyAuthorizationHeadersEnabled())
+      {
+         Auths &authHeaders = request.header(h_ProxyAuthorizations);
+         for (Auths::iterator i = authHeaders.begin(); i != authHeaders.end(); )
+         {
+            if(i->exists(p_realm) && mRequestContext.getProxy().isMyDomain(i->param(p_realm)))
+            {
+               i = authHeaders.erase(i);
+            }
+            else
+            {
+               ++i;
+           }
+         } 
       }
    }
 
@@ -896,19 +947,26 @@ ResponseContext::sendRequest(resip::SipMessage& request)
 void
 ResponseContext::processCancel(const SipMessage& request)
 {
-   assert(request.isRequest());
-   assert(request.method() == CANCEL);
+   resip_assert(request.isRequest());
+   resip_assert(request.method() == CANCEL);
 
    std::auto_ptr<SipMessage> ok(Helper::makeResponse(request, 200));   
    mRequestContext.sendResponse(*ok);
 
    if (!mRequestContext.mHaveSentFinalResponse)
    {
-      cancelAllClientTransactions();
+      if (request.exists(h_Reasons))
+      {
+         cancelAllClientTransactions(&request.header(h_Reasons));
+      }
+      else
+      {
+         cancelAllClientTransactions();
+      }
       if(!hasActiveTransactions())
       {
          SipMessage reqterm;
-         Helper::makeResponse(reqterm,mRequestContext.getOriginalRequest(),487);
+         Helper::makeResponse(reqterm, mRequestContext.getOriginalRequest(), 487);
          mRequestContext.sendResponse(reqterm);
       }
    }
@@ -932,8 +990,8 @@ ResponseContext::processResponse(SipMessage& response)
    // store this before we pop the via and lose the branch tag
    mCurrentResponseTid = response.getTransactionId();
    
-   assert (response.isResponse());
-   assert (response.exists(h_Vias) && !response.header(h_Vias).empty());
+   resip_assert (response.isResponse());
+   resip_assert (response.exists(h_Vias) && !response.header(h_Vias).empty());
    response.header(h_Vias).pop_front();
 
    // Stop processing responses that have nowhere else to go
@@ -948,20 +1006,26 @@ ResponseContext::processResponse(SipMessage& response)
       {
          return;
       }
-      else if (response.header(h_StatusLine).statusCode() > 199)
+      else if (response.header(h_StatusLine).statusCode() != 100)
       {
-         InfoLog( << "Received final response, but can't forward as there are "
-                        "no more Vias. Considering this branch failed. " 
-                        << response.brief() );
-         // .bwc. Treat as server error.
-         terminateClientTransaction(mCurrentResponseTid);
-         return;
-      }
-      else if(response.header(h_StatusLine).statusCode() != 100)
-      {
-         InfoLog( << "Received provisional response, but can't forward as there"
-                     " are no more Vias. Ignoring. " << response.brief() );
-         return;
+         if (!mRequestContext.handleMissingResponseVias(&response))
+         {
+            // If handle MissingResponseVias returns false, then processing does not continue
+            if (response.header(h_StatusLine).statusCode() > 199)
+            {
+               InfoLog(<< "Received final response, but can't forward as there are "
+                  "no more Vias. Considering this branch failed. "
+                  << response.brief());
+               // .bwc. Treat as server error.
+               terminateClientTransaction(mCurrentResponseTid);
+            }
+            else
+            {
+               InfoLog(<< "Received provisional response, but can't forward as there"
+                  " are no more Vias. Ignoring. " << response.brief());
+            }
+            return;
+         }
       }
    }
    else // We have a second Via
@@ -1042,7 +1106,7 @@ ResponseContext::processResponse(SipMessage& response)
    switch (code / 100)
    {
       case 1:
-         if(mRequestContext.getOriginalRequest().method()==INVITE)
+         if(mRequestContext.getOriginalRequest().method() == INVITE)
          {
             mRequestContext.updateTimerC();
          }
@@ -1063,18 +1127,21 @@ ResponseContext::processResponse(SipMessage& response)
          terminateClientTransaction(mCurrentResponseTid);
          if (mRequestContext.getOriginalRequest().method() == INVITE)
          {
-            cancelAllClientTransactions();
+            Tokens reasons;
+            Token reason("SIP");
+            reason.param(p_cause) = code;
+            reason.param(p_text) = "Call completed elsewhere";
+            reasons.push_back(reason);
+            cancelAllClientTransactions(&reasons);
             mRequestContext.mHaveSentFinalResponse = true;
-            mBestResponse.header(h_StatusLine).statusCode()=
-               response.header(h_StatusLine).statusCode();
+            mBestResponse.header(h_StatusLine).statusCode() = code;
             mRequestContext.sendResponse(response);
          }
          else if (!mRequestContext.mHaveSentFinalResponse)
          {
             clearCandidateTransactions();
             mRequestContext.mHaveSentFinalResponse = true;
-            mBestResponse.header(h_StatusLine).statusCode()=
-               response.header(h_StatusLine).statusCode();
+            mBestResponse.header(h_StatusLine).statusCode() = code;
 
             // If this is a registration response and we have flow timers enabled, and
             // we are doing outbound for this registration and there is no FlowTimer
@@ -1089,7 +1156,7 @@ ResponseContext::processResponse(SipMessage& response)
                mRequestContext.getProxy().getStack().enableFlowTimer(mRequestContext.getOriginalRequest().getSource());
             }
 
-            mRequestContext.sendResponse(response);            
+            mRequestContext.sendResponse(response);
          }
          break;
          
@@ -1127,8 +1194,7 @@ ResponseContext::processResponse(SipMessage& response)
                }
                else if (code / 100 == 3) // merge 3xx
                {
-
-                  if(mBestResponse.header(h_StatusLine).statusCode()/100!=3)
+                  if(mBestResponse.header(h_StatusLine).statusCode() / 100 != 3)
                   {
                      // .bwc. Do not merge contacts in 3xx with contacts from a
                      // previous 4xx or 5xx
@@ -1183,7 +1249,12 @@ ResponseContext::processResponse(SipMessage& response)
                if (mRequestContext.getOriginalRequest().method() == INVITE)
                {
                   // CANCEL INVITE branches
-                  cancelAllClientTransactions();
+                  Tokens reasons;
+                  Token reason("SIP");
+                  reason.param(p_cause) = code;
+                  reason.param(p_text) = response.header(h_StatusLine).reason();
+                  reasons.push_back(reason);
+                  cancelAllClientTransactions(&reasons);
                }
             }
             
@@ -1195,18 +1266,18 @@ ResponseContext::processResponse(SipMessage& response)
          break;
          
       default:
-         assert(0);
+         resip_assert(0);
          break;
    }
 }
 
 void
-ResponseContext::cancelClientTransaction(repro::Target* target)
+ResponseContext::cancelClientTransaction(repro::Target* target, const resip::Tokens* reasons)
 {
    if (target->status() == Target::Started)
    {
       InfoLog (<< "Cancel client transaction: " << target);
-      mRequestContext.cancelClientTransaction(target->via().param(p_branch).getTransactionId());
+      mRequestContext.cancelClientTransaction(target->via().param(p_branch).getTransactionId(), reasons);
 
       DebugLog(<< "Canceling a transaction with uri: " 
                << resip::Data::from(target->uri()) << " , to host: " 
@@ -1244,9 +1315,7 @@ ResponseContext::terminateClientTransaction(const resip::Data& tid)
       mCandidateTransactionMap.erase(j);
       return;   
    }
-      
 }
-
 
 int
 ResponseContext::getPriority(const resip::SipMessage& msg)
@@ -1254,7 +1323,7 @@ ResponseContext::getPriority(const resip::SipMessage& msg)
    int responseCode = msg.header(h_StatusLine).statusCode();
    int p = 0;  // "p" is the relative priority of the response
 
-      assert(responseCode >= 300 && responseCode <= 599);
+      resip_assert(responseCode >= 300 && responseCode <= 599);
       if (responseCode <= 399)  // 3xx response
       { 
          return 5;  // response priority is 5
@@ -1386,8 +1455,8 @@ ResponseContext::getPriority(const resip::SipMessage& msg)
 bool 
 ResponseContext::CompareStatus::operator()(const resip::SipMessage& lhs, const resip::SipMessage& rhs) const
 {
-   assert(lhs.isResponse());
-   assert(rhs.isResponse());
+   resip_assert(lhs.isResponse());
+   resip_assert(rhs.isResponse());
    
    // !rwm! replace with correct thingy here
    return lhs.header(h_StatusLine).statusCode() < rhs.header(h_StatusLine).statusCode();
@@ -1397,12 +1466,18 @@ void
 ResponseContext::forwardBestResponse()
 {
    InfoLog (<< "Forwarding best response: " << mBestResponse.brief());
-   
-   clearCandidateTransactions();
+
+   Tokens reasons;
+   Token reason("SIP");
+   reason.param(p_cause) = mBestResponse.header(h_StatusLine).statusCode();
+   reason.param(p_text) = mBestResponse.header(h_StatusLine).reason();
+   reasons.push_back(reason);
+
+   clearCandidateTransactions(&reasons);
    
    if(mRequestContext.getOriginalRequest().method()==INVITE)
    {
-      cancelActiveClientTransactions();
+      cancelActiveClientTransactions(&reasons);
    }
    
    if(mBestResponse.header(h_StatusLine).statusCode() == 503)

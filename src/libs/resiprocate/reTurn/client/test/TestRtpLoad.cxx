@@ -1,3 +1,7 @@
+#if defined(HAVE_CONFIG_H)
+#include "config.h"
+#endif
+
 #ifdef WIN32
 #pragma warning(disable : 4267)
 #endif
@@ -5,7 +9,9 @@
 #include <iostream>
 #include <string>
 #include <asio.hpp>
+#ifdef USE_SSL
 #include <asio/ssl.hpp>
+#endif
 #include <rutil/ThreadIf.hxx>
 
 #include "../../StunTuple.hxx"
@@ -16,9 +22,17 @@
 #include "../TurnAsyncUdpSocket.hxx"
 #include "../TurnAsyncSocketHandler.hxx"
 #include <rutil/Timer.hxx>
+#include <rutil/Random.hxx>
 #include <rutil/Logger.hxx>
 #include <rutil/DnsUtil.hxx>
 #include <rutil/WinLeakCheck.hxx>
+
+#ifdef BOOST_ASIO_HAS_STD_CHRONO
+using namespace std::chrono;
+#else
+#include <boost/chrono.hpp>
+using namespace boost::chrono;
+#endif
 
 using namespace reTurn;
 using namespace std;
@@ -46,7 +60,8 @@ static unsigned int PACKET_TIME_TO_SIMULATE=20;  // 20 ms
 // Test Config 4
 //#define ECHO_SERVER_ONLY
 
-resip::Data address = resip::DnsUtil::getLocalIpAddress();
+resip::Data address;
+unsigned short relayPort = 0;
 resip::Data turnAddress;
 char rtpPayloadData[172];  // 172 bytes of random data to simulate RTP payload
 resip::Data rtpPayload(rtpPayloadData, sizeof(rtpPayloadData));
@@ -71,13 +86,37 @@ public:
    virtual void thread()
    {
       asio::error_code rc;
-      TurnUdpSocket turnSocket(asio::ip::address::from_string(address.c_str()), 2000);
+      TurnUdpSocket turnSocket(asio::ip::address::from_string(address.c_str()), relayPort);
+      if(relayPort == 0)
+      {
+         unsigned int socketFd = turnSocket.getSocketDescriptor();
+         // Get Port from Fd
+         socklen_t len = sizeof(sockaddr);
+         sockaddr turnSockAddr;
+         if(::getsockname(socketFd, &turnSockAddr, &len) == SOCKET_ERROR)
+         {
+            std::cerr << "Error querying sockaddr" << std::endl;
+            exit(-1);
+         }
+         if (turnSockAddr.sa_family == AF_INET) // v4   
+         {
+            relayPort = ntohs(((sockaddr_in*)&turnSockAddr)->sin_port);
+         }
+         else
+         {
+#ifdef USE_IPV6
+            relayPort = ntohs(((sockaddr_in6*)&turnSockAddr)->sin6_port);
+#endif
+         }
+         std::cout << "relayPort is " << relayPort << std::endl;
+      }
 
       char buffer[1024];
       unsigned int size = sizeof(buffer);
       asio::ip::address sourceAddress;
       unsigned short sourcePort;
-      bool connected = false;
+      asio::ip::address connectedAddress;
+      unsigned short connectedPort=0;
 
       // Receive Data
       rc=turnSocket.receive(buffer, size, 1000, &sourceAddress, &sourcePort);
@@ -85,10 +124,12 @@ public:
       {
          if(!rc)
          {
-            if(!connected)
+            if(connectedAddress != sourceAddress ||
+               connectedPort != sourcePort)
             {
                turnSocket.connect(sourceAddress.to_string(), sourcePort);
-               connected = true;
+               connectedAddress = sourceAddress;
+               connectedPort = sourcePort;
             }
             //InfoLog(<< "PEER: Received data from " << sourceAddress << ":" << sourcePort << " - [" << resip::Data(buffer, size).c_str() << "]");
             turnSocket.send(buffer, size);
@@ -118,7 +159,7 @@ public:
    {
       if(++mNumSends <= NUM_RTP_PACKETS_TO_SIMULATE)
       {
-         mTimer.expires_from_now(boost::posix_time::milliseconds(PACKET_TIME_TO_SIMULATE));   
+         mTimer.expires_from_now(milliseconds(PACKET_TIME_TO_SIMULATE));
          mTimer.async_wait(boost::bind(&MyTurnAsyncSocketHandler::sendRtpSimPacket, this));
          //InfoLog(<< "Sending packet " << mNumReceives << "...");
          mTurnAsyncSocket->send(rtpPayload.data(), rtpPayload.size());  
@@ -126,9 +167,7 @@ public:
       else
       {
          InfoLog(<< "Done sending " << NUM_RTP_PACKETS_TO_SIMULATE << " packets (" << mNumReceives << " receives have already been completed).");
-#ifdef SEND_ONLY
          mTurnAsyncSocket->destroyAllocation();
-#endif
       }
    }
 
@@ -152,18 +191,18 @@ public:
       InfoLog( << "MyTurnAsyncSocketHandler::onSharedSecretFailure: socketDest=" << socketDesc << " error=" << e.value() << "(" << e.message() << ").");
    }
 
-   virtual void onBindSuccess(unsigned int socketDesc, const StunTuple& reflexiveTuple)
+   virtual void onBindSuccess(unsigned int socketDesc, const StunTuple& reflexiveTuple, const StunTuple& stunServerTuple)
    {
-      InfoLog( << "MyTurnAsyncSocketHandler::onBindingSuccess: socketDest=" << socketDesc << ", reflexive=" << reflexiveTuple);
+      InfoLog( << "MyTurnAsyncSocketHandler::onBindingSuccess: socketDest=" << socketDesc << ", reflexive=" << reflexiveTuple << ", stunServerTuple=" << stunServerTuple);
       mTurnAsyncSocket->createAllocation(30,       // TurnSocket::UnspecifiedLifetime, 
                                          TurnSocket::UnspecifiedBandwidth, 
                                          StunMessage::PropsPortPair,
                                          TurnAsyncSocket::UnspecifiedToken,
                                          StunTuple::UDP);  
    }
-   virtual void onBindFailure(unsigned int socketDesc, const asio::error_code& e)
+   virtual void onBindFailure(unsigned int socketDesc, const asio::error_code& e, const StunTuple& stunServerTuple)
    {
-      InfoLog( << "MyTurnAsyncSocketHandler::onBindingFailure: socketDest=" << socketDesc << " error=" << e.value() << "(" << e.message() << ").");
+      InfoLog( << "MyTurnAsyncSocketHandler::onBindingFailure: socketDest=" << socketDesc << " error=" << e.value() << "(" << e.message() << "), stunServerTuple=" << stunServerTuple);
    }
 
    virtual void onAllocationSuccess(unsigned int socketDesc, const StunTuple& reflexiveTuple, const StunTuple& relayTuple, unsigned int lifetime, unsigned int bandwidth, UInt64 reservationToken)
@@ -185,7 +224,7 @@ public:
 #ifdef EXTERNAL_ECHO_SERVER
        mTurnAsyncSocket->setActiveDestination(asio::ip::address::from_string(OTHER_HOST), OTHER_PORT);
 #else
-       mTurnAsyncSocket->setActiveDestination(asio::ip::address::from_string(address.c_str()), 2000);
+       mTurnAsyncSocket->setActiveDestination(asio::ip::address::from_string(address.c_str()), relayPort);
 #endif
 #endif
 #endif
@@ -228,6 +267,18 @@ public:
    {
       InfoLog( << "MyTurnAsyncSocketHandler::onClearActiveDestinationFailure: socketDest=" << socketDesc << " error=" << e.value() << "(" << e.message() << ").");
    }
+   virtual void onChannelBindRequestSent(unsigned int socketDesc, unsigned short channelNumber)
+   {
+      InfoLog( << "MyTurnAsyncSocketHandler::onChannelBindRequestSent: socketDest=" << socketDesc << " channelNumber=" << channelNumber);
+   }
+   virtual void onChannelBindSuccess(unsigned int socketDesc, unsigned short channelNumber)
+   {
+      InfoLog( << "MyTurnAsyncSocketHandler::onChannelBindSuccess: socketDest=" << socketDesc << " channelNumber=" << channelNumber);
+   }
+   virtual void onChannelBindFailure(unsigned int socketDesc, const asio::error_code& e)
+   {
+      InfoLog( << "MyTurnAsyncSocketHandler::onChannelBindFailure: socketDest=" << socketDesc << " error=" << e.value() << "(" << e.message() << ").");
+   }
 
    virtual void onSendSuccess(unsigned int socketDesc)
    {
@@ -244,7 +295,7 @@ public:
       if(++mNumReceives == NUM_RTP_PACKETS_TO_SIMULATE)
       {
          InfoLog(<< "Done receiving " << NUM_RTP_PACKETS_TO_SIMULATE << " packets.");
-         mTurnAsyncSocket->destroyAllocation();
+         //mTurnAsyncSocket->destroyAllocation();
       }
    }
    virtual void onReceiveFailure(unsigned int socketDesc, const asio::error_code& e)
@@ -252,11 +303,16 @@ public:
       InfoLog( << "MyTurnAsyncSocketHandler::onReceiveFailure: socketDest=" << socketDesc << " error=" << e.value() << "(" << e.message() << ").");
    }
 
+   virtual void onIncomingBindRequestProcessed(unsigned int socketDesc, const StunTuple& sourceTuple)
+   {
+      InfoLog( << "MyTurnAsyncSocketHandler::onIncomingBindRequestProcessed: socketDest=" << socketDesc << " sourceTuple=" << sourceTuple);
+   }
+
    void setTurnAsyncSocket(TurnAsyncSocket* turnAsyncSocket) { mTurnAsyncSocket = turnAsyncSocket; }
 
 private:
    asio::io_service& mIOService;
-   asio::deadline_timer mTimer;
+   asio::steady_timer mTimer;
    TurnAsyncSocket* mTurnAsyncSocket;
    unsigned int mNumReceives;
    unsigned int mNumSends;
@@ -266,9 +322,11 @@ private:
 
 int main(int argc, char* argv[])
 {
-#ifdef WIN32
+#if defined(WIN32) && defined(_DEBUG) && defined(LEAK_CHECK) 
   resip::FindMemoryLeaks fml;
 #endif
+  resip::Log::initialize("cout", "INFO", "TestRtpLoad");
+
   try
   {
     //if (argc == 2)
@@ -279,20 +337,25 @@ int main(int argc, char* argv[])
     //   turnPeer.join();
     //   return 0;
     //}
+    
+    address = resip::DnsUtil::getLocalIpAddress();
 
     if (argc < 3)
     {
-      std::cerr << "Usage: stunTestClient <host> <port> [<PacketTime>]\n";
+      std::cerr << "Usage: TestRtpLoad <host> <port> <loaclAddress> [<PacketTime>]\n";
       return 1;
     }
     turnAddress = argv[1];
     unsigned int port = resip::Data(argv[2]).convertUnsignedLong();
+    address = argv[3];
 
-    if(argc == 4)
+    if(argc == 5)
     {
        PACKET_TIME_TO_SIMULATE = atoi(argv[3]);
     }
     InfoLog(<< "Using " << address << " as local IP address.");
+
+    resip::Random::initialize();
 
     asio::error_code rc;
     char username[256] = "test";
@@ -306,14 +369,18 @@ int main(int argc, char* argv[])
     asio::io_service ioService;
     MyTurnAsyncSocketHandler handler(ioService);
 
-    asio::ssl::context sslContext(ioService, asio::ssl::context::tlsv1);
+#ifdef USE_SSL
+    asio::ssl::context sslContext(asio::ssl::context::tlsv1);
     // Setup SSL context
     sslContext.set_verify_mode(asio::ssl::context::verify_peer);
     sslContext.load_verify_file("ca.pem");
+#endif
 
     boost::shared_ptr<TurnAsyncSocket> turnSocket(new TurnAsyncUdpSocket(ioService, &handler, asio::ip::address::from_string(address.c_str()), 0));
     //boost::shared_ptr<TurnAsyncSocket> turnSocket(new TurnAsyncTcpSocket(ioService, &handler, asio::ip::address::from_string(address.c_str()), 0));
+#ifdef USE_SSL
     //boost::shared_ptr<TurnAsyncSocket> turnSocket(new TurnAsyncTlsSocket(ioService, sslContext, &handler, asio::ip::address::from_string(address.c_str()), 0)); port++;
+#endif
 
     handler.setTurnAsyncSocket(turnSocket.get());
 
@@ -345,6 +412,7 @@ int main(int argc, char* argv[])
 /* ====================================================================
 
  Copyright (c) 2007-2008, Plantronics, Inc.
+ Copyright (c) 2008-2018, SIP Spectrum, Inc.
  All rights reserved.
 
  Redistribution and use in source and binary forms, with or without

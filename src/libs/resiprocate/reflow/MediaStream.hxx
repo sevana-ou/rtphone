@@ -5,6 +5,10 @@
 #include "config.h"
 #endif
 
+// !slg! At least for builds in Visual Studio on windows this include needs to be above ASIO and boost includes since inlined shared_from_this has 
+// a different linkage signature if included after - haven't investigated the full details as to exactly why this happens
+#include <rutil/SharedPtr.hxx>
+
 #include <asio.hpp>
 #ifdef USE_SSL
 #include <asio/ssl.hpp>
@@ -16,7 +20,9 @@
 #endif
 
 #include "dtls_wrapper/DtlsFactory.hxx"
+#include "FlowContext.hxx"
 #include "Flow.hxx"
+#include "RTCPEventLoggingHandler.hxx"
 
 using namespace reTurn;
 
@@ -60,20 +66,19 @@ public:
    };
 
    MediaStream(asio::io_service& ioService,
-#ifdef USE_SSL
                asio::ssl::context& sslContext,
-#endif
                MediaStreamHandler& mediaStreamHandler,
                const StunTuple& localRtpBinding, 
                const StunTuple& localRtcpBinding,   // pass in transport type = None to disable RTCP
- #ifdef USE_SSL
                dtls::DtlsFactory* dtlsFactory = 0,
- #endif 
                NatTraversalMode natTraversalMode = NoNatTraversal,
                const char* natTraversalServerHostname = 0, 
                unsigned short natTraversalServerPort = 0, 
                const char* stunUsername = 0,
-               const char* stunPassword = 0); 
+               const char* stunPassword = 0,
+               bool forceCOMedia = false,
+               resip::SharedPtr<RTCPEventLoggingHandler> rtcpEventLoggingHandler = resip::SharedPtr<RTCPEventLoggingHandler>(),
+               resip::SharedPtr<FlowContext> context = resip::SharedPtr<FlowContext>());
    virtual ~MediaStream();
 
    Flow* getRtpFlow() { return mRtpFlow; }
@@ -87,9 +92,7 @@ protected:
    friend class Flow;
 
    // SRTP members
-#ifdef USE_SSL
    dtls::DtlsFactory* mDtlsFactory;
-#endif
    volatile bool mSRTPSessionInCreated;
    volatile bool mSRTPSessionOutCreated;
    resip::Mutex mMutex;
@@ -111,6 +114,7 @@ protected:
    unsigned short mNatTraversalServerPort;
    resip::Data mStunUsername;
    resip::Data mStunPassword;
+   bool mForceCOMedia;
 
 private:
    // Note: these member variables are set at creation time and never changed, thus
@@ -133,6 +137,7 @@ private:
 /* ====================================================================
 
  Copyright (c) 2007-2008, Plantronics, Inc.
+ Copyright (c) 2008-2018, SIP Spectrum, Inc.
  All rights reserved.
 
  Redistribution and use in source and binary forms, with or without

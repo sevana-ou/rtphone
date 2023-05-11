@@ -55,11 +55,13 @@ class UserStore
       Key getFirstKey();// return empty if no more
       Key getNextKey(); // return empty if no more 
       
+      static Key buildKey(const resip::Data& user, const resip::Data& domain);
+      static void getUserAndDomainFromKey(const AbstractDb::Key& key, resip::Data& user, resip::Data& domain);
+
    private:
-      Key buildKey( const resip::Data& user, 
-                    const resip::Data& domain) const;
 
       AbstractDb& mDb;
+      static const resip::Data SEPARATOR;
 };
 
  }

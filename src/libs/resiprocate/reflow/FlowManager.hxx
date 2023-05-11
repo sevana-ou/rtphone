@@ -5,14 +5,16 @@
 #include "config.h"
 #endif
 
+#include <rutil/SharedPtr.hxx>
+
+#include "FlowContext.hxx"
 #include "MediaStream.hxx"
 #include "FlowManagerException.hxx"
+#include "RTCPEventLoggingHandler.hxx"
 
-#ifdef USE_SSL
 #include "dtls_wrapper/DtlsFactory.hxx"
 #include <openssl/crypto.h>
 #include <openssl/ssl.h>
-#endif //USE_SSL 
 
 #include <map>
 
@@ -48,32 +50,33 @@ public:
                                   const char* natTraversalServerHostname = 0, 
                                   unsigned short natTraversalServerPort = 0, 
                                   const char* stunUsername = 0,
-                                  const char* stunPassword = 0);
+                                  const char* stunPassword = 0,
+                                  bool forceCOMedia = false,
+                                  resip::SharedPtr<FlowContext> context = resip::SharedPtr<FlowContext>());
 
-#ifdef USE_SSL
    void initializeDtlsFactory(const char* certAor);
    dtls::DtlsFactory* getDtlsFactory() { return mDtlsFactory; }
-#endif //USE_SSL   
+
+   void setRTCPEventLoggingHandler(resip::SharedPtr<RTCPEventLoggingHandler> handler) { mRtcpEventLoggingHandler = handler; }
+   RTCPEventLoggingHandler* getRTCPEventLoggingHandler() { return 0 != mRtcpEventLoggingHandler.get() ? mRtcpEventLoggingHandler.get() : 0; }
 
 protected: 
 
 private:
    static void srtpEventHandler(srtp_event_data_t *data);
 
+   resip::SharedPtr<RTCPEventLoggingHandler> mRtcpEventLoggingHandler;
+
    // Member variables used to manager asio io service thread
    asio::io_service mIOService;
    IOServiceThread* mIOServiceThread;
    asio::io_service::work* mIOServiceWork;
-#ifdef USE_SSL
    static int createCert (const resip::Data& pAor, int expireDays, int keyLen, X509*& outCert, EVP_PKEY*& outKey );
    asio::ssl::context mSslContext;
-#endif
    
-#ifdef USE_SSL
    X509* mClientCert;
    EVP_PKEY* mClientKey;
    dtls::DtlsFactory* mDtlsFactory;
-#endif    
 };
 
 }

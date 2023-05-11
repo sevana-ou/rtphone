@@ -29,13 +29,13 @@ class EventWrapper : public Event
       
 
    private:
-      std::unique_ptr<T> mWrapped;
+      std::auto_ptr<T> mWrapped;
 };
 
 template <class T>
-static std::unique_ptr<Event> wrap(T* t) 
+static std::auto_ptr<Event> wrap(T* t) 
 {
-   return std::unique_ptr<Event>(new EventWrapper<T>(t));
+   return std::auto_ptr<Event>(new EventWrapper<T>(t));
 }
 
 }

@@ -14,7 +14,24 @@ class ProcessorChain : public Processor
       ProcessorChain(ChainType type);
       virtual ~ProcessorChain();
 
-      void addProcessor(std::unique_ptr<Processor>);
+      void addProcessor(std::auto_ptr<Processor>);
+      template<class T> void insertProcessor(std::auto_ptr<Processor> rp)
+      {
+         resip_assert(!mChainReady);
+         rp->setChainType(mType);
+         for(Chain::iterator it = mChain.begin();
+            it != mChain.end();
+            it++)
+         {
+            Processor* p = *it;
+            if(dynamic_cast<T*>(p))
+            {
+               mChain.insert(it, rp.release());
+               return;
+            }
+         }
+         mChain.push_back(rp.release());
+      }
 
       virtual processor_action_t process(RequestContext &);
 
@@ -27,6 +44,9 @@ class ProcessorChain : public Processor
 
    private:
       Chain mChain;
+
+      bool mChainReady;
+      void onChainComplete();
 
    friend EncodeStream &operator<<(EncodeStream &os, const repro::ProcessorChain &pc);
 };

@@ -4,6 +4,7 @@
 #include <list>
 #include "rutil/Data.hxx"
 #include "rutil/RWMutex.hxx"
+#include "resip/stack/SipMessage.hxx"
 #include "resip/stack/Tuple.hxx"
 #include "repro/AbstractDb.hxx"
 
@@ -47,6 +48,13 @@ class AclStore
                   const short& port,
                   const short& transport);
       
+      void eraseAcl(const resip::Data& tlsPeerName,
+                    const resip::Data& address,
+                    const short& mask,
+                    const short& port,
+                    const short& family,
+                    const short& transport);
+
       void eraseAcl(const resip::Data& key);
       
       resip::Data getTlsPeerName( const resip::Data& key );
@@ -61,7 +69,6 @@ class AclStore
       bool isTlsPeerNameTrusted(const std::list<resip::Data>& tlsPeerNames);
       bool isAddressTrusted(const resip::Tuple& address);
       bool isRequestTrusted(const resip::SipMessage& request);
-
 
    private:
       AbstractDb& mDb;  

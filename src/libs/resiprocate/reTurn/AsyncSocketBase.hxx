@@ -1,15 +1,20 @@
 #ifndef ASYNC_SOCKET_BASE_HXX
 #define ASYNC_SOCKET_BASE_HXX
 
-#include <deque>
 #include <asio.hpp>
+#ifdef USE_SSL
+#include <asio/ssl.hpp>
+#endif
+#include <boost/function.hpp>
 #include <boost/bind.hpp>
 #include <boost/enable_shared_from_this.hpp>
+
+#include <deque>
 
 #include "DataBuffer.hxx"
 #include "StunTuple.hxx"
 
-#define RECEIVE_BUFFER_SIZE 2048 // ?slg? should we shrink this to something closer to MTU (1500 bytes)?
+#define RECEIVE_BUFFER_SIZE 4096 // ?slg? should we shrink this to something closer to MTU (1500 bytes)? !hbr! never actually increase it otherwise re-assembled UDP packets get lost. (was 2048)
 
 namespace reTurn {
 
@@ -42,6 +47,8 @@ public:
    asio::ip::address& getConnectedAddress() { return mConnectedAddress; }
    unsigned short getConnectedPort() { return mConnectedPort; }
 
+   virtual void setOnBeforeSocketClosedFp(boost::function<void(unsigned int)> fp) { mOnBeforeSocketCloseFp = fp; }
+
    /// Use these if you already operating within the ioService thread
    virtual void doSend(const StunTuple& destination, unsigned short channel, boost::shared_ptr<DataBuffer>& data, unsigned int bufferStartPos=0);
    virtual void doSend(const StunTuple& destination, boost::shared_ptr<DataBuffer>& data, unsigned int bufferStartPos=0);
@@ -49,8 +56,8 @@ public:
    virtual void doFramedReceive();
 
    /// Class override callbacks
-   virtual void onConnectSuccess() { assert(false); }
-   virtual void onConnectFailure(const asio::error_code& e) { assert(false); }
+   virtual void onConnectSuccess() { resip_assert(false); }
+   virtual void onConnectFailure(const asio::error_code& e) { resip_assert(false); }
    virtual void onReceiveSuccess(const asio::ip::address& address, unsigned short port, boost::shared_ptr<DataBuffer>& data) = 0;
    virtual void onReceiveFailure(const asio::error_code& e) = 0;
    virtual void onSendSuccess() = 0;
@@ -61,14 +68,14 @@ public:
 
    // Stubbed out async handlers needed by Protocol specific Subclasses of this - the requirement for these 
    // to be in the base class all revolves around the shared_from_this() use/requirement
-   virtual void start() { assert(false); }
-   virtual void stop() { assert(false); }
-   virtual void handleReadHeader(const asio::error_code& e) { assert(false); }
-   virtual void handleServerHandshake(const asio::error_code& e) { assert(false); }
-   virtual void handleTcpResolve(const asio::error_code& ec, asio::ip::tcp::resolver::iterator endpoint_iterator) { assert(false); }
-   virtual void handleUdpResolve(const asio::error_code& ec, asio::ip::udp::resolver::iterator endpoint_iterator) { assert(false); }
-   virtual void handleConnect(const asio::error_code& ec, asio::ip::tcp::resolver::iterator endpoint_iterator) { assert(false); }
-   virtual void handleClientHandshake(const asio::error_code& ec, asio::ip::tcp::resolver::iterator endpoint_iterator) { assert(false); }
+   virtual void start() { resip_assert(false); }
+   virtual void stop() { resip_assert(false); }
+   virtual void handleReadHeader(const asio::error_code& e) { resip_assert(false); }
+   virtual void handleServerHandshake(const asio::error_code& e) { resip_assert(false); }
+   virtual void handleTcpResolve(const asio::error_code& ec, asio::ip::tcp::resolver::iterator endpoint_iterator) { resip_assert(false); }
+   virtual void handleUdpResolve(const asio::error_code& ec, asio::ip::udp::resolver::iterator endpoint_iterator) { resip_assert(false); }
+   virtual void handleConnect(const asio::error_code& ec, asio::ip::tcp::resolver::iterator endpoint_iterator) { resip_assert(false); }
+   virtual void handleClientHandshake(const asio::error_code& ec, asio::ip::tcp::resolver::iterator endpoint_iterator) { resip_assert(false); }
 
 protected:
    /// Handle completion of a sendData operation.
@@ -89,6 +96,10 @@ protected:
 
    /// Handlers
    AsyncSocketBaseHandler* mAsyncSocketBaseHandler;
+
+   /// Provides an opportunity for the app to clean up, e.g., QoS-related data or resources
+   /// just before the socket is closed
+   boost::function<void(unsigned int)> mOnBeforeSocketCloseFp;
 
 private:
    virtual void transportSend(const StunTuple& destination, std::vector<asio::const_buffer>& buffers) = 0;

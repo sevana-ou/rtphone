@@ -85,14 +85,14 @@ class ConnectionClosed : public Event
 class MessageArrived : public Event
 {
    public:
-      MessageArrived (NodeId nodeId, std::unique_ptr<p2p::Message> message)
+      MessageArrived (NodeId nodeId, std::auto_ptr<p2p::Message> message)
         : mNodeId(nodeId), mMessage(message) {}
       ~MessageArrived();
 
       virtual void dispatch(EventConsumer& consumer);
 
       NodeId getNodeId() const {return mNodeId;}        
-      std::unique_ptr<p2p::Message> getMessage() { assert(mMessage.get());
+      std::auto_ptr<p2p::Message> getMessage() { resip_assert(mMessage.get());
          return mMessage; }
 
       virtual resip::Data brief() const
@@ -104,7 +104,7 @@ class MessageArrived : public Event
    protected:
 
       NodeId mNodeId;
-      std::unique_ptr<p2p::Message> mMessage;
+      std::auto_ptr<p2p::Message> mMessage;
 };
 
 class ApplicationMessageArrived : public Event

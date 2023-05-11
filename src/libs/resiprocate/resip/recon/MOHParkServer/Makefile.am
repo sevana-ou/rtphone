@@ -9,12 +9,18 @@
 
 EXTRA_DIST = ca.pem
 EXTRA_DIST += doc
-EXTRA_DIST += *.vcproj
+EXTRA_DIST += *.vcxproj *.vcxproj.filters
 EXTRA_DIST += MOHParkServer.config
 EXTRA_DIST += music.wav
 
 LDADD = ../librecon.la
-#LDADD += ../../........whatever
+LDADD += ../../../reflow/libreflow.la
+LDADD += ../../../reTurn/client/libreTurnClient.la
+LDADD += ../../../resip/dum/libdum.la
+LDADD += ../../../resip/stack/libresip.la
+LDADD += ../../../rutil/librutil.la
+LDADD += -lsipXport
+LDADD += $(LIBSSL_LIBADD) @LIBPTHREAD_LIBADD@
 
 sbin_PROGRAMS = MOHParkServer
 

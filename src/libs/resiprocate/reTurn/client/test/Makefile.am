@@ -1,16 +1,20 @@
 
 EXTRA_DIST = ca.pem
-EXTRA_DIST += *.vcxproj *.vcxproj.filters
-EXTRA_DIST += *.vcproj
+EXTRA_DIST += *.vcxproj
+
+AM_CXXFLAGS = -DASIO_HAS_BOOST_BIND
+AM_CXXFLAGS += -DBOOST_ASIO_HAS_STD_CHRONO
 
 LDADD = ../libreTurnClient.la
+LDADD += ../../libreTurnCommon.la
 LDADD += ../../../rutil/librutil.la
-LDADD += $(LIBSSL_LIBADD) -lpthread
+LDADD += $(LIBSSL_LIBADD) @LIBPTHREAD_LIBADD@
 
-TESTS = \
-        TestClient \
-        TestAsyncClient \
-        TestRtpLoad
+# These tests all need to be run manually at the moment, so
+# they are commented out (they still get compiled by `make check'):
+#TESTS = TestClient
+#TESTS += TestAsyncClient
+#TESTs += TestRtpLoad
 
 check_PROGRAMS = \
 	TestClient \

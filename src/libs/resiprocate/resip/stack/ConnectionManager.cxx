@@ -2,6 +2,11 @@
 #include "config.h"
 #endif
 
+#ifndef WIN32
+#include <sys/time.h>
+#include <sys/resource.h>
+#endif
+
 #include "resip/stack/ConnectionManager.hxx"
 #include "resip/stack/InteropHelper.hxx"
 #include "rutil/Logger.hxx"
@@ -15,10 +20,11 @@ using namespace std;
 #define RESIPROCATE_SUBSYSTEM Subsystem::TRANSPORT
 
 UInt64 ConnectionManager::MinimumGcAge = 1;  // in milliseconds
+UInt64 ConnectionManager::MinimumGcHeadroom = 0;
 bool ConnectionManager::EnableAgressiveGc = false;
 
 ConnectionManager::ConnectionManager() : 
-   mHead(0,Tuple(),0,Compression::Disabled),
+   mHead(0,Tuple(),0,Compression::Disabled, false),
    mWriteHead(ConnectionWriteList::makeList(&mHead)),
    mReadHead(ConnectionReadList::makeList(&mHead)),
    mLRUHead(ConnectionLruList::makeList(&mHead)),
@@ -31,10 +37,10 @@ ConnectionManager::ConnectionManager() :
 ConnectionManager::~ConnectionManager()
 {
    closeConnections();
-   assert(mReadHead->empty());
-   assert(mWriteHead->empty());
-   assert(mLRUHead->empty());
-   assert(mFlowTimerLRUHead->empty());
+   resip_assert(mReadHead->empty());
+   resip_assert(mWriteHead->empty());
+   resip_assert(mLRUHead->empty());
+   resip_assert(mFlowTimerLRUHead->empty());
 }
 
 void 
@@ -54,7 +60,7 @@ ConnectionManager::findConnection(const Tuple& addr)
       IdMap::iterator i = mIdMap.find(addr.mFlowKey);
       if (i != mIdMap.end())
       {
-         if(i->second->who()==addr)
+         if(i->second->who() == addr)
          {
             DebugLog(<<"Found fd " << addr.mFlowKey);
             return i->second;
@@ -84,7 +90,6 @@ ConnectionManager::findConnection(const Tuple& addr)
       return i->second;
    }
 
-   
    DebugLog(<<"Could not find a connection for " << addr);
    return 0;
 }
@@ -122,7 +127,6 @@ ConnectionManager::findConnection(const Tuple& addr) const
       return i->second;
    }
 
-   
    DebugLog(<<"Could not find a connection for " << addr);
    return 0;
 }
@@ -131,7 +135,7 @@ void
 ConnectionManager::buildFdSet(FdSet& fdset)
 {
    // If using PollGrp, caller shouldn't call this
-   assert( mPollGrp==0 );
+   resip_assert( mPollGrp==0 );
 
    for (ConnectionReadList::iterator i = mReadHead->begin(); 
         i != mReadHead->end(); ++i)
@@ -170,7 +174,7 @@ ConnectionManager::removeFromWritable(Connection* conn)
    }
    else
    {
-      assert(!mWriteHead->empty());
+      resip_assert(!mWriteHead->empty());
       conn->ConnectionWriteList::remove();
    }
 }
@@ -178,10 +182,9 @@ ConnectionManager::removeFromWritable(Connection* conn)
 void
 ConnectionManager::addConnection(Connection* connection)
 {
-   assert(mAddrMap.find(connection->who())==mAddrMap.end());
+   resip_assert(mAddrMap.find(connection->who())==mAddrMap.end());
 
-   //DebugLog (<< "ConnectionManager::addConnection() " << connection->mWho.mFlowKey  << ":" << connection->mSocket);
-   
+   DebugLog (<< "ConnectionManager::addConnection() " << connection->mWho.mFlowKey  << ":" << connection->who() << ", totalConnections=" << mIdMap.size());
    
    mAddrMap[connection->who()] = connection;
    mIdMap[connection->who().mFlowKey] = connection;
@@ -205,13 +208,13 @@ ConnectionManager::addConnection(Connection* connection)
 
    //DebugLog (<< "count=" << mAddrMap.count(connection->who()) << "who=" << connection->who() << " mAddrMap=" << Inserter(mAddrMap));
    //assert(mAddrMap.begin()->first == connection->who());
-   assert(mAddrMap.count(connection->who()) == 1);
+   resip_assert(mAddrMap.count(connection->who()) == 1);
 }
 
 void
 ConnectionManager::removeConnection(Connection* connection)
 {
-   //DebugLog (<< "ConnectionManager::removeConnection()");
+   DebugLog (<< "ConnectionManager::removeConnection()");
 
    mIdMap.erase(connection->mWho.mFlowKey);
    mAddrMap.erase(connection->mWho);
@@ -222,7 +225,7 @@ ConnectionManager::removeConnection(Connection* connection)
    }
    else
    {
-      assert(!mReadHead->empty());
+      resip_assert(!mReadHead->empty());
       connection->ConnectionReadList::remove();
       connection->ConnectionWriteList::remove();
       if(connection->isFlowTimerEnabled())
@@ -237,7 +240,7 @@ ConnectionManager::removeConnection(Connection* connection)
 }
 
 // release excessively old connections (free up file descriptors)
-void
+unsigned int
 ConnectionManager::gc(UInt64 relThreshold, unsigned int maxToRemove)
 {
    UInt64 curTimeMs = Timer::getTimeMs();
@@ -289,6 +292,78 @@ ConnectionManager::gc(UInt64 relThreshold, unsigned int maxToRemove)
          }
       }
    }
+
+   if(MinimumGcHeadroom > 0)
+   {
+#ifdef WIN32
+      DebugLog(<<"MinimumGcHeadroom not yet implemented on Windows (requires getrlimit())");
+#else
+      struct rlimit rlim;
+      if(getrlimit(RLIMIT_NOFILE, &rlim) != 0)
+      {
+         ErrLog(<<"Call to getrlimit() for RLIMIT_NOFILE failed: " << strerror(errno));
+      }
+      else
+      {
+         rlim_t& soft_limit = rlim.rlim_cur;
+         AddrMap::size_type conn_count = mAddrMap.size();
+         AddrMap::size_type headroom = soft_limit - conn_count;
+         DebugLog(<< "GC headroom check: soft_limit = " << soft_limit << ", managed connection count = " << conn_count << ", headroom = " << headroom << ", minimum headroom = " << MinimumGcHeadroom);
+         if(headroom < MinimumGcHeadroom)
+         {
+            WarningLog(<< "actual headroom = " << headroom << ", MinimumGcHeadroom = " << MinimumGcHeadroom << ", garbage collector making extra effort to reclaim file descriptors");
+            AddrMap::size_type mustRemove = MinimumGcHeadroom - headroom;
+            unsigned int remainder = gcWithTarget(mustRemove);
+            numRemoved += (mustRemove - remainder);
+            if(remainder > 0)
+            {
+               ErrLog(<< "No more stream connections to close, something else must be eating file descriptors, limit too low or MinimumGcHeadroom too high");
+            }
+         }
+      }
+#endif
+   }
+   return numRemoved;
+}
+
+unsigned int
+ConnectionManager::gcWithTarget(unsigned int target)
+{
+   ConnectionLruList::iterator i = mLRUHead->begin();
+   FlowTimerLruList::iterator i2 = mFlowTimerLRUHead->begin();
+   while(target > 0)
+   {
+      Connection* discard = 0;
+      if(i == mLRUHead->end())
+      {
+         if(i2 == mFlowTimerLRUHead->end())
+         {
+            WarningLog(<< "No more stream connections to close, remaining target = " << target);
+            return target;
+         }
+         discard = *i2;
+         ++i2;
+      }
+      else
+      {
+         if(i2 == mFlowTimerLRUHead->end() ||
+            (*i)->whenLastUsed() < (*i2)->whenLastUsed())
+         {
+                  discard = *i;
+                  ++i;
+         }
+         else
+         {
+                  discard = *i2;
+                  ++i2;
+         }
+      }
+      resip_assert(discard);
+      WarningLog(<< "recycling LRU connection: " << discard << " " << discard->getSocket());
+      delete discard;
+      target--;
+   }
+   return target;
 }
 
 // move to youngest
@@ -318,7 +393,7 @@ ConnectionManager::moveToFlowTimerLru(Connection *connection)
 void
 ConnectionManager::process(FdSet& fdset)
 {
-   assert( mPollGrp==NULL );	// owner shouldn't call this if polling
+   resip_assert( mPollGrp==NULL );	// owner shouldn't call this if polling
 
    // process the write list
    for (ConnectionWriteList::iterator writeIter = mWriteHead->begin();
@@ -385,6 +460,15 @@ ConnectionManager::setPollGrp(FdPollGrp *grp)
     // anyway.
     closeConnections();
     mPollGrp = grp;
+}
+
+void 
+ConnectionManager::invokeAfterSocketCreationFunc() const
+{
+    for (AddrMap::const_iterator it = mAddrMap.begin(); it != mAddrMap.end(); it++)
+    {
+        it->second->invokeAfterSocketCreationFunc();
+    }
 }
 
 /* ====================================================================

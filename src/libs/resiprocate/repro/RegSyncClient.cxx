@@ -1,8 +1,9 @@
-#include <cassert>
+#include "rutil/ResipAssert.h"
 #include <sstream>
 
 #include <resip/stack/Symbols.hxx>
 #include <resip/stack/Tuple.hxx>
+#include <resip/stack/GenericPidfContents.hxx>
 #include <rutil/Data.hxx>
 #include <rutil/DnsUtil.hxx>
 #include <rutil/Logger.hxx>
@@ -22,13 +23,15 @@ using namespace std;
 
 RegSyncClient::RegSyncClient(InMemorySyncRegDb* regDb,
                              Data address,
-                             unsigned short port) :
+                             unsigned short port,
+                             InMemorySyncPubDb* pubDb) :
    mRegDb(regDb),
+   mPubDb(pubDb),
    mAddress(address),
    mPort(port),
    mSocketDesc(0)
 {
-    assert(mRegDb);
+    resip_assert(mRegDb);
 }
 
 void 
@@ -37,11 +40,7 @@ RegSyncClient::delaySeconds(unsigned int seconds)
    // Delay for requested number of seconds - but check every second if we are shutdown or not
    for(unsigned int i = 0; i < seconds && !mShutdown; i++)
    {
-#ifdef WIN32
-      Sleep(1000);
-#else
-      sleep(1);
-#endif
+      sleepMs(1000);
    }
 }
 
@@ -93,7 +92,8 @@ RegSyncClient::thread()
       mSocketDesc = (int)socket(servAddr.ipVersion() == V6 ? PF_INET6 : PF_INET , SOCK_STREAM, 0);
       if(mSocketDesc < 0) 
       {
-         ErrLog(<< "RegSyncClient: cannot open socket");
+         int e = getErrno();
+         ErrLog(<< "RegSyncClient: cannot open socket, err=" << e);
          mSocketDesc = 0;
          return;
       }
@@ -102,7 +102,8 @@ RegSyncClient::thread()
       rc = ::bind(mSocketDesc, &localAddr.getMutableSockaddr(), localAddr.length());
       if(rc < 0) 
       {
-         ErrLog(<<"RegSyncClient: error binding locally");
+         int e = getErrno();
+         ErrLog(<<"RegSyncClient: error binding locally, err=" << e);
          closeSocket(mSocketDesc);
          mSocketDesc = 0;
          return;
@@ -112,7 +113,8 @@ RegSyncClient::thread()
       rc = ::connect(mSocketDesc, &servAddr.getMutableSockaddr(), servAddr.length());
       if(rc < 0) 
       {
-         if(!mShutdown) ErrLog(<< "RegSyncClient: error connecting to " << mAddress << ":" << mPort);
+         int e = getErrno();
+         if(!mShutdown) ErrLog(<< "RegSyncClient: error connecting to " << mAddress << ":" << mPort << ", err=" << e);
          closeSocket(mSocketDesc);
          mSocketDesc = 0;
          delaySeconds(30);
@@ -128,7 +130,19 @@ RegSyncClient::thread()
       rc = ::send(mSocketDesc, request.c_str(), (int)request.size(), 0);
       if(rc < 0) 
       {
-         if(!mShutdown) ErrLog(<< "RegSyncClient: error sending");
+         int e = getErrno();
+         if(!mShutdown) ErrLog(<< "RegSyncClient: error sending, err=" << e);
+         closeSocket(mSocketDesc);
+         mSocketDesc = 0;
+         continue;
+      }
+
+      // Make socket non blocking
+      bool ok = makeSocketNonBlocking(mSocketDesc);
+      if (!ok)
+      {
+         int e = getErrno();
+         ErrLog(<< "RegSyncClient: Could not make HTTP socket non-blocking, err=" << e);
          closeSocket(mSocketDesc);
          mSocketDesc = 0;
          continue;
@@ -136,19 +150,58 @@ RegSyncClient::thread()
 
       while(rc > 0)
       {
-         rc = ::recv(mSocketDesc, (char*)&mRxBuffer, sizeof(mRxBuffer), 0);
-         if(rc < 0) 
-         {
-            if(!mShutdown) ErrLog(<< "RegSyncClient: error receiving");
-            closeSocket(mSocketDesc);
-            mSocketDesc = 0;
-            break;
-         }
-
+         FdSet fdset;
+         fdset.setRead(mSocketDesc);
+         fdset.setExcept(mSocketDesc);
+         timeval tm;
+         tm.tv_sec = 30; // TODO - make a setting?
+         tm.tv_usec = 0;
+         rc = fdset.select(tm);
          if(rc > 0)
          {
-            mRxDataBuffer += Data(Data::Borrow, (const char*)&mRxBuffer, rc);   
-            while(tryParse());
+            rc = ::recv(mSocketDesc, (char*)&mRxBuffer, sizeof(mRxBuffer), 0);
+            if(rc < 0) 
+            {
+               int e = getErrno();
+               if(!mShutdown) ErrLog(<< "RegSyncClient: error receiving, err=" << e);
+               closeSocket(mSocketDesc);
+               mSocketDesc = 0;
+               break;
+            }
+            
+            if(rc > 0)
+            {
+               mRxDataBuffer += Data(Data::Borrow, (const char*)&mRxBuffer, rc);   
+               while(tryParse());
+            }
+         }
+         else if(rc == 0) // timeout - send keepalive
+         {
+            rc = ::send(mSocketDesc, Symbols::CRLFCRLF, (int)request.size(), 0);
+            if(rc < 0) 
+            {
+               int e = getErrno();
+               // If send is blocking then we must have pending send data - so just ignore error - no need to keepalive
+               if ( e != EAGAIN && e != EWOULDBLOCK ) // Treat EGAIN and EWOULDBLOCK as the same: http://stackoverflow.com/questions/7003234/which-systems-define-eagain-and-ewouldblock-as-different-values
+               {
+                  if(!mShutdown) ErrLog(<< "RegSyncClient: error sending keepalive, err=" << e);
+                  closeSocket(mSocketDesc);
+                  mSocketDesc = 0;
+                  continue;
+               }
+            }
+            //else
+            //{
+            //    InfoLog( << "RegSyncClient: keepalive sent!");
+            //}
+         }
+         else
+         {
+             int e = getErrno();
+             if(!mShutdown) ErrLog(<< "RegSyncClient: error calling select, err=" << e);
+             closeSocket(mSocketDesc);
+             mSocketDesc = 0;
+             break;
          }
       }
    } // end while
@@ -224,7 +277,18 @@ RegSyncClient::handleXml(const Data& xmlData)
              ErrLog(<< "RegSyncClient::handleXml: exception: " << e);
          }
       }
-      else 
+      else if (isEqualNoCase(xml.getTag(), "pubinfo"))
+      {
+         try
+         {
+            handlePubInfoEvent(xml);
+         }
+         catch (BaseException& e)
+         {
+            ErrLog(<< "RegSyncClient::handleXml: exception: " << e);
+         }
+      }
+      else
       {
          WarningLog(<< "RegSyncClient::handleXml: Ignoring XML message with unknown method: " << xml.getTag());
       }
@@ -335,6 +399,15 @@ RegSyncClient::handleRegInfoEvent(resip::XMLCursor& xml)
                            xml.parent();
                         }
                      }
+                     else if (isEqualNoCase(xml.getTag(), "useragent"))
+                     {
+                        if (xml.firstChild())
+                        {
+                           //InfoLog(<< "RegSyncClient::handleRegInfoEvent: useragent=" << xml.getValue());
+                           rec.mUserAgent = xml.getValue().xmlCharDataDecode();
+                           xml.parent();
+                        }
+                     }
                   } while(xml.nextSibling());
                   xml.parent();
 
@@ -348,7 +421,10 @@ RegSyncClient::handleRegInfoEvent(resip::XMLCursor& xml)
    }
    xml.parent();
 
-   processModify(aor, contacts);
+   if (mRegDb)
+   {
+      processModify(aor, contacts);
+   }
 }
 
 void 
@@ -369,20 +445,22 @@ RegSyncClient::processModify(const resip::Uri& aor, ContactList& syncContacts)
    bool found;
    for(; itSync != syncContacts.end(); itSync++)
    {
-       // See if contact already exists in currentContacts       
-       found = false;
-       for(itCurrent = currentContacts.begin(); itCurrent != currentContacts.end(); itCurrent++)
-       {
-           if(*itSync == *itCurrent)
-           {
-               found = true;
-               // We found a match - check if sycnContacts LastUpdated time is newer
-               if(itSync->mLastUpdated > itCurrent->mLastUpdated)
-               {
-                   // Replace current contact with Sync contact
-                   mRegDb->updateContact(aor, *itSync);
-               }
-           }
+      InfoLog(<< "  RegSyncClient::processModify: contact=" << itSync->mContact << ", instance=" << itSync->mInstance << ", regid=" << itSync->mRegId);
+
+      // See if contact already exists in currentContacts       
+      found = false;
+      for(itCurrent = currentContacts.begin(); itCurrent != currentContacts.end(); itCurrent++)
+      {
+          if(*itSync == *itCurrent)
+          {
+              found = true;
+              // We found a match - check if sycnContacts LastUpdated time is newer
+              if(itSync->mLastUpdated > itCurrent->mLastUpdated)
+              {
+                  // Replace current contact with Sync contact
+                  mRegDb->updateContact(aor, *itSync);
+              }
+          }
        }
        if(!found)
        {
@@ -392,11 +470,191 @@ RegSyncClient::processModify(const resip::Uri& aor, ContactList& syncContacts)
    mRegDb->unlockRecord(aor);
 }
 
+void
+RegSyncClient::handlePubInfoEvent(resip::XMLCursor& xml)
+{
+   UInt64 now = Timer::getTimeSecs();
+   PublicationPersistenceManager::PubDocument document;
+   DebugLog(<< "RegSyncClient::handlePubInfoEvent");
+   if (xml.firstChild())
+   {
+      do
+      {
+         if (isEqualNoCase(xml.getTag(), "eventtype"))
+         {
+            if (xml.firstChild())
+            {
+               document.mEventType = xml.getValue();
+               xml.parent();
+            }
+         }
+         else if (isEqualNoCase(xml.getTag(), "documentkey"))
+         {
+            if (xml.firstChild())
+            {
+               document.mDocumentKey = xml.getValue().xmlCharDataDecode();
+               xml.parent();
+            }
+         }
+         else if (isEqualNoCase(xml.getTag(), "etag"))
+         {
+            if (xml.firstChild())
+            {
+               document.mETag = xml.getValue().xmlCharDataDecode();
+               xml.parent();
+            }
+         }
+         else if (isEqualNoCase(xml.getTag(), "expires"))
+         {
+            if (xml.firstChild())
+            {
+               UInt64 expires = xml.getValue().convertUInt64();
+               document.mExpirationTime = (expires == 0 ? 0 : now + expires);
+               document.mLingerTime = document.mExpirationTime;
+               xml.parent();
+            }
+         }
+         else if (isEqualNoCase(xml.getTag(), "lastUpdate"))
+         {
+            if (xml.firstChild())
+            {
+               document.mLastUpdated = now - xml.getValue().convertUInt64();
+               xml.parent();
+            }
+         }
+         else if (isEqualNoCase(xml.getTag(), "contents"))
+         {
+            if (xml.firstChild())
+            {
+               Data contentsData = xml.getValue().xmlCharDataDecode();
+               HeaderFieldValue hfv(contentsData.data(), contentsData.size());
+               GenericPidfContents pidf(hfv, GenericPidfContents::getStaticType());
+               document.mContents.reset((Contents*)new GenericPidfContents(pidf));  // ensure we copy other pidf - since it shares data with contentsData
+               xml.parent();
+            }
+         }
+         else if (isEqualNoCase(xml.getTag(), "isencrypted"))
+         {
+            if (xml.firstChild())
+            {
+               if (document.mSecurityAttributes.get() == 0)
+               {
+                  document.mSecurityAttributes.reset(new SecurityAttributes);
+               }
+               if (isEqualNoCase(xml.getValue(), "true"))
+               {
+                  document.mSecurityAttributes->setEncrypted();
+               }
+               xml.parent();
+            }
+         }
+         else if (isEqualNoCase(xml.getTag(), "sigstatus"))
+         {
+            if (xml.firstChild())
+            {
+               if (document.mSecurityAttributes.get() == 0)
+               {
+                  document.mSecurityAttributes.reset(new SecurityAttributes);
+               }
+               if (isEqualNoCase(xml.getValue(), "none"))
+               {
+                  document.mSecurityAttributes->setSignatureStatus(SignatureNone);
+               }
+               else if (isEqualNoCase(xml.getValue(), "bad"))
+               {
+                  document.mSecurityAttributes->setSignatureStatus(SignatureIsBad);
+               }
+               else if (isEqualNoCase(xml.getValue(), "trusted"))
+               {
+                  document.mSecurityAttributes->setSignatureStatus(SignatureTrusted);
+               }
+               else if (isEqualNoCase(xml.getValue(), "catrusted"))
+               {
+                  document.mSecurityAttributes->setSignatureStatus(SignatureCATrusted);
+               }
+               else if (isEqualNoCase(xml.getValue(), "nottrusted"))
+               {
+                  document.mSecurityAttributes->setSignatureStatus(SignatureNotTrusted);
+               }
+               else if (isEqualNoCase(xml.getValue(), "selfsigned"))
+               {
+                  document.mSecurityAttributes->setSignatureStatus(SignatureSelfSigned);
+               }
+               xml.parent();
+            }
+         }
+         else if (isEqualNoCase(xml.getTag(), "signer"))
+         {
+            if (xml.firstChild())
+            {
+               if (document.mSecurityAttributes.get() == 0)
+               {
+                  document.mSecurityAttributes.reset(new SecurityAttributes);
+               }
+               document.mSecurityAttributes->setSigner(xml.getValue().xmlCharDataDecode());
+               xml.parent();
+            }
+         }
+         else if (isEqualNoCase(xml.getTag(), "identity"))
+         {
+            if (xml.firstChild())
+            {
+               if (document.mSecurityAttributes.get() == 0)
+               {
+                  document.mSecurityAttributes.reset(new SecurityAttributes);
+               }
+               document.mSecurityAttributes->setIdentity(xml.getValue().xmlCharDataDecode());
+               xml.parent();
+            }
+         }
+         else if (isEqualNoCase(xml.getTag(), "identitystrength"))
+         {
+            if (xml.firstChild())
+            {
+               if (document.mSecurityAttributes.get() == 0)
+               {
+                  document.mSecurityAttributes.reset(new SecurityAttributes);
+               }
+               if (isEqualNoCase(xml.getValue(), "from"))
+               {
+                  document.mSecurityAttributes->setIdentityStrength(SecurityAttributes::From);
+               }
+               else if (isEqualNoCase(xml.getValue(), "failedidentity"))
+               {
+                  document.mSecurityAttributes->setIdentityStrength(SecurityAttributes::FailedIdentity);
+               }
+               else if (isEqualNoCase(xml.getValue(), "identity"))
+               {
+                  document.mSecurityAttributes->setIdentityStrength(SecurityAttributes::Identity);
+               }
+               xml.parent();
+            }
+         }
+      } while (xml.nextSibling());
+      xml.parent();
+   }
+   xml.parent();
+
+   if (mPubDb)
+   {
+      if (document.mExpirationTime != 0)
+      {
+         document.mSyncPublication = true;
+         mPubDb->addUpdateDocument(document);
+      }
+      else
+      {
+         // Note:  This never comes in an initial sync - only realtime updates
+         mPubDb->removeDocument(document.mEventType, document.mDocumentKey, document.mETag, document.mLastUpdated, true);
+      }
+   }
+}
+
 /* ====================================================================
  * The Vovida Software License, Version 1.0 
  * 
  * Copyright (c) 2000 Vovida Networks, Inc.  All rights reserved.
- * Copyright (c) 2010 SIP Spectrum, Inc.  All rights reserved.
+ * Copyright (c) 2015 SIP Spectrum, Inc.  All rights reserved.
  * 
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions

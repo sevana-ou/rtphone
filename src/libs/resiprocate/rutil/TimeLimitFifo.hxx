@@ -1,7 +1,7 @@
 #ifndef RESIP_TimeLimitFifo_hxx
 #define RESIP_TimeLimitFifo_hxx 
 
-#include <cassert>
+#include "rutil/ResipAssert.h"
 #include <memory>
 #include "rutil/AbstractFifo.hxx"
 #include <iostream>
@@ -67,7 +67,7 @@ class Timestamped
       assert(tlf.size() == 1);
       assert(tlf.timeDepth() == 0);
 
-      sleepMS(2000);
+      sleepMs(2000);
 
       // still not empty
       assert(!tlf.empty());
@@ -230,7 +230,7 @@ template <class Msg>
 TimeLimitFifo<Msg>::~TimeLimitFifo()
 {
    clear();
-   assert(empty());
+   resip_assert(empty());
 }
 
 template <class Msg>
@@ -321,7 +321,7 @@ TimeLimitFifo<Msg>::wouldAcceptInteral(DepthUsage usage) const
       return true;
    }
 
-   assert(usage == EnforceTimeDepth);
+   resip_assert(usage == EnforceTimeDepth);
 
    if (mFifo.size() == 0 ||
        mMaxDurationSecs == 0 ||

@@ -20,6 +20,15 @@ TcpServer::TcpServer(asio::io_service& ioService, RequestHandler& requestHandler
 
    mAcceptor.open(endpoint.protocol());
    mAcceptor.set_option(asio::ip::tcp::acceptor::reuse_address(true));
+#ifdef USE_IPV6
+#ifdef __linux__
+   if(address.is_v6())
+   {
+      asio::ip::v6_only v6_opt(true);
+      mAcceptor.set_option(v6_opt);
+   }
+#endif
+#endif
    mAcceptor.bind(endpoint);
    mAcceptor.listen();
 
@@ -45,6 +54,12 @@ TcpServer::handleAccept(const asio::error_code& e)
    else
    {
       ErrLog(<< "Error in handleAccept: " << e.value() << "-" << e.message());
+      if(e == asio::error::no_descriptors)
+      {
+         // Retry if too many open files (ie. out of socket descriptors)
+         mNewConnection.reset(new TcpConnection(mIOService, mConnectionManager, mRequestHandler));
+         mAcceptor.async_accept(((TcpConnection*)mNewConnection.get())->socket(), boost::bind(&TcpServer::handleAccept, this, asio::placeholders::error));
+      }
    }
 }
 

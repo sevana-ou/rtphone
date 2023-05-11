@@ -2,6 +2,9 @@
 #define UDP_SERVER_HXX
 
 #include <asio.hpp>
+#ifdef USE_SSL
+#include <asio/ssl.hpp>
+#endif
 #include <string>
 #include <boost/noncopyable.hpp>
 #include "RequestHandler.hxx"
@@ -40,8 +43,15 @@ private:
    virtual void onSendSuccess();
    virtual void onSendFailure(const asio::error_code& e);
 
+   /// Manages turn allocations
+   TurnAllocationManager mTurnAllocationManager;
+
    /// The handler for all incoming requests.
    RequestHandler& mRequestHandler;
+
+   // Stores the local address and port
+   asio::ip::address mLocalAddress;
+   unsigned short mLocalPort;
 
    /// The RFC3489 Alternate Server
    UdpServer* mAlternatePortUdpServer;
@@ -57,7 +67,7 @@ private:
 
       UdpServer* mResponseUdpServer;
       StunMessage* mResponseMessage;
-      asio::deadline_timer mCleanupTimer;
+      asio::steady_timer mCleanupTimer;
    };
    typedef std::map<UInt128, ResponseEntry*> ResponseMap;
    ResponseMap mResponseMap;

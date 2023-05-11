@@ -1,5 +1,5 @@
 
-#include <cassert>
+#include "rutil/ResipAssert.h"
 #include <fcntl.h>
 #include <errno.h>
 
@@ -28,13 +28,6 @@ resip::makeSocketNonBlocking(Socket fd)
 		return false;
 	}
 #else
-    // Make socket non raising SIGPIPE
-#ifdef TARGET_OSX
-    int set = 1;
-    setsockopt(fd, SOL_SOCKET, SO_NOSIGPIPE, (void *)&set, sizeof(int));
-#endif
-
-    // Make socket non blocking
 	int flags  = fcntl( fd, F_GETFL, 0);
 	int errNoBlock = fcntl(fd, F_SETFL, flags | O_NONBLOCK );
 	if ( errNoBlock != 0 ) // !cj! I may have messed up this line
@@ -69,6 +62,23 @@ resip::makeSocketBlocking(Socket fd)
 
 
 
+bool
+resip::configureConnectedSocket(Socket fd)
+{
+#ifdef REQUIRE_SO_NOSIGPIPE
+   int on = 1;
+   if ( ::setsockopt ( fd, SOL_SOCKET, SO_NOSIGPIPE, (const char*)&on, sizeof(on)) )
+   {
+      int e = getErrno();
+      ErrLog (<< "Couldn't set sockoption SO_NOSIGPIPE: " << strerror(e));
+      return false;
+   }
+#endif
+   return true;
+}
+
+
+
 void
 resip::initNetwork()
 {
@@ -87,7 +97,7 @@ resip::initNetwork()
    {
       // could not find a usable WinSock DLL
       //cerr << "Could not load winsock" << endl;
-      assert(0); // is this is failing, try a different version that 2.2, 1.0 or later will likely work
+      resip_assert(0); // is this is failing, try a different version that 2.2, 1.0 or later will likely work
       exit(1);
    }
 
@@ -105,7 +115,7 @@ resip::initNetwork()
       WSACleanup( );
       //cerr << "Bad winsock verion" << endl;
       // TODO !cj! - add error message logging
-      assert(0); // if this is failing, try a different version that 2.2, 1.0 or later will likely work
+      resip_assert(0); // if this is failing, try a different version that 2.2, 1.0 or later will likely work
       exit(1);
    }
 	}
@@ -139,8 +149,7 @@ int resip::getSocketError(Socket fd)
 {
    int errNum = 0;
    int errNumSize = sizeof(errNum);
-   getsockopt(fd, SOL_SOCKET, SO_ERROR,
-     (char *)&errNum, (socklen_t *)&errNumSize);
+   getsockopt(fd, SOL_SOCKET, SO_ERROR, (char *)&errNum, (socklen_t *)&errNumSize);
    /// XXX: should check return code of getsockopt
    return errNum;
 }
@@ -222,7 +231,7 @@ static int trySetRcvBuf(Socket fd, int buflen)
    {
       return -1;
    }
-   assert(optlen == sizeof(rbuflen));
+   resip_assert(optlen == sizeof(rbuflen));
    if (rbuflen < buflen)
    {
       return -1;
@@ -234,7 +243,7 @@ static int trySetRcvBuf(Socket fd, int buflen)
 **/
 int resip::setSocketRcvBufLen(Socket fd, int buflen)
 {
-   assert(buflen >= 1024);
+   resip_assert(buflen >= 1024);
    int goal=buflen;
    int trylen=goal;
    int sts;

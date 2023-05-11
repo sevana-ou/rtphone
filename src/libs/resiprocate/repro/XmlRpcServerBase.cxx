@@ -2,7 +2,7 @@
 #include "config.h"
 #endif
 
-#include <cassert>
+#include "rutil/ResipAssert.h"
 
 #include <rutil/Data.hxx>
 #include <rutil/Socket.hxx>
@@ -25,8 +25,8 @@ using namespace std;
 #define RESIPROCATE_SUBSYSTEM Subsystem::REPRO
 
 
-XmlRpcServerBase::XmlRpcServerBase(int port, IpVersion ipVer) :
-   mTuple(Data::Empty,port,ipVer,TCP,Data::Empty),
+XmlRpcServerBase::XmlRpcServerBase(int port, IpVersion ipVer, Data ipAddr) :
+   mTuple(ipAddr,port,ipVer,TCP,Data::Empty),
    mSane(true)
 {   
 #ifdef USE_IPV6
@@ -46,7 +46,7 @@ XmlRpcServerBase::XmlRpcServerBase(int port, IpVersion ipVer) :
 
    DebugLog (<< "XmlRpcServerBase::XmlRpcServerBase: Creating fd=" << (int)mFd 
              << (ipVer == V4 ? " V4/" : " V6/") );
-      
+
    int on = 1;
 #if !defined(WIN32)
    if (::setsockopt(mFd, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on)))
@@ -60,9 +60,25 @@ XmlRpcServerBase::XmlRpcServerBase(int port, IpVersion ipVer) :
       mSane = false;
       return;
    }
-   
+
+#ifdef USE_IPV6
+#ifdef __linux__
+   if (ipVer == V6)
+   {
+      if ( ::setsockopt(mFd, IPPROTO_IPV6, IPV6_V6ONLY, &on, sizeof(on)) )
+      {
+          int e = getErrno();
+          logSocketError(e);
+          ErrLog(<< "XmlRpcServerBase::XmlRpcServerBase: Couldn't set sockoptions IPV6_V6ONLY: " << strerror(e));
+          mSane = false;
+          return;
+      }
+   }
+#endif
+#endif
+
    DebugLog(<< "XmlRpcServerBase::XmlRpcServerBase: Binding to " << Tuple::inet_ntop(mTuple));
-   
+
    if (::bind( mFd, &mTuple.getMutableSockaddr(), mTuple.length()) == SOCKET_ERROR)
    {
       int e = getErrno();
@@ -103,9 +119,31 @@ XmlRpcServerBase::XmlRpcServerBase(int port, IpVersion ipVer) :
    }
 }
 
+XmlRpcServerBase::XmlRpcServerBase(const Data& brokerUrl) :
+   mSane(true)
+{
+   // AMQP mode
+#ifdef BUILD_QPID_PROTON
+   mQpidProtonThread.reset(new QpidProtonThread(std::string(brokerUrl.c_str())));
+   InfoLog(<<"XmlRpcServerBase::XmlRpcServerBase: using Qpid Proton AMQP to send to " << brokerUrl);
+#else
+   ErrLog(<< "XmlRpcServerBase::XmlRpcServerBase: Qpid Proton support not enabled at compile time");
+   mSane = false;
+#endif
+}
 
 XmlRpcServerBase::~XmlRpcServerBase()
 {
+#ifdef BUILD_QPID_PROTON
+   if(mQpidProtonThread.get())
+   {
+      // the thread may not have started or may have already been stopped
+      mQpidProtonThread->shutdown();
+      mQpidProtonThread->join();
+      return;
+   }
+#endif
+
 #if defined(WIN32)
    closesocket(mFd);
 #else
@@ -138,6 +176,13 @@ XmlRpcServerBase::buildFdSet(FdSet& fdset)
 void 
 XmlRpcServerBase::process(FdSet& fdset)
 {
+#ifdef BUILD_QPID_PROTON
+   if(mQpidProtonThread.get())
+   {
+      return;
+   }
+#endif
+
    // Process Response fifo first
    while (mResponseFifo.messageAvailable())
    {
@@ -187,7 +232,10 @@ XmlRpcServerBase::process(FdSet& fdset)
          int e = getErrno();
          switch (e)
          {
-            case EWOULDBLOCK:
+            case EAGAIN:
+#if EAGAIN != EWOULDBLOCK
+            case EWOULDBLOCK:  // Treat EGAIN and EWOULDBLOCK as the same: http://stackoverflow.com/questions/7003234/which-systems-define-eagain-and-ewouldblock-as-different-values
+#endif
                return;
             default:
                logSocketError(e);
@@ -231,6 +279,14 @@ XmlRpcServerBase::sendResponse(unsigned int connectionId,
                                const Data& responseData,
                                bool isFinal)
 {
+#ifdef BUILD_QPID_PROTON
+   // FIXME: response support not yet completed/tested
+   if(mQpidProtonThread.get())
+   {
+      mQpidProtonThread->sendMessage(responseData);
+      return;
+   }
+#endif
    mResponseFifo.add(new ResponseInfo(connectionId, requestId, responseData, isFinal));
    mSelectInterruptor.interrupt();
 }
@@ -239,8 +295,21 @@ void
 XmlRpcServerBase::sendEvent(unsigned int connectionId,
                             const Data& eventData)
 {
+#ifdef BUILD_QPID_PROTON
+   if(mQpidProtonThread.get())
+   {
+      mQpidProtonThread->sendMessage(eventData);
+      return;
+   }
+#endif
    mResponseFifo.add(new ResponseInfo(connectionId, 0 /* requestId */, eventData, true /* isFinal */));
    mSelectInterruptor.interrupt();
+}
+
+SharedPtr<ThreadIf>
+XmlRpcServerBase::getThread()
+{
+   return SharedPtr<ThreadIf>(mQpidProtonThread, dynamic_cast_tag());
 }
 
 bool 

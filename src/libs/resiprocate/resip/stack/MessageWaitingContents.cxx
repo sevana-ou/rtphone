@@ -6,7 +6,7 @@
 #include "rutil/Logger.hxx"
 #include "rutil/ParseBuffer.hxx"
 #include "rutil/WinLeakCheck.hxx"
-#include <utility>
+
 
 using namespace resip;
 using namespace std;
@@ -60,7 +60,7 @@ MessageWaitingContents::MessageWaitingContents(const Data& data, const Mime& con
    {
       mHeaders[i] = 0;
    }
-   assert(0);
+   resip_assert(0);
 }
 
 MessageWaitingContents::MessageWaitingContents(const MessageWaitingContents& rhs)
@@ -271,7 +271,7 @@ resip::skipSipLWS(ParseBuffer& pb)
 	       }
 	       break;
 	    default:
-	       assert(false);
+	       resip_assert(false);
 	 }
       }
       pb.skipChar();
@@ -359,7 +359,7 @@ MessageWaitingContents::parse(ParseBuffer& pb)
          default :
             pb.fail(__FILE__, __LINE__);
       }
-      assert(ht != -1);
+      resip_assert(ht != -1);
 
       pb.skipToOneOf(ParseBuffer::Whitespace, Symbols::COLON);
       pb.skipWhitespace();
@@ -597,7 +597,7 @@ MessageWaitingContents::header(const Data& hn) const
             "code, before we _do_ start throwing. This is why const-correctness"
             " should never be made a TODO item </rant>");
       MessageWaitingContents* ncthis = const_cast<MessageWaitingContents*>(this);
-      h=ncthis->mExtensions.insert(std::pair<Data, Data>(hn,Data::Empty)).first;
+      h=ncthis->mExtensions.insert(std::make_pair(hn,Data::Empty)).first;
    }
    return h->second;
 }

@@ -77,7 +77,7 @@ class Mime : public ParserCategory
       defineParam(size, "size", DataParameter, "RFC 2046");
       defineParam(smimeType, "smime-type", DataParameter, "RFC 2633");
       defineParam(url, "url", QuotedDataParameter, "RFC 4483");
-      
+
 #undef defineParam
 
    private:

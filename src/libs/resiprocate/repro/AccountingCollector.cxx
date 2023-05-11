@@ -5,9 +5,9 @@
 #include <iostream>
 
 // JSON library includes
-#include "rutil/cajun/json/reader.h"
-#include "rutil/cajun/json/writer.h"
-#include "rutil/cajun/json/elements.h"
+#include "cajun/json/reader.h"
+#include "cajun/json/writer.h"
+#include "cajun/json/elements.h"
 
 #include "repro/AccountingCollector.hxx"
 #include "repro/RequestContext.hxx"
@@ -72,8 +72,8 @@ AccountingCollector::~AccountingCollector()
 void
 AccountingCollector::doRegistrationAccounting(AccountingCollector::RegistrationEvent regevent, const resip::SipMessage& msg)
 {
-   assert(msg.isRequest());
-   assert(msg.method() == REGISTER);
+   resip_assert(msg.isRequest());
+   resip_assert(msg.method() == REGISTER);
 
    if(regevent == RegistrationRefreshed && !mRegistrationAccountingLogRefreshes)
    {
@@ -628,7 +628,7 @@ AccountingCollector::initializeEventQueue(FifoEventType type, bool destroyFirst)
       }
       return mRegistrationEventQueue;
    default:
-      assert(false);
+      resip_assert(false);
       break;
    }
    return 0;

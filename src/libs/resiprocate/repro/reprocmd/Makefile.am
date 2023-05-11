@@ -1,18 +1,19 @@
 # $Id$
 
-EXTRA_DIST = reprocmd_10_0.vcxproj reprocmd_10_0.vcxproj.filters
-EXTRA_DIST += *.vcproj
+EXTRA_DIST = *.vcxproj
 
 #AM_CXXFLAGS = -DUSE_ARES
+AM_CXXFLAGS = -I $(top_srcdir)
 
 sbin_PROGRAMS = reprocmd
 reprocmd_SOURCES = reprocmd.cpp
 reprocmd_LDADD = ../librepro.la
 reprocmd_LDADD += ../../resip/dum/libdum.la
-reprocmd_LDADD += ../../resip/stack/libresip.la ../../rutil/librutil.la
+reprocmd_LDADD += ../../resip/stack/libresip.la
+reprocmd_LDADD += ../../rutil/librutil.la
 #reprocmd_LDADD += ../contrib/ares/libares.a
 #reprocmd_LDADD += -L../contrib/ares -lares
-reprocmd_LDADD += @LIBSSL_LIBADD@ -lpthread
+reprocmd_LDADD += @LIBPTHREAD_LIBADD@
 
 ##############################################################################
 # 

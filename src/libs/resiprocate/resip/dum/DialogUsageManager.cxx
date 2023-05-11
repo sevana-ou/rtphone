@@ -60,12 +60,14 @@
 #include "resip/dum/OutgoingEvent.hxx"
 #include "resip/dum/DumHelper.hxx"
 #include "resip/dum/MergedRequestRemovalCommand.hxx"
+#include "resip/dum/InMemorySyncPubDb.hxx"
+#include "rutil/ResipAssert.h"
 #include "rutil/Inserter.hxx"
 #include "rutil/Logger.hxx"
 #include "rutil/Random.hxx"
 #include "rutil/Lockable.hxx"
-#include "rutil/WinLeakCheck.hxx"
 #include "rutil/Timer.hxx"
+#include "rutil/WinLeakCheck.hxx"
 
 #ifdef USE_SSL
 #include "resip/stack/ssl/Security.hxx"
@@ -83,7 +85,7 @@ using namespace std;
    {                                                                    \
       if(mThreadDebugKey)                                               \
       {                                                                 \
-         assert(ThreadIf::tlsGetValue(mThreadDebugKey));                \
+         resip_assert(ThreadIf::tlsGetValue(mThreadDebugKey));                \
       }                                                                 \
    } while (false)
 #else
@@ -103,6 +105,7 @@ DialogUsageManager::DialogUsageManager(SipStack& stack, bool createDefaultFeatur
    mDialogSetHandler(0),
    mRequestValidationHandler(0),
    mRegistrationPersistenceManager(0),
+   mPublicationPersistenceManager(0),
    mIsDefaultServerReferHandler(true),
    mClientPagerMessageHandler(0),
    mServerPagerMessageHandler(0),
@@ -142,9 +145,7 @@ DialogUsageManager::DialogUsageManager(SipStack& stack, bool createDefaultFeatur
 #if defined (USE_SSL)
       addOutgoingFeature(encryptionOutgoing);
 #endif
-
    }
-
 }
 
 DialogUsageManager::~DialogUsageManager()
@@ -152,14 +153,6 @@ DialogUsageManager::~DialogUsageManager()
    mShutdownState = Destroying;
    //InfoLog ( << "~DialogUsageManager" );
 
-#if(0)
-   // !kh!
-   DialogSetMap::iterator dialogSet = mDialogSetMap.begin();
-   for (; dialogSet != mDialogSetMap.end(); ++dialogSet)
-   {
-      delete dialogSet->second;
-   }
-#endif
    if(!mDialogSetMap.empty())
    {
       DebugLog(<< "DialogUsageManager::mDialogSetMap has " << mDialogSetMap.size() << " DialogSets");
@@ -179,7 +172,7 @@ DialogUsageManager::~DialogUsageManager()
    while(!mDialogSetMap.empty())
    {
       DialogSet*  ds = mDialogSetMap.begin()->second;
-      delete ds;
+      delete ds;  // Deleting a dialog set removes itself from the map
    }
 
    if(mIsDefaultServerReferHandler)
@@ -189,6 +182,18 @@ DialogUsageManager::~DialogUsageManager()
 
    delete mIncomingTarget;
    delete mOutgoingTarget;
+
+   // Delete Server Publications
+   while (!mServerPublications.empty())
+   {
+       delete mServerPublications.begin()->second;  // Deleting a ServerPublication removes itself from the map
+   }
+
+   // Remove any lingering incoming feature chain memory
+   for(FeatureChainMap::iterator it = mIncomingFeatureChainMap.begin(); it != mIncomingFeatureChainMap.end(); it++)
+   {
+      delete it->second;
+   }
 
    //InfoLog ( << "~DialogUsageManager done" );
 }
@@ -292,41 +297,41 @@ DialogUsageManager::forceShutdown(DumShutdownHandler* h)
    DialogUsageManager::onAllHandlesDestroyed();
 }
 
-void DialogUsageManager::setAppDialogSetFactory(std::unique_ptr<AppDialogSetFactory> factory)
+void DialogUsageManager::setAppDialogSetFactory(std::auto_ptr<AppDialogSetFactory> factory)
 {
-   mAppDialogSetFactory = std::move(factory);
+   mAppDialogSetFactory = factory;
 }
 
 SharedPtr<MasterProfile>&
 DialogUsageManager::getMasterProfile()
 {
-   assert(mMasterProfile.get());
+   resip_assert(mMasterProfile.get());
    return mMasterProfile;
 }
 
 SharedPtr<UserProfile>&
 DialogUsageManager::getMasterUserProfile()
 {
-   assert(mMasterUserProfile.get());
+   resip_assert(mMasterUserProfile.get());
    return mMasterUserProfile;
 }
 
 void DialogUsageManager::setMasterProfile(const SharedPtr<MasterProfile>& masterProfile)
 {
-   assert(!mMasterProfile.get());
+   resip_assert(!mMasterProfile.get());
    mMasterProfile = masterProfile;
    mMasterUserProfile = masterProfile; // required so that we can return a reference to SharedPtr<UserProfile> in getMasterUserProfile
 }
 
-void DialogUsageManager::setKeepAliveManager(std::unique_ptr<KeepAliveManager> manager)
+void DialogUsageManager::setKeepAliveManager(std::auto_ptr<KeepAliveManager> manager)
 {
-   mKeepAliveManager = std::move(manager);
+   mKeepAliveManager = manager;
    mKeepAliveManager->setDialogUsageManager(this);
 }
 
-void DialogUsageManager::setRedirectManager(std::unique_ptr<RedirectManager> manager)
+void DialogUsageManager::setRedirectManager(std::auto_ptr<RedirectManager> manager)
 {
-   mRedirectManager = std::move(manager);
+   mRedirectManager = manager;
 }
 
 void DialogUsageManager::setRedirectHandler(RedirectHandler* handler)
@@ -340,9 +345,9 @@ RedirectHandler* DialogUsageManager::getRedirectHandler()
 }
 
 void
-DialogUsageManager::setClientAuthManager(std::unique_ptr<ClientAuthManager> manager)
+DialogUsageManager::setClientAuthManager(std::auto_ptr<ClientAuthManager> manager)
 {
-   mClientAuthManager = std::move(manager);
+   mClientAuthManager = manager;
 }
 
 void
@@ -354,14 +359,14 @@ DialogUsageManager::setServerAuthManager(SharedPtr<ServerAuthManager> manager)
 void
 DialogUsageManager::setClientRegistrationHandler(ClientRegistrationHandler* handler)
 {
-   assert(!mClientRegistrationHandler);
+   resip_assert(!mClientRegistrationHandler);
    mClientRegistrationHandler = handler;
 }
 
 void
 DialogUsageManager::setServerRegistrationHandler(ServerRegistrationHandler* handler)
 {
-   assert(!mServerRegistrationHandler);
+   resip_assert(!mServerRegistrationHandler);
    mServerRegistrationHandler = handler;
 }
 
@@ -374,27 +379,29 @@ DialogUsageManager::setDialogSetHandler(DialogSetHandler* handler)
 void
 DialogUsageManager::setInviteSessionHandler(InviteSessionHandler* handler)
 {
-   assert(!mInviteSessionHandler);
+   resip_assert(!mInviteSessionHandler);
    mInviteSessionHandler = handler;
 }
 
 void
 DialogUsageManager::setRequestValidationHandler(RequestValidationHandler* handler)
 {
-   assert(!mRequestValidationHandler);
+   resip_assert(!mRequestValidationHandler);
    mRequestValidationHandler = handler;
 }
 
 void
 DialogUsageManager::setRegistrationPersistenceManager(RegistrationPersistenceManager* manager)
 {
-   assert(!mRegistrationPersistenceManager);
+   resip_assert(!mRegistrationPersistenceManager);
    mRegistrationPersistenceManager = manager;
 }
 
 void
-DialogUsageManager::setRemoteCertStore(unique_ptr<RemoteCertStore> store)
+DialogUsageManager::setPublicationPersistenceManager(PublicationPersistenceManager* manager)
 {
+   resip_assert(!mPublicationPersistenceManager);
+   mPublicationPersistenceManager = manager;
 }
 
 void
@@ -417,15 +424,15 @@ DialogUsageManager::addTimerMs(DumTimeout::Type type, unsigned long duration,
 void
 DialogUsageManager::addClientSubscriptionHandler(const Data& eventType, ClientSubscriptionHandler* handler)
 {
-   assert(handler);
-   assert(mClientSubscriptionHandlers.count(eventType) == 0);
+   resip_assert(handler);
+   resip_assert(mClientSubscriptionHandlers.count(eventType) == 0);
    mClientSubscriptionHandlers[eventType] = handler;
 }
 
 void
 DialogUsageManager::addServerSubscriptionHandler(const Data& eventType, ServerSubscriptionHandler* handler)
 {
-   assert(handler);
+   resip_assert(handler);
    //default do-nothing server side refer handler can be replaced
    if (eventType == "refer" && mServerSubscriptionHandlers.count(eventType))
    {
@@ -440,24 +447,24 @@ DialogUsageManager::addServerSubscriptionHandler(const Data& eventType, ServerSu
 void
 DialogUsageManager::addClientPublicationHandler(const Data& eventType, ClientPublicationHandler* handler)
 {
-   assert(handler);
-   assert(mClientPublicationHandlers.count(eventType) == 0);
+   resip_assert(handler);
+   resip_assert(mClientPublicationHandlers.count(eventType) == 0);
    mClientPublicationHandlers[eventType] = handler;
 }
 
 void
 DialogUsageManager::addServerPublicationHandler(const Data& eventType, ServerPublicationHandler* handler)
 {
-   assert(handler);
-   assert(mServerPublicationHandlers.count(eventType) == 0);
+   resip_assert(handler);
+   resip_assert(mServerPublicationHandlers.count(eventType) == 0);
    mServerPublicationHandlers[eventType] = handler;
 }
 
 void
 DialogUsageManager::addOutOfDialogHandler(MethodTypes type, OutOfDialogHandler* handler)
 {
-   assert(handler);
-   assert(mOutOfDialogHandlers.count(type) == 0);
+   resip_assert(handler);
+   resip_assert(mOutOfDialogHandlers.count(type) == 0);
    mOutOfDialogHandlers[type] = handler;
 }
 
@@ -539,14 +546,14 @@ DialogUsageManager::makeResponse(SipMessage& response,
                                  int responseCode,
                                  const Data& reason) const
 {
-   assert(request.isRequest());
+   resip_assert(request.isRequest());
    Helper::makeResponse(response, request, responseCode, reason);
 }
 
 void
 DialogUsageManager::sendResponse(const SipMessage& response)
 {
-   assert(response.isResponse());
+   resip_assert(response.isResponse());
    mStack.send(response, this);
 }
 
@@ -585,6 +592,24 @@ DialogUsageManager::makeInviteSession(const NameAddr& target,
    return makeInviteSession(target, getMasterUserProfile(), initialOffer, level, alternative, appDs);
 }
 
+SharedPtr<SipMessage>
+DialogUsageManager::makeInviteSession(const NameAddr& target,
+    const DialogSetId& dialogSetId,
+    const SharedPtr<UserProfile>& userProfile,
+    const Contents* initialOffer,
+    EncryptionLevel level,
+    const Contents* alternative,
+    AppDialogSet* appDs)
+{
+    assert(mDialogSetMap.find(dialogSetId) == mDialogSetMap.end());
+    BaseCreator* baseCreator(new InviteSessionCreator(*this, target, userProfile, initialOffer, level, alternative));
+    baseCreator->getLastRequest()->header(h_CallID).value() = dialogSetId.getCallId();
+    baseCreator->getLastRequest()->header(h_From).param(p_tag) = dialogSetId.getLocalTag();
+    SharedPtr<SipMessage> inv = makeNewSession(baseCreator, appDs);
+    DumHelper::setOutgoingEncryptionLevel(*inv, level);
+    return inv;
+}
+
 SharedPtr<SipMessage> 
 DialogUsageManager::makeInviteSession(const NameAddr& target, 
                                       InviteSessionHandle sessionToReplace, 
@@ -594,11 +619,11 @@ DialogUsageManager::makeInviteSession(const NameAddr& target,
 {
    SharedPtr<SipMessage> inv = makeInviteSession(target, userProfile, initialOffer, ads);
    // add replaces header
-   assert(sessionToReplace.isValid());
+   resip_assert(sessionToReplace.isValid());
    if(sessionToReplace.isValid())
    {
       CallId replaces;
-      DialogId id = sessionToReplace->getDialogId();
+      const DialogId& id = sessionToReplace->getDialogId();
       replaces.value() = id.getCallId();
       replaces.param(p_toTag) = id.getRemoteTag();
       replaces.param(p_fromTag) = id.getLocalTag();
@@ -618,11 +643,11 @@ DialogUsageManager::makeInviteSession(const NameAddr& target,
 {
    SharedPtr<SipMessage> inv = makeInviteSession(target, userProfile, initialOffer, level, alternative, ads);
    // add replaces header
-   assert(sessionToReplace.isValid());
+   resip_assert(sessionToReplace.isValid());
    if(sessionToReplace.isValid())
    {
       CallId replaces;
-      DialogId id = sessionToReplace->getDialogId();
+      const DialogId& id = sessionToReplace->getDialogId();
       replaces.value() = id.getCallId();
       replaces.param(p_toTag) = id.getRemoteTag();
       replaces.param(p_fromTag) = id.getLocalTag();
@@ -641,11 +666,11 @@ DialogUsageManager::makeInviteSession(const NameAddr& target,
 {
    SharedPtr<SipMessage> inv = makeInviteSession(target, initialOffer, level, alternative, ads);
    // add replaces header
-   assert(sessionToReplace.isValid());
+   resip_assert(sessionToReplace.isValid());
    if(sessionToReplace.isValid())
    {
       CallId replaces;
-      DialogId id = sessionToReplace->getDialogId();
+      const DialogId& id = sessionToReplace->getDialogId();
       replaces.value() = id.getCallId();
       replaces.param(p_toTag) = id.getRemoteTag();
       replaces.param(p_fromTag) = id.getLocalTag();
@@ -751,7 +776,7 @@ DialogUsageManager::makeRefer(const NameAddr& target, const H_ReferTo::Type& ref
 SharedPtr<SipMessage>
 DialogUsageManager::makeSubscription(const NameAddr& target, const SharedPtr<UserProfile>& userProfile, const Data& eventType, AppDialogSet* appDs)
 {
-   assert(userProfile.get());
+   resip_assert(userProfile.get());
    return makeNewSession(new SubscriptionCreator(*this, target, userProfile, eventType, userProfile->getDefaultSubscriptionTime()), appDs);
 }
 
@@ -792,7 +817,7 @@ DialogUsageManager::makeSubscription(const NameAddr& target, const Data& eventTy
 SharedPtr<SipMessage>
 DialogUsageManager::makeRegistration(const NameAddr& target, const SharedPtr<UserProfile>& userProfile, AppDialogSet* appDs)
 {
-   assert(userProfile.get());
+   resip_assert(userProfile.get());
    return makeNewSession(new RegistrationCreator(*this, target, userProfile, userProfile->getDefaultRegistrationTime()), appDs);
 }
 
@@ -881,7 +906,7 @@ DialogUsageManager::send(SharedPtr<SipMessage> msg)
       userProfile = ds->getUserProfile().get();
    }
 
-   assert(userProfile);
+   resip_assert(userProfile);
    if (!userProfile->isAnonymous() && userProfile->hasUserAgent())
    {
       msg->header(h_UserAgent).value() = userProfile->getUserAgent();
@@ -899,7 +924,7 @@ DialogUsageManager::send(SharedPtr<SipMessage> msg)
       msg->remove(h_Warnings);
    }
    
-   assert(userProfile);
+   resip_assert(userProfile);
    if (msg->isRequest() 
        && userProfile->hasProxyRequires() 
        && msg->header(h_RequestLine).method() != ACK 
@@ -924,11 +949,7 @@ DialogUsageManager::send(SharedPtr<SipMessage> msg)
    SharedPtr<MessageDecorator> outboundDecorator = userProfile->getOutboundDecorator();
    if (outboundDecorator.get())
    {
-      msg->addOutboundDecorator(std::unique_ptr<MessageDecorator>(outboundDecorator->clone()));
-   }
-   else
-   {
-     DebugLog(<< "No outbound decorator for message");
+      msg->addOutboundDecorator(std::auto_ptr<MessageDecorator>(outboundDecorator->clone()));
    }
 
    if (msg->isRequest())
@@ -943,7 +964,11 @@ DialogUsageManager::send(SharedPtr<SipMessage> msg)
 
       if (msg->exists(h_Vias))
       {
-         if(!userProfile->getRportEnabled())
+         if(userProfile->getRportEnabled())
+         {
+            msg->header(h_Vias).front().param(p_rport);
+         }
+         else
          {
             msg->header(h_Vias).front().remove(p_rport);
          }
@@ -971,12 +996,9 @@ DialogUsageManager::send(SharedPtr<SipMessage> msg)
             if (mDialogEventStateManager)
             {
                Dialog* d = ds->findDialog(*msg);
-               if (d != 0)
+               if (d == 0)
                {
-                  mDialogEventStateManager->onConfirmed(*d, d->getInviteSession());
-               }
-               else
-               {
+                  // If we don't have a dialog yet and we are sending an INVITE, this is a new outbound (UAC) INVITE
                   mDialogEventStateManager->onTryingUac(*ds, *msg);
                }
             }
@@ -987,7 +1009,7 @@ DialogUsageManager::send(SharedPtr<SipMessage> msg)
    DebugLog (<< "SEND: " << std::endl << std::endl << *msg);
 
    OutgoingEvent* event = new OutgoingEvent(msg);
-   outgoingProcess(unique_ptr<Message>(event));
+   outgoingProcess(auto_ptr<Message>(event));
 }
 
 void 
@@ -998,7 +1020,7 @@ DialogUsageManager::sendCommand(SharedPtr<SipMessage> request)
 }
 
 
-void DialogUsageManager::outgoingProcess(unique_ptr<Message> message)
+void DialogUsageManager::outgoingProcess(auto_ptr<Message> message)
 {
    Data tid = Data::Empty;
    {
@@ -1071,12 +1093,12 @@ void DialogUsageManager::outgoingProcess(unique_ptr<Message> message)
             userProfile = ds->getUserProfile().get();
          }
 
-         assert(userProfile);
+         resip_assert(userProfile);
 
-         //!dcm! -- unique SharedPtr to unique_ptr conversion prob. a worthwhile
+         //!dcm! -- unique SharedPtr to auto_ptr conversion prob. a worthwhile
          //optimzation here. SharedPtr would have to be changed; would
          //throw/assert if not unique.
-         std::unique_ptr<SipMessage> toSend(static_cast<SipMessage*>(event->message()->clone()));
+         std::auto_ptr<SipMessage> toSend(static_cast<SipMessage*>(event->message()->clone()));
 
          // .bwc. Protect ourselves from garbage with an isWellFormed() check.
          // (Code in Dialog doesn't check for well-formedness in the 
@@ -1087,11 +1109,11 @@ void DialogUsageManager::outgoingProcess(unique_ptr<Message> message)
              !event->message()->header(h_Routes).front().uri().exists(p_lr))
          {
             Helper::processStrictRoute(*toSend);
-            sendUsingOutboundIfAppropriate(*userProfile, std::move(toSend));
+            sendUsingOutboundIfAppropriate(*userProfile, toSend);
          }
          else
          {
-            sendUsingOutboundIfAppropriate(*userProfile, std::move(toSend));
+            sendUsingOutboundIfAppropriate(*userProfile, toSend);
          }
       }
       else
@@ -1102,7 +1124,7 @@ void DialogUsageManager::outgoingProcess(unique_ptr<Message> message)
 }
 
 void
-DialogUsageManager::sendUsingOutboundIfAppropriate(UserProfile& userProfile, unique_ptr<SipMessage> msg)
+DialogUsageManager::sendUsingOutboundIfAppropriate(UserProfile& userProfile, auto_ptr<SipMessage> msg)
 {
    //a little inefficient, branch parameter might be better
    DialogId id(*msg);
@@ -1121,12 +1143,12 @@ DialogUsageManager::sendUsingOutboundIfAppropriate(UserProfile& userProfile, uni
          {
             DebugLog ( << "Sending with client outbound flow tuple to express outbound" );
             DebugLog ( << "Flow Tuple: " << userProfile.mClientOutboundFlowTuple << " and key: " << userProfile.mClientOutboundFlowTuple.mFlowKey);
-            mStack.sendTo(std::move(msg), userProfile.mClientOutboundFlowTuple, this);
+            mStack.sendTo(msg, userProfile.mClientOutboundFlowTuple, this);
          }
          else
          {
             DebugLog ( << "Sending to express outbound w/o flow tuple");
-            mStack.send(std::move(msg), this);
+            mStack.send(msg, this);
          }
       }
       else
@@ -1134,12 +1156,12 @@ DialogUsageManager::sendUsingOutboundIfAppropriate(UserProfile& userProfile, uni
          if(userProfile.clientOutboundEnabled() && userProfile.mClientOutboundFlowTuple.mFlowKey != 0)
          {
             DebugLog ( << "Sending to outbound (no express) with flow tuple");
-            mStack.sendTo(std::move(msg), userProfile.mClientOutboundFlowTuple, this);
+            mStack.sendTo(msg, userProfile.mClientOutboundFlowTuple, this);
          }
          else
          {
             DebugLog ( << "Sending to outbound uri");
-            mStack.sendTo(std::move(msg), userProfile.getOutboundProxy().uri(), this);
+            mStack.sendTo(msg, userProfile.getOutboundProxy().uri(), this);
          }
       }
    }
@@ -1148,11 +1170,11 @@ DialogUsageManager::sendUsingOutboundIfAppropriate(UserProfile& userProfile, uni
       DebugLog (<< "Send: " << msg->brief());
       if(userProfile.clientOutboundEnabled() && userProfile.mClientOutboundFlowTuple.mFlowKey != 0)
       {
-         mStack.sendTo(std::move(msg), userProfile.mClientOutboundFlowTuple, this);
+         mStack.sendTo(msg, userProfile.mClientOutboundFlowTuple, this);
       }
       else
       {
-         mStack.send(std::move(msg), this);
+         mStack.send(msg, this);
       }
    }
 }
@@ -1162,7 +1184,7 @@ void
 DialogUsageManager::end(DialogSetId setid)
 {
    DialogSet* ds = findDialogSet(setid);
-   if (ds == nullptr)
+   if (ds == 0)
    {
       throw Exception("Request no longer exists", __FILE__, __LINE__);
    }
@@ -1308,14 +1330,14 @@ AppDialogSetHandle DialogUsageManager::findAppDialogSet(const DialogSetId& id)
 }
 
 void
-DialogUsageManager::internalProcess(std::unique_ptr<Message> msg)
+DialogUsageManager::internalProcess(std::auto_ptr<Message> msg)
 {
 #ifdef RESIP_DUM_THREAD_DEBUG
    if(!mThreadDebugKey)
    {
       // .bwc. Probably means multiple threads are trying to give DUM cycles 
       // simultaneously.
-      assert(!mHiddenThreadDebugKey);
+      resip_assert(!mHiddenThreadDebugKey);
       // No d'tor needed, since we're just going to use a pointer to this.
       if(!ThreadIf::tlsKeyCreate(mThreadDebugKey, 0))
       {
@@ -1344,8 +1366,8 @@ DialogUsageManager::internalProcess(std::unique_ptr<Message> msg)
       if (tuMsg)
       {
          InfoLog (<< "TU unregistered ");
-         assert(mShutdownState == RemovingTransactionUser);
-         assert(tuMsg->type() == TransactionUserMessage::TransactionUserRemoved);
+         resip_assert(mShutdownState == RemovingTransactionUser);
+         resip_assert(tuMsg->type() == TransactionUserMessage::TransactionUserRemoved);
          mShutdownState = Shutdown;
          if (mDumShutdownHandler)
          {
@@ -1480,7 +1502,7 @@ DialogUsageManager::internalProcess(std::unique_ptr<Message> msg)
       }
    }
 
-   incomingProcess(std::move(msg));
+   incomingProcess(msg);
 }
 
 void
@@ -1499,7 +1521,7 @@ DialogUsageManager::processExternalMessage(ExternalMessageBase* externalMessage)
 }
 
 void 
-DialogUsageManager::incomingProcess(std::unique_ptr<Message> msg)
+DialogUsageManager::incomingProcess(std::auto_ptr<Message> msg)
 {
    //call or create feature chain if appropriate
    Data tid = Data::Empty;
@@ -1568,8 +1590,16 @@ DialogUsageManager::incomingProcess(std::unique_ptr<Message> msg)
          }
          else
          {
-            assert(dynamic_cast<SipMessage*>(msg.get()));
-            it = mIncomingFeatureChainMap.insert(lb, FeatureChainMap::value_type(tid, new DumFeatureChain(*this, mIncomingFeatureList, *mIncomingTarget)));
+            if(dynamic_cast<SipMessage*>(msg.get()))
+            {
+               it = mIncomingFeatureChainMap.insert(lb, FeatureChainMap::value_type(tid, new DumFeatureChain(*this, mIncomingFeatureList, *mIncomingTarget)));
+            }
+            else
+            {
+               // Certain messages from the wire (ie: CANCEL) can end a feature, however there may still be some 
+               // pending Async requests (non-SipMessages) that are coming in - just drop them if so
+               return;
+            }
          }
       }
       
@@ -1592,7 +1622,7 @@ DialogUsageManager::incomingProcess(std::unique_ptr<Message> msg)
    
    try
    {
-      InfoLog (<< "Got: " << msg->brief());
+      DebugLog (<< "Got: " << msg->brief());
       DumDecrypted* decryptedMsg = dynamic_cast<DumDecrypted*>(msg.get());
       SipMessage* sipMsg = 0;
       if (decryptedMsg)
@@ -1625,7 +1655,7 @@ DialogUsageManager::incomingProcess(std::unique_ptr<Message> msg)
                   DebugLog (<< "Failed required options validation " << *sipMsg);
                   return;
                }
-               if( !validate100RelSuport(*sipMsg) )
+               if( !validate100RelSupport(*sipMsg) )
                {
                   DebugLog (<< "Remote party does not support 100rel " << *sipMsg);
                   return;
@@ -1660,7 +1690,7 @@ DialogUsageManager::incomingProcess(std::unique_ptr<Message> msg)
    catch(BaseException& e)
    {
       //unparseable, bad 403 w/ 2543 trans it from FWD, etc
-	  ErrLog(<<"Illegal message rejected: " << e.getMessage());
+     ErrLog(<<"Illegal message rejected: " << e.getMessage());
    }
 }
 
@@ -1680,7 +1710,7 @@ DialogUsageManager::process(resip::Lockable* mutex)
 #ifdef RESIP_DUM_THREAD_DEBUG
       mThreadDebugKey=mHiddenThreadDebugKey;
 #endif
-      internalProcess(std::unique_ptr<Message>(mFifo.getNext()));
+      internalProcess(std::auto_ptr<Message>(mFifo.getNext()));
 #ifdef RESIP_DUM_THREAD_DEBUG
       // .bwc. Thread checking is disabled if mThreadDebugKey is 0; if the app 
       // is using this mutex-locked process() call, we only enable thread-
@@ -1698,7 +1728,7 @@ DialogUsageManager::process(resip::Lockable* mutex)
 bool 
 DialogUsageManager::process(int timeoutMs, resip::Lockable* mutex)
 {
-   std::unique_ptr<Message> message;
+   std::auto_ptr<Message> message;
 
    if(timeoutMs == -1)
    {
@@ -1714,7 +1744,7 @@ DialogUsageManager::process(int timeoutMs, resip::Lockable* mutex)
 #ifdef RESIP_DUM_THREAD_DEBUG
       mThreadDebugKey=mHiddenThreadDebugKey;
 #endif
-      internalProcess(std::move(message));
+      internalProcess(message);
 #ifdef RESIP_DUM_THREAD_DEBUG
       // .bwc. Thread checking is disabled if mThreadDebugKey is 0; if the app 
       // is using this mutex-locked process() call, we only enable thread-
@@ -1771,8 +1801,8 @@ DialogUsageManager::validateRequiredOptions(const SipMessage& request)
 {
    // RFC 2162 - 8.2.2
    if(request.exists(h_Requires) &&                 // Don't check requires if method is ACK or CANCEL
-      (request.header(h_RequestLine).getMethod() != ACK ||
-       request.header(h_RequestLine).getMethod() != CANCEL))
+      request.header(h_RequestLine).getMethod() != ACK &&
+      request.header(h_RequestLine).getMethod() != CANCEL)
    {
       Tokens unsupported = getMasterProfile()->getUnsupportedOptionsTags(request.header(h_Requires));
       if (!unsupported.empty())
@@ -1796,7 +1826,7 @@ DialogUsageManager::validateRequiredOptions(const SipMessage& request)
 
 
 bool
-DialogUsageManager::validate100RelSuport(const SipMessage& request)
+DialogUsageManager::validate100RelSupport(const SipMessage& request)
 {
    if(request.header(h_RequestLine).getMethod() == INVITE)
    {
@@ -1811,7 +1841,9 @@ DialogUsageManager::validate100RelSuport(const SipMessage& request)
             sendResponse(failure);
       
             if(mRequestValidationHandler)
+            {
                mRequestValidationHandler->on100RelNotSupportedByRemote(request);
+            }
 
             return false;
          }
@@ -1927,8 +1959,8 @@ DialogUsageManager::validateAccept(const SipMessage& request)
 bool
 DialogUsageManager::mergeRequest(const SipMessage& request)
 {
-   assert(request.isRequest());
-   assert(request.isExternal());
+   resip_assert(request.isRequest());
+   resip_assert(request.isExternal());
 
    if (!request.header(h_To).exists(p_tag))
    {
@@ -1972,7 +2004,7 @@ DialogUsageManager::processRequest(const SipMessage& request)
        toTag = false;
    }
 
-   assert(mAppDialogSetFactory.get());
+   resip_assert(mAppDialogSetFactory.get());
    // !jf! note, the logic was reversed during ye great merge of March of Ought 5
    if (toTag ||
        findDialogSet(DialogSetId(request)))
@@ -2043,7 +2075,7 @@ DialogUsageManager::processRequest(const SipMessage& request)
             }
             else
             {
-               InfoLog (<< "Received a CANCEL on a non-existent transaction ");
+               InfoLog (<< "Received a CANCEL on a non-existent transaction: tid=" << request.getTransactionId());
                SipMessage failure;
                makeResponse(failure, request, 481);
                sendResponse(failure);
@@ -2051,8 +2083,8 @@ DialogUsageManager::processRequest(const SipMessage& request)
             break;
          }
          case PUBLISH:
-            assert(false);
-	    return;
+            resip_assert(false);
+            return;
          case SUBSCRIBE:
             if (!checkEventPackage(request))
             {
@@ -2060,7 +2092,7 @@ DialogUsageManager::processRequest(const SipMessage& request)
                         << request.brief());
                return;
             }
-	    /*FALLTHRU*/
+           /*FALLTHRU*/
          case NOTIFY : // handle unsolicited (illegal) NOTIFYs
          case INVITE:   // new INVITE
          case REFER:    // out-of-dialog REFER
@@ -2121,11 +2153,11 @@ DialogUsageManager::processRequest(const SipMessage& request)
          }
          case RESPONSE:
          case SERVICE:
-            assert(false);
+            resip_assert(false);
             break;
          case UNKNOWN:
          case MAX_METHODS:
-            assert(false);
+            resip_assert(false);
             break;
       }
    }
@@ -2145,7 +2177,7 @@ DialogUsageManager::processResponse(const SipMessage& response)
       }
       else
       {
-		 InfoLog (<< "Throwing away stray response: " << std::endl << std::endl << response.brief());
+          InfoLog (<< "Throwing away stray response: " << std::endl << std::endl << response.brief());
       }
    }
 }
@@ -2168,9 +2200,22 @@ DialogUsageManager::processPublish(const SipMessage& request)
       }
       else
       {
-         SharedPtr<SipMessage> response(new SipMessage);
-         makeResponse(*response, request, 412);
-         send(response);
+         // Check if publication exists in PublicationDb - may have been sync'd over,
+         // or exists from a restart.  In this case, fabricate a new ServerSubcription 
+         // to handle this request.
+         if (mPublicationPersistenceManager &&
+             mPublicationPersistenceManager->documentExists(request.header(h_Event).value(), request.header(h_RequestLine).uri().getAor(), request.header(h_SIPIfMatch).value()))
+         {
+            ServerPublication* sp = new ServerPublication(*this, request.header(h_SIPIfMatch).value(), request);
+            mServerPublications[request.header(h_SIPIfMatch).value()] = sp;
+            sp->dispatch(request);
+         }
+         else
+         {
+            SharedPtr<SipMessage> response(new SipMessage);
+            makeResponse(*response, request, 412);
+            send(response);
+         }
       }
    }
    else
@@ -2239,7 +2284,7 @@ DialogUsageManager::checkEventPackage(const SipMessage& request)
             }
             break;
          default:
-            assert(0);
+            resip_assert(0);
       }
    }
 
@@ -2247,6 +2292,10 @@ DialogUsageManager::checkEventPackage(const SipMessage& request)
    {
       SharedPtr<SipMessage> response(new SipMessage);
       makeResponse(*response, request, failureCode);
+      if(failureCode == 489)
+      {
+         response->header(h_AllowEvents) = getMasterProfile()->getAllowedEvents();
+      }
       send(response);
       return false;
    }
@@ -2263,16 +2312,19 @@ DialogUsageManager::findDialogSet(const DialogSetId& id)
 
    if (it == mDialogSetMap.end())
    {
+      StackLog ( << "Not found" );
       return 0;
    }
    else
    {
       if(it->second->isDestroying())
       {
+         StackLog ( << "isDestroying() == true" );
          return 0;
       }
       else
       {
+         StackLog ( << "found" );
          return it->second;
       }
    }
@@ -2397,7 +2449,7 @@ DialogUsageManager::setOutgoingMessageInterceptor(SharedPtr<DumFeature> feat)
 void
 DialogUsageManager::applyToAllServerSubscriptions(ServerSubscriptionFunctor* functor)
 {
-   assert(functor);
+   resip_assert(functor);
    for (DialogSetMap::iterator it = mDialogSetMap.begin(); it != mDialogSetMap.end(); ++it)
    {
       for (DialogSet::DialogMap::iterator i = it->second->mDialogs.begin(); i != it->second->mDialogs.end(); ++i)
@@ -2414,7 +2466,7 @@ DialogUsageManager::applyToAllServerSubscriptions(ServerSubscriptionFunctor* fun
 void
 DialogUsageManager::applyToAllClientSubscriptions(ClientSubscriptionFunctor* functor)
 {
-   assert(functor);
+   resip_assert(functor);
    for (DialogSetMap::iterator it = mDialogSetMap.begin(); it != mDialogSetMap.end(); ++it)
    {
       for (DialogSet::DialogMap::iterator i = it->second->mDialogs.begin(); i != it->second->mDialogs.end(); ++i)
@@ -2425,6 +2477,32 @@ DialogUsageManager::applyToAllClientSubscriptions(ClientSubscriptionFunctor* fun
             functor->apply(*ics);
          }
       }
+   }
+}
+
+void 
+DialogUsageManager::endAllServerSubscriptions(TerminateReason reason)
+{
+   // Make a copy of the map - since calling end can cause an immediate delete this on the subscription and thus cause
+   // the object to remove itself from the mServerSubscriptions map, messing up our iterator
+   ServerSubscriptions tempSubscriptions = mServerSubscriptions;
+   ServerSubscriptions::iterator it = tempSubscriptions.begin();
+   for (; it != tempSubscriptions.end(); it++)
+   {
+      it->second->end(reason);
+   }
+}
+
+void 
+DialogUsageManager::endAllServerPublications()
+{
+   // Make a copy of the map - since calling end can cause an immediate delete this on the publication and thus cause
+   // the object to remove itself from the mServerPublications map, messing up our iterator
+   ServerPublications tempPublications = mServerPublications;
+   ServerPublications::iterator it = tempPublications.begin();
+   for (; it != tempPublications.end(); it++)
+   {
+      it->second->end();
    }
 }
 
@@ -2443,9 +2521,13 @@ DialogUsageManager::unRegisterForConnectionTermination(Postable* listener)
 void
 DialogUsageManager::requestMergedRequestRemoval(const MergedRequestKey& key)
 {
-   DebugLog(<< "Got merged request removal request");
-   MergedRequestRemovalCommand command(*this, key);
-   mStack.postMS(command, Timer::TF, this);
+   // Only post delayed merge request removal if running, if we are shutting down, then there is no need
+   if (mShutdownState == Running)
+   {
+       DebugLog(<< "Got merged request removal request");
+       MergedRequestRemovalCommand command(*this, key);
+       mStack.postMS(command, Timer::TF, this);
+   }
 }
 
 void
@@ -2483,6 +2565,30 @@ DialogUsageManager::createDialogEventStateManager(DialogEventHandler* handler)
    return mDialogEventStateManager;
 }
 
+void 
+DialogUsageManager::setAdvertisedCapabilities(SipMessage& msg, SharedPtr<UserProfile> userProfile)
+{
+   if(userProfile->isAdvertisedCapability(Headers::Allow)) 
+   {
+      msg.header(h_Allows) = getMasterProfile()->getAllowedMethods();
+   }
+   if(userProfile->isAdvertisedCapability(Headers::AcceptEncoding)) 
+   {
+      msg.header(h_AcceptEncodings) = getMasterProfile()->getSupportedEncodings();
+   }
+   if(userProfile->isAdvertisedCapability(Headers::AcceptLanguage)) 
+   {
+      msg.header(h_AcceptLanguages) = getMasterProfile()->getSupportedLanguages();
+   }
+   if(userProfile->isAdvertisedCapability(Headers::AllowEvents)) 
+   {
+      msg.header(h_AllowEvents) = getMasterProfile()->getAllowedEvents();
+   }
+   if(userProfile->isAdvertisedCapability(Headers::Supported)) 
+   {
+      msg.header(h_Supporteds) = getMasterProfile()->getSupportedOptionTags();
+   }
+}
 
 /* ====================================================================
  * The Vovida Software License, Version 1.0

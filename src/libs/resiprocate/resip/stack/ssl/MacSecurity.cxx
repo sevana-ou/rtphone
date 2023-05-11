@@ -1,4 +1,3 @@
-#if defined(TARGET_OS_MAC)
 
 #if defined(HAVE_CONFIG_H)
   #include "config.h"
@@ -48,18 +47,18 @@ MacSecurity::openSystemCertStore()
    const char *pathName = nil;
    SInt32 MacVersion = 0;
     
-   if (true/*Gestalt(gestaltSystemVersion, &MacVersion) == noErr*/)
+   if (Gestalt(gestaltSystemVersion, &MacVersion) == noErr)
    {
-      //if (MacVersion >= 0x1050)
+      if (MacVersion >= 0x1050)
       {
          //for Leopard OSX, the root certificate are located in SystemRootCertificates.keychain
 	     pathName = "/System/Library/Keychains/SystemRootCertificates.keychain"; 
       }
-      /*else
+      else
       {
          //for earlier OSX (including Tiger), the root certificate are located in X509Anchors
          pathName = "/System/Library/Keychains/X509Anchors";
-      }*/
+      }
    }
    if(nil == pathName)
    {
@@ -78,7 +77,7 @@ MacSecurity::openSystemCertStore()
    if (status != noErr)
    {
       ErrLog( << "X509Anchors keychain could not be opened");
-      assert(0);
+      resip_assert(0);
       return NULL;
    }
 
@@ -101,7 +100,7 @@ MacSecurity::openSystemCertStore()
    if (status != noErr)
    {      
       ErrLog( << "System certificate store cannot be opened");
-      assert(0);
+      resip_assert(0);
       return NULL;
    }
 
@@ -175,8 +174,8 @@ MacSecurity::getCerts()
       if (status != noErr)
       {
          // there was an error loading the certificate
-         ErrLog( << "Couldn't load certificate, error code: " << (int)status);
-         assert(0);
+         ErrLog( << "Couldn't load certificate, error code: " << status);
+         resip_assert(0);
       }
    }
    
@@ -184,7 +183,7 @@ MacSecurity::getCerts()
 }
 
 // TODO: this needs to be refactored with WinSecurity.cxx
-/*int
+int 
 verifyCallback(int iInCode, X509_STORE_CTX *pInStore)
 {
    char cBuf1[500];
@@ -203,16 +202,14 @@ verifyCallback(int iInCode, X509_STORE_CTX *pInStore)
    if(!iInCode)
    {
       memset(cBuf2, 0, sizeof(cBuf2) ); 
-      sprintf(cBuf2, "\n Error %s", X509_verify_cert_error_string(pInStore->error) );
+      sprintf(cBuf2, "\n Error %s", X509_verify_cert_error_string(X509_STORE_CTX_get_error(pInStore)) );
    }
  
    return iInCode;
 }
-*/
 
 #endif /* USE_SSL */
 
-#endif
 /* ====================================================================
  * The Vovida Software License, Version 1.0 
  * 

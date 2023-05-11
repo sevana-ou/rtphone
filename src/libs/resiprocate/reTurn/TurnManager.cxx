@@ -27,76 +27,7 @@ TurnManager::TurnManager(asio::io_service& ioService, const ReTurnConfig& config
 
 TurnManager::~TurnManager()
 {
-   TurnAllocationMap::iterator it = mTurnAllocationMap.begin();
-   for(;it != mTurnAllocationMap.end();it++)
-   {
-      delete it->second;
-   }
-
    InfoLog(<< "Turn Manager destroyed.");
-}
-
-void 
-TurnManager::addTurnAllocation(TurnAllocation* turnAllocation)
-{
-   assert(findTurnAllocation(turnAllocation->getKey()) == 0);   
-   mTurnAllocationMap[turnAllocation->getKey()] = turnAllocation;
-}
-
-void 
-TurnManager::removeTurnAllocation(const TurnAllocationKey& turnAllocationKey)
-{
-   TurnAllocationMap::iterator it = mTurnAllocationMap.find(turnAllocationKey);
-   if(it != mTurnAllocationMap.end())
-   {
-      delete it->second;
-      mTurnAllocationMap.erase(it);
-   }
-}
-
-TurnAllocation* 
-TurnManager::findTurnAllocation(const TurnAllocationKey& turnAllocationKey)
-{
-   TurnAllocationMap::iterator it = mTurnAllocationMap.find(turnAllocationKey);
-   if(it != mTurnAllocationMap.end())
-   {
-      return it->second;
-   }
-   return 0;
-}
-
-TurnAllocation* 
-TurnManager::findTurnAllocation(const StunTuple& requestedTuple)
-{
-   TurnAllocationMap::iterator it;
-   for(it = mTurnAllocationMap.begin(); it != mTurnAllocationMap.end(); it++)
-   {
-      if(it->second->getRequestedTuple() == requestedTuple)
-      {
-         return it->second;
-      }
-   }
-   return 0;
-}
-
-void 
-TurnManager::allocationExpired(const asio::error_code& e, const TurnAllocationKey& turnAllocationKey)
-{
-   if (e != asio::error::operation_aborted)  // Note: nothing currently stops timers
-   {
-      // Timer was not cancelled, take necessary action.
-      InfoLog(<< "Turn Allocation Expired! clientLocal=" << turnAllocationKey.getClientLocalTuple() << " clientRemote=" << turnAllocationKey.getClientRemoteTuple());
-
-      TurnAllocationMap::iterator it = mTurnAllocationMap.find(turnAllocationKey);
-      if(it != mTurnAllocationMap.end())
-      {
-         if(time(0) >= it->second->getExpires())
-         {
-            delete it->second;
-            mTurnAllocationMap.erase(it);
-         }
-      }
-   }
 }
 
 unsigned short 
@@ -120,7 +51,7 @@ TurnManager::allocateEvenPort(StunTuple::TransportType transport)
    PortAllocationMap& portAllocationMap = getPortAllocationMap(transport);
    unsigned short startPortToCheck = advanceLastAllocatedPort(transport);
    // Ensure start port is even
-   if(startPortToCheck % 2 != 0)
+   while(startPortToCheck % 2 != 0)
    {
       startPortToCheck = advanceLastAllocatedPort(transport);
    }
@@ -141,7 +72,7 @@ TurnManager::allocateOddPort(StunTuple::TransportType transport)
    PortAllocationMap& portAllocationMap = getPortAllocationMap(transport);
    unsigned short startPortToCheck = advanceLastAllocatedPort(transport);
    // Ensure start port is odd
-   if(startPortToCheck % 2 != 1)
+   while(startPortToCheck % 2 != 1)
    {
       startPortToCheck = advanceLastAllocatedPort(transport);
    }
@@ -160,8 +91,10 @@ TurnManager::allocateEvenPortPair(StunTuple::TransportType transport)
 {
    PortAllocationMap& portAllocationMap = getPortAllocationMap(transport);
    unsigned short startPortToCheck = advanceLastAllocatedPort(transport);
-   // Ensure start port is even
-   if(startPortToCheck % 2 != 0)
+   // Ensure start port is even and that start port + 1 is in range
+   while(startPortToCheck % 2 != 0 ||
+         startPortToCheck + 1 == 0 ||
+         startPortToCheck + 1 > mConfig.mAllocationPortRangeMax )
    {
       startPortToCheck = advanceLastAllocatedPort(transport);
    }
@@ -244,6 +177,10 @@ TurnManager::advanceLastAllocatedPort(StunTuple::TransportType transport, unsign
       {
          mLastAllocatedTcpPort = mConfig.mAllocationPortRangeMin+(mLastAllocatedTcpPort-mConfig.mAllocationPortRangeMax-1);
       }
+      else if(mLastAllocatedTcpPort == 0 /* Wrap around */)
+      {
+         mLastAllocatedTcpPort = mConfig.mAllocationPortRangeMin;
+      }
       return mLastAllocatedTcpPort;
    case StunTuple::UDP:
    default:
@@ -251,6 +188,10 @@ TurnManager::advanceLastAllocatedPort(StunTuple::TransportType transport, unsign
       if(mLastAllocatedUdpPort > mConfig.mAllocationPortRangeMax) 
       {
          mLastAllocatedUdpPort = mConfig.mAllocationPortRangeMin+(mLastAllocatedUdpPort-mConfig.mAllocationPortRangeMax-1);
+      }
+      else if(mLastAllocatedUdpPort == 0 /* Wrap around */)
+      {
+         mLastAllocatedUdpPort = mConfig.mAllocationPortRangeMin;
       }
       return mLastAllocatedUdpPort;
    }

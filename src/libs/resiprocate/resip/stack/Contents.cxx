@@ -8,6 +8,7 @@
 #include "rutil/ParseBuffer.hxx"
 #include "rutil/Logger.hxx"
 #include "resip/stack/OctetContents.hxx"
+#include "rutil/MD5Stream.hxx"
 #include "rutil/WinLeakCheck.hxx"
 
 using namespace resip;
@@ -223,7 +224,7 @@ Contents::exists(const MIME_Header& type) const
       return mDescription != 0;
    }
 
-   assert(false);
+   resip_assert(false);
    return false;
 }
 
@@ -272,7 +273,7 @@ Contents::remove(const MIME_Header& type)
       return;
    }
 
-   assert(false);
+   resip_assert(false);
 }
 
 const H_ContentType::Type&
@@ -563,7 +564,7 @@ Contents::preParseHeaders(ParseBuffer& pb)
                // add to application headers someday
                std::cerr << "Unknown MIME Content- header: " << headerName << std::endl;
                ErrLog(<< "Unknown MIME Content- header: " << headerName);
-               assert(false);
+               resip_assert(false);
             }
          }
       }
@@ -660,6 +661,22 @@ void
 Contents::addBuffer(char* buf)
 {
    mBufferList.push_back(buf);
+}
+
+bool
+resip::operator==(const Contents& lhs, const Contents& rhs)
+{
+   MD5Stream lhsStream;
+   lhsStream << lhs;
+   MD5Stream rhsStream;
+   rhsStream << rhs;
+   return lhsStream.getHex() == rhsStream.getHex();
+}
+
+bool
+resip::operator!=(const Contents& lhs, const Contents& rhs)
+{
+   return !operator==(lhs,rhs);
 }
 
 /* ====================================================================

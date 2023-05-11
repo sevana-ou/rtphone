@@ -21,6 +21,9 @@ class ParseBuffer
       ParseBuffer(const char* buff, size_t len, 
                   const Data& errorContext = Data::Empty);
 
+      explicit ParseBuffer(const char* buff, 
+                           const Data& errorContext = Data::Empty);
+
       explicit ParseBuffer(const Data& data,
                            const Data& errorContext = Data::Empty);
 
@@ -96,8 +99,8 @@ class ParseBuffer
       ParseBuffer& operator=(const ParseBuffer& other);
       void reset(const char* pos)
       {
-         assert( mBuff <= mEnd);
-         assert( (pos >= mBuff) && (pos <= mEnd) );
+         resip_assert( mBuff <= mEnd);
+         resip_assert( (pos >= mBuff) && (pos <= mEnd) );
          mPosition = pos;
       }
 
@@ -110,6 +113,7 @@ class ParseBuffer
       Pointer start() const { return Pointer(*this, mBuff, eof()); }
       CurrentPosition position() const { return CurrentPosition(*this); }
       Pointer end() const { return Pointer(*this, mEnd, true); }
+      size_t lengthRemaining() { return mEnd - mPosition; }
 
       CurrentPosition skipChar()
       {

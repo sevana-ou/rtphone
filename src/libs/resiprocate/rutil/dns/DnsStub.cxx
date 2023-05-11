@@ -8,7 +8,7 @@
 //	release version messes time_t definition again
 #include <set>
 #include <vector>
-#include <cassert>
+#include "rutil/ResipAssert.h"
 
 #include "AresCompat.hxx"
 
@@ -46,14 +46,14 @@ unsigned int DnsStub::mDnsFeatures = 0;
 void
 DnsResultSink::onLogDnsResult(const DNSResult<DnsHostRecord>& rr)
 {
-   DebugLog (<< rr);
+   DebugLog(<< "Host(A) Result: " << rr);
 }
 
 void
 DnsResultSink::onLogDnsResult(const DNSResult<DnsAAAARecord>& rr)
 {
 #if defined(USE_IPV6)
-   DebugLog (<< rr);
+   DebugLog(<< "Host(AAAA) Result: " << rr);
 #else
    ErrLog(<< "Something called "
             "DnsResultSink::onLogDnsResult(const DNSResult<DnsAAAARecord>& rr)"
@@ -64,19 +64,19 @@ DnsResultSink::onLogDnsResult(const DNSResult<DnsAAAARecord>& rr)
 void
 DnsResultSink::onLogDnsResult(const DNSResult<DnsSrvRecord>& rr)
 {
-   DebugLog (<< rr);
+   DebugLog(<< "SRV Result: " << rr);
 }
 
 void
 DnsResultSink::onLogDnsResult(const DNSResult<DnsNaptrRecord>& rr)
 {
-   DebugLog (<< rr);
+   DebugLog(<< "NAPTR Result: " << rr);
 }
 
 void
 DnsResultSink::onLogDnsResult(const DNSResult<DnsCnameRecord>& rr)
 {
-   DebugLog (<< rr);
+   DebugLog(<< "CNAME Result: " << rr);
 }
 
 DnsStub::DnsStub(const NameserverList& additional,
@@ -97,7 +97,7 @@ DnsStub::DnsStub(const NameserverList& additional,
    {
       if (retCode == ExternalDns::BuildMismatch)
       {
-         assert(0);
+         resip_assert(0);
          throw DnsStubException("Library was not build w/ required capabilities(probably USE_IPV6 resip/ares mismatch",
                                 __FILE__,__LINE__);
       }
@@ -159,6 +159,18 @@ DnsStub::processTimers()
    // the fifo is captures as a timer within getTimeTill... above
    processFifo();
    mDnsProvider->processTimers();
+}
+
+void 
+DnsStub::queueCommand(Command* command)
+{
+   mCommandFifo.add(command);
+
+   // Wake up fifo reader
+   if (mAsyncProcessHandler)
+   {
+      mAsyncProcessHandler->handleProcessNotification();
+   }
 }
 
 void
@@ -381,7 +393,7 @@ DnsStub::setPollGrp(FdPollGrp* pollGrp)
    if(mPollGrp)
    {
       // unregister our select interruptor
-      //mPollGrp->delPollItem(mInterruptorHandle);
+      mPollGrp->delPollItem(mInterruptorHandle);
       mInterruptorHandle=0;
    }
 
@@ -389,7 +401,7 @@ DnsStub::setPollGrp(FdPollGrp* pollGrp)
 
    if (mPollGrp)
    {
-      //mInterruptorHandle = mPollGrp->addPollItem(mSelectInterruptor.getReadSocket(), FPEM_Read, &mSelectInterruptor);
+      mInterruptorHandle = mPollGrp->addPollItem(mSelectInterruptor.getReadSocket(), FPEM_Read, &mSelectInterruptor);
    }
 
    mDnsProvider->setPollGrp(mPollGrp);
@@ -408,7 +420,7 @@ DnsStub::Query::Query(DnsStub& stub, ResultTransform* transform, ResultConverter
      mSink(s),
      mFollowCname(followCname)
 {
-   assert(s);
+   resip_assert(s);
 }
 
 DnsStub::Query::~Query()
@@ -485,7 +497,7 @@ DnsStub::Query::go()
    {
       if(mStub.mDnsProvider && mStub.mDnsProvider->hostFileLookupLookupOnlyMode())
       {
-         assert(mRRType == T_A);
+         resip_assert(mRRType == T_A);
          StackLog (<< targetToQuery << " not cached. Doing hostfile lookup");
          in_addr address;
          if (mStub.mDnsProvider->hostFileLookup(targetToQuery.c_str(), address))
@@ -601,11 +613,11 @@ DnsStub::Query::process(int status, const unsigned char* abuf, const int alen)
          case ARES_EBADFAMILY:
             ErrLog (<< "Bad lookup type " << mStub.errorMessage(status) << " for " << mTarget);
             // .bwc. This should not happen. If it does, we have code to fix.
-            assert(0);
+            resip_assert(0);
             break;
          default:
             ErrLog (<< "Unknown error " << mStub.errorMessage(status) << " for " << mTarget);
-            assert(0);
+            resip_assert(0);
             break;
       }
 
@@ -776,12 +788,7 @@ void
 DnsStub::setEnumSuffixes(const std::vector<Data>& suffixes)
 {
    SetEnumSuffixesCommand* command = new SetEnumSuffixesCommand(*this, suffixes);
-   mCommandFifo.add(command);
-
-   if (mAsyncProcessHandler)
-   {
-      mAsyncProcessHandler->handleProcessNotification();
-   }
+   queueCommand(command);
 }
 
 const std::vector<Data>&
@@ -800,12 +807,7 @@ void
 DnsStub::setEnumDomains(const std::map<Data,Data>& domains)
 {
    SetEnumDomainsCommand* command = new SetEnumDomainsCommand(*this, domains);
-   mCommandFifo.add(command);
-
-   if (mAsyncProcessHandler)
-   {
-      mAsyncProcessHandler->handleProcessNotification();
-   }
+   queueCommand(command);
 }
 
 const std::map<Data,Data>&
@@ -824,12 +826,7 @@ void
 DnsStub::clearDnsCache()
 {
    ClearDnsCacheCommand* command = new ClearDnsCacheCommand(*this);
-   mCommandFifo.add(command);
-
-   if (mAsyncProcessHandler)
-   {
-      mAsyncProcessHandler->handleProcessNotification();
-   }
+   queueCommand(command);
 }
 
 void
@@ -842,12 +839,7 @@ void
 DnsStub::logDnsCache()
 {
    LogDnsCacheCommand* command = new LogDnsCacheCommand(*this);
-   mCommandFifo.add(command);
-
-   if (mAsyncProcessHandler)
-   {
-      mAsyncProcessHandler->handleProcessNotification();
-   }
+   queueCommand(command);
 }
 
 void
@@ -860,21 +852,35 @@ void
 DnsStub::getDnsCacheDump(std::pair<unsigned long, unsigned long> key, GetDnsCacheDumpHandler* handler)
 {
    GetDnsCacheDumpCommand* command = new GetDnsCacheDumpCommand(*this, key, handler);
-   mCommandFifo.add(command);
-
-   if (mAsyncProcessHandler)
-   {
-      mAsyncProcessHandler->handleProcessNotification();
-   }
+   queueCommand(command);
 }
 
 void 
 DnsStub::doGetDnsCacheDump(std::pair<unsigned long, unsigned long> key, GetDnsCacheDumpHandler* handler)
 {
-   assert(handler != 0);
+   resip_assert(handler != 0);
    Data dnsCacheDump;
    mRRCache.getCacheDump(dnsCacheDump);
    handler->onDnsCacheDumpRetrieved(key, dnsCacheDump);
+}
+
+void
+DnsStub::reloadDnsServers()
+{
+    ReloadDnsServersCommand* command = new ReloadDnsServersCommand(*this);
+    queueCommand(command);
+}
+
+void
+DnsStub::doReloadDnsServers()
+{
+    bool changed = mDnsProvider->checkDnsChange();
+    if (changed) 
+    {
+        doClearDnsCache();
+
+        mDnsProvider->init(mDnsTimeout, mDnsTries, mDnsFeatures);
+    }
 }
 
 void

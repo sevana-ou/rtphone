@@ -1,6 +1,14 @@
+#if defined(HAVE_CONFIG_H)
+#include "config.h"
+#endif
+
 #include <iostream>
+#include <csignal>
 #include <string>
 #include <asio.hpp>
+#ifdef USE_SSL
+#include <asio/ssl.hpp>
+#endif
 #include <boost/bind.hpp>
 #include <boost/function.hpp>
 #include <boost/lexical_cast.hpp>
@@ -73,6 +81,15 @@ reTurn::ReTurnServerProcess::main(int argc, char* argv[])
    }
 
    setPidFile(reTurnConfig.mPidFile);
+   if(isAlreadyRunning())
+   {
+      std::cerr << "Already running, will not start two instances.  Please stop existing process and/or delete PID file.";
+#ifndef WIN32
+      syslog(LOG_DAEMON | LOG_CRIT, "Already running, will not start two instances.  Please stop existing process and/or delete PID file.");
+#endif
+      return false;
+   }
+
    // Daemonize if necessary
    if(reTurnConfig.mDaemonize)
    {
@@ -82,8 +99,8 @@ reTurn::ReTurnServerProcess::main(int argc, char* argv[])
    try
    {
       // Initialize Logging
-      resip::Log::initialize(reTurnConfig.mLoggingType, reTurnConfig.mLoggingLevel, "reTurnServer", reTurnConfig.mLoggingFilename.c_str());
-      resip::GenericLogImpl::MaxLineCount = reTurnConfig.mLoggingFileMaxLineCount;
+      resip::Log::initialize(reTurnConfig.mLoggingType, reTurnConfig.mLoggingLevel, "reTurnServer", reTurnConfig.mLoggingFilename.c_str(), 0, reTurnConfig.mSyslogFacility);
+      resip::Log::setMaxLineCount(reTurnConfig.mLoggingFileMaxLineCount);
 
       // Initialize server.
       asio::io_service ioService;                                // The one and only ioService for the stunServer
@@ -91,10 +108,18 @@ reTurn::ReTurnServerProcess::main(int argc, char* argv[])
 
       boost::shared_ptr<reTurn::UdpServer> udpTurnServer;  // also a1p1StunUdpServer
       boost::shared_ptr<reTurn::TcpServer> tcpTurnServer;
+#ifdef USE_SSL
       boost::shared_ptr<reTurn::TlsServer> tlsTurnServer;
+#endif
       boost::shared_ptr<reTurn::UdpServer> a1p2StunUdpServer;
       boost::shared_ptr<reTurn::UdpServer> a2p1StunUdpServer;
       boost::shared_ptr<reTurn::UdpServer> a2p2StunUdpServer;
+
+#ifdef USE_IPV6
+      boost::shared_ptr<reTurn::UdpServer> udpV6TurnServer;
+      boost::shared_ptr<reTurn::TcpServer> tcpV6TurnServer;
+      boost::shared_ptr<reTurn::TlsServer> tlsV6TurnServer;
+#endif
 
       // The one and only RequestHandler - if altStunPort is non-zero, then assume RFC3489 support is enabled and pass settings to request handler
       reTurn::RequestHandler requestHandler(turnManager, 
@@ -105,7 +130,21 @@ reTurn::ReTurnServerProcess::main(int argc, char* argv[])
 
       udpTurnServer.reset(new reTurn::UdpServer(ioService, requestHandler, reTurnConfig.mTurnAddress, reTurnConfig.mTurnPort));
       tcpTurnServer.reset(new reTurn::TcpServer(ioService, requestHandler, reTurnConfig.mTurnAddress, reTurnConfig.mTurnPort));
-      tlsTurnServer.reset(new reTurn::TlsServer(ioService, requestHandler, reTurnConfig.mTurnAddress, reTurnConfig.mTlsTurnPort));
+#ifdef USE_SSL
+      if(reTurnConfig.mTlsTurnPort != 0)
+      {
+         tlsTurnServer.reset(new reTurn::TlsServer(ioService, requestHandler, reTurnConfig.mTurnAddress, reTurnConfig.mTlsTurnPort));
+      }
+#endif
+
+#ifdef USE_IPV6
+      udpV6TurnServer.reset(new reTurn::UdpServer(ioService, requestHandler, reTurnConfig.mTurnV6Address, reTurnConfig.mTurnPort));
+      tcpV6TurnServer.reset(new reTurn::TcpServer(ioService, requestHandler, reTurnConfig.mTurnV6Address, reTurnConfig.mTurnPort));
+      if(reTurnConfig.mTlsTurnPort != 0)
+      {
+         tlsV6TurnServer.reset(new reTurn::TlsServer(ioService, requestHandler, reTurnConfig.mTurnV6Address, reTurnConfig.mTlsTurnPort));
+      }
+#endif
 
       if(reTurnConfig.mAltStunPort != 0) // if alt stun port is non-zero, then RFC3489 support is enabled
       {
@@ -123,7 +162,33 @@ reTurn::ReTurnServerProcess::main(int argc, char* argv[])
 
       udpTurnServer->start();
       tcpTurnServer->start();
-      tlsTurnServer->start();
+#ifdef USE_SSL
+      if(tlsTurnServer)
+      {
+         tlsTurnServer->start();
+      }
+#endif
+
+#ifdef USE_IPV6
+      udpV6TurnServer->start();
+      tcpV6TurnServer->start();
+#ifdef USE_SSL
+      if(tlsV6TurnServer)
+      {
+         tlsV6TurnServer->start();
+      }
+#endif
+#endif
+
+      // Drop privileges (can do this now that sockets are bound)
+      if(!reTurnConfig.mRunAsUser.empty())
+      {
+         InfoLog( << "Trying to drop privileges, configured uid = " << reTurnConfig.mRunAsUser << " gid = " << reTurnConfig.mRunAsGroup);
+         dropPrivileges(reTurnConfig.mRunAsUser, reTurnConfig.mRunAsGroup);
+      }
+
+      ReTurnUserFileScanner userFileScanner(ioService, reTurnConfig);
+      userFileScanner.start();
 
 #ifdef _WIN32
       // Set console control handler to allow server to be stopped.

@@ -8,6 +8,7 @@
 #include <map>
 #include <rutil/TimeLimitFifo.hxx>
 #include <rutil/Mutex.hxx>
+#include <rutil/SharedPtr.hxx>
 
 #ifdef WIN32
 #include <srtp.h>
@@ -23,6 +24,9 @@
 #include "reTurn/StunMessage.hxx"
 #include "FakeSelectSocketDescriptor.hxx"
 #include "dtls_wrapper/DtlsSocket.hxx"
+
+#include "FlowContext.hxx"
+#include "RTCPEventLoggingHandler.hxx"
 
 using namespace reTurn;
 
@@ -44,6 +48,9 @@ class Flow : public TurnAsyncSocketHandler
 {
 public:
 
+   static int maxReceiveFifoDuration;
+   static int maxReceiveFifoSize;
+
    enum FlowState
    {
       Unconnected,
@@ -56,12 +63,13 @@ public:
    };
 
    Flow(asio::io_service& ioService,
-#ifdef USE_SSL
         asio::ssl::context& sslContext,
-#endif
         unsigned int componentId,
         const StunTuple& localBinding, 
-        MediaStream& mediaStream);
+        MediaStream& mediaStream,
+        bool forceCOMedia,
+        resip::SharedPtr<RTCPEventLoggingHandler> rtcpEventLoggingHandler = resip::SharedPtr<RTCPEventLoggingHandler>(),
+        resip::SharedPtr<FlowContext> context = resip::SharedPtr<FlowContext>());
    ~Flow();
 
    void activateFlow(UInt8 allocationProps = StunMessage::PropsNone);
@@ -115,9 +123,7 @@ public:
 
 private:
    asio::io_service& mIOService;
-#ifdef USE_SSL
    asio::ssl::context& mSslContext;
-#endif
 
    // Note: these member variables are set at creation time and never changed, thus
    //       they do not require mutex protection
@@ -127,8 +133,18 @@ private:
    // MediaStream that this Flow belongs too
    MediaStream& mMediaStream;
 
+   // Use peer's RTP source IP instead of the peer's SDP connection IP
+   bool mForceCOMedia;
+
+   // Logging handler, if set
+   resip::SharedPtr<RTCPEventLoggingHandler> mRtcpEventLoggingHandler;
+
+   // Flow context from application layer
+   resip::SharedPtr<FlowContext> mFlowContext;
+
    // mTurnSocket has it's own threading protection
    boost::shared_ptr<TurnAsyncSocket> mTurnSocket;
+   bool mPrivatePeer;
 
    // These are only set once, then accessed - thus they do not require mutex protection
    UInt8 mAllocationProps;
@@ -140,17 +156,15 @@ private:
    StunTuple mRelayTuple;
    resip::Data mRemoteSDPFingerprint;
 
-#ifdef USE_SSL
    // Map to store all DtlsSockets - in forking cases there can be more than one
    std::map<reTurn::StunTuple, dtls::DtlsSocket*> mDtlsSockets;
    dtls::DtlsSocket* getDtlsSocket(const reTurn::StunTuple& endpoint);
    dtls::DtlsSocket* createDtlsSocketClient(const StunTuple& endpoint);
    dtls::DtlsSocket* createDtlsSocketServer(const StunTuple& endpoint);
-#endif 
 
    volatile FlowState mFlowState;
    void changeFlowState(FlowState newState);
-   char* flowStateToString(FlowState state);
+   const char* flowStateToString(FlowState state);
 
    class ReceivedData
    {
@@ -178,8 +192,8 @@ private:
    virtual void onSharedSecretSuccess(unsigned int socketDesc, const char* username, unsigned int usernameSize, const char* password, unsigned int passwordSize);
    virtual void onSharedSecretFailure(unsigned int socketDesc, const asio::error_code& e);
 
-   virtual void onBindSuccess(unsigned int socketDesc, const StunTuple& reflexiveTuple);
-   virtual void onBindFailure(unsigned int socketDesc, const asio::error_code& e);
+   virtual void onBindSuccess(unsigned int socketDesc, const StunTuple& reflexiveTuple, const StunTuple& stunServerTuple);
+   virtual void onBindFailure(unsigned int socketDesc, const asio::error_code& e, const StunTuple& stunServerTuple);
 
    virtual void onAllocationSuccess(unsigned int socketDesc, const StunTuple& reflexiveTuple, const StunTuple& relayTuple, unsigned int lifetime, unsigned int bandwidth, UInt64 reservationToken);
    virtual void onAllocationFailure(unsigned int socketDesc, const asio::error_code& e);
@@ -192,12 +206,18 @@ private:
    virtual void onClearActiveDestinationSuccess(unsigned int socketDesc);
    virtual void onClearActiveDestinationFailure(unsigned int socketDesc, const asio::error_code &e);
 
+   virtual void onChannelBindRequestSent(unsigned int socketDesc, unsigned short channelNumber); 
+   virtual void onChannelBindSuccess(unsigned int socketDesc, unsigned short channelNumber);
+   virtual void onChannelBindFailure(unsigned int socketDesc, const asio::error_code& e);
+
    //virtual void onReceiveSuccess(unsigned int socketDesc, const asio::ip::address& address, unsigned short port, const char* buffer, unsigned int size);
    virtual void onReceiveSuccess(unsigned int socketDesc, const asio::ip::address& address, unsigned short port, boost::shared_ptr<DataBuffer>& data);
    virtual void onReceiveFailure(unsigned int socketDesc, const asio::error_code& e);
 
    virtual void onSendSuccess(unsigned int socketDesc);
    virtual void onSendFailure(unsigned int socketDesc, const asio::error_code& e);
+
+   virtual void onIncomingBindRequestProcessed(unsigned int socketDesc, const StunTuple& sourceTuple);
 };
 
 }

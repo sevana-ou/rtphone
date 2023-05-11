@@ -6,7 +6,7 @@
 #include "repro/Proxy.hxx"
 #include "repro/Ack200DoneMessage.hxx"
 #include "repro/UserStore.hxx"
-#include "repro/Dispatcher.hxx"
+#include "resip/stack/Dispatcher.hxx"
 
 #include "resip/stack/TransactionTerminated.hxx"
 #include "resip/stack/ApplicationMessage.hxx"
@@ -14,6 +14,7 @@
 #include "resip/stack/Helper.hxx"
 #include "resip/stack/InteropHelper.hxx"
 #include "rutil/Random.hxx"
+#include "rutil/Lock.hxx"
 #include "rutil/Logger.hxx"
 #include "rutil/Inserter.hxx"
 #include "rutil/WinLeakCheck.hxx"
@@ -81,9 +82,13 @@ Proxy::Proxy(SipStack& stack,
      mConfig(config),
      mRecordRoute(config.getConfigUri("RecordRouteUri", Uri())),
      mRecordRouteForced(config.getConfigBool("ForceRecordRouting", false)),
-     mAssumePath(config.getConfigBool("AssumePath", false)),
      mPAssertedIdentityProcessing(config.getConfigBool("EnablePAssertedIdentityProcessing", false)),
+     mNeverStripProxyAuthorizationHeaders(config.getConfigBool("NeverStripProxyAuthorizationHeaders", false)),
+#ifdef PACKAGE_VERSION
+     mServerText(config.getConfigData("ServerText", "repro " PACKAGE_VERSION)),
+#else
      mServerText(config.getConfigData("ServerText", "")),
+#endif
      mTimerC(config.getConfigInt("TimerC", 180)),
      mKeyValueStore(*Proxy::getGlobalKeyValueStoreKeyAllocator()),
      mRequestProcessorChain(requestP), 
@@ -112,7 +117,6 @@ Proxy::Proxy(SipStack& stack,
    }
 }
 
-
 Proxy::~Proxy()
 {
    shutdown();
@@ -139,13 +143,11 @@ Proxy::isShutDown() const
   return false;
 }
 
-
 UserStore&
 Proxy::getUserStore()
 {
    return mUserStore;
 }
-
 
 void
 Proxy::thread()
@@ -208,7 +210,7 @@ Proxy::thread()
 
                         if(resip::InteropHelper::getOutboundSupported())
                         {
-                           resp->header(h_Supporteds).push_back(Token("outbound"));
+                           resp->header(h_Supporteds).push_back(Token(Symbols::Outbound));
                         }
                         mStack.send(*resp,this);
                         delete sip;
@@ -287,7 +289,7 @@ Proxy::thread()
                   
                   if (sip->method() == CANCEL)
                   {
-                     HashMap<Data,RequestContext*>::iterator i = mServerRequestContexts.find(tid);
+                     RequestContextMap::iterator i = mServerRequestContexts.find(tid);
 
                      if(i == mServerRequestContexts.end())
                      {
@@ -326,8 +328,7 @@ Proxy::thread()
                      }
                      
                      RequestContext* context=0;
-
-                     HashMap<Data,RequestContext*>::iterator i = mServerRequestContexts.find(tid);
+                     RequestContextMap::iterator i = mServerRequestContexts.find(tid);
                      
                      // .bwc. This might be an ACK/200, or a stray ACK/failure
                      if(i == mServerRequestContexts.end())
@@ -407,7 +408,7 @@ Proxy::thread()
                   InfoLog (<< "Looking up RequestContext tid=" << tid);
                
                   // TODO  is there a problem with a stray 200?
-                  HashMap<Data,RequestContext*>::iterator i = mClientRequestContexts.find(tid);
+                  RequestContextMap::iterator i = mClientRequestContexts.find(tid);
                   if (i != mClientRequestContexts.end())
                   {
                      try
@@ -433,7 +434,7 @@ Proxy::thread()
                Data tid(app->getTransactionId());
                tid.lowercase();
                DebugLog(<< "Trying to dispatch : " << *app );
-               HashMap<Data,RequestContext*>::iterator i=mServerRequestContexts.find(tid);
+               RequestContextMap::iterator i = mServerRequestContexts.find(tid);
                // the underlying RequestContext may not exist
                if (i != mServerRequestContexts.end())
                {
@@ -469,7 +470,7 @@ Proxy::thread()
                tid.lowercase();
                if (term->isClientTransaction())
                {
-                  HashMap<Data,RequestContext*>::iterator i=mClientRequestContexts.find(tid);
+                  RequestContextMap::iterator i = mClientRequestContexts.find(tid);
                   if (i != mClientRequestContexts.end())
                   {
                      try
@@ -489,7 +490,7 @@ Proxy::thread()
                }
                else 
                {
-                  HashMap<Data,RequestContext*>::iterator i=mServerRequestContexts.find(tid);
+                  RequestContextMap::iterator i = mServerRequestContexts.find(tid);
                   if (i != mServerRequestContexts.end())
                   {
                      try
@@ -509,6 +510,10 @@ Proxy::thread()
                }
                delete term;
             }
+            else
+            {
+               processUnknownMessage(msg);
+            }
          }
       }
       catch (BaseException& e)
@@ -521,6 +526,13 @@ Proxy::thread()
       }
    }
    InfoLog (<< "Proxy::thread exit");
+}
+
+void
+Proxy::processUnknownMessage(Message* msg)
+{
+   ErrLog(<< "Unknown/unprocessed message passed to proxy fifo (this will leak): " << *msg);
+   resip_assert(false);
 }
 
 void
@@ -553,13 +565,11 @@ Proxy::postTimerC(std::auto_ptr<TimerCMessage> tc)
    }
 }
 
-
 void
 Proxy::postMS(std::auto_ptr<resip::ApplicationMessage> msg, int msec)
 {
    mStack.postMS(*msg,msec,this);
 }
-
 
 const Data& 
 Proxy::name() const
@@ -595,22 +605,38 @@ Proxy::isMyUri(const Uri& uri) const
    return ret;
 }
 
-const resip::NameAddr& 
-Proxy::getRecordRoute(const Transport* transport) const
+void 
+Proxy::addTransportRecordRoute(unsigned int transportKey, const resip::NameAddr& recordRoute)
 {
-   assert(transport);
-   if(transport->hasRecordRoute())
-   {
-      // Transport specific record-route found
-      return transport->getRecordRoute();
-   }
-   return mRecordRoute;
+   Lock lock(mTransportRecordRouteMutex);
+   mTransportRecordRoutes[transportKey] = recordRoute;
 }
 
-bool
-Proxy::getRecordRouteForced() const
+void Proxy::removeTransportRecordRoute(unsigned int transportKey)
 {
-   return mRecordRouteForced;
+   Lock lock(mTransportRecordRouteMutex);
+   mTransportRecordRoutes.erase(transportKey);
+}
+
+const resip::NameAddr& 
+Proxy::getRecordRoute(unsigned int transportKey, bool* transportSpecific) const
+{
+   Lock lock(mTransportRecordRouteMutex);
+   TransportRecordRouteMap::const_iterator it = mTransportRecordRoutes.find(transportKey);
+   if(it != mTransportRecordRoutes.end())
+   {
+      if(transportSpecific)
+      {
+         *transportSpecific = true;
+      }
+      // Transport specific record-route found
+      return it->second;
+   }
+   if (transportSpecific)
+   {
+       *transportSpecific = false;
+   }
+   return mRecordRoute;
 }
 
 bool 
@@ -636,7 +662,7 @@ Proxy::doSessionAccounting(const resip::SipMessage& sip, bool received, RequestC
 {
    if(mSessionAccountingEnabled)
    {
-      assert(mAccountingCollector);
+      resip_assert(mAccountingCollector);
       mAccountingCollector->doSessionAccounting(sip, received, context);
    }
 }
@@ -646,7 +672,7 @@ Proxy::doRegistrationAccounting(AccountingCollector::RegistrationEvent regEvent,
 {
    if(mRegistrationAccountingEnabled)
    {
-      assert(mAccountingCollector);
+      resip_assert(mAccountingCollector);
       mAccountingCollector->doRegistrationAccounting(regEvent, sip);
    }
 }

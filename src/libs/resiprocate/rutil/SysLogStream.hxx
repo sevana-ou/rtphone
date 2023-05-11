@@ -11,6 +11,7 @@ class SysLogStream : private SysLogBuf, public std::ostream
 {
    public:
       SysLogStream();
+      SysLogStream(const Data& ident, int facility = LOG_DAEMON);
       virtual ~SysLogStream();
 
    private:

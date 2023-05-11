@@ -32,18 +32,14 @@ public:
       StunBindDiscovery,
       TurnUdpAllocation,
       TurnTcpAllocation,
-#ifdef USE_SSL
       TurnTlsAllocation
-#endif
    };
 
    enum SecureMediaMode
    {
       NoSecureMedia, // Will accept secure media offers, but will not offer secure media in calls placed
       Srtp,       // SRTP with keying outside of media stream - ie. SDES key negotiation via SDP
-#ifdef USE_SSL
       SrtpDtls    // SRTP with DTLS key negotiation
-#endif
    };
 
    enum SecureMediaCryptoSuite
@@ -196,6 +192,9 @@ public:
    virtual NatTraversalMode& natTraversalMode() { return mNatTraversalMode; }
    virtual const NatTraversalMode natTraversalMode() const { return mNatTraversalMode; }
 
+   virtual bool& forceCOMedia() { return mForceCOMedia; }
+   virtual const bool forceCOMedia() const { return mForceCOMedia; }
+
    /** 
      Get/Set the NAT traversal server hostname that will be used for if natTranversalMode
      is anything other than NoNatTraversal.  The server can be specified as an IP address
@@ -249,6 +248,7 @@ private:
    bool mSecureMediaRequired;
    SecureMediaCryptoSuite mDefaultSecureMediaCryptoSuite;
    NatTraversalMode mNatTraversalMode;
+   bool mForceCOMedia;
    resip::Data mNatTraversalServerHostname;
    unsigned short mNatTraversalServerPort;
    resip::Data mStunUsername;
