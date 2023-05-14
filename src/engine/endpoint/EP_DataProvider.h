@@ -10,7 +10,6 @@
 #include <vector>
 
 #include "resip/stack/SdpContents.hxx"
-#include "rutil/SharedPtr.hxx"
 
 #include "../helper/HL_InternetAddress.h"
 #include "../helper/HL_NetworkSocket.h"

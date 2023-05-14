@@ -37,12 +37,12 @@ ResipSessionAppDialog::~ResipSessionAppDialog()
 
 #pragma region ResipSession
 
-resip::AtomicCounter ResipSession::InstanceCounter;
+std::atomic_int ResipSession::InstanceCounter;
 
 ResipSession::ResipSession(resip::DialogUsageManager& dum) 
     : resip::AppDialogSet(dum), mUserAgent(NULL), mType(Type_None), mSessionId(0), mSession(0)
 {
-    ResipSession::InstanceCounter.increment();
+    ResipSession::InstanceCounter++;
     mTag = NULL;
     mTerminated = false;
     mOnWatchingStartSent = false;
@@ -62,7 +62,7 @@ ResipSession::~ResipSession()
     {
     }
 
-    ResipSession::InstanceCounter.decrement();
+    ResipSession::InstanceCounter--;
 }
 
 resip::AppDialog* ResipSession::createAppDialog(const resip::SipMessage& msg)
@@ -167,12 +167,12 @@ int ResipSession::sessionId()
     return mSessionId;
 }
 
-void ResipSession::setUASProfile(std::shared_ptr<resip::UserProfile> profile)
+void ResipSession::setUASProfile(const std::shared_ptr<resip::UserProfile>& profile)
 {
     mUASProfile = profile;
 }
 
-resip::SharedPtr<resip::UserProfile> ResipSession::selectUASUserProfile(const resip::SipMessage& msg)
+std::shared_ptr<resip::UserProfile> ResipSession::selectUASUserProfile(const resip::SipMessage& msg)
 {
     assert(mUserAgent != nullptr);
 
@@ -184,7 +184,7 @@ resip::SharedPtr<resip::UserProfile> ResipSession::selectUASUserProfile(const re
         else
             return mUserAgent->mProfile;
     }
-    return resip::SharedPtr<resip::UserProfile>();
+    return std::shared_ptr<resip::UserProfile>();
 }
 
 #pragma endregion
@@ -262,11 +262,11 @@ void Session::Stream::setRtcpMuxAttr(bool value)
 #pragma endregion
 
 #pragma region Session
-resip::AtomicCounter Session::InstanceCounter;
+std::atomic_int Session::InstanceCounter;
 
 Session::Session(PAccount account)
 {  
-    InstanceCounter.increment();
+    InstanceCounter++;
     mAccount = account;
     mSessionId = Session::generateId();
     mTag = NULL;
@@ -278,7 +278,7 @@ Session::Session(PAccount account)
     mRole = Acceptor;
     mGatheredCandidates = false;
     mTerminated = false;
-    mRemoteOriginVersion = (UInt64)-1;
+    mRemoteOriginVersion = (uint64_t)-1;
     mResipSession = NULL;
     mRefCount = 1;
     mOfferAnswerCounter = 0;
@@ -296,7 +296,7 @@ Session::~Session()
     }
     catch(...)
     {}
-    InstanceCounter.decrement();
+    InstanceCounter--;
 }
 
 void Session::start(const std::string& peer)
@@ -829,10 +829,10 @@ int Session::sessionId()
     return mSessionId;
 }
 
-resip::AtomicCounter Session::IdGenerator;
+std::atomic_int Session::IdGenerator;
 int Session::generateId()
 {
-    return (int)IdGenerator.increment();
+    return ++IdGenerator;
 }
 
 std::string Session::remoteAddress() const
@@ -914,7 +914,7 @@ void Session::refreshMediaPath()
 }
 
 // Received offer with new SDP
-int Session::processSdp(UInt64 version, bool iceAvailable, std::string icePwd, std::string iceUfrag,
+int Session::processSdp(uint64_t version, bool iceAvailable, std::string icePwd, std::string iceUfrag,
                         std::string remoteIp, const resip::SdpContents::Session::MediumContainer& media)
 {
     bool iceRestart = false;

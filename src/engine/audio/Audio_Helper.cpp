@@ -102,6 +102,7 @@ unsigned TimeSource::time()
 #if defined(TARGET_ANDROID)
   assert(0);
 #endif
+  return 0;
 }
 
 // --- StubTimer ---

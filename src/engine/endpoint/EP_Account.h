@@ -65,7 +65,7 @@ public:
   void setup(VariantMap& config);
 
   /* Returns corresponding resiprocate profile */
-  resip::SharedPtr<resip::UserProfile> getUserProfile() const { return mProfile; }
+  std::shared_ptr<resip::UserProfile> getUserProfile() const { return mProfile; }
 
   typedef std::map<std::string, std::string> UserInfo;
   void setUserInfo(const UserInfo& info);
@@ -83,7 +83,7 @@ protected:
   RegistrationState mRegistrationState;
 
   ice::NetworkAddress mExternalAddress;
-  resip::SharedPtr<resip::UserProfile> mProfile;
+  std::shared_ptr<resip::UserProfile> mProfile;
   UserAgent& mAgent;
   bool mPresenceOnline;
   std::string mPresenceContent;

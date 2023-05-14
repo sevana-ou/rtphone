@@ -365,8 +365,9 @@ void AndroidInputDevice::DeviceCallback(SLAndroidSimpleBufferQueueItf bq, void *
 // ------------ AndroidOutputDevice -----------------
 AndroidOutputDevice::AndroidOutputDevice(int devId)
 {
-  ICELogDebug(<< "Creating AndroidOutputDevice. This is: " << StringHelper::toHex(this));
+  ICELogDebug(<< "Creating AndroidOutputDevice. This is: " << strx::toHex(this));
 }
+
 AndroidOutputDevice::~AndroidOutputDevice()
 {
   ICELogDebug(<< "Deleting AndroidOutputDevice.");

@@ -213,7 +213,8 @@ public:
   void refreshMediaPath();
 
   // Processes new sdp from offer. Returns response code (200 is ok, 488 bad codec, 503 internal error).
-  int processSdp(UInt64 version, bool iceAvailable, std::string icePwd, std::string iceUfrag,
+  // There are passing string objects by value; this is correct; this values will modified on the stack.
+  int processSdp(uint64_t version, bool iceAvailable, std::string icePwd, const std::string iceUfrag,
     std::string remoteIp, const resip::SdpContents::Session::MediumContainer& media);
 
   // Session ID
@@ -223,7 +224,7 @@ public:
   std::vector<Stream>  mStreamList;
 
   // Smart pointer to ICE stack. Actually stack is created in CreateICEStack() method
-  resip::SharedPtr<ice::Stack>    mIceStack;
+  std::shared_ptr<ice::Stack>    mIceStack;
 
   // Pointer to owner user agent instance
   UserAgent*           mUserAgent;
@@ -236,7 +237,7 @@ public:
 
   // SDP's origin version for sending
   int                  mOriginVersion;
-  UInt64               mRemoteOriginVersion;
+  uint64_t             mRemoteOriginVersion;
 
   // SDP's session version
   int                  mSessionVersion;
@@ -359,7 +360,7 @@ public:
   ResipSession(resip::DialogUsageManager& dum);
   virtual ~ResipSession();
   virtual resip::AppDialog* createAppDialog(const resip::SipMessage& msg);
-  virtual resip::SharedPtr<resip::UserProfile> selectUASUserProfile(const resip::SipMessage& msg);
+  virtual std::shared_ptr<resip::UserProfile> selectUASUserProfile(const resip::SipMessage& msg);
   
   void setType(Type type);
   Type type();
@@ -383,7 +384,7 @@ public:
 
   void runTerminatedEvent(Type type, int code = 0, int reason = 0);
 
-  void setUASProfile(std::shared_ptr<resip::UserProfile> profile);
+  void setUASProfile(const std::shared_ptr<resip::UserProfile>& profile);
 
 protected:
   bool mTerminated;

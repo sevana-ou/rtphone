@@ -8,7 +8,7 @@ cmake -DCMAKE_TOOLCHAIN_FILE=$ANDROID_NDK_HOME/build/cmake/android.toolchain.cma
       -DANDROID_NDK=$ANDROID_NDK_HOME                                                   \
       -DANDROID_PLATFORM=24                                                             \
       -DCMAKE_BUILD_TYPE=Release                                                        \
-      -DANDROID_ABI="armeabi-v7a"                                                       \
+      -DANDROID_ABI="arm64-v8a"                                                       \
       ../src
 
 cmake --build . -j8

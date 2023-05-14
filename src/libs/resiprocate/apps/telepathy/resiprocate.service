@@ -1,3 +1,0 @@
-[D-BUS Service]
-Name=org.freedesktop.Telepathy.ConnectionManager.resiprocate
-Exec=/home/daniel/ws/resiprocate/resip-github/apps/telepathy/telepathy-resiprocate

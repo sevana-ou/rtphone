@@ -10,8 +10,8 @@ set (SPEEXDSP_SOURCES
     libspeexdsp/buffer.c
     libspeexdsp/fftwrap.c
     libspeexdsp/filterbank.c
-#   libspeexdsp/kiss_fft.c
-#   libspeexdsp/kiss_fftr.c
+   libspeexdsp/kiss_fft.c
+   libspeexdsp/kiss_fftr.c
     libspeexdsp/mdf.c
     libspeexdsp/scal.c
     libspeexdsp/smallft.c

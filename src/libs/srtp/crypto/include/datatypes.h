@@ -403,6 +403,10 @@ static inline uint32_t be32_to_cpu(uint32_t v) {
 # else /* HAVE_X86 */
 #  ifdef HAVE_NETINET_IN_H
 #   include <netinet/in.h>
+#   include <arpa/inet.h>
+#   if defined(TARGET_ANDROID)
+#     include <sys/endian.h>
+#   endif
 #  elif defined HAVE_WINSOCK2_H
 #   include <winsock2.h>
 #  endif

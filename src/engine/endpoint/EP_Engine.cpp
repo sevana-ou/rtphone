@@ -54,7 +54,7 @@ UserAgent::UserAgent()
   mConfig[CONFIG_RTCP_ATTR] = true;
 
   // Create master profile
-  mProfile = resip::SharedPtr<resip::MasterProfile>(new resip::MasterProfile());
+  mProfile = std::make_shared<resip::MasterProfile>();
   mProfile->clearSupportedMethods();
   mProfile->addSupportedMethod(resip::INVITE);
   mProfile->addSupportedMethod(resip::BYE);
@@ -146,8 +146,8 @@ void UserAgent::start()
   mTransportList.clear();
   resip::InternalTransport* t;
 
-#define ADD_TRANSPORT4(X) if ((t = dynamic_cast<resip::InternalTransport*>(mStack->addTransport(X, 0, resip::V4)))) { t->setTransportLogger(this); mTransportList.push_back(t);}
-#define ADD_TRANSPORT6(X) if ((t = dynamic_cast<resip::InternalTransport*>(mStack->addTransport(X, 0, resip::V6)))) { t->setTransportLogger(this); mTransportList.push_back(t);}
+#define ADD_TRANSPORT4(X) if ((t = dynamic_cast<resip::InternalTransport*>(mStack->addTransport(X, 0, resip::V4)))) { /*t->setTransportLogger(this);*/ mTransportList.push_back(t);}
+#define ADD_TRANSPORT6(X) if ((t = dynamic_cast<resip::InternalTransport*>(mStack->addTransport(X, 0, resip::V6)))) { /*t->setTransportLogger(this);*/ mTransportList.push_back(t);}
 
   switch (mConfig[CONFIG_TRANSPORT].asInt())
   {
@@ -315,7 +315,10 @@ void UserAgent::stop()
   mTransportList.clear();
 
   // Dump statistics here
-  ICELogInfo(<< "Remaining " << Session::InstanceCounter.value() << " session(s), " << ResipSession::InstanceCounter.value() << " resip DialogSet(s), " << resip::ClientRegistration::InstanceCounter.value() << " ClientRegistration(s)");
+  ICELogInfo(<< "Remaining "
+             << Session::InstanceCounter << " session(s), "
+             << ResipSession::InstanceCounter << " resip DialogSet(s), "
+             << resip::ClientRegistration::InstanceCounter << " ClientRegistration(s)");
 
   mDum->shutdown(this);
   onDumCanBeDeleted();
@@ -585,7 +588,7 @@ void UserAgent::sendOffer(Session* session)
   if (session->mOriginVersion == 1)
   {
     // Construct INVITE session
-    resip::SharedPtr<resip::SipMessage> msg = mDum->makeInviteSession(session->mRemotePeer, session->account()->mProfile, &sdp, session->mResipSession);
+    auto msg = mDum->makeInviteSession(session->mRemotePeer, session->account()->mProfile, &sdp, session->mResipSession);
 
     // Include user headers
     for (Session::UserHeaders::const_iterator iter = session->mUserHeaders.begin(); iter != session->mUserHeaders.end(); iter++)
@@ -655,8 +658,14 @@ void UserAgent::onFailure(resip::ClientRegistrationHandle h, const resip::SipMes
 
 #pragma endregion
 
-bool UserAgent::operator()(resip::Log::Level level, const resip::Subsystem& subsystem, const resip::Data& appName, const char* file, 
-      int line, const resip::Data& message, const resip::Data& messageWithHeaders)
+bool UserAgent::operator()(resip::Log::Level level,
+                           const resip::Subsystem& subsystem,
+                           const resip::Data& appName,
+                           const char* file,
+                           int line,
+                           const resip::Data& message,
+                           const resip::Data& messageWithHeaders,
+                           const resip::Data& instanceName)
 {
   std::string filename = file;
   std::stringstream ss;
@@ -990,7 +999,7 @@ void UserAgent::onAnswer(resip::InviteSessionHandle h, const resip::SipMessage& 
       s->mIceStack->clear();
   }
 
-  UInt64 version = sdp.session().origin().getVersion();
+  uint64_t version = sdp.session().origin().getVersion();
   s->mRemoteOriginVersion = version;
 }
 
@@ -1017,10 +1026,10 @@ void UserAgent::onOffer(resip::InviteSessionHandle h, const resip::SipMessage& m
 
   ice::Stack& ice = *s->mIceStack;
 
-  UInt64 version = sdp.session().origin().getVersion();
+  uint64_t version = sdp.session().origin().getVersion();
   std::string remoteIp = sdp.session().connection().getAddress().c_str();
   int code;
-  if ((UInt64)-1 == s->mRemoteOriginVersion)
+  if ((uint64_t)-1 == s->mRemoteOriginVersion)
   {
     code = s->processSdp(version, iceAvailable, icePwd, iceUfrag, remoteIp, sdp.session().media());
   }
@@ -1564,7 +1573,7 @@ void UserAgent::onSipMessage(int flow, const char* msg, unsigned int length, con
   ice::NetworkAddress address(*addr, addrlen);
   std::string addressText = address.toStdString();
 
-  switch (flow)
+  /*switch (flow)
   {
   case resip::InternalTransport::TransportLogger::Flow_Received:
     ICELogDebug(<< "Received from " << addressText << ":" << "\n"
@@ -1574,7 +1583,7 @@ void UserAgent::onSipMessage(int flow, const char* msg, unsigned int length, con
   case resip::InternalTransport::TransportLogger::Flow_Sent:
     ICELogDebug(<< "Sent to " << addressText << "\n" << strx::prefixLines(d, "<---"));
     break;
-  }
+  }*/
 }
 
 PSession UserAgent::getUserSession(int sessionId)

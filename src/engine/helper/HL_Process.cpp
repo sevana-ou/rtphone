@@ -311,6 +311,8 @@ std::shared_ptr<std::thread> OsProcess::asyncExecCommand(const std::string& cmdl
     return t;
 }
 
+#if defined(TARGET_OSX) || defined(TARGET_LINUX)
+
 pid_t OsProcess::findPid(const std::string& cmdline)
 {
     try
@@ -332,5 +334,6 @@ void OsProcess::killByPid(pid_t pid)
         return;
     execSystem("kill -9 " + std::to_string(pid) + " &");
 }
+#endif
 
 #endif

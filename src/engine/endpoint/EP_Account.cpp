@@ -156,7 +156,7 @@ Account::Account(PVariantMap config, UserAgent& agent)
   :mAgent(agent), mId(0), mConfig(config), mRegistrationState(RegistrationState::None),
     mRegistration(NULL)
 {
-  mProfile = resip::SharedPtr<resip::UserProfile>(new resip::UserProfile(agent.mProfile));
+  mProfile = std::make_shared<resip::UserProfile>(agent.mProfile);
   mId = Account::generateId();
   setup(*config);
 }
@@ -201,7 +201,7 @@ void Account::setup(VariantMap &config)
   }
 
   // NAT decorator
-  mProfile->setOutboundDecorator(resip::SharedPtr<resip::MessageDecorator>(new NATDecorator(mAgent)));
+  mProfile->setOutboundDecorator(std::make_shared<NATDecorator>(mAgent));
 
   // Rinstance
   if (config.exists(CONFIG_INSTANCE_ID))
@@ -266,7 +266,7 @@ void Account::start()
 
   // Create registration
   mRegistration = new ResipSession(*mAgent.mDum);
-  resip::SharedPtr<resip::SipMessage> regmessage = mAgent.mDum->makeRegistration(mProfile->getDefaultFrom(), mProfile, mConfig->at(CONFIG_REGISTERDURATION).asInt(), mRegistration);
+  auto regmessage = mAgent.mDum->makeRegistration(mProfile->getDefaultFrom(), mProfile, mConfig->at(CONFIG_REGISTERDURATION).asInt(), mRegistration);
 
   for (UserInfo::const_iterator iter = mUserInfo.begin(); iter != mUserInfo.end(); iter++)
     regmessage->header(resip::ExtensionHeader(iter->first.c_str())).push_back(resip::StringCategory(iter->second.c_str()));
@@ -380,7 +380,7 @@ PClientObserver Account::observe(const std::string& target, const std::string& p
   observer->mSessionId = observer->mSession->sessionId();
   observer->mPeer = target;
 
-  resip::SharedPtr<resip::SipMessage> msg;
+  std::shared_ptr<resip::SipMessage> msg;
   int expires = DEFAULT_SUBSCRIPTION_TIME, refresh = DEFAULT_SUBSCRIPTION_REFRESHTIME;
   if (mConfig->exists(CONFIG_SUBSCRIPTION_TIME))
     expires = CONFIG(CONFIG_SUBSCRIPTION_TIME).asInt();
@@ -498,7 +498,7 @@ void Account::prepareIceStack(Session *session, ice::AgentRole icerole)
   //config.mDetectNetworkChange = true;
   //config.mNetworkCheckInterval = 5000;
 
-  session->mIceStack = resip::SharedPtr<ice::Stack>(ice::Stack::makeICEBox(config));
+  session->mIceStack = std::shared_ptr<ice::Stack>(ice::Stack::makeICEBox(config));
   session->mIceStack->setEventHandler(session, this);
   session->mIceStack->setRole(icerole);
 }
@@ -552,9 +552,8 @@ void Account::onSuccess(resip::ClientRegistrationHandle h, const resip::SipMessa
       mAgent.mDum->addDomain(resip::Data(mExternalAddress.ip()));
   }
 
-  const resip::Transport* transport = response.getReceivedTransport();
-  mUsedTransport = transport->transport();
-  bool streamTransport = transport->transport() == resip::TCP || transport->transport() == resip::TLS;
+  mUsedTransport = response.getReceivedTransportTuple().getType();
+  bool streamTransport = mUsedTransport == resip::TCP || mUsedTransport == resip::TLS;
 
   // Retry registration for stream based transport too
   if  ( (hostChanged || portChanged) && mRegistrationState == RegistrationState::Registering /*&& !streamTransport*/ && mConfig->at(CONFIG_EXTERNALIP).asBool())
@@ -596,7 +595,7 @@ void Account::onRemoved(resip::ClientRegistrationHandle h, const resip::SipMessa
       //mProfile->setDefaultFrom(from);
     }
     mProfile->setRegId(mConfig->at(CONFIG_REGID).asInt());
-    resip::SharedPtr<resip::SipMessage> regmessage = mAgent.mDum->makeRegistration(mProfile->getDefaultFrom(), mProfile, UA_REGISTRATION_TIME);
+    auto regmessage = mAgent.mDum->makeRegistration(mProfile->getDefaultFrom(), mProfile, UA_REGISTRATION_TIME);
     for (UserInfo::const_iterator iter = mUserInfo.begin(); iter != mUserInfo.end(); iter++)
       regmessage->header(resip::ExtensionHeader(iter->first.c_str())).push_back(resip::StringCategory(iter->second.c_str()));
 
@@ -740,8 +739,8 @@ Account::UserInfo Account::getUserInfo() const
   return mUserInfo;
 }
 
-resip::AtomicCounter Account::IdGenerator;
+std::atomic_int Account::IdGenerator;
 int Account::generateId()
 {
-  return IdGenerator.increment();
+  return ++IdGenerator;
 }

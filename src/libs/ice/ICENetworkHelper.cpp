@@ -17,13 +17,20 @@
 # if defined(WINDOWS_RT)
 #   include "ICEWinRtSupport.h"
 # endif
-#else
-#if defined(TARGET_IOS)
+#elif defined(TARGET_IOS)
 # include "ICEIosSupport.h"
-#endif
+#else
 # include <unistd.h>
-# if defined(TARGET_ANDROID)/* || defined(TARGET_LINUX) */
+# if defined(TARGET_ANDROID) || defined(TARGET_LINUX)
+#  include <linux/if.h>
 #  include <linux/in6.h>
+#  if defined(TARGET_ANDROID)
+#    if __ANDROID_API__ < 24
+#      include "android-ifaddrs/android-ifaddrs.h"
+#    else
+#      include <ifaddrs.h>
+#    endif
+#  endif
 # endif
 #endif
 

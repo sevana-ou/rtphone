@@ -18,6 +18,7 @@ set (AUDIOLIB_SOURCES
     Audio_Null.cpp
     Audio_CoreAudio.cpp
     Audio_DirectSound.cpp
+    Audio_Android.cpp
     Audio_WavFile.cpp
 )
 

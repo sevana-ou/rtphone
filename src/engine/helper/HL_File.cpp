@@ -1,7 +1,7 @@
 #include "HL_File.h"
 #include <fstream>
 
-#if defined(TARGET_LINUX) || defined(TARGET_OSX)
+#if defined(TARGET_LINUX) || defined(TARGET_OSX) || defined(TARGET_ANDROID)
 # include <unistd.h>
 # include <sys/statvfs.h>
 # include <memory.h>
@@ -34,7 +34,7 @@ void FileHelper::remove(const char* s)
 
 std::string FileHelper::gettempname()
 {
-#if defined(TARGET_LINUX)
+#if defined(TARGET_LINUX) || defined(TARGET_ANDROID)
     char template_filename[L_tmpnam] = "rtphone_XXXXXXX.tmp";
     mkstemp(template_filename);
     return template_filename;
@@ -64,7 +64,7 @@ std::string FileHelper::getCurrentDir()
     return std::string();
 #endif
 
-#if defined(TARGET_LINUX) || defined(TARGET_OSX)
+#if defined(TARGET_LINUX) || defined(TARGET_OSX) || defined(TARGET_ANDROID)
     char buf[512];
     if (getcwd(buf, sizeof buf) != nullptr)
         return buf;

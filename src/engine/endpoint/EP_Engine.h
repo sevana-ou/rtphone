@@ -378,12 +378,13 @@ public:
 #pragma region ExternalLogger implementation
    /** return true to also do default logging, false to suppress default logging. */
   virtual bool operator()(resip::Log::Level level,
-    const resip::Subsystem& subsystem, 
-    const resip::Data& appName,
-      const char* file,
-      int line,
-      const resip::Data& message,
-      const resip::Data& messageWithHeaders) override;
+                          const resip::Subsystem& subsystem,
+                          const resip::Data& appName,
+                          const char* file,
+                          int line,
+                          const resip::Data& message,
+                          const resip::Data& messageWithHeaders,
+                          const resip::Data& instanceName) override;
 #pragma endregion
 
 #pragma region DnsResultSink implementation
@@ -437,7 +438,7 @@ public:
 
 #pragma region PagerHandler
   void onSuccess(resip::ClientPagerMessageHandle, const resip::SipMessage& status) override;
-  void onFailure(resip::ClientPagerMessageHandle, const resip::SipMessage& status, std::unique_ptr<resip::Contents> contents);
+  void onFailure(resip::ClientPagerMessageHandle, const resip::SipMessage& status, std::unique_ptr<resip::Contents> contents) override;
   void onMessageArrived(resip::ServerPagerMessageHandle, const resip::SipMessage& message) override;
 #pragma endregion
 
@@ -447,7 +448,7 @@ protected:
   Mutex mGuard;
 
   // Smart pointer to resiprocate's master profile instance. The stack configuration holds here.
-  resip::SharedPtr<resip::MasterProfile> mProfile;
+  std::shared_ptr<resip::MasterProfile> mProfile;
   
   // Resiprocate's SIP stack object pointer
   resip::SipStack* mStack;

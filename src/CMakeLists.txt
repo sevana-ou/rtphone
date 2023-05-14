@@ -50,8 +50,8 @@ macro(configure_msvc_runtime)
 endmacro()
 
 
-# Rely on C++ 11
-set (CMAKE_CXX_STANDARD 11)
+# Rely on C++ 17
+set (CMAKE_CXX_STANDARD 17)
 set (CMAKE_CXX_STANDARD_REQUIRED ON)
 
 set (rtphone_libs libs)
@@ -70,7 +70,7 @@ if (NOT DEFINED LIB_PLATFORM)
 endif()
 
 message("Libraries: ${LIB_PLATFORM}")
-set (OPENSSL_INCLUDE ${LIB_PLATFORM}/openssl/1.0/include)
+set (OPENSSL_INCLUDE ${LIB_PLATFORM}/openssl/1.1/include)
 message ("Using OpenSSL include files from ${OPENSSL_INCLUDE}")
 
 if (CMAKE_SYSTEM MATCHES "Windows*")
@@ -78,7 +78,7 @@ if (CMAKE_SYSTEM MATCHES "Windows*")
 endif()
 
 if (CMAKE_SYSTEM MATCHES "Linux*")
-    add_definitions (-DTARGET_LINUX)
+    add_definitions (-DTARGET_LINUX -DHAVE_NETINET_IN_H)
 endif()
 
 
@@ -91,6 +91,7 @@ if (CMAKE_SYSTEM MATCHES "Android")
     set (OBOE_DIR libs/oboe)
     add_subdirectory (${OBOE_DIR} ./oboe)
     include_directories (${OBOE_DIR}/include)
+    add_definitions(-DTARGET_ANDROID -DHAVE_NETINET_IN_H)
 endif()
 
 if (USE_MUSL)
@@ -184,13 +185,12 @@ add_subdirectory(${rtphone_engine}/audio)
 add_subdirectory(${rtphone_engine}/media)
 
 set (LIBS ice_stack jrtplib g729_codec gsm_codec
-    gsmhr_codec g722_codec srtp resiprocate helper_lib audio_lib webrtc speexdsp
-    uuid)
+    gsmhr_codec g722_codec srtp resiprocate helper_lib audio_lib webrtc speexdsp)
 
 if (CMAKE_SYSTEM MATCHES "Win*")
     set (LIBS ${LIBS} )
 else ()
-    set (LIBS ${LIBS} dl uuid)
+    set (LIBS ${LIBS} dl)
 endif ()
 
 if (CMAKE_SYSTEM MATCHES "Android")
@@ -199,13 +199,6 @@ endif()
 
 
 target_link_libraries(rtphone
-    ice_stack jrtplib g729_codec gsm_codec
-    gsmhr_codec g722_codec srtp resiprocate
-    helper_lib
-    audio_lib
-    webrtc
-    speexdsp
-    uuid
     ${OPENSSL_SSL}
     ${OPENSSL_CRYPTO}
     ${LIBS} )

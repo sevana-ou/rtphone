@@ -85,7 +85,7 @@ void WatcherQueue::process()
     if (i == mItemList.end())
       return;
     
-    resip::SharedPtr<resip::SipMessage> msg;
+    std::shared_ptr<resip::SipMessage> msg;
     int expires = DEFAULT_SUBSCRIPTION_TIME, refresh = DEFAULT_SUBSCRIPTION_REFRESHTIME;
 
     switch (i->mState)
