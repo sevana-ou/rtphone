@@ -73,6 +73,9 @@ message("Libraries: ${LIB_PLATFORM}")
 set (OPENSSL_INCLUDE ${LIB_PLATFORM}/openssl/1.1/include)
 message ("Using OpenSSL include files from ${OPENSSL_INCLUDE}")
 
+add_definitions(-DUSE_OPENSSL)
+include_directories(${OPENSSL_INCLUDE})
+
 if (CMAKE_SYSTEM MATCHES "Windows*")
     add_definitions (-DTARGET_WIN -D_SILENCE_STDEXT_HASH_DEPRECATION_WARNINGS -D_UNICODE -D_CRT_SECURE_NO_WARNINGS)
 endif()
@@ -199,9 +202,10 @@ endif()
 
 
 target_link_libraries(rtphone
+    ${LIBS}
     ${OPENSSL_SSL}
     ${OPENSSL_CRYPTO}
-    ${LIBS} )
+     )
 
 
 target_include_directories(rtphone

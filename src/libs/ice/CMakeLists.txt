@@ -1,7 +1,7 @@
 project (ice_stack)
 
-# Rely on C++ 11
-set (CMAKE_CXX_STANDARD 11)
+# Rely on C++ 17
+set (CMAKE_CXX_STANDARD 17)
 set (CMAKE_CXX_STANDARD_REQUIRED ON)
 
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
@@ -33,6 +33,10 @@ set (ICE_STACK_SOURCES ICEAddress.cpp
     ICESync.cpp
     ICETime.cpp
     ICETransactionList.cpp)
+
+if (ANDROID_ABI)
+    set (ICE_STACK_SOURCES ${ICE_STACK_SOURCES} android-ifaddrs/android-ifaddrs.h android-ifaddrs/android-ifaddrs.c)
+endif()
 
 if (TARGET_MUSL)
     add_definitions(-DTARGET_MUSL)
