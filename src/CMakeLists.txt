@@ -68,11 +68,12 @@ set (CMAKE_POSITION_INDEPENDENT_CODE ON)
 if (NOT DEFINED LIB_PLATFORM)
     set (LIB_PLATFORM ${CMAKE_CURRENT_SOURCE_DIR}/../../libraries)
 endif()
+include (${LIB_PLATFORM}/platform_libs.cmake)
 
 message("Libraries: ${LIB_PLATFORM}")
 set (OPENSSL_INCLUDE ${LIB_PLATFORM}/openssl/1.1/include)
 message ("Using OpenSSL include files from ${OPENSSL_INCLUDE}")
-
+message ("Using OpenSSL libs: ${OPENSSL_SSL} and ${OPENSSL_CRYPTO}")
 add_definitions(-DUSE_OPENSSL)
 include_directories(${OPENSSL_INCLUDE})
 
