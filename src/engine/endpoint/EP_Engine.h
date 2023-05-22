@@ -162,9 +162,9 @@ class UserAgent:  public resip::ClientRegistrationHandler,
   friend class WatcherQueue;
 public:
   /* Compares two sip addresses. Returns true if they represent the same entity - user and domain are the same. Otherwise returns false. */
-  static bool compareSipAddresses(std::string sip1, std::string sip2);
-  static std::string formatSipAddress(std::string sip);
-  static bool isSipAddressValid(std::string sip);
+  static bool compareSipAddresses(const std::string& sip1, const std::string& sip2);
+  static std::string formatSipAddress(const std::string& sip);
+  static bool isSipAddressValid(const std::string& sip);
   struct SipAddress
   {
     bool mValid;

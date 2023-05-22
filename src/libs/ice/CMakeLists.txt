@@ -34,9 +34,10 @@ set (ICE_STACK_SOURCES ICEAddress.cpp
     ICETime.cpp
     ICETransactionList.cpp)
 
-if (ANDROID_ABI)
-    set (ICE_STACK_SOURCES ${ICE_STACK_SOURCES} android-ifaddrs/android-ifaddrs.h android-ifaddrs/android-ifaddrs.c)
-endif()
+
+#if (ANDROID_ABI)
+#    set (ICE_STACK_SOURCES ${ICE_STACK_SOURCES} android-ifaddrs/android-ifaddrs.h android-ifaddrs/android-ifaddrs.c)
+#endif()
 
 if (TARGET_MUSL)
     add_definitions(-DTARGET_MUSL)

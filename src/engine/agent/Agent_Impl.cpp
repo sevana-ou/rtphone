@@ -629,18 +629,16 @@ void AgentImpl::processAddRootCert(JsonCpp::Value& request, JsonCpp::Value& answ
     std::string pem = request["cert"].asString();
 
     std::string::size_type pb = 0, pe = 0;
+    while (pb != std::string::npos && pe != std::string::npos) {
+        pb = pem.find(BeginCertificate, pb);
+        pe = pem.find(EndCertificate, pe);
 
-    for(pb = pem.find(BeginCertificate, pb), pe = pem.find(EndCertificate, pe);
-        pb != std::string::npos && pe != std::string::npos;
-        pb = pem.find(BeginCertificate, pb + BeginCertificate.size()), pe = pem.find(EndCertificate, pe + EndCertificate.size()))
-    {
-        // Get single certificate
-        std::string cert = pem.substr(pb, pe + EndCertificate.size());
-        //int size = cert.size();
-        addRootCert(ByteBuffer(cert.c_str(), cert.size()));
+        if (pb != std::string::npos && pe != std::string::npos && pe > pb) {
+            std::string cert = pem.substr(pb, pe - pb + EndCertificate.size());
+            addRootCert(ByteBuffer(cert.c_str(), cert.size()));
 
-        // Delete processed part
-        pem.erase(0, pe + EndCertificate.size());
+            pb = ++pe;
+        }
     }
 
     answer["status"] = Status_Ok;

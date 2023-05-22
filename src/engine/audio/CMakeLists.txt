@@ -8,18 +8,31 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 set (AUDIOLIB_SOURCES
     Audio_Resampler.cpp
+    Audio_Resampler.h
     Audio_Quality.cpp
+    Audio_Quality.h
     Audio_Mixer.cpp
+    Audio_Mixer.h
     Audio_Interface.cpp
+    Audio_Interface.h
     Audio_Helper.cpp
+    Audio_Helper.h
     Audio_DataWindow.cpp
+    Audio_DataWindow.h
     Audio_DevicePair.cpp
+    Audio_DevicePair.h
     Audio_Player.cpp
+    Audio_Player.h
     Audio_Null.cpp
+    Audio_Null.h
     Audio_CoreAudio.cpp
+    Audio_CoreAudio.h
     Audio_DirectSound.cpp
-    Audio_Android.cpp
+    Audio_DirectSound.h
+    Audio_AndroidOboe.cpp
+    Audio_AndroidOboe.h
     Audio_WavFile.cpp
+    Audio_WavFile.h
 )
 
 add_library(audio_lib ${AUDIOLIB_SOURCES})

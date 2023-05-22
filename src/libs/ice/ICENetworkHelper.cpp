@@ -26,7 +26,7 @@
 #  include <linux/in6.h>
 #  if defined(TARGET_ANDROID)
 #    if __ANDROID_API__ < 24
-#      include "android-ifaddrs/android-ifaddrs.h"
+#      error not supported for ANDROID_API < 24
 #    else
 #      include <ifaddrs.h>
 #    endif
@@ -161,6 +161,7 @@ void NetworkHelper::reload(int networkType)
   fillUwpInterfaceList(AF_INET, networkType, mIPList);
   fillUwpInterfaceList(AF_INET6, networkType, mIPList);
 #else
+  // https://github.com/golang/go/issues/40569
   struct ifaddrs* il = NULL;
   if (getifaddrs(&il))
     throw Exception(GETIFADDRS_FAILED, errno);

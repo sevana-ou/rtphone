@@ -44,6 +44,60 @@
 typedef resip::SdpContents::Session::Medium Medium;
 typedef resip::SdpContents::Session::MediumContainer MediumContainer;
 
+class TransportLogger: public resip::Transport::SipMessageLoggingHandler
+{
+public:
+    void outboundMessage(const resip::Tuple &source, const resip::Tuple &destination, const resip::SipMessage &msg) override
+    {
+      std::ostringstream dest_buffer; dest_buffer << destination;
+      std::ostringstream msg_buffer; msg_buffer << msg;
+      std::string msg_text = msg_buffer.str();
+#if defined(TARGET_ANDROID)
+      if (msg_text.size() > 512)
+      {
+        ICELogDebug(<< "Sent to " << dest_buffer.str() << " :");
+        msg_text = strx::prefixLines(msg_text, "<---");
+
+        auto lines = strx::split(msg_text);
+        for (const auto& l: lines)
+            ICELogDebug(<< l);
+      }
+      else
+        ICELogDebug(<< "Sent to " << dest_buffer.str() << "\n" << strx::prefixLines(msg_text, "<---"));
+#else
+      ICELogDebug(<< "Sent to " << dest_buffer.str() << "\n" << strx::prefixLines(msg_text, "<---"));
+#endif
+    }
+
+    // Note:  retransmissions store already encoded messages, so callback doesn't send SipMessage it sends
+    //        the encoded version of the SipMessage instead.  If you need a SipMessage you will need to
+    //        re-parse back into a SipMessage in the callback handler.
+    void outboundRetransmit(const resip::Tuple &source, const resip::Tuple &destination, const resip::SendData &data) override
+    {}
+
+    void inboundMessage(const resip::Tuple& source, const resip::Tuple& destination, const resip::SipMessage &msg) override
+    {
+      std::ostringstream source_buffer; source_buffer << source;
+      std::ostringstream msg_buffer; msg_buffer << msg;
+      std::string msg_text = msg_buffer.str();
+#if defined(TARGET_ANDROID)
+      if (msg_text.size() > 512)
+      {
+        ICELogDebug(<< "Received from " << source_buffer.str() << " :");
+        msg_text = strx::prefixLines(msg_text, "--->");
+        auto lines = strx::split(msg_text);
+        for (const auto& l: lines)
+            ICELogDebug(<< l);
+        }
+        else
+            ICELogDebug(<< "Received from " << source_buffer.str() << "\n" << strx::prefixLines(msg_text, "<---"));
+#else
+        ICELogDebug(<< "Received from " << source_buffer.str() << "\n" << strx::prefixLines(msg_buffer.str(), "--->"));
+#endif
+    }
+
+};
+
 //-------------- UserAgent -----------------------
 UserAgent::UserAgent()
 {
@@ -93,7 +147,7 @@ void UserAgent::start()
   }
   
   // Initialize resip loggег
-  resip::Log::initialize(resip::Log::OnlyExternal, resip::Log::Debug, "Client", *this);
+  resip::Log::initialize(resip::Log::OnlyExternal, resip::Log::Info, "Client", *this);
 
   // Build list of nameservers if specified
   resip::DnsStub::NameserverList nslist;
@@ -141,6 +195,8 @@ void UserAgent::start()
       ICELogError(<< "Failed to preload root certificate");
     }
   }
+
+  mStack->setTransportSipMessageLoggingHandler(std::make_shared<TransportLogger>());
 
   // Add transports
   mTransportList.clear();
@@ -262,16 +318,16 @@ void UserAgent::shutdown()
 
   {
     LOCK;
-    for (auto observerIter: mClientObserverMap)
+    for (auto& observerIter: mClientObserverMap)
       observerIter.second->stop();
 
-    for (auto observerIter: mServerObserverMap)
+    for (auto& observerIter: mServerObserverMap)
       observerIter.second->stop();
 
-    for (auto sessionIter: mSessionMap)
+    for (auto& sessionIter: mSessionMap)
       sessionIter.second->stop();
 
-    for (auto accountIter: mAccountSet)
+    for (auto& accountIter: mAccountSet)
       accountIter->stop();
   }
 }
@@ -279,24 +335,24 @@ void UserAgent::shutdown()
 bool UserAgent::active()
 {
   LOCK;
-  return mStack != NULL;
+  return mStack != nullptr;
 }
 
 void UserAgent::refresh()
 {
   LOCK;
 
-  for (auto acc: mAccountSet)
+  for (auto& acc: mAccountSet)
     acc->refresh();
 
-  for (auto observer: mClientObserverMap)
+  for (auto& observer: mClientObserverMap)
     observer.second->refresh();
 }
 
 void UserAgent::onDumCanBeDeleted()
 {
-  delete mDum; mDum = NULL;
-  delete mStack; mStack = NULL;
+  delete mDum; mDum = nullptr;
+  delete mStack; mStack = nullptr;
   
   mClientObserverMap.clear();
   mServerObserverMap.clear();
@@ -382,15 +438,14 @@ void UserAgent::process()
       
     // Find all sessions
     std::set<int> idSet;
-    SessionMap::iterator sessionIter;
-    for (sessionIter = mSessionMap.begin(); sessionIter != mSessionMap.end(); ++sessionIter)
+    for (auto sessionIter = mSessionMap.begin(); sessionIter != mSessionMap.end(); ++sessionIter)
       idSet.insert(sessionIter->first);
 
     // Now process session one by one checking if current is available yet
     std::set<int>::iterator resipIter;
     for (resipIter = idSet.begin(); resipIter != idSet.end(); ++resipIter)
     {
-      SessionMap::iterator sessionIter = mSessionMap.find(*resipIter);
+      auto sessionIter = mSessionMap.find(*resipIter);
       if (sessionIter == mSessionMap.end())
         continue;
 
@@ -432,7 +487,12 @@ void UserAgent::addRootCert(const ByteBuffer& data)
 {
   LOCK;
   resip::Data b(data.data(), data.size());
-  mStack->getSecurity()->addRootCertPEM(b);
+  try {
+    mStack->getSecurity()->addRootCertPEM(b);
+  }
+  catch(...) {
+    // Ignore silently
+  }
 }
 
 PAccount UserAgent::createAccount(PVariantMap config)
@@ -467,7 +527,7 @@ PSession UserAgent::createSession(PAccount account)
   return session;
 }
 
-std::string UserAgent::formatSipAddress(std::string sip)
+std::string UserAgent::formatSipAddress(const std::string& sip)
 {
   std::string result;
   if (sip.size())
@@ -483,17 +543,18 @@ std::string UserAgent::formatSipAddress(std::string sip)
   return result;
 }
 
-bool UserAgent::isSipAddressValid(std::string sip)
+bool UserAgent::isSipAddressValid(const std::string& sip)
 {
   bool result = false;
   try
   {
-    if (sip.find('<') == std::string::npos)
-      sip = "<" + sip;
-    if (sip.find('>') == std::string::npos)
-      sip += ">";
+    std::string s = sip;
+    if (s.find('<') == std::string::npos)
+      s = "<" + s;
+    if (s.find('>') == std::string::npos)
+      s += ">";
 
-    resip::Data d(formatSipAddress(sip));
+    resip::Data d(formatSipAddress(s));
     resip::Uri uri(d);
     result = uri.isWellFormed();
     if (result)
@@ -543,7 +604,7 @@ UserAgent::SipAddress UserAgent::parseSipAddress(const std::string& sip)
   return result;
 }
 
-bool UserAgent::compareSipAddresses(std::string sip1, std::string sip2)
+bool UserAgent::compareSipAddresses(const std::string& sip1, const std::string& sip2)
 {
   if (sip1.empty() || sip2.empty())
     return false;
