@@ -64,7 +64,7 @@ void AudioProvider::configureMediaObserver(MT::Stream::MediaObserver *observer, 
 }
 
 // Processes incoming data
-void  AudioProvider::processData(PDatagramSocket s, const void* dataBuffer, int dataSize, InternetAddress& source)
+void  AudioProvider::processData(const PDatagramSocket& s, const void* dataBuffer, int dataSize, InternetAddress& source)
 {
     if (!mActiveStream)
         return;
@@ -77,7 +77,7 @@ void  AudioProvider::processData(PDatagramSocket s, const void* dataBuffer, int 
 }
 
 // This method is called by user agent to send ICE packet from mediasocket
-void AudioProvider::sendData(PDatagramSocket s, InternetAddress& destination, const void* buffer, unsigned int size)
+void AudioProvider::sendData(const PDatagramSocket& s, InternetAddress& destination, const void* buffer, unsigned int size)
 {
     s->sendDatagram(destination, buffer, size);
 }

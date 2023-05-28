@@ -14,6 +14,7 @@
 #include <mutex>
 #include <condition_variable>
 
+
 class AgentImpl: public UserAgent, public MT::Stream::MediaObserver
 {
 protected:
@@ -34,7 +35,7 @@ protected:
   volatile bool mShutdown;
   std::shared_ptr<MT::Terminal> mTerminal;
   std::shared_ptr<AudioManager> mAudioManager;
-  //Audio::PWavFileWriter mIncomingAudioDump, mOutgoingAudioDump;
+  Audio::DataConnection* mAudioMonitoring = nullptr;
 
   void run();
   void addEvent(const JsonCpp::Value& v);
@@ -64,6 +65,12 @@ public:
   std::string command(const std::string& command);
   bool waitForData(int milliseconds);
   std::string read();
+
+  // Get access to internal audio manager. Value can be nullptr.
+  const std::shared_ptr<AudioManager>& audioManager() const;
+
+  void setAudioMonitoring(Audio::DataConnection* monitoring);
+  Audio::DataConnection* monitoring() const;
 
   // UserAgent overrides
   // Called on new incoming session; providers shoukld

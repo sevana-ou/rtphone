@@ -26,28 +26,31 @@ namespace Audio
       virtual void deviceChanged(DevicePair* dpair) = 0;
     };
 
-    DevicePair(bool aec = true, bool agc = true);
+    DevicePair();
     virtual ~DevicePair();
 
-    void setAec(bool aec);
+    DevicePair& setAec(bool aec);
     bool aec();
-    void setAgc(bool agc);
+    DevicePair& setAgc(bool agc);
     bool agc();
 
     VariantMap* config();
-    void setConfig(VariantMap* config);
+    DevicePair& setConfig(VariantMap* config);
 
     PInputDevice input();
-    void setInput(PInputDevice input);
+    DevicePair& setInput(PInputDevice input);
 
     POutputDevice output();
-    void setOutput(POutputDevice output);
+    DevicePair& setOutput(POutputDevice output);
 
     bool start();
     void stop();
 
-    void setDelegate(Delegate* dc);
+    DevicePair& setDelegate(Delegate* dc);
     Delegate* delegate();
+
+    DevicePair& setMonitoring(DataConnection* monitoring);
+    DataConnection* monitoring();
 
     Player& player();
 
@@ -63,6 +66,7 @@ namespace Audio
     Player mPlayer;
     UniversalResampler mMicResampler, mSpkResampler;
     DataWindow mInputBuffer, mOutputBuffer, mAecSpkBuffer, mInputResampingData, mOutputNativeData, mOutput10msBuffer;
+    DataConnection* mMonitoring;
 
 #ifdef DUMP_NATIVEOUTPUT
     std::shared_ptr<WavFileWriter> mNativeOutputDump;

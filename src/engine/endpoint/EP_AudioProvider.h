@@ -1,4 +1,4 @@
-/* Copyright(C) 2007-2014 VoIP objects (voipobjects.com)
+/* Copyright(C) 2007-2023 VoIP objects (voipobjects.com)
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -12,9 +12,7 @@
 #include "../media/MT_Box.h"
 #include "../media/MT_Stream.h"
 #include "../media/MT_Codec.h"
-#include "../audio/Audio_Interface.h"
 
-#include "rutil/ThreadIf.hxx"
 #include <vector>
 #include <string>
 
@@ -37,10 +35,10 @@ public:
   void          setDestinationAddress(const RtpPair<InternetAddress>& addr) override;
 
   // Processes incoming data
-  void          processData(PDatagramSocket s, const void* dataBuffer, int dataSize, InternetAddress& source) override;
+  void          processData(const PDatagramSocket& s, const void* dataBuffer, int dataSize, InternetAddress& source) override;
 
   // This method is called by user agent to send ICE packet from mediasocket
-  void          sendData(PDatagramSocket s, InternetAddress& destination, const void* dataBuffer, unsigned int datasize) override;
+  void          sendData(const PDatagramSocket& s, InternetAddress& destination, const void* dataBuffer, unsigned int datasize) override;
 
   // Updates SDP offer
   void          updateSdpOffer(resip::SdpContents::Session::Medium& sdp, SdpDirection direction) override;

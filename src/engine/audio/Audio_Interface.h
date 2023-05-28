@@ -57,6 +57,27 @@ namespace Audio
       sprintf(buffer, "%dHz %dch", mRate, mChannels);
       return std::string(buffer);
     }
+
+    bool operator == (const Format& rhs) const
+    {
+        return mRate == rhs.mRate && mChannels == rhs.mChannels;
+    }
+
+    bool operator != (const Format& rhs) const
+    {
+        return mRate != rhs.mRate || mChannels != rhs.mChannels;
+    }
+
+    int rate() const
+    {
+        return mRate;
+    }
+
+    int channels() const
+    {
+        return mChannels;
+    }
+
   };
 
   class DataConnection

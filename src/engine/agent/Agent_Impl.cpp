@@ -32,6 +32,24 @@ AgentImpl::~AgentImpl()
     stopAgentAndThread();
 }
 
+// Get access to internal audio manager. Value can be nullptr.
+const std::shared_ptr<AudioManager>& AgentImpl::audioManager() const
+{
+  return mAudioManager;
+}
+
+void AgentImpl::setAudioMonitoring(Audio::DataConnection* monitoring)
+{
+  mAudioMonitoring = monitoring;
+  if (mAudioManager)
+    mAudioManager->setAudioMonitoring(monitoring);
+}
+
+Audio::DataConnection* AgentImpl::monitoring() const
+{
+  return mAudioMonitoring;
+}
+
 void AgentImpl::run()
 {
     while (!mShutdown)
@@ -212,8 +230,10 @@ void AgentImpl::processStart(JsonCpp::Value& request, JsonCpp::Value &answer)
     // Enable audio
     mAudioManager = std::make_shared<AudioManager>();
     mAudioManager->setTerminal(mTerminal.get());
+    if (mAudioMonitoring)
+      mAudioManager->setAudioMonitoring(mAudioMonitoring);
 
-    // Do not start here. Start right before call.
+    // Do not start audio manager here. Start right before call.
 
     // Initialize endpoint
     start();

@@ -8,10 +8,7 @@
 
 #include "../engine/audio/Audio_Interface.h"
 #include "../engine/audio/Audio_Player.h"
-#include "../engine/endpoint/EP_Engine.h"
 #include "../engine/media/MT_Box.h"
-#include "../engine/helper/HL_Log.h"
-#include "../engine/helper/HL_Sync.h"
 
 
 
@@ -49,6 +46,9 @@ public:
   void setTerminal(MT::Terminal* terminal);
   MT::Terminal* terminal();
 
+  void setAudioMonitoring(Audio::DataConnection* monitoring);
+  Audio::DataConnection* audioMonitoring();
+
   // Start/stop methods relies on usage counter; only first start and last stop opens/closes devices actually
   void start(int usageId);
   void stop(int usageId);
@@ -69,6 +69,7 @@ public:
   void startPlayFile(int usageId, const std::string& path, AudioTarget target, LoopMode lm, int timelimit = 0);
   void stopPlayFile(int usageId);
   
+
   void onFilePlayed(Audio::Player::PlaylistItem& item);
   
   // Must be called from main loop to release used audio devices
@@ -79,6 +80,7 @@ protected:
   Audio::POutputDevice mAudioOutput;
   Audio::Player mPlayer;
   MT::Terminal* mTerminal;
+  Audio::DataConnection* mAudioMonitoring;
 
   std::map<int, int> UsageMap;
   UsageCounter mUsage;

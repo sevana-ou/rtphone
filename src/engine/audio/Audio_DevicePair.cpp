@@ -13,8 +13,9 @@
 using namespace Audio;
 
 // --- DevicePair ---
-DevicePair::DevicePair(bool aec, bool agc)
-:mConfig(NULL), mDelegate(NULL), mAec(aec), mAgc(agc), mAecFilter(AUDIO_MIC_BUFFER_LENGTH*10, AUDIO_MIC_BUFFER_LENGTH, AUDIO_SAMPLERATE), mAgcFilter(AUDIO_CHANNELS)
+DevicePair::DevicePair()
+:mConfig(nullptr), mDelegate(nullptr), mAec(false), mAgc(false), mAecFilter(AUDIO_MIC_BUFFER_LENGTH*10, AUDIO_MIC_BUFFER_LENGTH, AUDIO_SAMPLERATE), mAgcFilter(AUDIO_CHANNELS),
+  mMonitoring(nullptr)
 {
   mInputBuffer.setCapacity(AUDIO_MIC_BUFFER_SIZE * (AUDIO_MIC_BUFFER_COUNT + 1));
   mOutputBuffer.setCapacity(AUDIO_SPK_BUFFER_SIZE * (AUDIO_SPK_BUFFER_COUNT + 1));
@@ -28,26 +29,50 @@ DevicePair::~DevicePair()
   if (mInput)
   {
     if (mInput->connection() == this)
-      mInput->setConnection(NULL);
+      mInput->setConnection(nullptr);
     mInput.reset();
   }
 
   if (mOutput)
   {
     if (mOutput->connection() == this)
-      mOutput->setConnection(NULL);
+      mOutput->setConnection(nullptr);
     mOutput.reset();
   }
 }
+
+DevicePair& DevicePair::setAec(bool aec)
+{
+  mAec = aec;
+  return *this;
+}
+
+bool DevicePair::aec()
+{
+  return mAec;
+}
+
+DevicePair& DevicePair::setAgc(bool agc)
+{
+  mAgc = agc;
+  return *this;
+}
+
+bool DevicePair::agc()
+{
+  return mAgc;
+}
+
 
 VariantMap* DevicePair::config()
 {
   return mConfig;
 }
 
-void DevicePair::setConfig(VariantMap* config)
+DevicePair& DevicePair::setConfig(VariantMap* config)
 {
   mConfig = config;
+  return *this;
 }
 
 PInputDevice DevicePair::input()
@@ -55,15 +80,17 @@ PInputDevice DevicePair::input()
   return mInput;
 }
 
-void DevicePair::setInput(PInputDevice input)
+DevicePair& DevicePair::setInput(PInputDevice input)
 {
   if (mInput == input)
-    return;
+    return *this;
 
   mInput = input;
   mInput->setConnection(this);
   if (mDelegate)
     mDelegate->deviceChanged(this);
+
+  return *this;
 }
 
 POutputDevice DevicePair::output()
@@ -71,14 +98,17 @@ POutputDevice DevicePair::output()
   return mOutput;
 }
 
-void DevicePair::setOutput(POutputDevice output)
+DevicePair& DevicePair::setOutput(POutputDevice output)
 {
   if (output == mOutput)
-    return;
+    return *this;
+
   mOutput = output;  
   mOutput->setConnection(this);
   if (mDelegate)
     mDelegate->deviceChanged(this);
+
+  return *this;
 }
 
 bool DevicePair::start()
@@ -88,6 +118,7 @@ bool DevicePair::start()
     result = mInput->open();
   if (mOutput && result)
     result &= mOutput->open();
+
   return result;
 }
 
@@ -99,14 +130,26 @@ void DevicePair::stop()
     mOutput->close();
 }
 
-void DevicePair::setDelegate(Delegate* dc)
+DevicePair& DevicePair::setDelegate(Delegate* dc)
 {
   mDelegate = dc;
+  return *this;
 }
 
 DevicePair::Delegate* DevicePair::delegate()
 {
   return mDelegate;
+}
+
+DevicePair& DevicePair::setMonitoring(DataConnection* monitoring)
+{
+  mMonitoring = monitoring;
+  return *this;
+}
+
+DataConnection* DevicePair::monitoring()
+{
+  return mMonitoring;
 }
 
 Player& DevicePair::player()
@@ -219,6 +262,10 @@ void DevicePair::onSpkData(const Format& f, void* buffer, int length)
 
   mOutputNativeData.read(buffer, length);
 
+  // Send data to monitoring if needed
+  if (mMonitoring)
+    mMonitoring->onSpkData(f, buffer, length);
+
   #define AEC_FRAME_SIZE (AUDIO_CHANNELS * (AUDIO_SAMPLERATE / 1000) * AEC_FRAME_TIME * sizeof(short))
 
   // AEC filter wants frames.
@@ -229,7 +276,6 @@ void DevicePair::onSpkData(const Format& f, void* buffer, int length)
       mAecFilter.toSpeaker(mAecSpkBuffer.mutableData() + AEC_FRAME_SIZE * frameIndex);
     mAecSpkBuffer.erase(nrOfFrames * AEC_FRAME_SIZE);
   }
-  //ICELogMedia(<< "Audio::DevicePair::onSpkData() end")
 }
 
 void DevicePair::processMicData(const Format& f, void* buffer, int length)

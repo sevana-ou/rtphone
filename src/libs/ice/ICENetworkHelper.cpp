@@ -26,7 +26,8 @@
 #  include <linux/in6.h>
 #  if defined(TARGET_ANDROID)
 #    if __ANDROID_API__ < 24
-#      error not supported for ANDROID_API < 24
+#      include "android-ifaddrs/android-ifaddrs.h"
+//#      error not supported for ANDROID_API < 24
 #    else
 #      include <ifaddrs.h>
 #    endif

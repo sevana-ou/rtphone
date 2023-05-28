@@ -118,14 +118,23 @@ set (RTPHONE_SOURCES
     ${rtphone_engine}/media/MT_AudioCodec.cpp
     ${rtphone_engine}/media/MT_CngHelper.cpp
     ${rtphone_engine}/agent/Agent_Impl.cpp
+    ${rtphone_engine}/agent/Agent_Impl.h
     ${rtphone_engine}/agent/Agent_AudioManager.cpp
+    ${rtphone_engine}/agent/Agent_AudioManager.h
     ${rtphone_engine}/endpoint/EP_Account.cpp
+    ${rtphone_engine}/endpoint/EP_Account.h
     ${rtphone_engine}/endpoint/EP_AudioProvider.cpp
+    ${rtphone_engine}/endpoint/EP_AudioProvider.h
     ${rtphone_engine}/endpoint/EP_DataProvider.cpp
+    ${rtphone_engine}/endpoint/EP_DataProvider.h
     ${rtphone_engine}/endpoint/EP_Engine.cpp
+    ${rtphone_engine}/endpoint/EP_Engine.h
     ${rtphone_engine}/endpoint/EP_NetworkQueue.cpp
+    ${rtphone_engine}/endpoint/EP_NetworkQueue.h
     ${rtphone_engine}/endpoint/EP_Observer.cpp
+    ${rtphone_engine}/endpoint/EP_Observer.h
     ${rtphone_engine}/endpoint/EP_Session.cpp
+    ${rtphone_engine}/endpoint/EP_Session.h
 
     ${rtphone_engine}/media/MT_Statistics.h
     ${rtphone_engine}/media/MT_WebRtc.h
@@ -140,17 +149,7 @@ set (RTPHONE_SOURCES
     ${rtphone_engine}/media/MT_AudioStream.h
     ${rtphone_engine}/media/MT_AudioReceiver.h
     ${rtphone_engine}/media/MT_AudioCodec.h
-
     ${rtphone_engine}/media/MT_CngHelper.h
-    ${rtphone_engine}/agent/Agent_Impl.h
-    ${rtphone_engine}/agent/Agent_AudioManager.h
-    ${rtphone_engine}/endpoint/EP_Account.h
-    ${rtphone_engine}/endpoint/EP_AudioProvider.h
-    ${rtphone_engine}/endpoint/EP_DataProvider.h
-    ${rtphone_engine}/endpoint/EP_Engine.h
-    ${rtphone_engine}/endpoint/EP_NetworkQueue.h
-    ${rtphone_engine}/endpoint/EP_Observer.h
-    ${rtphone_engine}/endpoint/EP_Session.h
     )
 
 if (USE_AMR_CODEC)

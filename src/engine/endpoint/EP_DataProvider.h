@@ -45,10 +45,10 @@ public:
   virtual void          setDestinationAddress(const RtpPair<InternetAddress>& addr) = 0;
 
   // Processes incoming data
-  virtual void          processData(PDatagramSocket s, const void* dataBuffer, int dataSize, InternetAddress& address) = 0;
+  virtual void          processData(const PDatagramSocket& s, const void* dataBuffer, int dataSize, InternetAddress& address) = 0;
 
   // This method is called by user agent to send ICE packet from mediasocket
-  virtual void          sendData(PDatagramSocket s, InternetAddress& destination, const void* dataBuffer, unsigned int datasize) = 0;
+  virtual void          sendData(const PDatagramSocket& s, InternetAddress& destination, const void* dataBuffer, unsigned int datasize) = 0;
   
   // Updates SDP offer
   virtual void          updateSdpOffer(resip::SdpContents::Session::Medium& sdp, SdpDirection direction) = 0;

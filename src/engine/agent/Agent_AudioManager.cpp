@@ -1,11 +1,10 @@
-/* Copyright(C) 2007-2017 VoIP objects (voipobjects.com)
+/* Copyright(C) 2007-2023 VoIP objects (voipobjects.com)
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 #include "Agent_AudioManager.h"
 #include "../engine/audio/Audio_WavFile.h"
-#include "../engine/helper/HL_String.h"
 #include "../engine/audio/Audio_Null.h"
 
 #if defined(TARGET_ANDROID)
@@ -15,18 +14,15 @@
 #define LOG_SUBSYSTEM "AudioManager"
 
 
-// ---------------- AudioManager -------------
-//static AudioManager GAudioManager;
-
 AudioManager::AudioManager()
-:mTerminal(nullptr)
+:mTerminal(nullptr), mAudioMonitoring(nullptr)
 {
   mPlayer.setDelegate(this);
 }
 
 AudioManager::~AudioManager()
 {
-  //stop();
+  // stop();
 }
 
 AudioManager& AudioManager::instance()
@@ -49,6 +45,16 @@ MT::Terminal* AudioManager::terminal()
   return mTerminal;
 }
 
+void AudioManager::setAudioMonitoring(Audio::DataConnection* monitoring)
+{
+  mAudioMonitoring = monitoring;
+}
+
+Audio::DataConnection* AudioManager::audioMonitoring()
+{
+  return mAudioMonitoring;
+}
+
 #define LOCK_MANAGER std::unique_lock<std::mutex> l(mGuard)
 void AudioManager::start(int usageId)
 {
@@ -68,7 +74,14 @@ void AudioManager::start(int usageId)
       // Disable AEC for now - because PVQA conflicts with speex AEC.
       std::shared_ptr<Audio::Enumerator> enumerator(Audio::Enumerator::make(usageId == atNull));
       if (!mTerminal->audio())
-          mTerminal->setAudio(std::make_shared<Audio::DevicePair>(false, true));
+      {
+          auto audio = std::make_shared<Audio::DevicePair>();
+          audio->setAgc(true);
+          audio->setAec(false);
+          audio->setMonitoring(mAudioMonitoring);
+
+          mTerminal->setAudio(audio);
+      }
 
       if (!mAudioInput)
       {
@@ -96,8 +109,8 @@ void AudioManager::start(int usageId)
             if (outputIndex >= enumerator->count())
               outputIndex = 0;
 
-              mAudioOutput = Audio::POutputDevice(
-                      Audio::OutputDevice::make(enumerator->idAt(outputIndex)));
+            mAudioOutput = Audio::POutputDevice(
+                  Audio::OutputDevice::make(enumerator->idAt(outputIndex)));
           }
           else
               mAudioOutput = Audio::POutputDevice(new Audio::NullOutputDevice());

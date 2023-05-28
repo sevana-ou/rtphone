@@ -1,4 +1,4 @@
-/* Copyright(C) 2007-2017 VoIP objects (voipobjects.com)
+/* Copyright(C) 2007-2023 VoIP objects (voipobjects.com)
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -7,11 +7,7 @@
 #include "EP_Engine.h"
 #include "EP_AudioProvider.h"
 #include "../media/MT_Stream.h"
-#include "../media/MT_AudioStream.h"
-#include "../media/MT_Dtmf.h"
 #include "../helper/HL_Log.h"
-#include "../helper/HL_Exception.h"
-#include "../helper/HL_StreamState.h"
 #include "../helper/HL_Sync.h"
 #include "../helper/HL_String.h"
 
@@ -20,7 +16,7 @@
 typedef resip::SdpContents::Session::Medium Medium;
 typedef resip::SdpContents::Session::MediumContainer MediumContainer;
 
-#define DOMULTIPLEX()  mUserAgent->mConfig[CONFIG_MULTIPLEXING].asBool() ? SocketHeap::DoMultiplexing : SocketHeap::DontMultiplexing
+#define IS_MULTIPLEX()  mUserAgent->mConfig[CONFIG_MULTIPLEXING].asBool() ? SocketHeap::DoMultiplexing : SocketHeap::DontMultiplexing
 
 
 //------------ ResipSessionAppDialog ------------
@@ -714,11 +710,11 @@ void Session::buildSdp(resip::SdpContents &sdp, SdpDirection sdpDirection)
             if (mUserAgent->mConfig[CONFIG_MULTIPLEXING].asBool())
                 rtcpPort = rtpPort;
             else
-                if (rtcpPort.isEmpty())
-                {
-                    rtcpPort = rtpPort;
-                    rtcpPort.setPort( rtpPort.port() + 1);
-                }
+            if (rtcpPort.isEmpty())
+            {
+                rtcpPort = rtpPort;
+                rtcpPort.setPort( rtpPort.port() + 1);
+            }
 
             media.addAttribute("rtcp", resip::Data(rtcpPort.port()));
         }
@@ -792,8 +788,8 @@ void Session::addProvider(PDataProvider provider)
     s.setProvider( provider );
 
     // Allocate socket for provider
-    s.setSocket4( SocketHeap::instance().allocSocketPair(AF_INET, this, DOMULTIPLEX()) );
-    s.setSocket6( SocketHeap::instance().allocSocketPair(AF_INET6, this, DOMULTIPLEX()) );
+    s.setSocket4( SocketHeap::instance().allocSocketPair(AF_INET, this, IS_MULTIPLEX()) );
+    s.setSocket6( SocketHeap::instance().allocSocketPair(AF_INET6, this, IS_MULTIPLEX()) );
     s.provider()->setSocket(s.socket4(), s.socket6());
 
     // Create ICE stream/component
@@ -896,8 +892,8 @@ void Session::refreshMediaPath()
         SocketHeap::instance().freeSocketPair(p->socket(AF_INET));
 
         // Bring new socket to provider and stream
-        RtpPair<PDatagramSocket> s4 = SocketHeap::instance().allocSocketPair(AF_INET, this, DOMULTIPLEX() ),
-                s6 = SocketHeap::instance().allocSocketPair(AF_INET, this, DOMULTIPLEX());
+        RtpPair<PDatagramSocket> s4 = SocketHeap::instance().allocSocketPair(AF_INET, this, IS_MULTIPLEX() ),
+                s6 = SocketHeap::instance().allocSocketPair(AF_INET, this, IS_MULTIPLEX());
 
         p->setSocket(s4, s6);
         s.setSocket4(s4);
@@ -976,8 +972,8 @@ int Session::processSdp(uint64_t version, bool iceAvailable, std::string icePwd,
         {
             try
             {
-                stream.setSocket4(SocketHeap::instance().allocSocketPair(AF_INET, this, DOMULTIPLEX()));
-                stream.setSocket6(SocketHeap::instance().allocSocketPair(AF_INET6, this, DOMULTIPLEX()));
+                stream.setSocket4(SocketHeap::instance().allocSocketPair(AF_INET, this, IS_MULTIPLEX()));
+                stream.setSocket6(SocketHeap::instance().allocSocketPair(AF_INET6, this, IS_MULTIPLEX()));
             }
             catch(...)
             {
