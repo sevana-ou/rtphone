@@ -446,27 +446,18 @@ void Session::getSessionInfo(Session::InfoOptions options, VariantMap& info)
 
     // Iterate all session providers
     stat.reset();
-    Stream* media = NULL;
-    for (unsigned streamIndex = 0; streamIndex < mStreamList.size(); streamIndex++)
+    Stream* media = nullptr;
+    for (Stream& stream: mStreamList)
     {
-        Stream& stream = mStreamList[streamIndex];
-        if (stream.provider())
-        {
-            media = &stream;
-            MT::Statistics s = stream.provider()->getStatistics();
-#if defined(USE_PVQA_LIBRARY) && !defined(TARGET_SERVER)
-            if (options != InfoOptions::Standard)
-            {
-                // This information is available AFTER audio stream is deleted
-                info[SessionInfo_PvqaMos] = s.mPvqaMos;
-                info[SessionInfo_PvqaReport] = s.mPvqaReport;
-            }
-#endif
-            info[SessionInfo_NetworkMos] = static_cast<float>(s.calculateMos(4.14));
-            info[SessionInfo_AudioCodec] = s.mCodecName;
+        if (!stream.provider())
+            continue;
 
-            stat += s;
-        }
+        media = &stream;
+        MT::Statistics s = stream.provider()->getStatistics();
+        info[SessionInfo_NetworkMos] = static_cast<float>(s.calculateMos(4.14));
+        info[SessionInfo_AudioCodec] = s.mCodecName;
+
+        stat += s;
     }
 
     info[SessionInfo_ReceivedTraffic] = static_cast<int>(stat.mReceived);

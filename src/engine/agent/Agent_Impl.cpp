@@ -526,24 +526,13 @@ void AgentImpl::processGetMediaStats(JsonCpp::Value& request, JsonCpp::Value& an
     {
         PSession session = sessionIter->second;
         VariantMap result;
-        bool includePvqa = request["include_pvqa"].asBool();
-#if defined(USE_AQUA_LIBRARY)
-        bool includeAqua = request["include_aqua"].asBool();
-        std::string aquaReference = request["aqua_reference_audio"].asString();
-#endif
-        session->getSessionInfo(includePvqa ? Session::InfoOptions::Detailed : Session::InfoOptions::Standard,
+        session->getSessionInfo(Session::InfoOptions::Detailed,
                                 result);
 
         if (result.exists(SessionInfo_AudioCodec))
             answer["codec"] = result[SessionInfo_AudioCodec].asStdString();
         if (result.exists(SessionInfo_NetworkMos))
             answer["network_mos"] = result[SessionInfo_NetworkMos].asFloat();
-#if defined(USE_PVQA_LIBRARY)
-        if (result.exists(SessionInfo_PvqaMos))
-            answer["pvqa_mos"] = result[SessionInfo_PvqaMos].asFloat();
-        if (result.exists(SessionInfo_PvqaReport))
-            answer["pvqa_report"] = CsvReportToJson(result[SessionInfo_PvqaReport].asStdString());
-#endif
         if (result.exists(SessionInfo_PacketLoss))
             answer["rtp_lost"] = result[SessionInfo_LostRtp].asInt();
         if (result.exists(SessionInfo_DroppedRtp))
@@ -565,69 +554,6 @@ void AgentImpl::processGetMediaStats(JsonCpp::Value& request, JsonCpp::Value& an
             answer["rtp_ssrc"] = result[SessionInfo_SSRC].asInt();
         if (result.exists(SessionInfo_RemotePeer))
             answer["rtp_remotepeer"] = result[SessionInfo_RemotePeer].asStdString();
-
-#if defined(USE_AQUA_LIBRARY)
-/*        if (includeAqua)
-        {
-            answer["incoming_audio"] = mAquaIncoming.hexstring();
-            answer["incoming_audio_samplerate"] = AUDIO_SAMPLERATE;
-            answer["incoming_audio_channels"] = AUDIO_CHANNELS;
-
-            ICELogInfo(<< "Running AQuA analyzer.");
-            ByteBuffer referenceAudio;
-            // Read AQuA reference audio from file if available
-            if (aquaReference.empty())
-            {
-                ICELogCritical(<< "AQuA reference audio file is not set, skipping analyzing.");
-            }
-            else {
-                auto sa = mAquaMap[sessionIter->first];
-                if (sa) {
-                    Audio::WavFileReader reader;
-                    reader.open(strx::makeTstring(aquaReference));
-
-                    if (reader.isOpened()) {
-                        char buffer[1024];
-                        int wasRead = 0;
-                        do {
-                            wasRead = reader.read(buffer, 1024);
-                            if (wasRead > 0)
-                                referenceAudio.appendBuffer(buffer, wasRead);
-                        } while (wasRead == 1024);
-                    }
-                    else {
-                        ICELogCritical(<< "Failed to read AQuA reference audio, error code: " << reader.lastError());
-                    }
-
-                    sevana::aqua::audio_buffer test(mAquaIncoming.data(), mAquaIncoming.size()),
-                            reference(referenceAudio.data(), referenceAudio.size());
-                    test.mRate = AUDIO_SAMPLERATE;
-                    reference.mRate = AUDIO_SAMPLERATE;
-                    test.mChannels = AUDIO_CHANNELS;
-                    reference.mChannels = AUDIO_CHANNELS;
-                    ICELogInfo(
-                            << "Comparing test audio " << mAquaIncoming.size() << " bytes with reference audio " << referenceAudio.size() << " bytes.");
-                    auto r = sa->compare(reference, test);
-                    if (r.mErrorCode) {
-                        ICELogInfo(
-                                << "Error code: " << r.mErrorCode << ", msg: " << r.mErrorMessage);
-                    } else {
-                        ICELogInfo(<< "MOS: " << r.mMos << ", faults: " << r.mFaultsText);
-                    }
-                    answer["aqua_mos"] = r.mMos;
-                    answer["aqua_report"] = r.mFaultsText;
-
-                    if (r.mErrorCode) {
-                        answer["aqua_error_code"] = r.mErrorCode;
-                        answer["aqua_error_message"] = r.mErrorMessage;
-                    }
-                    closeAqua(sessionIter->first);
-                }
-            }
-            // Remove test audio
-            mAquaIncoming.clear(); mAquaOutgoing.clear();
-        }*/
-#endif
 
         answer["status"] = Status_Ok;
     }
