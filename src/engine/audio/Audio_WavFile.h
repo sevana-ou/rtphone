@@ -20,16 +20,17 @@ namespace Audio
   class WavFileReader
   {
   protected:
-    FILE* mHandle;
-    short mChannels;
-    short mBits;
-    int mRate;
-    std::tstring mFileName;
-    mutable std::recursive_mutex mFileMtx;
-    unsigned mDataOffset;
-    unsigned mDataLength;
-    Resampler mResampler;
-    unsigned mLastError;
+    FILE*           mHandle;
+    short           mChannels;
+    short           mBits;
+    int             mSamplerate;
+    std::tstring    mFileName;
+    mutable std::recursive_mutex
+                    mFileMtx;
+    unsigned        mDataOffset;
+    unsigned        mDataLength;
+    Resampler       mResampler;
+    unsigned        mLastError;
 
     std::string readChunk();
   public:
@@ -40,13 +41,14 @@ namespace Audio
     void close();
     bool isOpened();
     void rewind();
-    int rate() const;
+    int  samplerate() const;
+    int  channels() const;
 
     // This method returns number of read bytes
-    unsigned read(void* buffer, unsigned bytes);
+    unsigned read(void* buffer, unsigned bytes, bool resample = true);
 
     // This method returns number of read samples
-    unsigned read(short* buffer, unsigned samples);
+    unsigned read(short* buffer, unsigned samples, bool resample = true);
     std::tstring filename() const;
     unsigned size() const;
 
