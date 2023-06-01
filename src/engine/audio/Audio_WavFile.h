@@ -45,10 +45,13 @@ namespace Audio
     int  channels() const;
 
     // This method returns number of read bytes
-    unsigned read(void* buffer, unsigned bytes, bool resample = true);
+    size_t read(void* buffer, size_t bytes);
+    size_t  readRaw(void* buffer, size_t bytes);
 
     // This method returns number of read samples
-    unsigned read(short* buffer, unsigned samples, bool resample = true);
+    size_t read(short* buffer, size_t samples);
+    size_t readRaw(short* buffer, size_t samples);
+
     std::tstring filename() const;
     unsigned size() const;
 

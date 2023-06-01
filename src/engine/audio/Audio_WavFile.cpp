@@ -10,6 +10,7 @@
 #include "../config.h"
 
 #include <memory.h>
+#include <assert.h>
 
 #ifndef WORD
 # define WORD unsigned short
@@ -191,24 +192,25 @@ int WavFileReader::channels() const
     return mChannels;
 }
 
-unsigned WavFileReader::read(void* buffer, unsigned bytes, bool resample)
+size_t WavFileReader::read(void* buffer, size_t bytes)
 {
-    if (resample)
-        return read((short*)buffer, bytes / (AUDIO_CHANNELS * 2), true) * AUDIO_CHANNELS * 2;
-    else
-        return read((short*)buffer, bytes / channels() / sizeof(short), false) * channels() * sizeof(short);
+    return read((short*)buffer, bytes / (AUDIO_CHANNELS * 2)) * AUDIO_CHANNELS * 2;
 }
 
-unsigned WavFileReader::read(short* buffer, unsigned samples, bool resample)
+size_t WavFileReader::readRaw(void* buffer, size_t bytes)
+{
+    return readRaw((short*)buffer, bytes / channels() / sizeof(short)) * channels() * sizeof(short);
+}
+
+size_t WavFileReader::read(short* buffer, size_t samples)
 {
     LOCK;
 
     if (!mHandle)
         return 0;
 
-
     // Get number of samples that must be read from source file
-    int requiredBytes = resample ? mResampler.getSourceLength(samples) * mChannels * mBits / 8 : samples * mChannels * sizeof(short);
+    size_t requiredBytes = mResampler.getSourceLength(samples) * mChannels * mBits / 8;
     void* temp = alloca(requiredBytes);
     memset(temp, 0, requiredBytes);
 
@@ -222,17 +224,40 @@ unsigned WavFileReader::read(short* buffer, unsigned samples, bool resample)
         requiredBytes = (int)fileAvailable < requiredBytes ? (int)fileAvailable : requiredBytes;
     }
 
-    /*int readSamples = */fread(temp, 1, requiredBytes, mHandle);// / mChannels / (mBits / 8);
-    if (resample)
-    {
-        size_t processedBytes = 0;
-        size_t result = mResampler.processBuffer(temp, requiredBytes, processedBytes,
-                                                 buffer, samples * 2 * AUDIO_CHANNELS);
+    size_t readBytes = fread(temp, 1, requiredBytes, mHandle);
 
-        return result / 2 / AUDIO_CHANNELS;
+    size_t processedBytes = 0;
+    size_t result = mResampler.processBuffer(temp, readBytes, processedBytes,
+                                             buffer, samples * 2 * AUDIO_CHANNELS);
+
+    return result / 2 / AUDIO_CHANNELS;
+}
+
+
+size_t WavFileReader::readRaw(short* buffer, size_t samples)
+{
+    LOCK;
+
+    if (!mHandle)
+        return 0;
+
+    // Get number of samples that must be read from source file
+    int requiredBytes = samples * channels() * sizeof(short);
+
+    // Find required size of input buffer
+    if (mDataLength)
+    {
+        unsigned filePosition = ftell(mHandle);
+
+        // Check how much data we can read
+        unsigned fileAvailable = mDataLength + mDataOffset - filePosition;
+        requiredBytes = (int)fileAvailable < requiredBytes ? (int)fileAvailable : requiredBytes;
     }
-    else
-        return requiredBytes / channels() / sizeof(short);
+
+    size_t readBytes = fread(buffer, 1, requiredBytes, mHandle);
+
+
+    return readBytes / channels() / sizeof(short);
 }
 
 bool WavFileReader::isOpened()
