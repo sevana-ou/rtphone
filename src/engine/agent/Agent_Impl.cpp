@@ -482,7 +482,7 @@ void AgentImpl::processWaitForEvent(JsonCpp::Value &request, JsonCpp::Value &ans
 }
 
 #if defined(USE_PVQA_LIBRARY)
-static JsonCpp::Value CsvReportToJson(const std::string& report)
+/*static JsonCpp::Value CsvReportToJson(const std::string& report)
 {
     JsonCpp::Value detectorValues;
     std::istringstream iss(report);
@@ -514,7 +514,7 @@ static JsonCpp::Value CsvReportToJson(const std::string& report)
         }
     }
     return detectorValues;
-}
+}*/
 #endif
 
 void AgentImpl::processGetMediaStats(JsonCpp::Value& request, JsonCpp::Value& answer)

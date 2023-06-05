@@ -21,14 +21,14 @@ namespace Audio
   {
   protected:
     FILE*           mHandle;
-    short           mChannels;
-    short           mBits;
+    uint16_t        mChannels;
+    uint16_t        mBits;
     int             mSamplerate;
     std::tstring    mFileName;
     mutable std::recursive_mutex
                     mFileMtx;
-    unsigned        mDataOffset;
-    unsigned        mDataLength;
+    size_t          mDataOffset;
+    size_t          mDataLength;
     Resampler       mResampler;
     unsigned        mLastError;
 
@@ -53,7 +53,7 @@ namespace Audio
     size_t readRaw(short* buffer, size_t samples);
 
     std::tstring filename() const;
-    unsigned size() const;
+    size_t size() const;
 
     unsigned lastError() const;
   };
@@ -66,8 +66,8 @@ namespace Audio
     FILE*                   mHandle;        /// Handle of audio file.
     std::tstring            mFileName;      /// Path to requested audio file.
     std::recursive_mutex    mFileMtx;       /// Mutex to protect this instance.
-    int                     mWritten;       /// Amount of written data (in bytes)
-    int                     mLengthOffset;  /// Position of length field.
+    size_t                  mWritten;       /// Amount of written data (in bytes)
+    size_t                  mLengthOffset;  /// Position of length field.
     int                     mRate,
                             mChannels;
 

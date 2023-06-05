@@ -1085,7 +1085,7 @@ void UserAgent::onOffer(resip::InviteSessionHandle h, const resip::SipMessage& m
   if (sdp.session().exists("ice-ufrag"))
     iceUfrag = sdp.session().getValues("ice-ufrag").front().c_str();
 
-  ice::Stack& ice = *s->mIceStack;
+  //ice::Stack& ice = *s->mIceStack;
 
   uint64_t version = sdp.session().origin().getVersion();
   std::string remoteIp = sdp.session().connection().getAddress().c_str();
@@ -1591,7 +1591,7 @@ VariantMap& UserAgent::config()
   return mConfig;
 }
 
-static void splitToHeaders(resip::Data& content, std::vector<resip::Data>& output)
+/*static void splitToHeaders(resip::Data& content, std::vector<resip::Data>& output)
 {
   resip::Data::size_type startLine = 0, endLine = content.find("\r\n");
   while (endLine != resip::Data::npos)
@@ -1603,9 +1603,9 @@ static void splitToHeaders(resip::Data& content, std::vector<resip::Data>& outpu
   }
   if (0 == startLine)
     output.push_back(content);
-}
+}*/
 
-static bool parseHeader(resip::Data& input, resip::Data& name, resip::Data& value)
+/*static bool parseHeader(resip::Data& input, resip::Data& name, resip::Data& value)
 {
   resip::Data::size_type p = input.find(":");
   if (p == resip::Data::npos)
@@ -1626,7 +1626,7 @@ static bool parseHeader(resip::Data& input, resip::Data& name, resip::Data& valu
     }
   }
   return true;
-}
+}*/
 
 void UserAgent::onSipMessage(int flow, const char* msg, unsigned int length, const sockaddr* addr, unsigned int addrlen)
 {

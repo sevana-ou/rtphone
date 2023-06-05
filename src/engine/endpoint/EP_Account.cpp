@@ -553,7 +553,7 @@ void Account::onSuccess(resip::ClientRegistrationHandle h, const resip::SipMessa
   }
 
   mUsedTransport = response.getReceivedTransportTuple().getType();
-  bool streamTransport = mUsedTransport == resip::TCP || mUsedTransport == resip::TLS;
+  //bool streamTransport = mUsedTransport == resip::TCP || mUsedTransport == resip::TLS;
 
   // Retry registration for stream based transport too
   if  ( (hostChanged || portChanged) && mRegistrationState == RegistrationState::Registering /*&& !streamTransport*/ && mConfig->at(CONFIG_EXTERNALIP).asBool())

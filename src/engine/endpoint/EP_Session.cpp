@@ -536,12 +536,11 @@ void Session::onReceivedData(PDatagramSocket socket, InternetAddress& src, const
     {
         // Try to process incoming data by ICE stack
         int component = -1, stream = -1;
-        bool processed;
         if (mIceStack->findStreamAndComponent(socket->family(), socket->localport(), &stream, &component))
         {
             ice::ByteBuffer buffer(receivedPtr, receivedSize);
             buffer.setRemoteAddress(src);
-            processed = mIceStack->processIncomingData(stream, component, buffer);
+            /*bool processed = */mIceStack->processIncomingData(stream, component, buffer);
         }
     }
     else

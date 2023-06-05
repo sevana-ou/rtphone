@@ -315,10 +315,10 @@ static int hex2code(char s)
     return 0;
 }
 
-static int hex2code(const char* s)
+/*static int hex2code(const char* s)
 {
     return (hex2code(s[0]) << 4) + hex2code(s[1]);
-}
+}*/
 
 std::string strx::fromHex2String(const std::string& s)
 {

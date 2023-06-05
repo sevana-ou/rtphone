@@ -125,6 +125,8 @@ void AudioProvider::updateSdpOffer(resip::SdpContents::Session::Medium& sdp, Sdp
         {
         case msSendonly: attr = "recvonly"; break;
         case msInactive: attr = "recvonly"; break;
+        case msRecvonly:
+        case msSendRecv: break; // Do nothing here
         }
         break;
 

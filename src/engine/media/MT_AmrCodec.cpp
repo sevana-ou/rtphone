@@ -599,10 +599,10 @@ int AmrWbCodec::encode(const void* input, int inputBytes, void* output, int outp
         return 0;
 
     // Declare the data input pointer
-    const short *dataIn = (const short *)input;
+    // const short *dataIn = (const short *)input;
 
     // Declare the data output pointer
-    unsigned char *dataOut = (unsigned char *)output;
+    // unsigned char *dataOut = (unsigned char *)output;
 
     // Find how much RTP frames will be generated
     unsigned int frames = inputBytes / pcmLength();

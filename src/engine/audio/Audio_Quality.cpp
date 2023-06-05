@@ -17,7 +17,10 @@
 
 using namespace Audio;
 
-#define SHRT_MAX      32767         /* maximum (signed) short value */
+#ifndef SHRT_MAX
+# define SHRT_MAX      32767         /* maximum (signed) short value */
+#endif
+
 AgcFilter::AgcFilter(int channels)
 {
   static const float DefaultLevel = 0.8f;
