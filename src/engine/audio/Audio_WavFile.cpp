@@ -105,7 +105,7 @@ bool WavFileReader::open(const std::tstring& filename)
             THROW_READERROR;
 
         // Read the file size
-        unsigned int filesize = 0;
+        uint32_t filesize = 0;
         if (fread(&filesize, 4, 1, mHandle) < 1)
             THROW_READERROR;
 
@@ -117,20 +117,19 @@ bool WavFileReader::open(const std::tstring& filename)
         if (strcmp(wavefmt, "WAVEfmt ") != 0)
             THROW_READERROR;
 
-        unsigned fmtSize = 0;
+        uint32_t fmtSize = 0;
         if (fread(&fmtSize, 4, 1, mHandle) < 1)
             THROW_READERROR;
 
-        unsigned fmtStart = ftell(mHandle);
+        uint32_t fmtStart = ftell(mHandle);
 
-        unsigned short formattag  = 0;
+        uint16_t formattag  = 0;
         if (fread(&formattag, 2, 1, mHandle) < 1)
             THROW_READERROR;
 
         if (formattag != 1/*WAVE_FORMAT_PCM*/)
             THROW_READERROR;
 
-        mChannels = 0;
         if (fread(&mChannels, 2, 1, mHandle) < 1)
             THROW_READERROR;
 
@@ -220,8 +219,8 @@ size_t WavFileReader::read(short* buffer, size_t samples)
         unsigned filePosition = ftell(mHandle);
 
         // Check how much data we can read
-        unsigned fileAvailable = mDataLength + mDataOffset - filePosition;
-        requiredBytes = (int)fileAvailable < requiredBytes ? (int)fileAvailable : requiredBytes;
+        size_t fileAvailable = mDataLength + mDataOffset - filePosition;
+        requiredBytes = fileAvailable < requiredBytes ? fileAvailable : requiredBytes;
     }
 
     size_t readBytes = fread(temp, 1, requiredBytes, mHandle);
@@ -282,7 +281,7 @@ std::tstring WavFileReader::filename() const
     return mFileName;
 }
 
-unsigned WavFileReader::size() const
+size_t WavFileReader::size() const
 {
     LOCK;
 

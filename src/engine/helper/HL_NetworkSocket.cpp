@@ -61,7 +61,7 @@ void DatagramSocket::sendDatagram(InternetAddress &dest, const void *packetData,
   if (mHandle == INVALID_SOCKET)
     return;
 
-  int sent = ::sendto(mHandle, (const char*)packetData, packetSize, 0, dest.genericsockaddr(), dest.sockaddrLen());
+  /*int sent = */::sendto(mHandle, (const char*)packetData, packetSize, 0, dest.genericsockaddr(), dest.sockaddrLen());
 }
 
 unsigned DatagramSocket::recvDatagram(InternetAddress &src, void *packetBuffer, unsigned packetCapacity)

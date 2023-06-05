@@ -125,7 +125,7 @@ int G729Codec::channels()
   return 1;
 }
 
-static const int SamplesPerFrame = 80;
+// static const int SamplesPerFrame = 80;
 int G729Codec::encode(const void* input, int inputBytes, void* output, int outputCapacity)
 {
   // Create encoder if it is not done yet

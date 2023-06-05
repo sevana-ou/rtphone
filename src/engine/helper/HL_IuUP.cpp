@@ -1208,7 +1208,7 @@ static const uint16_t byte_crc10_table[256] = {
 /* Update the data block's CRC-10 remainder one byte at a time */
 uint16_t update_crc10_by_bytes(uint16_t crc10_accum, const uint8_t *data_blk_ptr, int data_blk_size)
 {
-  register int i;
+  /*register*/ int i;
 
   for (i = 0;  i < data_blk_size; i++) {
     crc10_accum = ((crc10_accum << 8) & 0x3ff)

@@ -227,8 +227,7 @@ int EVSCodec::decode(const void* input, int input_length, void* output, int outp
         else
             buffer = std::string(reinterpret_cast<const char*>(input), input_length);
     }
-    else
-        // Skip CMR byte
+    else // Skip CMR byte
         buffer = std::string(reinterpret_cast<const char*>(input) + 1, input_length-1);
 
 
