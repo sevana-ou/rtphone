@@ -77,19 +77,21 @@ uint64_t ThreadHelper::getCurrentId()
 // ------------------- TimeHelper ---------------
 using namespace std::chrono;
 
+// Milliseconds starting from the epoch
 static uint64_t TimestampStartPoint = duration_cast<milliseconds>(steady_clock::now().time_since_epoch()).count();
+
+// Seconds starting from the epoch
 static time_t TimestampBase = time(nullptr);
 
-uint64_t TimeHelper::getTimestamp()
+// Returns number of milliseconds starting from 01 Jan 1970 GMT
+uint64_t chronox::getTimestamp()
 {
     time_point<steady_clock> t = steady_clock::now();
-
     uint64_t ms = duration_cast< milliseconds >(t.time_since_epoch()).count();
-
     return ms - TimestampStartPoint + TimestampBase * 1000;
 }
 
-uint64_t TimeHelper::getUptime()
+uint64_t chronox::getUptime()
 {
     time_point<steady_clock> t = steady_clock::now();
 
@@ -98,7 +100,7 @@ uint64_t TimeHelper::getUptime()
     return ms - TimestampStartPoint;
 }
 
-uint32_t TimeHelper::getDelta(uint32_t later, uint32_t earlier)
+uint32_t chronox::getDelta(uint32_t later, uint32_t earlier)
 {
     if (later > earlier)
         return later - earlier;
@@ -109,14 +111,30 @@ uint32_t TimeHelper::getDelta(uint32_t later, uint32_t earlier)
     return 0;
 }
 
-TimeHelper::ExecutionTime::ExecutionTime()
+timespec chronox::toTimespec(uint64_t milliseconds)
 {
-    mStart = TimeHelper::getTimestamp();
+    timespec r;
+    r.tv_sec = milliseconds / 1000;
+    r.tv_nsec = milliseconds % 1000;
+    r.tv_nsec *= 1000 * 1000;
+    return r;
 }
 
-uint64_t TimeHelper::ExecutionTime::getSpentTime() const
+int64_t chronox::getDelta(const timespec& a, const timespec& b)
 {
-    return TimeHelper::getTimestamp() - mStart;
+    uint64_t ms_a = a.tv_sec * 1000 + a.tv_nsec / 10000000;
+    uint64_t ms_b = b.tv_sec * 1000 + a.tv_nsec / 10000000;
+    return ms_a - ms_b;
+}
+
+chronox::ExecutionTime::ExecutionTime()
+{
+    mStart = chronox::getTimestamp();
+}
+
+uint64_t chronox::ExecutionTime::getSpentTime() const
+{
+    return chronox::getTimestamp() - mStart;
 }
 
 // --------------- BufferQueue -----------------

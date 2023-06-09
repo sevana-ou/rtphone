@@ -46,7 +46,7 @@ public:
   static uint64_t getCurrentId();
 };
 
-class TimeHelper
+class chronox
 {
 public:
   // Returns current timestamp in milliseconds
@@ -58,6 +58,12 @@ public:
   // Finds time delta between 'later' and 'earlier' time points.
   // Handles cases when clock is wrapped.
   static uint32_t getDelta(uint32_t later, uint32_t earlier);
+
+  // Converts number of milliseconds starting from Epoch begin to timespec.
+  static timespec toTimespec(uint64_t milliseconds);
+
+  // Returns difference between timestamps in milliseconds
+  static int64_t getDelta(const timespec& a, const timespec& b);
 
   class ExecutionTime
   {
