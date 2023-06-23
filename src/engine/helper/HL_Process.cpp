@@ -39,7 +39,7 @@ std::string OsProcess::execCommand(const std::string& cmd)
     PROCESS_INFORMATION pi  = { 0 };
 
     char* cmdline = (char*)_alloca(cmd.size()+1);
-    strcpy(cmdline, StringHelper::replace(cmd, "/", "\\").c_str());
+    strcpy(cmdline, strx::replace(cmd, "/", "\\").c_str());
 
     BOOL fSuccess = CreateProcessA( nullptr, cmdline, NULL, NULL, TRUE, CREATE_NEW_CONSOLE, NULL, NULL, &si, &pi);
     if (! fSuccess)
@@ -114,7 +114,7 @@ std::shared_ptr<std::thread> OsProcess::asyncExecCommand(const std::string& cmdl
     memset(&pi, 0, sizeof pi);
 
     char* cmdbuffer = (char*)_alloca(cmdline.size()+1);
-    strcpy(cmdbuffer, StringHelper::replace(cmdline, "/", "\\").c_str());
+    strcpy(cmdbuffer, strx::replace(cmdline, "/", "\\").c_str());
 
 
     BOOL fSuccess = CreateProcessA( nullptr, cmdbuffer, nullptr, nullptr, TRUE,
@@ -160,14 +160,14 @@ std::shared_ptr<std::thread> OsProcess::asyncExecCommand(const std::string& cmdl
                 {
                     std::string line(buf, cr - buf -1);
                     if (callback)
-                        callback(StringHelper::trim(line));
+                        callback(strx::trim(line));
                     memmove(buf, cr + 1, strlen(cr+1) + 1);
                 }
             }
         } //for
 
         if (buf[0])
-            callback(StringHelper::trim(std::string(buf)));
+            callback(strx::trim(std::string(buf)));
 
         char ctrlc = 3;
         //if (finish_flag)

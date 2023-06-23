@@ -2,7 +2,7 @@ cmake_minimum_required (VERSION 3.15)
 project (helper_lib)
 
 # Rely on C++ 11
-set (CMAKE_CXX_STANDARD 11)
+set (CMAKE_CXX_STANDARD 20)
 set (CMAKE_CXX_STANDARD_REQUIRED ON)
 
 option (USE_NULL_UUID "When enabled linking to libuuid is avoided" OFF)
