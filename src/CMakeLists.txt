@@ -1,53 +1,7 @@
 project(rtphone)
 
-cmake_minimum_required(VERSION 3.0)
+cmake_minimum_required(VERSION 3.10)
  
-macro(configure_msvc_runtime)
-    if(MSVC)
-        # Default to statically-linked runtime.
-        if("${MSVC_RUNTIME}" STREQUAL "")
-            set(MSVC_RUNTIME "static")
-        endif()
-        # Set compiler options.
-        set(variables
-            CMAKE_C_FLAGS_DEBUG
-            CMAKE_C_FLAGS_MINSIZEREL
-            CMAKE_C_FLAGS_RELEASE
-            CMAKE_C_FLAGS_RELWITHDEBINFO
-            CMAKE_CXX_FLAGS_DEBUG
-            CMAKE_CXX_FLAGS_MINSIZEREL
-            CMAKE_CXX_FLAGS_RELEASE
-            CMAKE_CXX_FLAGS_RELWITHDEBINFO
-            )
-        if(${MSVC_RUNTIME} STREQUAL "static")
-            message(STATUS
-                "rtphone: MSVC -> forcing use of statically-linked runtime."
-                )
-            foreach(variable ${variables})
-                if(${variable} MATCHES "/MD")
-                    string(REGEX REPLACE "/MD" "/MT" ${variable} "${${variable}}")
-                endif()
-            endforeach()
-        else()
-            message(STATUS
-                "rtphone: MSVC -> forcing use of dynamically-linked runtime."
-                )
-            foreach(variable ${variables})
-                if(${variable} MATCHES "/MT")
-                    string(REGEX REPLACE "/MT" "/MD" ${variable} "${${variable}}")
-                endif()
-            endforeach()
-        endif()
-
-        foreach(variable ${variables})
-            string(REGEX REPLACE "/Z[iI7]" ""
-                ${variable}
-                "${${variable}}")
-
-            set(${variable} "${${variable}} /Zi /Oy-")
-        endforeach()
-    endif()
-endmacro()
 
 
 # Rely on C++ 17
@@ -225,4 +179,4 @@ target_include_directories(rtphone
     )
 
 # For MSVC static builds
-configure_msvc_runtime()
+set_property(TARGET rtphone PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")

@@ -17,3 +17,7 @@ set_property(TARGET helper_lib PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<C
 # Private include directories
 target_include_directories(helper_lib PUBLIC ../../libs/ ../../engine ../ .)
 target_compile_definitions(helper_lib PRIVATE -D_CRT_SECURE_NO_WARNINGS -D_UNICODE)
+
+if (NOT USE_NULL_UUID)
+    target_link_libraries(helper_lib PUBLIC uuid)
+endif()
