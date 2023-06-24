@@ -23,6 +23,8 @@ set (SOURCES
     MT_AudioReceiver.cpp
     MT_AudioCodec.cpp
     MT_CngHelper.cpp
+    MT_AmrCodec.cpp
+    MT_EvsCodec.cpp
 
     MT_Statistics.h
     MT_WebRtc.h
@@ -38,48 +40,47 @@ set (SOURCES
     MT_AudioReceiver.h
     MT_AudioCodec.h
     MT_CngHelper.h
+    MT_AmrCodec.h
+    MT_EvsCodec.h
     )
 
+add_library(media_lib ${SOURCES})
 if (USE_AMR_CODEC)
     message("Media: AMR NB and WB codecs will be included.")
-    add_definitions(-DUSE_AMR_CODEC)
-    set (SOURCES ${SOURCES} MT_AmrCodec.cpp MT_AmrCodec.h)
+    target_compile_definitions(media_lib PUBLIC USE_AMR_CODEC)
     set (LIBS_CODEC)
 endif()
 
 if (USE_EVS_CODEC)
     message("Media: EVS codec will be included.")
-    add_definitions (-DUSE_EVS_CODEC)
-    set (SOURCES ${SOURCES} MT_EvsCodec.cpp MT_EvsCodec.h)
+    target_compile_definitions (media_lib PUBLIC USE_EVS_CODEC)
     set (LIBS_CODEC evs_codec)
 endif()
 
 if (USE_OPUS_CODEC)
     message("Media: Opus codec will be included.")
-    add_definitions(-DUSE_OPUS_CODEC)
+    target_compile_definitions(media_lib PUBLIC USE_OPUS_CODEC)
+    set (LIBS_CODEC opus)
+    add_subdirectory(../../libs/opus build_opus)
 endif()
 
 
-if(CMAKE_SYSTEM MATCHES "Linux*")
-    add_definitions(-DHAVE_NETINET_IN_H)
+if(CMAKE_SYSTEM MATCHES "Linux*" OR CMAKE_SYSTEM MATCHES "Darwin*")
+    target_compile_definitions(media_lib PUBLIC HAVE_NETINET_IN_H)
 endif()
 
-if(CMAKE_SYSTEM MATCHES "Darwin*")
-    # OS X Specific flags
-    add_definitions(-DHAVE_NETINET_IN_H)
-endif()
 
 if (CMAKE_SYSTEM MATCHES "Windows*")
     # Windows Specific flags - MSVC expected
-    add_definitions(
-        -D_CRT_SECURE_NO_WARNINGS
-        -DHAVE_WINSOCK2_H
-        -D_SILENCE_STDEXT_HASH_DEPRECATION_WARNINGS
-        -DUNICODE
-        -D_UNICODE )
+    target_compile_definitions(media_lib PRIVATE
+        _CRT_SECURE_NO_WARNINGS
+        HAVE_WINSOCK2_H
+        _SILENCE_STDEXT_HASH_DEPRECATION_WARNINGS
+        UNICODE
+        _UNICODE )
 endif()
 
-add_library(media_lib ${SOURCES})
+
 
 # Dependency on ice_stack - Linux build requires it
 # Codec libraries as well

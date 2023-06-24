@@ -23,8 +23,7 @@ void AVQ_demuxdec(
     int   xriq[],     /* o:   decoded subvectors [0..8*Nsv-1] */
     short *nb_bits,   /* i/o: number of allocated bits        */
     const short Nsv,        /* i:   number of subvectors            */
-    short nq_out[]    /* i/o: AVQ nq index                    */
-)
+    short nq_out[]    /* i/o: AVQ nq index                    */)
 {
     short i,j, bits, order_v;
     long I[NSV_MAX];
@@ -33,7 +32,7 @@ void AVQ_demuxdec(
     kv = xriq;        /* reuse vector to save memory */
     bits = *nb_bits;
 
-    for(i = 0; i <NSV_MAX; i++)
+    for(i = 0; i < NSV_MAX; i++)
     {
         I[i] = -1;
     }
@@ -44,7 +43,6 @@ void AVQ_demuxdec(
 
         if( bits > 8 )
         {
-            /* read the unary code including the stop bit for nq[i] */
             nq[i] = -1;
             do
             {
@@ -152,8 +150,7 @@ void AVQ_demuxdec(
 void AVQ_dec_lpc(
     const int   indx[],     /* i  : index[] (4 bits per words)      */
     int   nvecq[],    /* o  : vector quantized                */
-    const short Nsv         /* i  : number of subvectors (lg=Nsv*8) */
-)
+    const short Nsv         /* i  : number of subvectors (lg=Nsv*8) */)
 {
     int    i, l, n, nq, nk, pos, ival, c[8], kv[8];
     long   I;

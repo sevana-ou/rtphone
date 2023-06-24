@@ -652,6 +652,7 @@ void RTPExternalTransmitter::FlushPackets()
 
 int RTPExternalTransmitter::CreateAbortDescriptors()
 {
+#if !defined(RTP_DISABLE_INTERRUPT)
 	SOCKET listensock;
 	int size;
 	struct sockaddr_in addr;
@@ -726,13 +727,16 @@ int RTPExternalTransmitter::CreateAbortDescriptors()
 	// okay, got the connection, close the listening socket
 
 	RTPCLOSE(listensock);
+#endif
 	return 0;
 }
 
 void RTPExternalTransmitter::DestroyAbortDescriptors()
 {
-	RTPCLOSE(abortdesc[0]);
+#if !defined(RTP_DISABLE_INTERRUPT)
+    RTPCLOSE(abortdesc[0]);
 	RTPCLOSE(abortdesc[1]);
+#endif
 }
 
 #else // in a non winsock environment we can use pipes
