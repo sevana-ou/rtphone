@@ -45,25 +45,27 @@ set (SOURCES
     )
 
 add_library(media_lib ${SOURCES})
+set (LIBS_CODEC)
+
 if (USE_AMR_CODEC)
+    include (../../../../libraries/platform_libs.cmake)
     message("Media: AMR NB and WB codecs will be included.")
     target_compile_definitions(media_lib PUBLIC USE_AMR_CODEC)
-    set (LIBS_CODEC)
+    list (APPEND LIBS_CODEC ${OPENCORE_AMRNB} ${OPENCORE_AMRWB})
 endif()
 
 if (USE_EVS_CODEC)
     message("Media: EVS codec will be included.")
     target_compile_definitions (media_lib PUBLIC USE_EVS_CODEC)
-    set (LIBS_CODEC evs_codec)
+    list (APPEND LIBS_CODEC evs_codec)
 endif()
 
 if (USE_OPUS_CODEC)
     message("Media: Opus codec will be included.")
     target_compile_definitions(media_lib PUBLIC USE_OPUS_CODEC)
-    set (LIBS_CODEC opus)
+    list (APPEND LIBS_CODEC opus)
     add_subdirectory(../../libs/opus build_opus)
 endif()
-
 
 if(CMAKE_SYSTEM MATCHES "Linux*" OR CMAKE_SYSTEM MATCHES "Darwin*")
     target_compile_definitions(media_lib PUBLIC HAVE_NETINET_IN_H)
