@@ -11,6 +11,10 @@
 namespace evs {
 
 
+#if defined(_WIN32) && !defined(_DEBUG)
+#pragma optimize("", off)
+#endif
+
 /*-----------------------------------------------------------------*
  * AVQ_demuxdec()
  *
@@ -139,6 +143,9 @@ void AVQ_demuxdec(
     return;
 }
 
+#if defined(_WIN32) && !defined(_DEBUG)
+#pragma optimize("", on)
+#endif
 
 /*-----------------------------------------------------------------*
  * AVQ_dec_lpc()
