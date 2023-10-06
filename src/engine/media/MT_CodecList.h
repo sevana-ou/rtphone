@@ -15,6 +15,7 @@
 #include "MT_Codec.h"
 #include <vector>
 #include <set>
+#include <list>
 #include "../helper/HL_VariantMap.h"
 
 #define ALL_CODECS_STRING "OPUS,ISAC,ILBC,PCMU,PCMA,G722,GSM"
