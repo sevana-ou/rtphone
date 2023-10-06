@@ -508,11 +508,6 @@ target_compile_definitions(opus
                            $<$<BOOL:${HAVE_LRINT}>:HAVE_LRINT>
                            $<$<BOOL:${HAVE_LRINTF}>:HAVE_LRINTF>)
 
-if (MSVC)
-    set_property(TARGET opus PROPERTY
-                 MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
-endif()
-
 if(OPUS_BUILD_FRAMEWORK)
   set_target_properties(opus PROPERTIES
                         FRAMEWORK TRUE
