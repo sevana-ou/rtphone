@@ -39,10 +39,6 @@ const char* ice::RunningStateToString(RunningState state)
   return "Undefined";
 }
 
-
-
-#pragma region BindingAction
-
 // This class is intended to bring client binding results with candidates
 class BindingAction: public Action
 {
@@ -107,9 +103,6 @@ public:
   }
 };
 
-#pragma endregion
-
-#pragma region RelayingAction
 
 class RelayingAction: public Action
 {
@@ -234,9 +227,7 @@ public:
     }
   }
 };
-#pragma endregion
 
-#pragma region CheckPairAction
 class CheckPairAction: public Action
 {
   friend struct Stream;
@@ -434,9 +425,7 @@ protected:
   int                   mAgentRole;
 };
 
-#pragma endregion
 
-#pragma region ICEInstallPermissions
 
 //This class is intended to bring client binding results with candidates
 class ICEInstallPermissionsAction: public Action
@@ -479,7 +468,6 @@ public:
   }
 };
 
-#pragma endregion
 static long GStackID = 0;
 
 Stream::Stream()
