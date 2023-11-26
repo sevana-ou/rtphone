@@ -57,6 +57,7 @@ if (USE_MUSL)
 endif()
 
 set (RTPHONE_SOURCES
+    ${rtphone_engine}/engine_config.h
     ${rtphone_engine}/media/MT_Statistics.cpp
     ${rtphone_engine}/media/MT_WebRtc.cpp
     ${rtphone_engine}/media/MT_Stream.cpp

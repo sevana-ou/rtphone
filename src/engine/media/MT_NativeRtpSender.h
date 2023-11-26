@@ -6,7 +6,7 @@
 #ifndef __MT_NATIVE_RTP_SENDER_H
 #define __MT_NATIVE_RTP_SENDER_H
 
-#include "../config.h"
+#include "../engine_config.h"
 #include "jrtplib/src/rtpexternaltransmitter.h"
 #include "srtp/include/srtp.h"
 #include "../helper/HL_NetworkSocket.h"

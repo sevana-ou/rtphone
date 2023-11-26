@@ -1,7 +1,7 @@
 #ifndef MT_AMRCODEC_H
 #define MT_AMRCODEC_H
 
-#include "../config.h"
+#include "../engine_config.h"
 #include <map>
 #include "MT_Codec.h"
 #include "../helper/HL_Pointer.h"

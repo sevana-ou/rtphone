@@ -5,7 +5,7 @@
 
 #define NOMINMAX
 
-#include "../config.h"
+#include "../engine_config.h"
 #include "MT_AudioReceiver.h"
 #include "MT_AudioCodec.h"
 #include "MT_CngHelper.h"

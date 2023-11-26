@@ -1,4 +1,4 @@
-#include "../config.h"
+#include "../engine_config.h"
 
 #include "MT_CngHelper.h"
 #include <stdlib.h>

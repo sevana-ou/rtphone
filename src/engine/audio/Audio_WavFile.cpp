@@ -7,7 +7,7 @@
 #include "helper/HL_Exception.h"
 #include "helper/HL_String.h"
 #include "helper/HL_Log.h"
-#include "../config.h"
+#include "../engine_config.h"
 
 #include <memory.h>
 #include <assert.h>

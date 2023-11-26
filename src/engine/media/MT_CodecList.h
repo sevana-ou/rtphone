@@ -6,7 +6,7 @@
 #ifndef __MT_CODEC_LIST_H
 #define __MT_CODEC_LIST_H
 
-#include "../config.h"
+#include "../engine_config.h"
 
 #if defined(USE_RESIP_INTEGRATION)
 # include "resiprocate/resip/stack/SdpContents.hxx"

@@ -7,7 +7,7 @@
 #define __AUDIO_INTERFACE_H
 
 #include <string>
-#include "../config.h"
+#include "../engine_config.h"
 #include "../helper/HL_Types.h"
 #include "../helper/HL_VariantMap.h"
 #include "../helper/HL_Pointer.h"

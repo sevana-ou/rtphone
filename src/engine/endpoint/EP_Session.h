@@ -35,7 +35,7 @@
 #include <atomic>
 #include <time.h>
 
-#include "../config.h"
+#include "../engine_config.h"
 #include "EP_Account.h"
 #include "EP_DataProvider.h"
 #include "EP_AudioProvider.h"

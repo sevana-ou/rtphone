@@ -6,7 +6,7 @@
 #ifndef __AUDIO_CODEC_H
 #define __AUDIO_CODEC_H
 
-#include "../config.h"
+#include "../engine_config.h"
 #include <map>
 #include "MT_Codec.h"
 #include "../audio/Audio_Resampler.h"

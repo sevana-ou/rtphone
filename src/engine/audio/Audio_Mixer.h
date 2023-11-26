@@ -6,7 +6,7 @@
 #ifndef _RX_MIXER_H
 #define _RX_MIXER_H
 
-#include "../config.h"
+#include "../engine_config.h"
 #include "../helper/HL_ByteBuffer.h"
 #include "../helper/HL_Sync.h"
 #include "Audio_Resampler.h"

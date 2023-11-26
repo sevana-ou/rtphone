@@ -47,7 +47,7 @@
 #include "../ice/ICETime.h"
 #include <sstream>
 #include <time.h>
-#include "../config.h"
+#include "../engine_config.h"
 #include "EP_Session.h"
 #include "EP_Observer.h"
 #include "EP_DataProvider.h"

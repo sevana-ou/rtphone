@@ -3,7 +3,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-#include "../config.h"
+#include "../engine_config.h"
 #include "MT_WebRtc.h"
 #include "../helper/HL_Exception.h"
 

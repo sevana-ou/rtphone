@@ -6,7 +6,7 @@
 #ifndef MT_DTMF
 #define MT_DTMF
 
-#include "../config.h"
+#include "../engine_config.h"
 #include <vector>
 #include <string>
 #include "../helper/HL_ByteBuffer.h"

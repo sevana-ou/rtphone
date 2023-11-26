@@ -5,7 +5,7 @@
 
 #ifndef __AUDIO_QUALITY_H
 #define __AUDIO_QUALITY_H
-#include "../config.h"
+#include "../engine_config.h"
 #include "../helper/HL_Sync.h"
 #include <vector>
 

@@ -6,7 +6,7 @@
 #ifndef __MT_AUDIOSTREAM_H
 #define __MT_AUDIOSTREAM_H
 
-#include "../config.h"
+#include "../engine_config.h"
 #include "MT_Stream.h"
 #include "MT_NativeRtpSender.h"
 #include "MT_SingleAudioStream.h"

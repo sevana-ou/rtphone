@@ -7,7 +7,7 @@
 # include <asm/ioctls.h>
 #endif
 
-#include "../config.h"
+#include "../engine_config.h"
 #include "HL_NetworkSocket.h"
 
 #if defined(TARGET_OSX) || defined(TARGET_LINUX)

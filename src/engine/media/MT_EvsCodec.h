@@ -1,5 +1,7 @@
-#pragma once
+#ifndef __MT_EVS_CODEC_H
+#define __MT_EVS_CODEC_H
 
+#include "../engine_config.h"
 #include <set>
 #include <map>
 #include <memory>
@@ -10,7 +12,6 @@
 #include <assert.h>
 #include <sstream>
 
-#include "config.h"
 #include "MT_Codec.h"
 
 #include "libevs/lib_com/prot.h"
@@ -40,7 +41,7 @@ public:
 
     public:
         EVSFactory(StreamParameters& sp);
-        const char* name() { return MT_EVS_CODECNAME; };
+        const char* name() { return MT_EVS_CODECNAME; }
         int samplerate();
         int payloadType();
         PCodec create();
@@ -51,7 +52,7 @@ public:
     EVSCodec(const StreamParameters& sp);
     ~EVSCodec() override;
 
-    const char* name() override { return MT_EVS_CODECNAME; } ;
+    const char* name() override { return MT_EVS_CODECNAME; }
     int samplerate() override;
     int pcmLength() override;
     int frameTime() override;
@@ -68,3 +69,5 @@ private:
 };
 
 } // End of namespace
+
+#endif

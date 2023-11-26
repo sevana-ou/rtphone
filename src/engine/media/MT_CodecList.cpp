@@ -5,7 +5,7 @@
 #include <algorithm>
 #include <list>
 
-#include "../config.h"
+#include "../engine_config.h"
 #include "MT_CodecList.h"
 #include "MT_AudioCodec.h"
 
