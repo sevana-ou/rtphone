@@ -61,6 +61,7 @@ namespace ice
     
     unsigned short  port() const;
     std::string     toStdString() const;
+    std::string     toBriefStdString() const;
 #ifdef WIN32
     std::wstring    toStdWString() const;
 #endif

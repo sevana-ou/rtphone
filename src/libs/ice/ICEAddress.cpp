@@ -515,6 +515,18 @@ std::string NetworkAddress::toStdString() const
   
   return temp;
 }
+
+std::string NetworkAddress::toBriefStdString() const
+{
+    if (!mInitialized)
+        return "";
+
+    char temp[128];
+    sprintf(temp, "%s:%u", ip().c_str(), (unsigned int)port());
+
+    return temp;
+}
+
 #ifdef WIN32
 std::wstring NetworkAddress::toStdWString() const
 {

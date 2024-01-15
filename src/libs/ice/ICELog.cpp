@@ -211,8 +211,8 @@ Logger::endLine()
     struct tm current_time = *gmtime(&unix_timestamp);
     char time_buffer[128]; strftime(time_buffer, sizeof(time_buffer), "%H:%M:%S", &current_time);
 
-    result << time_buffer << ":"  << (unix_timestamp_ms.count() % 1000 ) << "\t" << " | " << std::setw(8) << ThreadInfo::currentThread() << " | " << std::setw(30)
-           << mFilename.c_str() << " | " << std::setw(4) << mLine << " | " << std::setw(12) << mSubsystem.c_str() << " | "
+    result << time_buffer << ":"  << (unix_timestamp_ms.count() % 1000 ) << "\t" << " | " << std::setw(8) << ThreadInfo::currentThread() << " | "
+           << std::setw(40) << mFilename.c_str() << " | " << std::setw(4) << mLine << " | " << std::setw(12) << mSubsystem.c_str() << " | "
            << mStream->str().c_str();
 
     std::string t = result.str();
