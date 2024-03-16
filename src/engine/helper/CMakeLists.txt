@@ -23,5 +23,6 @@ if (USE_NULL_UUID)
 endif()
 
 if (NOT USE_NULL_UUID)
-    target_link_libraries(helper_lib PUBLIC uuid)
+    message("Warning: uuid library will be linked!")
+    #target_link_libraries(helper_lib PUBLIC uuid)
 endif()
