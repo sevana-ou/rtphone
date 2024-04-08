@@ -240,8 +240,8 @@ void CodecList::init(const Settings& settings)
   mFactoryList.push_back(new G711Codec::UlawFactory());
 
   mFactoryList.push_back(new GsmCodec::GsmFactory(mSettings.mGsmFrPayloadLength == 32 ? GsmCodec::Type::Bytes_32 : GsmCodec::Type::Bytes_33, mSettings.mGsmFrPayloadType));
-  // mFactoryList.push_back(new G722Codec::G722Factory());
-  // mFactoryList.push_back(new G729Codec::G729Factory());
+  mFactoryList.push_back(new G722Codec::G722Factory());
+  mFactoryList.push_back(new G729Codec::G729Factory());
 #ifndef TARGET_ANDROID
   mFactoryList.push_back(new GsmHrCodec::GsmHrFactory(mSettings.mGsmHrPayloadType));
 #endif

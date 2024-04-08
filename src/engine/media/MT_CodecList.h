@@ -72,7 +72,7 @@ public:
             static EvsSpec parse(const std::string& spec);
 
             bool operator == (const EvsSpec& rhs) const { return std::tie(mPayloadType, mBandwidth, mEncodingType) == std::tie(rhs.mPayloadType, rhs.mBandwidth, rhs.mEncodingType);}
-            bool operator != (const EvsSpec& rhs) const { return ! (operator ==) (rhs);};
+            bool operator != (const EvsSpec& rhs) const { return ! (operator ==) (rhs);}
 
         };
 
@@ -90,7 +90,7 @@ public:
 
             bool isValid() const;
             bool operator == (const OpusSpec& rhs) const { return std::tie(mPayloadType, mRate, mChannels) == std::tie(rhs.mPayloadType, rhs.mRate, rhs.mChannels);}
-            bool operator != (const OpusSpec& rhs) const { return ! (operator ==) (rhs);};
+            bool operator != (const OpusSpec& rhs) const { return ! (operator ==) (rhs);}
 
             static OpusSpec parse(const std::string& spec);
         };
