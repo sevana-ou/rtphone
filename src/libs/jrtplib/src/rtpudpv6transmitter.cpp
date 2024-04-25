@@ -411,8 +411,9 @@ int RTPUDPv6Transmitter::GetLocalHostName(uint8_t *buffer,size_t *bufferlength)
 {
 	if (!init)
 		return ERR_RTP_UDPV6TRANS_NOTINIT;
+    return ERR_RTP_UDPV6TRANS_NOLOCALIPS;
 
-	MAINMUTEX_LOCK
+    /*MAINMUTEX_LOCK
 	if (!created)
 	{
 		MAINMUTEX_UNLOCK
@@ -542,7 +543,7 @@ int RTPUDPv6Transmitter::GetLocalHostName(uint8_t *buffer,size_t *bufferlength)
 	*bufferlength = localhostnamelength;
 	
 	MAINMUTEX_UNLOCK
-	return 0;
+    return 0;*/
 }
 
 bool RTPUDPv6Transmitter::ComesFromThisTransmitter(const RTPAddress *addr)
@@ -1726,7 +1727,9 @@ bool RTPUDPv6Transmitter::GetLocalIPList_Interfaces()
 
 void RTPUDPv6Transmitter::GetLocalIPList_DNS()
 {
-	int status;
+    return;
+    /*
+    int status;
 	char name[1024];
 
 	gethostname(name,1023);
@@ -1754,7 +1757,7 @@ void RTPUDPv6Transmitter::GetLocalIPList_DNS()
 		tmp = tmp->ai_next;
 	}
 	
-	freeaddrinfo(res);	
+    freeaddrinfo(res);	*/
 }
 
 

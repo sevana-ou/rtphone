@@ -406,7 +406,9 @@ int RTPUDPv4Transmitter::GetLocalHostName(uint8_t *buffer,size_t *bufferlength)
 	if (!init)
 		return ERR_RTP_UDPV4TRANS_NOTINIT;
 
-	MAINMUTEX_LOCK
+    return ERR_RTP_UDPV4TRANS_NOLOCALIPS;
+
+    /*MAINMUTEX_LOCK
 	if (!created)
 	{
 		MAINMUTEX_UNLOCK
@@ -533,6 +535,7 @@ int RTPUDPv4Transmitter::GetLocalHostName(uint8_t *buffer,size_t *bufferlength)
 	*bufferlength = localhostnamelength;
 	
 	MAINMUTEX_UNLOCK
+    */
 	return 0;
 }
 
@@ -1636,7 +1639,7 @@ int RTPUDPv4Transmitter::CreateLocalIPList()
 	if (!GetLocalIPList_Interfaces())
 	{
 		// If this fails, we'll have to depend on DNS info
-		GetLocalIPList_DNS();
+        // GetLocalIPList_DNS();
 	}
 	AddLoopbackAddress();
 	return 0;
@@ -1773,7 +1776,10 @@ bool RTPUDPv4Transmitter::GetLocalIPList_Interfaces()
 
 void RTPUDPv4Transmitter::GetLocalIPList_DNS()
 {
-	struct hostent *he;
+    // Commented out as this functionality is not used and adds dependency on DNS resolver in Linux/glibc systems
+    return;
+
+    /*struct hostent *he;
 	char name[1024];
 	uint32_t ip;
 	bool done;
@@ -1800,7 +1806,7 @@ void RTPUDPv4Transmitter::GetLocalIPList_DNS()
 			localIPs.push_back(ip);
 			i++;
 		}
-	}
+    }*/
 }
 
 void RTPUDPv4Transmitter::AbortWaitInternal()

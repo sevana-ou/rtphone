@@ -168,7 +168,7 @@ if(OPUS_CPU_X86 OR OPUS_CPU_X64)
   set(OPUS_X86_MAY_HAVE_SSE4_1_HELP_STR "does runtime check for SSE4.1 support.")
   cmake_dependent_option(OPUS_X86_MAY_HAVE_SSE4_1
                          ${OPUS_X86_MAY_HAVE_SSE4_1_HELP_STR}
-                         ON
+                         OFF
                          "SSE4_1_SUPPORTED; NOT OPUS_DISABLE_INTRINSICS"
                          OFF)
   add_feature_info(OPUS_X86_MAY_HAVE_SSE4_1 OPUS_X86_MAY_HAVE_SSE4_1 ${OPUS_X86_MAY_HAVE_SSE4_1_HELP_STR})
@@ -187,13 +187,13 @@ if(OPUS_CPU_X86 OR OPUS_CPU_X64)
   if(OPUS_CPU_X64) # Assume x86_64 has up to SSE2 support
     cmake_dependent_option(OPUS_X86_PRESUME_SSE
                            ${OPUS_X86_PRESUME_SSE_HELP_STR}
-                           ON
+                           OFF
                            "OPUS_X86_MAY_HAVE_SSE; NOT OPUS_DISABLE_INTRINSICS"
                            OFF)
 
     cmake_dependent_option(OPUS_X86_PRESUME_SSE2
                            ${OPUS_X86_PRESUME_SSE2_HELP_STR}
-                           ON
+                           OFF
                            "OPUS_X86_MAY_HAVE_SSE2; NOT OPUS_DISABLE_INTRINSICS"
                            OFF)
   else()
