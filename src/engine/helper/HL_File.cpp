@@ -109,3 +109,32 @@ size_t FileHelper::getFreespace(const std::string& path)
 #endif
     return r;
 }
+
+std::string FileHelper::expandUserHome(const std::string &path)
+{
+    if (path.empty() || path[0] != '~')
+        return path;  // No expansion needed
+    
+    const char* home_dir = nullptr;
+
+#ifdef TARGET_WIN
+    home_dir = std::getenv("USERPROFILE");
+    if (!home_dir)
+    {
+        home_dir = std::getenv("HOMEDRIVE");
+        const char* homepath = std::getenv("HOMEPATH");
+        if (home_dir && homepath) {
+            std::string fullpath(home_dir);
+            fullpath += homepath;
+            return fullpath + path.substr(1);
+        }
+    }
+#else
+    home_dir = std::getenv("HOME");
+#endif
+    
+    if (!home_dir)
+        throw std::runtime_error("Unable to determine the home directory");
+    
+    return std::string(home_dir) + path.substr(1);
+}

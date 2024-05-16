@@ -23,6 +23,7 @@ public:
     // Returns free space on volume for path
     // Works for Linux only. For other systems (size_t)-1 is returned (for errors too)
     static size_t getFreespace(const std::string& path);
+    static std::string expandUserHome(const std::string& path);
 };
 
 #endif

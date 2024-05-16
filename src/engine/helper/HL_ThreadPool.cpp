@@ -20,6 +20,17 @@ void thread_pool::enqueue(const thread_pool::task& t)
     this->condition.notify_one();
 }
 
+void thread_pool::wait(std::chrono::milliseconds interval)
+{
+    while (size() != 0)
+        std::this_thread::sleep_for(interval);
+}
+
+size_t thread_pool::size()
+{
+    std::unique_lock l(this->queue_mutex);
+    return this->tasks.size();
+}
 
 // the destructor joins all threads
 thread_pool::~thread_pool()
@@ -37,7 +48,7 @@ void thread_pool::run_worker()
 {
     ThreadHelper::setName(this->name);
     task t;
-    while(!this->stop)
+    while (!this->stop)
     {
         {
             std::unique_lock<std::mutex> lock(this->queue_mutex);
