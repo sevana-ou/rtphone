@@ -1,23 +1,20 @@
 #include "HL_Uuid.h"
 #include <memory.h>
+#include <random>
+#include "uuid_v4.h"
 
 Uuid::Uuid()
 {
-#if defined(TARGET_WIN) || defined(TARGET_LINUX) || defined(TARGET_OSX)
     memset(&mUuid, 0, sizeof mUuid);
-#endif
 }
 
 Uuid Uuid::generateOne()
 {
     Uuid result;
 #if !defined(USE_NULL_UUID)
-#if defined(TARGET_LINUX) || defined(TARGET_OSX)
-    uuid_generate(result.mUuid);
-#endif
-#if defined(TARGET_WIN)
-    UuidCreate(&result.mUuid);
-#endif
+    UUIDv4::UUIDGenerator<std::mt19937_64> generatorUUID;
+    auto r = generatorUUID.getUUID();
+    r.bytes((char*)result.mUuid);
 #endif
     return result;
 }
@@ -25,53 +22,20 @@ Uuid Uuid::generateOne()
 Uuid Uuid::parse(const std::string &s)
 {
     Uuid result;
-#if !defined(USE_NULL_UUID)
-#if defined(TARGET_LINUX) || defined(TARGET_OSX)
-    uuid_parse(s.c_str(), result.mUuid);
-#endif
-
-#if defined(TARGET_WIN)
-    UuidFromStringA((RPC_CSTR)s.c_str(), &result.mUuid);
-#endif
-#endif
+    UUIDv4::UUID load;
+    load.fromStr(s.c_str());
+    load.bytes((char*)result.mUuid);
     return result;
 }
 
 std::string Uuid::toString() const
 {
-#if defined(USE_NULL_UUID)
-    return "UUID_disabled";
-#else
-    char buf[64];
-
-#if defined(TARGET_LINUX) || defined(TARGET_OSX)
-    uuid_unparse_lower(mUuid, buf);
-#endif
-
-#if defined(TARGET_WIN)
-    RPC_CSTR s = nullptr;
-    UuidToStringA(&mUuid, &s);
-    if (s)
-    {
-        strcpy(buf, (const char*)s);
-        RpcStringFreeA(&s);
-        s = nullptr;
-    }
-#endif
-
-    return buf;
-#endif
+    UUIDv4::UUID load((const uint8_t*)mUuid);
+    return load.str();
 }
 
 bool Uuid::operator < (const Uuid& right) const
 {
-#if defined(TARGET_LINUX) || defined(TARGET_OSX)
     return memcmp(mUuid, right.mUuid, sizeof(mUuid)) < 0;
-#endif
-
-#if defined(TARGET_WIN)
-    return memcmp(&mUuid, &right.mUuid, sizeof(mUuid)) < 0;
-#endif
-
     return false;
 }

@@ -31,10 +31,10 @@ public:
         bool mSkipDecode            = false;
 
         // AMR payload types
-        std::set<int> mAmrWbPayloadType       = { MT_AMRWB_PAYLOADTYPE };
-        std::set<int> mAmrNbPayloadType       = { MT_AMRNB_PAYLOADTYPE };
-        std::set<int> mAmrWbOctetPayloadType  = { MT_AMRWB_OCTET_PAYLOADTYPE };
-        std::set<int> mAmrNbOctetPayloadType  = { MT_AMRNB_OCTET_PAYLOADTYPE };
+        std::set<int64_t> mAmrWbPayloadType       = { MT_AMRWB_PAYLOADTYPE };
+        std::set<int64_t> mAmrNbPayloadType       = { MT_AMRNB_PAYLOADTYPE };
+        std::set<int64_t> mAmrWbOctetPayloadType  = { MT_AMRWB_OCTET_PAYLOADTYPE };
+        std::set<int64_t> mAmrNbOctetPayloadType  = { MT_AMRNB_OCTET_PAYLOADTYPE };
 
         bool isAmrWb(int ptype) const { return mAmrWbOctetPayloadType.count(ptype) > 0 || mAmrWbPayloadType.count(ptype) > 0; }
         bool isAmrNb(int ptype) const { return mAmrNbOctetPayloadType.count(ptype) > 0 || mAmrNbPayloadType.count(ptype) > 0; }
