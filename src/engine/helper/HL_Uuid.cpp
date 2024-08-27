@@ -1,7 +1,10 @@
 #include "HL_Uuid.h"
 #include <memory.h>
 #include <random>
-#include "uuid_v4.h"
+#include <span>
+
+#define UUID_SYSTEM_GENERATOR
+#include "uuid.h"
 
 Uuid::Uuid()
 {
@@ -11,27 +14,27 @@ Uuid::Uuid()
 Uuid Uuid::generateOne()
 {
     Uuid result;
-#if !defined(USE_NULL_UUID)
-    UUIDv4::UUIDGenerator<std::mt19937_64> generatorUUID;
-    auto r = generatorUUID.getUUID();
-    r.bytes((char*)result.mUuid);
-#endif
+
+    auto id = uuids::uuid_system_generator{}();
+    memcpy(result.mUuid, id.as_bytes().data(), id.as_bytes().size_bytes());
     return result;
 }
 
 Uuid Uuid::parse(const std::string &s)
 {
     Uuid result;
-    UUIDv4::UUID load;
-    load.fromStr(s.c_str());
-    load.bytes((char*)result.mUuid);
+    auto id = uuids::uuid::from_string(s);
+    if (id)
+        memcpy(result.mUuid, id->as_bytes().data(), id->as_bytes().size_bytes());
+
     return result;
 }
 
 std::string Uuid::toString() const
 {
-    UUIDv4::UUID load((const uint8_t*)mUuid);
-    return load.str();
+    auto s = std::span<uuids::uuid::value_type, 16>{(uuids::uuid::value_type*)mUuid, 16};
+    uuids::uuid id(s);
+    return uuids::to_string(id);
 }
 
 bool Uuid::operator < (const Uuid& right) const

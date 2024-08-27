@@ -5,9 +5,7 @@ project (helper_lib)
 set (CMAKE_CXX_STANDARD 20)
 set (CMAKE_CXX_STANDARD_REQUIRED ON)
 
-option (USE_NULL_UUID "When enabled linking to libuuid is avoided" ON)
-
-set (CMAKE_POSITION_INDEPENDENT_CODE ON)
+set (CMAKE_POSITION_INDEPENDENT_CODE OFF)
 
 file (GLOB HELPER_LIB_SOURCES "*.cpp" "*.h")
 
@@ -17,12 +15,3 @@ set_property(TARGET helper_lib PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<C
 # Private include directories
 target_include_directories(helper_lib PUBLIC ../../libs/ ../../engine ../ .)
 target_compile_definitions(helper_lib PRIVATE -D_CRT_SECURE_NO_WARNINGS -D_UNICODE)
-
-if (USE_NULL_UUID)
-    target_compile_definitions (helper_lib PUBLIC -DUSE_NULL_UUID)
-endif()
-
-if (NOT USE_NULL_UUID)
-    message("Warning: uuid library will be linked!")
-    #target_link_libraries(helper_lib PUBLIC uuid)
-endif()
