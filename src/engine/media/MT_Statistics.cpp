@@ -1,4 +1,5 @@
 #include <math.h>
+#include <iostream>
 
 #include "MT_Statistics.h"
 #include "audio/Audio_Interface.h"
@@ -55,8 +56,11 @@ void JitterStatistics::process(jrtplib::RTPPacket* packet, int rate)
         mReceiveTime = receiveTime;
         mReceiveTimestamp = timestamp;
 
-        // And mJitter are in seconds again
-        mJitter.process(mLastJitter.value() / float(rate));
+        // And mJitter are in milliseconds again
+        float jitter_s = mLastJitter.value() / (float(rate));
+        // std::cout << "Jitter (in seconds): " << std::dec << jitter_s << std::endl;
+
+        mJitter.process(jitter_s);
     }
 }
 

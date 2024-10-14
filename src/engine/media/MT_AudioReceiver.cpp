@@ -331,6 +331,7 @@ AudioReceiver::AudioReceiver(const CodecList::Settings& settings, MT::Statistics
     mResampler48.start(AUDIO_CHANNELS, 48000, AUDIO_SAMPLERATE);
 
     // Init codecs
+    mCodecList.setSettings(settings);
     mCodecList.fillCodecMap(mCodecMap);
 
 #if defined(DUMP_DECODED)
@@ -442,14 +443,14 @@ bool AudioReceiver::add(const std::shared_ptr<jrtplib::RTPPacket>& p, Codec** co
     if (payloadLength >= 1 && payloadLength <= 6 && (ptype == 0 || ptype == 8))
         time_length = mLastPacketTimeLength ? mLastPacketTimeLength : 20;
     else
-        // Check if packet is too short from time length side
-        if (time_length < 2)
-        {
-            // It will cause statistics to report about bad RTP packet
-            // I have to replay last packet payload here to avoid report about lost packet
-            mBuffer.add(p, time_length, codecIter->second->samplerate());
-            return false;
-        }
+    // Check if packet is too short from time length side
+    if (time_length < 2)
+    {
+        // It will cause statistics to report about bad RTP packet
+        // I have to replay last packet payload here to avoid report about lost packet
+        mBuffer.add(p, time_length, codecIter->second->samplerate());
+        return false;
+    }
 
     // Queue packet to buffer
     auto packet = mBuffer.add(p, time_length, codecIter->second->samplerate()).get();
