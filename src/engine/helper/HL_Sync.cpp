@@ -127,6 +127,13 @@ int64_t chronox::getDelta(const timespec& a, const timespec& b)
     return ms_a - ms_b;
 }
 
+int64_t chronox::getDelta(const timeval& a, const timeval& b)
+{
+    int64_t diff_seconds = a.tv_sec - b.tv_sec;
+    int64_t diff_microseconds = a.tv_usec - b.tv_usec;
+    return diff_seconds * 1000 + diff_microseconds / 1000;
+}
+
 chronox::ExecutionTime::ExecutionTime()
 {
     mStart = chronox::getTimestamp();

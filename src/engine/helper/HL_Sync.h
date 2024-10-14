@@ -64,6 +64,7 @@ public:
 
   // Returns difference between timestamps in milliseconds
   static int64_t getDelta(const timespec& a, const timespec& b);
+  static int64_t getDelta(const timeval& a, const timeval& b);
 
   class ExecutionTime
   {
