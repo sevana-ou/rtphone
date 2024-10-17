@@ -15,6 +15,7 @@
 #define stricmp strcasecmp
 #endif
 
+#include <cstdint>
 
 class strx
 {
