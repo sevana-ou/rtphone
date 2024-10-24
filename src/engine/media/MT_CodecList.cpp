@@ -116,7 +116,7 @@ CodecList::Settings::OpusSpec CodecList::Settings::OpusSpec::parse(const std::st
 {
     OpusSpec result;
 
-    auto parts = strx::split(spec, "-");
+    auto parts = strx::split(spec, "-/");
     if (parts.size() == 3)
     {
         result.mPayloadType = strx::toInt(strx::trim(parts.front()).c_str(), -1);
