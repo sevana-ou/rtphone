@@ -9,6 +9,7 @@
 #include <vector>
 #include <string>
 #include <sstream>
+#include <stdint.h>
 #include "HL_Types.h"
 
 #ifdef TARGET_OSX
