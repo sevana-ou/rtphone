@@ -1,7 +1,11 @@
 project (media_lib)
 
-# Rely on C++ 11
-set (CMAKE_CXX_STANDARD 11)
+if (NOT DEFINED LIB_PLATFORM)
+    message(FATAL_ERROR media_lib project requires LIB_PLATFORM to be set - it uses libraries from that directory)
+endif()
+
+# Rely on C++ 20
+set (CMAKE_CXX_STANDARD 20)
 set (CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # Produce PIC code always
@@ -48,7 +52,7 @@ add_library(media_lib ${SOURCES})
 set (LIBS_CODEC)
 
 if (USE_AMR_CODEC)
-    include (../../../../libraries/platform_libs.cmake)
+    include (${LIB_PLATFORM}/platform_libs.cmake)
     message("Media: AMR NB and WB codecs will be included.")
     target_compile_definitions(media_lib PUBLIC USE_AMR_CODEC)
     list (APPEND LIBS_CODEC ${OPENCORE_AMRNB} ${OPENCORE_AMRWB})

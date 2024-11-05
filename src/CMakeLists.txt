@@ -3,7 +3,7 @@ project(rtphone)
 
  
 # Rely on C++ 17
-set (CMAKE_CXX_STANDARD 17)
+set (CMAKE_CXX_STANDARD 20)
 set (CMAKE_CXX_STANDARD_REQUIRED ON)
 
 set (rtphone_libs libs)
@@ -17,9 +17,7 @@ option (USE_MUSL        "Build with MUSL library"               OFF)
 # PIC code by default
 set (CMAKE_POSITION_INDEPENDENT_CODE ON)
 
-if (NOT DEFINED LIB_PLATFORM)
-    set (LIB_PLATFORM ${CMAKE_CURRENT_SOURCE_DIR}/../../libraries)
-endif()
+set (LIB_PLATFORM ${CMAKE_CURRENT_SOURCE_DIR}/libs/libraries)
 include (${LIB_PLATFORM}/platform_libs.cmake)
 
 message("Libraries: ${LIB_PLATFORM}")
