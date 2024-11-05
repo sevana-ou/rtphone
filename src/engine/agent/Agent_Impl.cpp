@@ -682,34 +682,34 @@ void AgentImpl::processUseStreamForSession(JsonCpp::Value& request, JsonCpp::Val
                 }
             }
             else
-                if (actionText == "write")
+            if (actionText == "write")
+            {
+                if (path.empty())
                 {
-                    if (path.empty())
-                    {
-                        // Turn off recording from the stream
-                        prov->writeFile(Audio::PWavFileWriter(), direction);
-                        answer["status"] = Status_Ok;
-                    }
-                    else
-                    {
-                        Audio::PWavFileWriter writer = std::make_shared<Audio::WavFileWriter>();
-                        if (!writer->open(strx::makeTstring(path), AUDIO_SAMPLERATE, AUDIO_CHANNELS))
-                            answer["status"] = Status_FailedToOpenFile;
-                        else
-                        {
-                            prov->writeFile(writer, direction);
-                            answer["status"] = Status_Ok;
-                        }
-                    }
+                    // Turn off recording from the stream
+                    prov->writeFile(Audio::PWavFileWriter(), direction);
+                    answer["status"] = Status_Ok;
                 }
                 else
-                    if (actionText == "mirror")
+                {
+                    Audio::PWavFileWriter writer = std::make_shared<Audio::WavFileWriter>();
+                    if (!writer->open(strx::makeTstring(path), AUDIO_SAMPLERATE, AUDIO_CHANNELS))
+                        answer["status"] = Status_FailedToOpenFile;
+                    else
                     {
-                        prov->setupMirror(request["enable"].asBool());
+                        prov->writeFile(writer, direction);
                         answer["status"] = Status_Ok;
                     }
-                    else
-                        answer["status"] = Status_AccountNotFound;
+                }
+            }
+            else
+            if (actionText == "mirror")
+            {
+                prov->setupMirror(request["enable"].asBool());
+                answer["status"] = Status_Ok;
+            }
+            else
+                answer["status"] = Status_AccountNotFound;
         }
         else
             answer["status"] = Status_NoMediaAction;

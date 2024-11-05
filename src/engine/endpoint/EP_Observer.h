@@ -21,51 +21,51 @@ class ResipSession;
 
 class ClientObserver
 {
-  friend class Account;
-  friend class UserAgent;
+    friend class Account;
+    friend class UserAgent;
 public:
-  ClientObserver();
-  ~ClientObserver();
+    ClientObserver();
+    ~ClientObserver();
 
-  void refresh();
-  void stop();
-  std::string peer();
+    void refresh();
+    void stop();
+    std::string peer();
 
 protected:
-  resip::ClientSubscriptionHandle mHandle;
-  ResipSession* mSession;
-  int mSessionId;
-  std::string mPeer;
+    resip::ClientSubscriptionHandle mHandle;
+    ResipSession* mSession;
+    int mSessionId;
+    std::string mPeer;
 };
 
 typedef std::shared_ptr<ClientObserver> PClientObserver;
 
 class ServerObserver
 {
-  friend class UserAgent;
+    friend class UserAgent;
 public:
-  ServerObserver();
-  ~ServerObserver();
+    ServerObserver();
+    ~ServerObserver();
 
-  std::string peer() const;
-  std::string package() const;
+    std::string peer() const;
+    std::string package() const;
 
-  void accept();
-  void update(std::string simpleId, bool online, std::string msg);
-  void stop();
+    void accept();
+    void update(std::string simpleId, bool online, std::string msg);
+    void stop();
 
 protected:
-  enum State
-  {
-    State_Incoming,
-    State_Active,
-    State_Closed
-  };
-  State mState;
-  resip::ServerSubscriptionHandle mHandle;
-  std::string mPeer, mPackage;
-  resip::Uri mContact;
-  int mSessionId;
+    enum State
+    {
+        State_Incoming,
+        State_Active,
+        State_Closed
+    };
+    State mState;
+    resip::ServerSubscriptionHandle mHandle;
+    std::string mPeer, mPackage;
+    resip::Uri mContact;
+    int mSessionId;
 };
 
 typedef std::shared_ptr<ServerObserver> PServerObserver;

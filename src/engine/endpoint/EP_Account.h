@@ -24,118 +24,118 @@ class Session;
 
 class Account: public resip::DnsResultSink
 {
-friend class UserAgent;
-friend class NATDecorator;
+    friend class UserAgent;
+    friend class NATDecorator;
 public:
-  Account(PVariantMap config, UserAgent& agent);
-  ~Account();
+    Account(PVariantMap config, UserAgent& agent);
+    ~Account();
 
-  void start();
-  void stop();
-  void refresh();
-  bool active();
-  int id() const;
+    void start();
+    void stop();
+    void refresh();
+    bool active();
+    int id() const;
 
-  enum class RegistrationState
-  {
-    None,
-    Registering,
-    Reregistering,
-    Registered,
-    Unregistering
-  };
-  RegistrationState registrationState();
+    enum class RegistrationState
+    {
+        None,
+        Registering,
+        Reregistering,
+        Registered,
+        Unregistering
+    };
+    RegistrationState registrationState();
 
-  /* Publishes new presence information */
-  void publishPresence(bool online, const std::string& content, int seconds = 600);
+    /* Publishes new presence information */
+    void publishPresence(bool online, const std::string& content, int seconds = 600);
 
-  /* Stops publishing of presence */
-  void stopPublish();
+    /* Stops publishing of presence */
+    void stopPublish();
 
-  /* Starts observing on specified target / package */
-  PClientObserver observe(const std::string& target, const std::string& package, void* tag);
+    /* Starts observing on specified target / package */
+    PClientObserver observe(const std::string& target, const std::string& package, void* tag);
 
-  /* Queues message to peer with specified mime type. Returns ID of message. */
-  int sendMsg(const std::string& peer, const void* ptr, unsigned length, const std::string& mime, void* tag);
+    /* Queues message to peer with specified mime type. Returns ID of message. */
+    int sendMsg(const std::string& peer, const void* ptr, unsigned length, const std::string& mime, void* tag);
 
-  /* Returns name of account - <sip:user@domain> */
-  std::string name();
+    /* Returns name of account - <sip:user@domain> */
+    std::string name();
 
-  /* Updates account with configuration */
-  void setup(VariantMap& config);
+    /* Updates account with configuration */
+    void setup(VariantMap& config);
 
-  /* Returns corresponding resiprocate profile */
-  std::shared_ptr<resip::UserProfile> getUserProfile() const { return mProfile; }
+    /* Returns corresponding resiprocate profile */
+    std::shared_ptr<resip::UserProfile> getUserProfile() const { return mProfile; }
 
-  typedef std::map<std::string, std::string> UserInfo;
-  void setUserInfo(const UserInfo& info);
-  UserInfo getUserInfo() const;
+    typedef std::map<std::string, std::string> UserInfo;
+    void setUserInfo(const UserInfo& info);
+    UserInfo getUserInfo() const;
 
 protected:
-  PVariantMap mConfig;
+    PVariantMap mConfig;
 
-  // Registration
-  ResipSession* mRegistration;
-  resip::ClientRegistrationHandle mRegistrationHandle;
-  resip::ClientPublicationHandle mPublication;
-  resip::TransportType mUsedTransport;
+    // Registration
+    ResipSession* mRegistration;
+    resip::ClientRegistrationHandle mRegistrationHandle;
+    resip::ClientPublicationHandle mPublication;
+    resip::TransportType mUsedTransport;
 
-  RegistrationState mRegistrationState;
+    RegistrationState mRegistrationState;
 
-  ice::NetworkAddress mExternalAddress;
-  std::shared_ptr<resip::UserProfile> mProfile;
-  UserAgent& mAgent;
-  bool mPresenceOnline;
-  std::string mPresenceContent;
+    ice::NetworkAddress mExternalAddress;
+    std::shared_ptr<resip::UserProfile> mProfile;
+    UserAgent& mAgent;
+    bool mPresenceOnline;
+    std::string mPresenceContent;
 
-  // Timer to refresh STUN server IP
-  ice::ICEScheduleTimer mRefreshStunServerIpTimer;
+    // Timer to refresh STUN server IP
+    ice::ICEScheduleTimer mRefreshStunServerIpTimer;
 
-  // Cached auth
-  resip::Auth mCachedAuth;
+    // Cached auth
+    resip::Auth mCachedAuth;
 
-  // Id of account
-  int mId;
+    // Id of account
+    int mId;
 
-  // User info about current state
-  UserInfo mUserInfo;
+    // User info about current state
+    UserInfo mUserInfo;
 
-  // List of client subscriptions sent from this account
-  typedef std::set<PClientObserver> ClientObserverSet;
-  ClientObserverSet mClientObserverSet;
+    // List of client subscriptions sent from this account
+    typedef std::set<PClientObserver> ClientObserverSet;
+    ClientObserverSet mClientObserverSet;
 
 
-  void process();
-  // Method queries new stun server ip from dns (if stun server is specified as dns name)
-  void queryStunServerIp();
+    void process();
+    // Method queries new stun server ip from dns (if stun server is specified as dns name)
+    void queryStunServerIp();
 
-  bool isResponsibleFor(const resip::NameAddr& addr);
-  enum class SecureScheme
-  {
-    SipsAndTls,
-    SipsOnly,
-    TlsOnly,
-    Nothing
-  };
+    bool isResponsibleFor(const resip::NameAddr& addr);
+    enum class SecureScheme
+    {
+        SipsAndTls,
+        SipsOnly,
+        TlsOnly,
+        Nothing
+    };
 
-  resip::NameAddr contact(SecureScheme ss = SecureScheme::SipsOnly);
+    resip::NameAddr contact(SecureScheme ss = SecureScheme::SipsOnly);
 
-  // This method prepares configuration, creates ice stack and sets ownership to session
-  void prepareIceStack(Session* session, ice::AgentRole role);
-  void onSuccess(resip::ClientRegistrationHandle h, const resip::SipMessage& response);
-  void onRemoved(resip::ClientRegistrationHandle h, const resip::SipMessage& response);
-  void onFailure(resip::ClientRegistrationHandle, const resip::SipMessage& response);
+    // This method prepares configuration, creates ice stack and sets ownership to session
+    void prepareIceStack(Session* session, ice::AgentRole role);
+    void onSuccess(resip::ClientRegistrationHandle h, const resip::SipMessage& response);
+    void onRemoved(resip::ClientRegistrationHandle h, const resip::SipMessage& response);
+    void onFailure(resip::ClientRegistrationHandle, const resip::SipMessage& response);
 
 #pragma region DnsResultSink implementation
-  void onDnsResult(const resip::DNSResult<resip::DnsHostRecord>&);
-  void onDnsResult(const resip::DNSResult<resip::DnsAAAARecord>&);
-  void onDnsResult(const resip::DNSResult<resip::DnsSrvRecord>&);
-  void onDnsResult(const resip::DNSResult<resip::DnsNaptrRecord>&);
-  void onDnsResult(const resip::DNSResult<resip::DnsCnameRecord>&);
+    void onDnsResult(const resip::DNSResult<resip::DnsHostRecord>&);
+    void onDnsResult(const resip::DNSResult<resip::DnsAAAARecord>&);
+    void onDnsResult(const resip::DNSResult<resip::DnsSrvRecord>&);
+    void onDnsResult(const resip::DNSResult<resip::DnsNaptrRecord>&);
+    void onDnsResult(const resip::DNSResult<resip::DnsCnameRecord>&);
 #pragma endregion
 
-  static int generateId();
-  static std::atomic_int IdGenerator;
+    static int generateId();
+    static std::atomic_int IdGenerator;
 };
 
 typedef std::shared_ptr<Account> PAccount;

@@ -66,10 +66,10 @@ std::string WavFileReader::readChunk()
     if (result == "fact")
         fread(&mDataLength, 4, 1, mHandle);
     else
-    if (result != "data")
-        fseek(mHandle, size, SEEK_CUR);
-    else
-        mDataLength = size;
+        if (result != "data")
+            fseek(mHandle, size, SEEK_CUR);
+        else
+            mDataLength = size;
 
     return result;
 }

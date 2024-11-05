@@ -17,23 +17,23 @@
 namespace Audio
 {
 
-  class WavFileReader
-  {
-  protected:
+class WavFileReader
+{
+protected:
     FILE*           mHandle;
     uint16_t        mChannels;
     uint16_t        mBits;
     int             mSamplerate;
     std::tstring    mFileName;
     mutable std::recursive_mutex
-                    mFileMtx;
+        mFileMtx;
     size_t          mDataOffset;
     size_t          mDataLength;
     Resampler       mResampler;
     unsigned        mLastError;
 
     std::string readChunk();
-  public:
+public:
     WavFileReader();
     ~WavFileReader();
 
@@ -56,24 +56,24 @@ namespace Audio
     size_t size() const;
 
     unsigned lastError() const;
-  };
+};
 
-  typedef std::shared_ptr<WavFileReader> PWavFileReader;
+typedef std::shared_ptr<WavFileReader> PWavFileReader;
 
-  class WavFileWriter
-  {
-  protected:
+class WavFileWriter
+{
+protected:
     FILE*                   mHandle;        /// Handle of audio file.
     std::tstring            mFileName;      /// Path to requested audio file.
     std::recursive_mutex    mFileMtx;       /// Mutex to protect this instance.
     size_t                  mWritten;       /// Amount of written data (in bytes)
     size_t                  mLengthOffset;  /// Position of length field.
     int                     mRate,
-                            mChannels;
+        mChannels;
 
     void checkWriteResult(int result);
 
-  public:
+public:
     WavFileWriter();
     ~WavFileWriter();
 
@@ -82,9 +82,9 @@ namespace Audio
     bool isOpened();
     size_t write(const void* buffer, size_t bytes);
     std::tstring filename();
-  };
+};
 
-  typedef std::shared_ptr<WavFileWriter> PWavFileWriter;
+typedef std::shared_ptr<WavFileWriter> PWavFileWriter;
 
 }
 
