@@ -251,13 +251,13 @@ Logger::operator << (const char* data)
     return *this;
 }
 
-Logger& 
+/*Logger&
 Logger::operator << (const wchar_t* data)
 {
     *mStream << data;
 
     return *this;
-}
+}*/
 
 Logger& 
 Logger::operator << (const int data)
