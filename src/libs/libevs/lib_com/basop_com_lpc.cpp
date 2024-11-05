@@ -10,6 +10,7 @@
 #include "typedef.h"
 #include "basop_proto_func.h"
 #include "cnst.h"
+#include "move.h"
 
 #include "basop_util.h"
 #include "stl.h"
