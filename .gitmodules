@@ -2,3 +2,6 @@
 	path = src/libs/resiprocate
 	url = git@git.sevana.biz:sevana_ou/resiprocate.git
 	branch = master
+[submodule "src/libs/libraries"]
+	path = src/libs/libraries
+	url = git@gitlab.com:dmytro.bogovych/libraries.git
