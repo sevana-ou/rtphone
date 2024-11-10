@@ -77,9 +77,9 @@ void
 sha1(const uint8_t *msg,  int octets_in_msg, uint32_t hash_value[5]) {
   sha1_ctx_t ctx;
 
-  sha1_init(&ctx);
-  sha1_update(&ctx, msg, octets_in_msg);
-  sha1_final(&ctx, hash_value);
+  srtp_sha1_init(&ctx);
+  srtp_sha1_update(&ctx, msg, octets_in_msg);
+  srtp_sha1_final(&ctx, hash_value);
 
 }
 
@@ -183,7 +183,7 @@ sha1_core(const uint32_t M[16], uint32_t hash_value[5]) {
 }
 
 void
-sha1_init(sha1_ctx_t *ctx) {
+srtp_sha1_init(sha1_ctx_t *ctx) {
 
   /* initialize state vector */
   ctx->H[0] = 0x67452301;
@@ -201,7 +201,7 @@ sha1_init(sha1_ctx_t *ctx) {
 }
 
 void
-sha1_update(sha1_ctx_t *ctx, const uint8_t *msg, int octets_in_msg) {
+srtp_sha1_update(sha1_ctx_t *ctx, const uint8_t *msg, int octets_in_msg) {
   int i;
   uint8_t *buf = (uint8_t *)ctx->M;
 
@@ -249,7 +249,7 @@ sha1_update(sha1_ctx_t *ctx, const uint8_t *msg, int octets_in_msg) {
  */
 
 void
-sha1_final(sha1_ctx_t *ctx, uint32_t *output) {
+srtp_sha1_final(sha1_ctx_t *ctx, uint32_t *output) {
   uint32_t A, B, C, D, E, TEMP;
   uint32_t W[80];  
   int i, t;
