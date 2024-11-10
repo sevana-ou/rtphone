@@ -74,6 +74,7 @@ protected:
     OpusDecoder        *mDecoderCtx;
     int mPTime, mSamplerate, mChannels;
     Audio::SpeexResampler mDecodeResampler;
+    int mDecoderChannels;
 public:
     struct Params
     {
