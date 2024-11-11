@@ -410,7 +410,7 @@ OpusCodec::OpusCodec(int samplerate, int channels, int ptime)
     :mEncoderCtx(nullptr), mDecoderCtx(nullptr), mChannels(channels), mPTime(ptime), mSamplerate(samplerate), mDecoderChannels(0)
 {
     int status;
-    mEncoderCtx = opus_encoder_create(48000, mChannels, OPUS_APPLICATION_VOIP, &status);
+    mEncoderCtx = opus_encoder_create(mSamplerate, mChannels, OPUS_APPLICATION_VOIP, &status);
     if (OPUS_OK != opus_encoder_ctl(mEncoderCtx, OPUS_SET_COMPLEXITY(OPUS_CODEC_COMPLEXITY)))
         ICELogError(<< "Failed to set Opus encoder complexity");
     //if (OPUS_OK != opus_encoder_ctl(mEncoderCtx, OPUS_SET_FORCE_CHANNELS(AUDIO_CHANNELS)))
@@ -433,7 +433,7 @@ void OpusCodec::applyParams(const Params &params)
     if (OPUS_OK != (error = opus_encoder_ctl(mEncoderCtx, OPUS_SET_PACKET_LOSS_PERC(params.mExpectedPacketLoss))))
         ICELogError(<< "Failed to (un)set expected packet loss. Error " << opus_strerror(error));
 
-    mDecodeResampler.start(channels(), 48000, mSamplerate);
+    // mDecodeResampler.start(channels(), 48000, mSamplerate);
 }
 
 OpusCodec::~OpusCodec()
@@ -493,10 +493,10 @@ int OpusCodec::encode(const void* input, int inputBytes, void* output, int outpu
 
 int OpusCodec::decode(const void* input, int inputBytes, void* output, int outputCapacity)
 {
+    int result = 0;
+
     // Examine the number of channels available in incoming packet
     int nr_of_channels = opus_packet_get_nb_channels((const unsigned char *) input);
-    int nr_of_frames = opus_decoder_get_nb_samples(mDecoderCtx, (const unsigned char *) input,
-                                                   inputBytes);
 
     // Recreate decoder if needed
     if (mDecoderChannels != nr_of_channels)
@@ -508,42 +508,53 @@ int OpusCodec::decode(const void* input, int inputBytes, void* output, int outpu
         }
         mDecoderChannels = nr_of_channels;
     }
-    int status = 0;
-    mDecoderCtx = opus_decoder_create(48000, mDecoderChannels, &status);
-    if (status)
-        return 0;
+
+    if (!mDecoderCtx)
+    {
+        int status = 0;
+        mDecoderCtx = opus_decoder_create(mSamplerate, mDecoderChannels, &status);
+        if (status)
+            return 0;
+    }
+
+    int nr_of_frames = opus_decoder_get_nb_samples(mDecoderCtx, (const unsigned char *) input,
+                                                   inputBytes);
 
     // We support stereo and mono here.
     int buffer_capacity = nr_of_frames * sizeof(opus_int16) * nr_of_channels;
-    opus_int16 *buffer_decode = (opus_int16 *) alloca(buffer_capacity);
+    opus_int16 *buffer_decode = (opus_int16 *)alloca(buffer_capacity);
     int decoded = opus_decode(mDecoderCtx,
                               reinterpret_cast<const unsigned char *>(input), inputBytes,
                               buffer_decode, nr_of_frames, 0);
 
     size_t resampler_processed = 0;
     opus_int16 *buffer_stereo = nullptr;
+    int buffer_stereo_capacity = buffer_capacity * 2;
+
     switch (nr_of_channels) {
         case 1:
             // Convert to stereo before
-            buffer_stereo = (opus_int16 *) alloca(buffer_capacity * 2);
+            buffer_stereo = (opus_int16 *) alloca(buffer_stereo_capacity);
             for (int i = 0; i < nr_of_frames; i++) {
                 buffer_stereo[i * 2 + 1] = buffer_decode[i];
                 buffer_stereo[i * 2] = buffer_decode[i];
             }
-            return (int) mDecodeResampler.processBuffer(buffer_stereo,
-                                                        decoded * sizeof(opus_int16) * 2,
-                                                        resampler_processed, output,
-                                                        outputCapacity);
+            assert(buffer_stereo_capacity <= outputCapacity);
+            memcpy(output, buffer_stereo, buffer_stereo_capacity);
+            result = buffer_stereo_capacity;
             break;
 
         case 2:
-            return (int) mDecodeResampler.processBuffer(buffer_decode,
-                                                        decoded * sizeof(opus_int16) *
-                                                        nr_of_channels, resampler_processed, output,
-                                                        outputCapacity);
+            assert(buffer_capacity <= outputCapacity);
+            memcpy(output, buffer_decode, buffer_capacity);
+            result = buffer_capacity;
+            break;
+
+        default:
+            assert(0);
     }
 
-    return 0;
+    return result;
 }
 
 int OpusCodec::plc(int lostPackets, void* output, int outputCapacity)

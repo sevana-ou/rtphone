@@ -73,7 +73,7 @@ protected:
     OpusEncoder        *mEncoderCtx;
     OpusDecoder        *mDecoderCtx;
     int mPTime, mSamplerate, mChannels;
-    Audio::SpeexResampler mDecodeResampler;
+    // Audio::SpeexResampler mDecodeResampler;
     int mDecoderChannels;
 public:
     struct Params
