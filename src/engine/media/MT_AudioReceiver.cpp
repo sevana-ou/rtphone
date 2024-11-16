@@ -638,8 +638,7 @@ AudioReceiver::DecodeResult AudioReceiver::getAudio(Audio::DataWindow& output, i
                                     // Decode frame by frame
                                     mDecodedLength = mCodec->decode(p->rtp()->GetPayloadData() + i * mCodec->rtpLength(),
                                                                     frameLength, mDecodedFrame, sizeof mDecodedFrame);
-                                    // mDecodedLength = 3840; // Opus 20 ms stereo
-                                    if (mDecodedLength)
+                                    if (mDecodedLength > 0)
                                         processDecoded(output, options);
                                 }
                             }

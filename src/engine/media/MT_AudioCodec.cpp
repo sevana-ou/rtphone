@@ -519,6 +519,8 @@ int OpusCodec::decode(const void* input, int inputBytes, void* output, int outpu
 
     int nr_of_frames = opus_decoder_get_nb_samples(mDecoderCtx, (const unsigned char *) input,
                                                    inputBytes);
+    if (nr_of_frames <= 0)
+        return 0;
 
     // We support stereo and mono here.
     int buffer_capacity = nr_of_frames * sizeof(opus_int16) * nr_of_channels;
