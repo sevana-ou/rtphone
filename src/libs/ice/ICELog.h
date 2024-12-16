@@ -148,21 +148,21 @@ extern Logger GLogger;
 #define ICELog(level_, subsystem_, args_)\
 {do\
 {\
-    if (GLogger.level() >= level_)\
+    if (ice::GLogger.level() >= level_)\
 {\
-    LogLock log_lock(GLogger.mutex());\
-    GLogger.beginLine(level_, __FILE__, __LINE__, subsystem_);\
-    GLogger args_;\
-    GLogger.endLine();\
+    ice::LogLock log_lock(ice::GLogger.mutex());\
+    ice::GLogger.beginLine(level_, __FILE__, __LINE__, subsystem_);\
+    ice::GLogger args_;\
+    ice::GLogger.endLine();\
 }\
 } while (false);}
 
-#define ICELogCritical(args_) ICELog(LL_CRITICAL, LOG_SUBSYSTEM, args_)
-#define ICELogInfo(args_) ICELog(LL_INFO, LOG_SUBSYSTEM, args_)
-#define ICELogDebug(args_) ICELog(LL_DEBUG, LOG_SUBSYSTEM, args_)
-#define ICELogMedia(args_) ICELog(LL_MEDIA, LOG_SUBSYSTEM, args_)
-#define ICELogError(args_) ICELog(LL_ERROR, LOG_SUBSYSTEM, args_)
-#define ICELogSpecial(args_) ICELog(LL_SPECIAL, LOG_SUBSYSTEM, args_)
+#define ICELogCritical(args_)   ICELog(ice::LL_CRITICAL, LOG_SUBSYSTEM, args_)
+#define ICELogInfo(args_)       ICELog(ice::LL_INFO, LOG_SUBSYSTEM, args_)
+#define ICELogDebug(args_)      ICELog(ice::LL_DEBUG, LOG_SUBSYSTEM, args_)
+#define ICELogMedia(args_)      ICELog(ice::LL_MEDIA, LOG_SUBSYSTEM, args_)
+#define ICELogError(args_)      ICELog(ice::LL_ERROR, LOG_SUBSYSTEM, args_)
+#define ICELogSpecial(args_)    ICELog(ice::LL_SPECIAL, LOG_SUBSYSTEM, args_)
 
 /*
 #define ICELogCritical2(args_) ICELog(LogLevel_Critical, LogSubsystem.c_str(), args_)
