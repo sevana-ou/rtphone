@@ -31,22 +31,22 @@ public:
         bool mSkipDecode            = false;
 
         // AMR payload types
-        std::set<int64_t> mAmrWbPayloadType       = { MT_AMRWB_PAYLOADTYPE };
-        std::set<int64_t> mAmrNbPayloadType       = { MT_AMRNB_PAYLOADTYPE };
-        std::set<int64_t> mAmrWbOctetPayloadType  = { MT_AMRWB_OCTET_PAYLOADTYPE };
-        std::set<int64_t> mAmrNbOctetPayloadType  = { MT_AMRNB_OCTET_PAYLOADTYPE };
+        std::set<int64_t> mAmrWbPayloadType       = { };
+        std::set<int64_t> mAmrNbPayloadType       = { };
+        std::set<int64_t> mAmrWbOctetPayloadType  = { };
+        std::set<int64_t> mAmrNbOctetPayloadType  = { };
 
         bool isAmrWb(int ptype) const { return mAmrWbOctetPayloadType.count(ptype) > 0 || mAmrWbPayloadType.count(ptype) > 0; }
         bool isAmrNb(int ptype) const { return mAmrNbOctetPayloadType.count(ptype) > 0 || mAmrNbPayloadType.count(ptype) > 0; }
 
-        int mIsac16KPayloadType     = MT_ISAC16K_PAYLOADTYPE;
-        int mIsac32KPayloadType     = MT_ISAC32K_PAYLOADTYPE;
-        int mIlbc20PayloadType      = MT_ILBC20_PAYLOADTYPE;
-        int mIlbc30PayloadType      = MT_ILBC30_PAYLOADTYPE;
+        int mIsac16KPayloadType     = -1;
+        int mIsac32KPayloadType     = -1;
+        int mIlbc20PayloadType      = -1;
+        int mIlbc30PayloadType      = -1;
         int mGsmFrPayloadType       = 3; // GSM is codec with fixed payload type. But sometimes it has to be overwritten.
         int mGsmFrPayloadLength     = 33; // Expected GSM payload length
-        int mGsmHrPayloadType       = MT_GSMHR_PAYLOADTYPE;
-        int mGsmEfrPayloadType      = MT_GSMEFR_PAYLOADTYPE;
+        int mGsmHrPayloadType       = -1;
+        int mGsmEfrPayloadType      = -1;
 
         struct EvsSpec
         {
@@ -98,6 +98,7 @@ public:
 
         // Textual representation - used in logging
         std::string toString() const;
+        void clear();
 
         static Settings DefaultSettings;
 
@@ -115,7 +116,7 @@ public:
     Codec::Factory& codecAt(int index) const;
     int findCodec(const std::string& name) const;
     void fillCodecMap(CodecMap& cm);
-
+    void clear();
 
 protected:
     typedef std::vector<Codec::Factory*> FactoryList;

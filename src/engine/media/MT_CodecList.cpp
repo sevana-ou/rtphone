@@ -62,6 +62,24 @@ std::string CodecList::Settings::toString() const
     return oss.str();
 }
 
+void CodecList::Settings::clear()
+{
+    // Remove all dynamic payload type assignments
+    mEvsSpec.clear();
+    mOpusSpec.clear();
+    mAmrNbOctetPayloadType.clear();
+    mAmrNbPayloadType.clear();
+    mAmrWbOctetPayloadType.clear();
+    mAmrWbPayloadType.clear();
+    mIsac16KPayloadType = -1;
+    mIsac32KPayloadType = -1;
+    mIlbc20PayloadType = -1;
+    mIlbc30PayloadType = -1;
+    mGsmEfrPayloadType = -1;
+    mGsmFrPayloadType = -1;
+    mGsmHrPayloadType = -1;
+}
+
 bool CodecList::Settings::EvsSpec::isValid() const
 {
     return mPayloadType >= 96 && mPayloadType <= 127;
@@ -296,7 +314,6 @@ void CodecList::fillCodecMap(CodecMap& cm)
     cm.insert({factory->payloadType(), c});
   }
 }
-
 
 CodecListPriority::CodecListPriority()
 {
