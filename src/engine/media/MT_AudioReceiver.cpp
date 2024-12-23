@@ -197,7 +197,7 @@ RtpBuffer::FetchResult RtpBuffer::fetch(ResultList& rl)
     // See if there is enough information in buffer
     int total = findTimelength();
 
-    while (total > mHigh && mPacketList.size())
+    while (total > mHigh && mPacketList.size() && 0 != mHigh)
     {
         ICELogMedia( << "Dropping RTP packets from jitter buffer");
         total -= mPacketList.front()->timelength();
@@ -356,9 +356,15 @@ void AudioReceiver::setCodecSettings(const CodecList::Settings& codecSettings)
         return;
 
     mCodecSettings = codecSettings;
-    mCodecMap.clear();
-    mCodecList.setSettings(mCodecSettings);
+    mCodecList.setSettings(mCodecSettings); // This builds factory list with proper payload types according to payload types in settings
+
+    // Rebuild codec map from factory list
     mCodecList.fillCodecMap(mCodecMap);
+}
+
+CodecList::Settings& AudioReceiver::getCodecSettings()
+{
+    return mCodecSettings;
 }
 
 size_t decode_packet(Codec& codec, RTPPacket& p, void* output_buffer, size_t output_capacity)
@@ -399,12 +405,15 @@ size_t decode_packet(Codec& codec, RTPPacket& p, void* output_buffer, size_t out
 
 bool AudioReceiver::add(const std::shared_ptr<jrtplib::RTPPacket>& p, Codec** codec)
 {
+    // Estimate time length
+    int time_length = 0, payloadLength = p->GetPayloadLength(), ptype = p->GetPayloadType();
+
     // ICELogInfo(<< "Adding packet No " << p->GetSequenceNumber());
     // Increase codec counter
-    mStat.mCodecCount[p->GetPayloadType()]++;
+    mStat.mCodecCount[ptype]++;
 
     // Check if codec can be handled
-    CodecMap::iterator codecIter = mCodecMap.find(p->GetPayloadType());
+    CodecMap::iterator codecIter = mCodecMap.find(ptype);
     if (codecIter == mCodecMap.end())
     {
         ICELogMedia(<< "Cannot find codec in available codecs");
@@ -427,8 +436,6 @@ bool AudioReceiver::add(const std::shared_ptr<jrtplib::RTPPacket>& p, Codec** co
     if (mStat.mCodecName.empty())
         mStat.mCodecName = codecIter->second->name();
 
-    // Estimate time length
-    int time_length = 0, payloadLength = p->GetPayloadLength(), ptype = p->GetPayloadType();
 
     if (!codecIter->second->rtpLength())
         time_length = codecIter->second->frameTime();
@@ -462,8 +469,11 @@ bool AudioReceiver::add(const std::shared_ptr<jrtplib::RTPPacket>& p, Codec** co
         {
             // Move data to packet buffer
             size_t available = decode_packet(**codec, *p, mDecodedFrame, sizeof mDecodedFrame);
-            packet->pcm().resize(available / 2);
-            memcpy(packet->pcm().data(), mDecodedFrame, available / 2);
+            if (available > 0)
+            {
+                packet->pcm().resize(available / 2);
+                memcpy(packet->pcm().data(), mDecodedFrame, available / 2);
+            }
         }
         return true;
     }

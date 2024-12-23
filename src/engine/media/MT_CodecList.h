@@ -43,7 +43,7 @@ public:
         int mIsac32KPayloadType     = -1;
         int mIlbc20PayloadType      = -1;
         int mIlbc30PayloadType      = -1;
-        int mGsmFrPayloadType       = 3; // GSM is codec with fixed payload type. But sometimes it has to be overwritten.
+        int mGsmFrPayloadType       = -1; // GSM is codec with fixed payload type. But sometimes it has to be overwritten.
         int mGsmFrPayloadLength     = 33; // Expected GSM payload length
         int mGsmHrPayloadType       = -1;
         int mGsmEfrPayloadType      = -1;
@@ -96,6 +96,9 @@ public:
         };
         std::vector<OpusSpec> mOpusSpec;
 
+        // Payload type
+        bool contains(int ptype) const;
+
         // Textual representation - used in logging
         std::string toString() const;
         void clear();
@@ -110,7 +113,9 @@ public:
 
     CodecList(const Settings& settings);
     ~CodecList();
-    void setSettings(const Settings& settings) { init(settings); }
+    void setSettings(const Settings& settings) {
+        init(settings);
+    }
 
     int count() const;
     Codec::Factory& codecAt(int index) const;
@@ -119,7 +124,7 @@ public:
     void clear();
 
 protected:
-    typedef std::vector<Codec::Factory*> FactoryList;
+    typedef std::vector<std::shared_ptr<Codec::Factory>> FactoryList;
     FactoryList mFactoryList;
     Settings mSettings;
 

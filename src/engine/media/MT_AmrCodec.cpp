@@ -543,6 +543,7 @@ PCodec AmrWbCodec::CodecFactory::create()
     return PCodec(new AmrWbCodec(mConfig));
 }
 
+AmrWbStatistics MT::GAmrWbStatistics;
 
 AmrWbCodec::AmrWbCodec(const AmrCodecConfig& config)
     :mEncoderCtx(nullptr), mDecoderCtx(nullptr), mConfig(config),
@@ -672,6 +673,7 @@ int AmrWbCodec::decode(const void* input, int inputBytes, void* output, int outp
         }
         catch(...)
         {
+            GAmrWbStatistics.mNonParsed++;
             ICELogDebug(<< "Failed to decode AMR payload");
             return 0;
         }
@@ -680,8 +682,10 @@ int AmrWbCodec::decode(const void* input, int inputBytes, void* output, int outp
 
         // Check if packet is corrupted
         if (ap.mDiscardPacket)
+        {
+            GAmrWbStatistics.mDiscarded++;
             return 0;
-
+        }
         // Check for output buffer capacity
         if (outputCapacity < (int)ap.mFrames.size() * pcmLength())
             return 0;

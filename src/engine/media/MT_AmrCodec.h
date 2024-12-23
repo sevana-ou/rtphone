@@ -14,16 +14,16 @@
 
 namespace MT
 {
-  struct AmrCodecConfig
-  {
+struct AmrCodecConfig
+{
     bool mIuUP;
     bool mOctetAligned;
     int mPayloadType;
-  };
+};
 
-  class AmrNbCodec : public Codec
-  {
-  protected:
+class AmrNbCodec : public Codec
+{
+protected:
     void* mEncoderCtx;
     void* mDecoderCtx;
     AmrCodecConfig mConfig;
@@ -31,25 +31,25 @@ namespace MT
     int mSwitchCounter;
     int mPreviousPacketLength;
 
-  public:
+public:
     class CodecFactory: public Factory
     {
     public:
-      CodecFactory(const AmrCodecConfig& config);
+        CodecFactory(const AmrCodecConfig& config);
 
-      const char* name() override;
-      int samplerate() override;
-      int payloadType() override;
+        const char* name() override;
+        int samplerate() override;
+        int payloadType() override;
 
 #ifdef USE_RESIP_INTEGRATION
-      void updateSdp(resip::SdpContents::Session::Medium::CodecContainer& codecs, SdpDirection direction) override;
-      int processSdp(const resip::SdpContents::Session::Medium::CodecContainer& codecs, SdpDirection direction) override;
-      void create(CodecMap& codecs) override;
+        void updateSdp(resip::SdpContents::Session::Medium::CodecContainer& codecs, SdpDirection direction) override;
+        int processSdp(const resip::SdpContents::Session::Medium::CodecContainer& codecs, SdpDirection direction) override;
+        void create(CodecMap& codecs) override;
 #endif
-      PCodec create() override;
+        PCodec create() override;
 
     protected:
-      AmrCodecConfig mConfig;
+        AmrCodecConfig mConfig;
     };
 
     AmrNbCodec(const AmrCodecConfig& config);
@@ -64,11 +64,18 @@ namespace MT
     int decode(const void* input, int inputBytes, void* output, int outputCapacity) override;
     int plc(int lostFrames, void* output, int outputCapacity) override;
     int getSwitchCounter() const;
-  };
+};
 
-  class AmrWbCodec : public Codec
-  {
-  protected:
+struct AmrWbStatistics
+{
+    int mDiscarded = 0;
+    int mNonParsed = 0;
+};
+extern AmrWbStatistics GAmrWbStatistics;
+
+class AmrWbCodec : public Codec
+{
+protected:
     void* mEncoderCtx;
     void* mDecoderCtx;
     AmrCodecConfig mConfig;
@@ -76,25 +83,25 @@ namespace MT
     int mSwitchCounter;
     int mPreviousPacketLength;
 
-  public:
+public:
     class CodecFactory: public Factory
     {
     public:
-      CodecFactory(const AmrCodecConfig& config);
+        CodecFactory(const AmrCodecConfig& config);
 
-      const char* name() override;
-      int samplerate() override;
-      int payloadType() override;
+        const char* name() override;
+        int samplerate() override;
+        int payloadType() override;
 
 #ifdef USE_RESIP_INTEGRATION
-      void updateSdp(resip::SdpContents::Session::Medium::CodecContainer& codecs, SdpDirection direction) override;
-      int processSdp(const resip::SdpContents::Session::Medium::CodecContainer& codecs, SdpDirection direction) override;
-      void create(CodecMap& codecs) override;
+        void updateSdp(resip::SdpContents::Session::Medium::CodecContainer& codecs, SdpDirection direction) override;
+        int processSdp(const resip::SdpContents::Session::Medium::CodecContainer& codecs, SdpDirection direction) override;
+        void create(CodecMap& codecs) override;
 #endif
-      PCodec create() override;
+        PCodec create() override;
 
     protected:
-      AmrCodecConfig mConfig;
+        AmrCodecConfig mConfig;
     };
 
     AmrWbCodec(const AmrCodecConfig& config);
@@ -109,35 +116,35 @@ namespace MT
     int decode(const void* input, int inputBytes, void* output, int outputCapacity) override;
     int plc(int lostFrames, void* output, int outputCapacity) override;
     int getSwitchCounter() const;
-  };
+};
 
-  class GsmEfrCodec : public Codec
-  {
-  protected:
+class GsmEfrCodec : public Codec
+{
+protected:
     void* mEncoderCtx;
     void* mDecoderCtx;
     bool mIuUP;
 
-  public:
+public:
     class GsmEfrFactory: public Factory
     {
     public:
-      GsmEfrFactory(bool iuup, int ptype);
+        GsmEfrFactory(bool iuup, int ptype);
 
-      const char* name() override;
-      int samplerate() override;
-      int payloadType() override;
+        const char* name() override;
+        int samplerate() override;
+        int payloadType() override;
 
 #ifdef USE_RESIP_INTEGRATION
-      void updateSdp(resip::SdpContents::Session::Medium::CodecContainer& codecs, SdpDirection direction) override;
-      int processSdp(const resip::SdpContents::Session::Medium::CodecContainer& codecs, SdpDirection direction) override;
-      void create(CodecMap& codecs) override;
+        void updateSdp(resip::SdpContents::Session::Medium::CodecContainer& codecs, SdpDirection direction) override;
+        int processSdp(const resip::SdpContents::Session::Medium::CodecContainer& codecs, SdpDirection direction) override;
+        void create(CodecMap& codecs) override;
 #endif
-      PCodec create() override;
+        PCodec create() override;
 
     protected:
-      bool mIuUP;
-      int mPayloadType;
+        bool mIuUP;
+        int mPayloadType;
     };
 
     GsmEfrCodec(bool iuup = false);
@@ -151,7 +158,7 @@ namespace MT
     int encode(const void* input, int inputBytes, void* output, int outputCapacity) override;
     int decode(const void* input, int inputBytes, void* output, int outputCapacity) override;
     int plc(int lostFrames, void* output, int outputCapacity) override;
-  };
+};
 
 } // End of MT namespace
 

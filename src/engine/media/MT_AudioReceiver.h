@@ -124,7 +124,7 @@ namespace MT
     
     // Update codec settings
     void setCodecSettings(const CodecList::Settings& codecSettings);
-
+    CodecList::Settings& getCodecSettings();
     // Returns false when packet is rejected as illegal. codec parameter will show codec which will be used for decoding.
     // Lifetime of pointer to codec is limited by lifetime of AudioReceiver (it is container).
     bool add(const std::shared_ptr<jrtplib::RTPPacket>& p, Codec** codec = nullptr);
