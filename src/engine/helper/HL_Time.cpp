@@ -15,3 +15,39 @@ double now_ms(void)
     return 1000.0 * res.tv_sec + (double) res.tv_nsec / 1e6;
 #endif
 }
+
+int compare_timespec(const timespec& lhs, const timespec& rhs)
+{
+    if (lhs.tv_sec < rhs.tv_sec)
+        return -1;
+    if (lhs.tv_sec > rhs.tv_sec)
+        return 1;
+
+    if (lhs.tv_nsec < rhs.tv_nsec)
+        return -1;
+    if (lhs.tv_nsec > rhs.tv_nsec)
+        return 1;
+
+    return 0;
+}
+
+bool operator < (const timespec& lhs, const timespec& rhs)
+{
+    return compare_timespec(lhs, rhs) < 0;
+}
+
+bool operator == (const timespec& lhs, const timespec& rhs)
+{
+    return compare_timespec(lhs, rhs) == 0;
+}
+
+bool operator > (const timespec& lhs, const timespec& rhs)
+{
+    return compare_timespec(lhs, rhs) > 0;
+}
+
+bool is_zero(const timespec& ts)
+{
+    return !ts.tv_sec && !ts.tv_nsec;
+}
+

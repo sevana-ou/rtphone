@@ -420,13 +420,10 @@ bool AudioReceiver::add(const std::shared_ptr<jrtplib::RTPPacket>& p, Codec** co
         return false; // Reject packet with unknown payload type
     }
 
-    // Check if codec is created actually
+    // Check if codec is creating lazily
     if (!codecIter->second)
     {
-        // Look for ptype
-        for (int codecIndex = 0; codecIndex < mCodecList.count(); codecIndex++)
-            if (mCodecList.codecAt(codecIndex).payloadType() == p->GetPayloadType())
-                codecIter->second = mCodecList.codecAt(codecIndex).create();
+        codecIter->second = mCodecList.createCodecByPayloadType(ptype);
     }
 
     // Return pointer to codec if needed.get()

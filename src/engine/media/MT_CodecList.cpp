@@ -407,9 +407,19 @@ void CodecList::fillCodecMap(CodecMap& cm)
     for (auto& factory: mFactoryList)
     {
         // Create codec here. Although they are not needed right now - they can be needed to find codec's info.
-        PCodec c = factory->create();
-        cm.insert({factory->payloadType(), c});
+        // PCodec c = factory->create();
+        cm.insert({factory->payloadType(), PCodec()});
     }
+}
+
+PCodec CodecList::createCodecByPayloadType(int payloadType)
+{
+    for (auto& factory: mFactoryList)
+    {
+        if (factory->payloadType() == payloadType)
+            return factory->create();
+    }
+    return PCodec();
 }
 
 CodecListPriority::CodecListPriority()

@@ -121,6 +121,7 @@ public:
     Codec::Factory& codecAt(int index) const;
     int findCodec(const std::string& name) const;
     void fillCodecMap(CodecMap& cm);
+    PCodec createCodecByPayloadType(int payloadType);
     void clear();
 
 protected:
