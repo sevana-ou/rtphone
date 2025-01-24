@@ -51,34 +51,34 @@ protected:
 class Statistics
 {
 public:
-    size_t      mReceived,        // Received traffic in bytes
-                mSent,            // Sent traffic in bytes
-                mReceivedRtp,     // Number of received rtp packets
-                mSentRtp,         // Number of sent rtp packets
-                mReceivedRtcp,    // Number of received rtcp packets
-                mSentRtcp,        // Number of sent rtcp packets
-                mDuplicatedRtp,   // Number of received duplicated rtp packets
-                mOldRtp,          // Number of late rtp packets
-                mPacketLoss,      // Number of lost packets
-                mPacketDropped,   // Number of dropped packets (due to time unsync when playing)б
-                mIllegalRtp;      // Number of rtp packets with bad payload type
+    size_t      mReceived = 0,        // Received traffic in bytes
+                mSent = 0,            // Sent traffic in bytes
+                mReceivedRtp = 0,     // Number of received rtp packets
+                mSentRtp = 0,         // Number of sent rtp packets
+                mReceivedRtcp = 0,    // Number of received rtcp packets
+                mSentRtcp = 0,        // Number of sent rtcp packets
+                mDuplicatedRtp = 0,   // Number of received duplicated rtp packets
+                mOldRtp = 0,          // Number of late rtp packets
+                mPacketLoss = 0,      // Number of lost packets
+                mPacketDropped = 0,   // Number of dropped packets (due to time unsync when playing)б
+                mIllegalRtp = 0;      // Number of rtp packets with bad payload type
 
     TestResult<float> mDecodingInterval, // Average interval on call to packet decode
                       mDecodeRequested,  // Average amount of requested audio frames to play
                       mPacketInterval;   // Average interval between packet adding to jitter buffer
 
-    int         mLoss[128];       // Every item is number of loss of corresping length
-    size_t      mAudioTime;       // Decoded/found time in milliseconds
-    size_t      mDecodedSize;     // Number of decoded bytes
-    uint16_t    mSsrc;            // Last known SSRC ID in a RTP stream
-    ice::NetworkAddress mRemotePeer; // Last known remote RTP address
+    int         mLoss[128] = {0};       // Every item is number of loss of corresping length
+    size_t      mAudioTime = 0;         // Decoded/found time in milliseconds
+    size_t      mDecodedSize = 0;       // Number of decoded bytes
+    uint16_t    mSsrc = 0;              // Last known SSRC ID in a RTP stream
+    ice::NetworkAddress mRemotePeer;    // Last known remote RTP address
 
     // AMR codec bitrate switch counter
-    int       mBitrateSwitchCounter;
+    int       mBitrateSwitchCounter = 0;
 
     std::string mCodecName;
 
-    float     mJitter;          // Jitter
+    float     mJitter = 0.0f;          // Jitter
 
     TestResult<float> mRttDelay; // RTT delay
 
