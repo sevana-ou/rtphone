@@ -28,4 +28,11 @@ void hmacSha1Digest(const void* inputData, size_t inputSize, void* outputData, c
   HMAC(EVP_sha1(), key, keySize, (const unsigned char*)inputData, inputSize, (unsigned char*)outputData, &outputSize);
 }
 
+#else
+
+#include "hmac_sha1_impl.h"
+void hmacSha1Digest(const void* inputData, size_t inputSize, void* outputData, const void* key, size_t keySize)
+{
+  hmac_sha1((const uint8_t*)key, keySize, (const uint8_t*)inputData, inputSize, (uint8_t*)outputData);
+}
 #endif

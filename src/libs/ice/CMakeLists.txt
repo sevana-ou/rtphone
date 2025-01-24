@@ -32,21 +32,18 @@ set (ICE_STACK_SOURCES ICEAddress.cpp
     ICEStunTransaction.cpp
     ICESync.cpp
     ICETime.cpp
-    ICETransactionList.cpp)
+    ICETransactionList.cpp
+    hmac_sha1_impl.h
+    hmac_sha1_impl.c
+    md5_impl.h
+    md5_impl.c
+)
 
-
-#if (ANDROID_ABI)
-#    set (ICE_STACK_SOURCES ${ICE_STACK_SOURCES} android-ifaddrs/android-ifaddrs.h android-ifaddrs/android-ifaddrs.c)
-#endif()
-
+set (ICE_DEFINES -D_WINSOCK_DEPRECATED_NO_WARNINGS)
 if (TARGET_MUSL)
-    add_definitions(-DTARGET_MUSL)
+    set(ICE_DEFINES ${ICE_DEFINES} -DTARGET_MUSL)
 endif()
-
-add_definitions(-DUSE_NATIVE_SMARTPTR -D_WINSOCK_DEPRECATED_NO_WARNINGS -DUSE_OPENSSL)
 
 add_library(ice_stack ${ICE_STACK_SOURCES})
-set_property(TARGET ice_stack PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
-if (TARGET_LINUX)
-    # target_link_libraries(ice_stack PUBLIC ssl crypto)
-endif()
+target_compile_definitions(ice_stack PRIVATE ${ICE_DEFINES})
+set_target_properties(ice_stack PROPERTIES MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
