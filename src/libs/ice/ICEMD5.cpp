@@ -31,6 +31,7 @@ void ice::md5Bin(const void* inputData, size_t inputSize, void* digest)
   MD5_Final((unsigned char*)digest, &md5);
 }
 #else
+
 #include "md5_impl.h"
 // Use own MD5 implementation
 void ice::md5Bin(const void* inputData, size_t inputSize, void* digest)

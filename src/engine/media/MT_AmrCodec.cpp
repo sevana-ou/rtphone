@@ -190,7 +190,7 @@ static AmrPayload parseAmrPayload(AmrPayloadInfo& input)
 
         AmrFrame frame;
         frame.mFrameType = FT;
-
+        frame.mSTI = 0;
         frame.mMode = FT < SID_FT ? FT : 0xFF;
         frame.mGoodQuality = Q == 1;
         frame.mTimestamp = input.mCurrentTimestamp;

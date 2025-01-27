@@ -204,8 +204,8 @@ void md5String(char *input, uint8_t *result){
     memcpy(result, ctx.digest, 16);
 }
 
-void md5File(FILE *file, uint8_t *result){
-    char *input_buffer = malloc(1024);
+void md5File(FILE *file, uint8_t *result) {
+    char *input_buffer = (char*)malloc(1024);
     size_t input_size = 0;
 
     MD5Context ctx;

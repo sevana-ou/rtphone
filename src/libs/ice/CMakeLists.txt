@@ -34,9 +34,9 @@ set (ICE_STACK_SOURCES ICEAddress.cpp
     ICETime.cpp
     ICETransactionList.cpp
     hmac_sha1_impl.h
-    hmac_sha1_impl.c
+    hmac_sha1_impl.cpp
     md5_impl.h
-    md5_impl.c
+    md5_impl.cpp
 )
 
 set (ICE_DEFINES -D_WINSOCK_DEPRECATED_NO_WARNINGS)
