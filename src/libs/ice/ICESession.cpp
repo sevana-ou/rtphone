@@ -795,7 +795,7 @@ bool Session::isDataIndication(ByteBuffer& source, ByteBuffer* plain)
     return false;
 }
 
-bool Session::isStun(ByteBuffer& source)
+bool Session::isStun(const ByteBuffer& source)
 {
   if (source.size() < 8)
     return false;

@@ -61,6 +61,7 @@ public:
 
   // Converts number of milliseconds starting from Epoch begin to timespec.
   static timespec toTimespec(uint64_t milliseconds);
+  static uint64_t toTimestamp(const timeval& ts);
 
   // Returns difference between timestamps in milliseconds
   static int64_t getDelta(const timespec& a, const timespec& b);

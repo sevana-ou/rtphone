@@ -140,7 +140,7 @@ namespace ice
     bool              hasAllocations();
         
     static bool       isDataIndication(ByteBuffer& source, ByteBuffer* plain);
-    static bool       isStun(ByteBuffer& source);
+    static bool       isStun(const ByteBuffer& source);
     static bool       isRtp(ByteBuffer& source);
     static bool       isChannelData(ByteBuffer& source, TurnPrefix prefix);
 

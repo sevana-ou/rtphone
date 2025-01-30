@@ -120,6 +120,11 @@ timespec chronox::toTimespec(uint64_t milliseconds)
     return r;
 }
 
+uint64_t chronox::toTimestamp(const timeval& ts)
+{
+    return ts.tv_sec * 1000 + ts.tv_usec / 1000;
+}
+
 int64_t chronox::getDelta(const timespec& a, const timespec& b)
 {
     uint64_t ms_a = a.tv_sec * 1000 + a.tv_nsec / 10000000;
