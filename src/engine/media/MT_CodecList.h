@@ -59,7 +59,7 @@ public:
                 Bandwidth_FB
             };
 
-            Bandwidth mBandwidth = Bandwidth_NB;
+            Bandwidth mBandwidth = Bandwidth_FB;
 
             enum Encoding
             {

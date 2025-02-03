@@ -32,6 +32,11 @@ size_t thread_pool::size()
     return this->tasks.size();
 }
 
+size_t thread_pool::threads()
+{
+    return this->workers.size();
+}
+
 // the destructor joins all threads
 thread_pool::~thread_pool()
 {

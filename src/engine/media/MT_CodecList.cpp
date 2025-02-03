@@ -1,4 +1,4 @@
-/* Copyright(C) 2007-2023 VoIPobjects (voipobjects.com)
+/* Copyright(C) 2007-2025 VoIPobjects (voipobjects.com)
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -172,14 +172,14 @@ CodecList::Settings::EvsSpec CodecList::Settings::EvsSpec::parse(const std::stri
         if (bandwidth == "nb" || bandwidth == "NB")
             result.mBandwidth = Bandwidth_NB;
         else
-            if (bandwidth == "wb" || bandwidth == "WB")
-                result.mBandwidth = Bandwidth_WB;
-            else
-                if (bandwidth == "swb" || bandwidth == "SWB")
-                    result.mBandwidth = Bandwidth_SWB;
-                else
-                    if (bandwidth == "fb" || bandwidth == "FB")
-                        result.mBandwidth = Bandwidth_FB;
+        if (bandwidth == "wb" || bandwidth == "WB")
+            result.mBandwidth = Bandwidth_WB;
+        else
+        if (bandwidth == "swb" || bandwidth == "SWB")
+            result.mBandwidth = Bandwidth_SWB;
+        else
+        if (bandwidth == "fb" || bandwidth == "FB")
+            result.mBandwidth = Bandwidth_FB;
     }
 
     return result;
@@ -243,33 +243,36 @@ CodecList::Settings CodecList::Settings::parseSdp(const std::list<resip::Codec>&
             r.mOpusSpec.push_back({ptype, samplerate, channels});
         }
         else
-            if (codec_name == "AMR-WB")
+        if (codec_name == "AMR-WB")
+        {
+            int octet_mode = findOctetMode(params.c_str());
+            if (octet_mode != -1)
             {
-                int octet_mode = findOctetMode(params.c_str());
-                if (octet_mode != -1)
-                {
-                    if (octet_mode == 0)
-                        r.mAmrWbPayloadType.insert(ptype);
-                    else
-                        if (octet_mode == 1)
-                            r.mAmrWbOctetPayloadType.insert(ptype);
-                }
-                // std::cout << "AMR-WB parameters: " << params.c_str() << ", found octet-mode: " << octet_mode << std::endl;
+                if (octet_mode == 0)
+                    r.mAmrWbPayloadType.insert(ptype);
+                else
+                if (octet_mode == 1)
+                    r.mAmrWbOctetPayloadType.insert(ptype);
             }
-            else
-                if (codec_name == "AMR")
-                {
-                    int octet_mode = findOctetMode(params.c_str());
-                    if (octet_mode != -1)
-                    {
-                        if (octet_mode == 0)
-                            r.mAmrWbPayloadType.insert(ptype);
-                        else
-                            if (octet_mode == 1)
-                                r.mAmrWbOctetPayloadType.insert(ptype);
-                    }
-                    // std::cout << "AMR parameters: " << params.c_str() << ", found octet-mode: " << octet_mode << std::endl;
-                }
+        }
+        else
+        if (codec_name == "AMR")
+        {
+            int octet_mode = findOctetMode(params.c_str());
+            if (octet_mode != -1)
+            {
+                if (octet_mode == 0)
+                    r.mAmrWbPayloadType.insert(ptype);
+                else
+                if (octet_mode == 1)
+                    r.mAmrWbOctetPayloadType.insert(ptype);
+            }
+        }
+        else
+        if (codec_name == "EVS")
+        {
+            r.mEvsSpec.push_back({ptype});
+        }
     }
     return r;
 }

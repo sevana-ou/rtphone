@@ -52,8 +52,12 @@ bool RtpHelper::isRtp(const void* buffer, size_t length)
     if (length < 12)
         return false;
 
-    unsigned char _type = reinterpret_cast<const RtpHeader*>(buffer)->pt;
-    bool rtp = ( (_type & 0x7F) >= 96 && (_type & 0x7F) <= 127) || ((_type & 0x7F) < 35);
+    const RtpHeader* h = reinterpret_cast<const RtpHeader*>(buffer);
+    if (h->version != 0b10)
+        return false;
+
+    unsigned char pt = h->pt;
+    bool rtp = ( (pt & 0x7F) >= 96 && (pt & 0x7F) <= 127) || ((pt & 0x7F) < 35);
     return rtp;
 }
 
@@ -62,9 +66,8 @@ bool RtpHelper::isRtpOrRtcp(const void* buffer, size_t length)
 {
     if (length < 12)
         return false;
-    unsigned char b = ((const unsigned char*)buffer)[0];
-
-    return (b & 0xC0 ) == 128;
+    const RtcpHeader* h = reinterpret_cast<const RtcpHeader*>(buffer);
+    return h->version == 0b10;
 }
 
 bool RtpHelper::isRtcp(const void* buffer, size_t length)

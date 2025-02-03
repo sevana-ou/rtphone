@@ -146,8 +146,7 @@ PCodec EVSCodec::EVSFactory::create()
 }
 
 EVSCodec::EVSCodec(): EVSCodec(StreamParameters())
-{
-}
+{}
 
 EVSCodec::EVSCodec(const StreamParameters &sp)
 {

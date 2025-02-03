@@ -24,6 +24,8 @@ public:
     void enqueue(const task& task);
     void wait(std::chrono::milliseconds interval = std::chrono::milliseconds(50));
     size_t size();
+    size_t threads();
+
 private:
     // need to keep track of threads so we can join them
     std::vector< std::thread > workers;
