@@ -1467,7 +1467,7 @@ Word16 read_indices_mime(                /* o  : 1 = reading OK, 0 = problem    
     if( total_brate < 0 )
     {
         /* validate that total_brate (derived from RTP packet or a file header) is one of the defined bit rates  */
-        fprintf(stderr, "\n  Error illegal total bit rate (= %d) in MIME ToC header \n",     total_brate );
+        //fprintf(stderr, "\n  Error illegal total bit rate (= %d) in MIME ToC header \n",     total_brate );
         num_bits = -1;
     }
 
@@ -1478,14 +1478,14 @@ Word16 read_indices_mime(                /* o  : 1 = reading OK, 0 = problem    
         if ( (isAMRWB_IOmode == 0) &&  ((num_bits < 0)  ||  ((header & 0x80) > 0) || ((header & 0x40) > 0)  || (header & 0x30) != 0x00 )  )
         {
             /* incorrect FT header */
-            fprintf(stderr, "\nError in EVS  FT ToC header(%02x) ! ",header);
+            // fprintf(stderr, "\nError in EVS  FT ToC header(%02x) ! ",header);
             return 0;
             // exit(-1);
         }
         else if( (isAMRWB_IOmode != 0) && ( (num_bits < 0) ||  ((header & 0x80) > 0) || ((header & 0x40) > 0) )  )  /* AMRWBIO */
         {
             /* incorrect IO FT header */
-            fprintf(stderr, "\nError in EVS(AMRWBIO)  FT ToC header(%02x) ! ",header);
+            // fprintf(stderr, "\nError in EVS(AMRWBIO)  FT ToC header(%02x) ! ",header);
             return 0;
             //exit(-1);
         }
@@ -1496,12 +1496,10 @@ Word16 read_indices_mime(                /* o  : 1 = reading OK, 0 = problem    
         if ( num_bits < 0  )
         {
             /* incorrect FT header */
-            fprintf(stderr, "\nError in AMRWB RFC4867  Toc(FT)  header(%02x) !", header);
+            // fprintf(stderr, "\nError in AMRWB RFC4867  Toc(FT)  header(%02x) !", header);
             return 0;//exit(-1);
         }
     }
-
-
 
     /* read serial stream of indices from file to the local buffer */
     num_bytes_read = (num_bits + 7) >> 3;
