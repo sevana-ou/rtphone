@@ -256,16 +256,16 @@ CodecList::Settings CodecList::Settings::parseSdp(const std::list<resip::Codec>&
             }
         }
         else
-        if (codec_name == "AMR")
+        if (codec_name == "AMR" || codec_name == "AMR-NB")
         {
             int octet_mode = findOctetMode(params.c_str());
             if (octet_mode != -1)
             {
                 if (octet_mode == 0)
-                    r.mAmrWbPayloadType.insert(ptype);
+                    r.mAmrNbPayloadType.insert(ptype);
                 else
                 if (octet_mode == 1)
-                    r.mAmrWbOctetPayloadType.insert(ptype);
+                    r.mAmrNbOctetPayloadType.insert(ptype);
             }
         }
         else

@@ -119,6 +119,7 @@ struct AmrPayload
 static AmrPayload parseAmrPayload(AmrPayloadInfo& input)
 {
     AmrPayload result;
+
     // Do not skip packet by default; I suppose packet is good enough by default.
     result.mDiscardPacket = false;
 
@@ -136,7 +137,7 @@ static AmrPayload parseAmrPayload(AmrPayloadInfo& input)
     //      in Table 1a in [4].  CMR value 15 indicates that no mode request
     //      is present, and other values are for future use.
     result.mCodeModeRequest = static_cast<uint8_t>(br.readBits(4));
-    //ICELogMedia(<< "CMR: " << result.mCodeModeRequest);
+    // ICELogMedia(<< "CMR: " << result.mCodeModeRequest);
 
     // Consume extra 4 bits for octet aligned profile
     if (input.mOctetAligned)
@@ -203,43 +204,52 @@ static AmrPayload parseAmrPayload(AmrPayloadInfo& input)
 
     for (size_t frameIndex=0; frameIndex < result.mFrames.size(); frameIndex++)
     {
-        AmrFrame& frame = result.mFrames[frameIndex];
-        size_t bitsLength = input.mWideband ? amrwb_framelenbits[frame.mFrameType] : amrnb_framelenbits[frame.mFrameType];
-        size_t byteLength = input.mWideband ? amrwb_framelen[frame.mFrameType] : amrnb_framelen[frame.mFrameType];
-        ICELogMedia(<< "New AMR speech frame: frame type = " << FT <<
-                    ", mode = " << frame.mMode <<
-                    ", timestamp = " << static_cast<int>(frame.mTimestamp) <<
+        AmrFrame& f = result.mFrames[frameIndex];
+
+        bool discard = input.mWideband ? (f.mFrameType >= 10 && f.mFrameType <= 13) : (f.mFrameType >= 9 && f.mFrameType <= 14);
+        discard |= input.mWideband ? f.mFrameType >= 14 : f.mFrameType >= 15;
+        if (discard)
+        {
+            result.mDiscardPacket = true;
+            continue;
+        }
+
+        size_t bitsLength = input.mWideband ? amrwb_framelenbits[f.mFrameType] : amrnb_framelenbits[f.mFrameType];
+        size_t byteLength = input.mWideband ? amrwb_framelen[f.mFrameType] : amrnb_framelen[f.mFrameType];
+        std::cout << "New AMR speech frame: frame type = " << FT <<
+                    ", mode = " << f.mMode <<
+                    ", timestamp = " << static_cast<int>(f.mTimestamp) <<
                     ", bits length = " << static_cast<int>(bitsLength) <<
                     ", byte length =" << static_cast<int>(byteLength) <<
-                    ", remaining packet length = " << static_cast<int>(dataIn.size()));
+                    ", remaining packet length = " << static_cast<int>(dataIn.size()) << std::endl;;
 
         if (bitsLength > 0)
         {
             if (input.mOctetAligned)
             {
                 if (dataIn.size() < byteLength)
-                    frame.mGoodQuality = false;
+                    f.mGoodQuality = false;
                 else
                 {
                     // It is octet aligned scheme, so we are on byte boundary now
                     size_t byteOffset = br.count() / 8;
 
                     // Copy data of AMR frame
-                    frame.mData = std::make_shared<ByteBuffer>(input.mPayload + byteOffset, byteLength);
+                    f.mData = std::make_shared<ByteBuffer>(input.mPayload + byteOffset, byteLength);
                 }
             }
             else
             {
                 // Allocate place for copying
-                frame.mData = std::make_shared<ByteBuffer>();
-                frame.mData->resize(bitsLength / 8 + ((bitsLength % 8) ? 1 : 0) + 1);
+                f.mData = std::make_shared<ByteBuffer>();
+                f.mData->resize(bitsLength / 8 + ((bitsLength % 8) ? 1 : 0) + 1);
 
                 // Add header for decoder
-                frame.mData->mutableData()[0] = (frame.mFrameType << 3) | (1 << 2);
+                f.mData->mutableData()[0] = (f.mFrameType << 3) | (1 << 2);
 
                 // Read bits
-                if (br.readBits(frame.mData->mutableData() + 1, bitsLength /*+ bitsLength*/ ) < (size_t)bitsLength)
-                    frame.mGoodQuality = false;
+                if (br.readBits(f.mData->mutableData() + 1, bitsLength /*+ bitsLength*/ ) < (size_t)bitsLength)
+                    f.mGoodQuality = false;
             }
         }
     }
