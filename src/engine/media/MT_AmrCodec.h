@@ -16,9 +16,9 @@ namespace MT
 {
 struct AmrCodecConfig
 {
-    bool mIuUP;
-    bool mOctetAligned;
-    int mPayloadType;
+    bool    mIuUP = false;
+    bool    mOctetAligned = false;
+    int     mPayloadType = -1;
 };
 
 class AmrNbCodec : public Codec

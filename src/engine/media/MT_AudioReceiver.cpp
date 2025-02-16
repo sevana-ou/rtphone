@@ -117,7 +117,6 @@ std::shared_ptr<RtpBuffer::Packet> RtpBuffer::add(std::shared_ptr<jrtplib::RTPPa
 
     Lock l(mGuard);
 
-
     // Update statistics
     if (mLastAddTime == 0.0)
         mLastAddTime = now_ms();
@@ -406,7 +405,9 @@ size_t decode_packet(Codec& codec, RTPPacket& p, void* output_buffer, size_t out
 bool AudioReceiver::add(const std::shared_ptr<jrtplib::RTPPacket>& p, Codec** codec)
 {
     // Estimate time length
-    int time_length = 0, payloadLength = p->GetPayloadLength(), ptype = p->GetPayloadType();
+    int time_length = 0,
+        payloadLength = p->GetPayloadLength(),
+        ptype = p->GetPayloadType();
 
     // ICELogInfo(<< "Adding packet No " << p->GetSequenceNumber());
     // Increase codec counter

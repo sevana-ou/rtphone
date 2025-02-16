@@ -340,7 +340,8 @@ void CodecList::init(const Settings& settings)
 #if !defined(TARGET_ANDROID) && !defined(TARGET_OPENWRT) && !defined(TARGET_RPI)
 #if defined(USE_AMR_CODEC)
     for (int pt: mSettings.mAmrWbPayloadType)
-        mFactoryList.push_back(std::make_shared<AmrWbCodec::CodecFactory>(AmrCodecConfig{mSettings.mWrapIuUP, false, pt}));
+        mFactoryList.push_back(std::make_shared<AmrWbCodec::CodecFactory>(
+            AmrCodecConfig{mSettings.mWrapIuUP, false, pt}));
     for (int pt: mSettings.mAmrWbOctetPayloadType)
         mFactoryList.push_back(std::make_shared<AmrWbCodec::CodecFactory>(AmrCodecConfig{mSettings.mWrapIuUP, true, pt}));
 
@@ -426,14 +427,10 @@ PCodec CodecList::createCodecByPayloadType(int payloadType)
 }
 
 CodecListPriority::CodecListPriority()
-{
-
-}
+{}
 
 CodecListPriority::~CodecListPriority()
-{
-
-}
+{}
 
 bool CodecListPriority::isNegativePriority(const CodecListPriority::Item& item)
 {
