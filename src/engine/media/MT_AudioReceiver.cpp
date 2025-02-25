@@ -522,7 +522,17 @@ AudioReceiver::DecodeResult AudioReceiver::getAudio(Audio::DataWindow& output, i
             if (options & DecodeOptions_SkipDecode)
                 mDecodedLength = 0;
             else
+            {
                 mDecodedLength = mCodec->plc(mFrameCount, mDecodedFrame, sizeof mDecodedFrame);
+                if (!mDecodedLength)
+                {
+                    // PLC is not support or failed
+                    // So substitute the silence
+                    size_t nr_of_samples = mCodec->frameTime() * mCodec->samplerate() / 1000 * sizeof(short);
+                    mDecodedLength = nr_of_samples * sizeof(short);
+                    memset(mDecodedFrame, 0, mDecodedLength);
+                }
+            }
         }
 
         if (mDecodedLength)
