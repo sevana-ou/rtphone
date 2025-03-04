@@ -125,12 +125,13 @@ int SpeexResampler::destRate()
 
 size_t SpeexResampler::getDestLength(size_t sourceLen)
 {
-    return size_t(sourceLen * (float(mDestRate) / mSourceRate) + 0.5f) / 2 * 2;
+    return size_t(sourceLen * (float(mDestRate) / mSourceRate) + 0.5f);
 }
 
 size_t SpeexResampler::getSourceLength(size_t destLen)
 {
-    return size_t(destLen * (float(mSourceRate) / mDestRate) + 0.5f) / 2 * 2;
+    // Here we want to get 'destLen' number of samples
+    return size_t(destLen * (float(mSourceRate) / mDestRate) + 0.5f);
 }
 
 // Returns instance + speex resampler size in bytes
