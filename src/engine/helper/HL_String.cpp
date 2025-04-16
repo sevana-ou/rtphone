@@ -408,3 +408,18 @@ std::string strx::uppercase(const std::string& s)
     std::transform(r.begin(), r.end(), r.begin(), ::toupper);
     return r;
 }
+
+std::string strx::removeQuotes(const std::string& s)
+{
+    std::string r(s);
+    if (s.empty())
+        return s;
+
+    if (r.front() == '"')
+        r = r.substr(1);
+
+    if (r.back() == '"')
+        r = r.substr(0, r.size()-1);
+
+    return r;
+}

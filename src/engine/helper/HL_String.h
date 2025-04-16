@@ -70,6 +70,7 @@ public:
     static bool         endsWith(const std::string& s, const std::string& suffix);
     static int          stringToDuration(const std::string& s);
     static std::string  uppercase(const std::string& s);
+    static std::string  removeQuotes(const std::string& s);
 
 };
 
