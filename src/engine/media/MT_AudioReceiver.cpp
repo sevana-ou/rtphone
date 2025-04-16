@@ -62,6 +62,8 @@ std::vector<short>& RtpBuffer::Packet::pcm()
 RtpBuffer::RtpBuffer(Statistics& stat)
     :mStat(stat)
 {
+    if (mStat.mPacketLoss)
+        std::cout << "Warning: packet loss is not zero" << std::endl;
 }
 
 RtpBuffer::~RtpBuffer()
@@ -203,6 +205,7 @@ RtpBuffer::FetchResult RtpBuffer::fetch(ResultList& rl)
 
         // Save it as last packet however - to not confuse loss packet counter
         mFetchedPacket = mPacketList.front();
+        mLastSeqno = mPacketList.front()->rtp()->GetExtendedSequenceNumber();
 
         // Erase from packet list
         mPacketList.erase(mPacketList.begin());
@@ -212,47 +215,48 @@ RtpBuffer::FetchResult RtpBuffer::fetch(ResultList& rl)
     }
 
     if (total < mLow)
+    {
+        // Still not prebuffered
         result = FetchResult::NoPacket;
+    }
     else
     {
+        // Did we fetch any packet before ?
         bool is_fetched_packet = mFetchedPacket.get() != nullptr;
         if (is_fetched_packet)
             is_fetched_packet &= mFetchedPacket->rtp().get() != nullptr;
 
-        if (is_fetched_packet)
+        if (mLastSeqno.has_value())
         {
             if (mPacketList.empty())
             {
                 result = FetchResult::NoPacket;
-                mStat.mPacketLoss++;
+                // Don't increase counter of lost packets here; maybe it is DTX
             }
             else
             {
                 // Current sequence number ?
-                unsigned seqno = mPacketList.front()->rtp()->GetExtendedSequenceNumber();
+                uint32_t seqno = mPacketList.front()->rtp()->GetExtendedSequenceNumber();
 
                 // Gap between new packet and previous on
-                int gap = (int64_t)seqno - (int64_t)mFetchedPacket->rtp()->GetExtendedSequenceNumber() - 1;
+                int gap = (int64_t)seqno - (int64_t)*mLastSeqno - 1;
                 gap = std::min(gap, 127);
-                if (gap > 0 && mPacketList.empty())
+                if (gap > 0)
                 {
+                    // std::cout << "Increase the packet loss for SSRC " << std::hex << mSsrc << std::endl;
+                    mStat.mPacketLoss++;
+                    //mStat.mLoss[gap]++;
+                    mLastSeqno = *mLastSeqno + 1;
                     result = FetchResult::Gap;
-                    mStat.mPacketLoss += gap;
-                    mStat.mLoss[gap]++;
                 }
                 else
                 {
-                    if (gap > 0)
-                    {
-                        mStat.mPacketLoss += gap;
-                        mStat.mLoss[gap]++;
-                    }
-
                     result = FetchResult::RegularPacket;
                     rl.push_back(mPacketList.front());
 
                     // Save last returned normal packet
                     mFetchedPacket = mPacketList.front();
+                    mLastSeqno = mPacketList.front()->rtp()->GetExtendedSequenceNumber();
 
                     // Remove returned packet from the list
                     mPacketList.erase(mPacketList.begin());
@@ -262,7 +266,7 @@ RtpBuffer::FetchResult RtpBuffer::fetch(ResultList& rl)
         else
         {
             // See if prebuffer limit is reached
-            if (findTimelength() >= mPrebuffer)
+            if (findTimelength() >= mPrebuffer && !mPacketList.empty())
             {
                 // Normal packet will be returned
                 result = FetchResult::RegularPacket;
@@ -272,6 +276,7 @@ RtpBuffer::FetchResult RtpBuffer::fetch(ResultList& rl)
 
                 // Remember returned packet
                 mFetchedPacket = mPacketList.front();
+                mLastSeqno = mPacketList.front()->rtp()->GetExtendedSequenceNumber();
 
                 // Remove returned packet from buffer list
                 mPacketList.erase(mPacketList.begin());
@@ -402,10 +407,11 @@ size_t decode_packet(Codec& codec, RTPPacket& p, void* output_buffer, size_t out
     return result;
 }
 
-bool AudioReceiver::add(const std::shared_ptr<jrtplib::RTPPacket>& p, Codec** codec)
+bool AudioReceiver::add(const std::shared_ptr<jrtplib::RTPPacket>& p, Codec** detectedCodec)
 {
     // Estimate time length
     int time_length = 0,
+        samplerate = 8000,
         payloadLength = p->GetPayloadLength(),
         ptype = p->GetPayloadType();
 
@@ -414,34 +420,43 @@ bool AudioReceiver::add(const std::shared_ptr<jrtplib::RTPPacket>& p, Codec** co
     mStat.mCodecCount[ptype]++;
 
     // Check if codec can be handled
+    Codec* codec = nullptr;
     CodecMap::iterator codecIter = mCodecMap.find(ptype);
     if (codecIter == mCodecMap.end())
     {
-        ICELogMedia(<< "Cannot find codec in available codecs");
-        return false; // Reject packet with unknown payload type
+        time_length = 10;
     }
-
-    // Check if codec is creating lazily
-    if (!codecIter->second)
-    {
-        codecIter->second = mCodecList.createCodecByPayloadType(ptype);
-    }
-
-    // Return pointer to codec if needed.get()
-    if (codec)
-        *codec = codecIter->second.get();
-
-    if (mStat.mCodecName.empty())
-        mStat.mCodecName = codecIter->second->name();
-
-
-    if (!codecIter->second->rtpLength())
-        time_length = codecIter->second->frameTime();
     else
-        time_length = lround(double(payloadLength) / codecIter->second->rtpLength() * codecIter->second->frameTime());
+    {
+        // Check if codec is creating lazily
+        if (!codecIter->second)
+        {
+            codecIter->second = mCodecList.createCodecByPayloadType(ptype);
+        }
+        codec = codecIter->second.get();
+
+        // Return pointer to codec if needed.get()
+        if (detectedCodec)
+            *detectedCodec = codec;
+
+        if (mStat.mCodecName.empty() && codec)
+            mStat.mCodecName = codec->name();
+
+
+        if (!codec)
+            time_length = 10;
+        else
+        if (!codec->rtpLength())
+            time_length = codec->frameTime();
+        else
+            time_length = lround(double(payloadLength) / codec->rtpLength() * codec->frameTime());
+
+        if (codec)
+            samplerate = codec->samplerate();
+    }
 
     // Process jitter
-    mJitterStats.process(p.get(), codecIter->second->samplerate());
+    mJitterStats.process(p.get(), samplerate);
     mStat.mJitter = static_cast<float>(mJitterStats.get());
 
     // Check if packet is CNG
@@ -453,20 +468,20 @@ bool AudioReceiver::add(const std::shared_ptr<jrtplib::RTPPacket>& p, Codec** co
     {
         // It will cause statistics to report about bad RTP packet
         // I have to replay last packet payload here to avoid report about lost packet
-        mBuffer.add(p, time_length, codecIter->second->samplerate());
+        mBuffer.add(p, time_length, samplerate);
         return false;
     }
 
     // Queue packet to buffer
-    auto packet = mBuffer.add(p, time_length, codecIter->second->samplerate()).get();
+    auto packet = mBuffer.add(p, time_length, samplerate).get();
 
     if (packet)
     {
         // Check if early decoding configured
-        if (mEarlyDecode && *codec)
+        if (mEarlyDecode && codec)
         {
             // Move data to packet buffer
-            size_t available = decode_packet(**codec, *p, mDecodedFrame, sizeof mDecodedFrame);
+            size_t available = decode_packet(*codec, *p, mDecodedFrame, sizeof mDecodedFrame);
             if (available > 0)
             {
                 packet->pcm().resize(available / 2);
@@ -549,7 +564,6 @@ AudioReceiver::DecodeResult AudioReceiver::getAudio(Audio::DataWindow& output, i
 
     case RtpBuffer::FetchResult::RegularPacket:
         mFailedCount = 0;
-
         for (std::shared_ptr<RtpBuffer::Packet>& p: rl)
         {
             assert(p);

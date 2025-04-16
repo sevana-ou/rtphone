@@ -423,7 +423,7 @@ PCodec CodecList::createCodecByPayloadType(int payloadType)
         if (factory->payloadType() == payloadType)
             return factory->create();
     }
-    return PCodec();
+    return {};
 }
 
 CodecListPriority::CodecListPriority()

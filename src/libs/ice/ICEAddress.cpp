@@ -68,7 +68,7 @@ NetworkAddress NetworkAddress::parse(const std::string& s)
     if (ip4Pos == std::string::npos && ip6Pos == std::string::npos)
     {
       // Parse usual IP[:port] pair
-      std::string::size_type cp = s.find(":");
+      std::string::size_type cp = s.find_last_of(":");
       if (cp == std::string::npos)
         result.setIp(cp);
       else
@@ -116,7 +116,7 @@ NetworkAddress::NetworkAddress(int stunType)
 }
 
 NetworkAddress::NetworkAddress(const in6_addr& addr6, unsigned short port)
-:mInitialized(true), mRelayed(false)
+  :mInitialized(true), mRelayed(false)
 {
   memset(&mAddr6, 0, sizeof(mAddr6));
   mAddr4.sin_family = AF_INET6;
@@ -125,7 +125,7 @@ NetworkAddress::NetworkAddress(const in6_addr& addr6, unsigned short port)
 }
 
 NetworkAddress::NetworkAddress(const in_addr& addr4, unsigned short port)
-:mInitialized(true), mRelayed(false)
+  :mInitialized(true), mRelayed(false)
 {
   memset(&mAddr6, 0, sizeof(mAddr6));
   mAddr4.sin_family = AF_INET;
@@ -168,7 +168,7 @@ void NetworkAddress::setStunType(unsigned char st)
 }
 
 NetworkAddress::NetworkAddress(const std::string& ip, unsigned short port)
-:mInitialized(true), mRelayed(false)
+  :mInitialized(true), mRelayed(false)
 {
   memset(&mAddr6, 0, sizeof(mAddr6));
   setIp(ip);
@@ -186,42 +186,42 @@ NetworkAddress::NetworkAddress(const char *ip, unsigned short port)
 }
 
 NetworkAddress::NetworkAddress(uint32_t ip_4, uint16_t port)
-    :mInitialized(true), mRelayed(false)
+  :mInitialized(true), mRelayed(false)
 {
-    memset(&mAddr6, 0, sizeof(mAddr6));
-    mAddr4.sin_family = AF_INET;
-    mAddr4.sin_addr.s_addr = ip_4;
-    mAddr4.sin_port = port;
+  memset(&mAddr6, 0, sizeof(mAddr6));
+  mAddr4.sin_family = AF_INET;
+  mAddr4.sin_addr.s_addr = ip_4;
+  mAddr4.sin_port = port;
 }
 
 NetworkAddress::NetworkAddress(const uint8_t* ip_6, uint16_t port)
-    :mInitialized(true), mRelayed(false)
+  :mInitialized(true), mRelayed(false)
 {
-    memset(&mAddr6, 0, sizeof(mAddr6));
-    mAddr6.sin6_family = AF_INET6;
-    memmove(&mAddr6.sin6_addr, ip_6, sizeof(mAddr6.sin6_addr));
-    mAddr6.sin6_port = port;
+  memset(&mAddr6, 0, sizeof(mAddr6));
+  mAddr6.sin6_family = AF_INET6;
+  memmove(&mAddr6.sin6_addr, ip_6, sizeof(mAddr6.sin6_addr));
+  mAddr6.sin6_port = port;
 }
 
 NetworkAddress::NetworkAddress(const sockaddr& addr, size_t addrLen)
-    :mInitialized(true), mRelayed(false)
+  :mInitialized(true), mRelayed(false)
 {
   switch (addr.sa_family)
   {
-    case AF_INET6:
-      memset(&mAddr6, 0, sizeof(mAddr6));
-      memcpy(&mAddr6, &addr, addrLen);
-      break;
-      
-    case AF_INET:
-      memset(&mAddr4, 0, sizeof(mAddr4));
-      memcpy(&mAddr4, &addr, addrLen);
-      break;
+  case AF_INET6:
+    memset(&mAddr6, 0, sizeof(mAddr6));
+    memcpy(&mAddr6, &addr, addrLen);
+    break;
+
+  case AF_INET:
+    memset(&mAddr4, 0, sizeof(mAddr4));
+    memcpy(&mAddr4, &addr, addrLen);
+    break;
   }
 }
 
 NetworkAddress::NetworkAddress(const NetworkAddress& src)
-:mInitialized(src.mInitialized), mRelayed(src.mRelayed)
+  :mInitialized(src.mInitialized), mRelayed(src.mRelayed)
 {
   memset(&mAddr6, 0, sizeof(mAddr6));
   if (src.mAddr4.sin_family == AF_INET)
@@ -373,15 +373,15 @@ void NetworkAddress::setIp(unsigned long ip)
 
 void NetworkAddress::setIp(const in_addr& ip)
 {
-	//memset(&mAddr4, 0, sizeof mAddr4);
-	mAddr4.sin_family = AF_INET;
-	mAddr4.sin_addr = ip;
+  //memset(&mAddr4, 0, sizeof mAddr4);
+  mAddr4.sin_family = AF_INET;
+  mAddr4.sin_addr = ip;
 }
 
 void NetworkAddress::setIp(const in6_addr& ip)
 {
-	mAddr6.sin6_family = AF_INET6;
-	mAddr6.sin6_addr = ip;
+  mAddr6.sin6_family = AF_INET6;
+  mAddr6.sin6_addr = ip;
 }
 // 10.0.0.0 - 10.255.255.255
 // 172.16.0.0 - 172.31.255.255
@@ -390,54 +390,54 @@ void NetworkAddress::setIp(const in6_addr& ip)
 bool NetworkAddress::isSameLAN(const NetworkAddress& a1, const NetworkAddress& a2)
 {
   if (a1.family() != a2.family())
-		return false;
+    return false;
   if (a1.family() == AF_INET)
-	{
-		sockaddr_in* s1 = a1.sockaddr4();
-		sockaddr_in* s2 = a2.sockaddr4();
+  {
+    sockaddr_in* s1 = a1.sockaddr4();
+    sockaddr_in* s2 = a2.sockaddr4();
 #ifdef TARGET_WIN
-		unsigned b1_0 = (s1->sin_addr.S_un.S_addr >> 0) & 0xFF;
-		unsigned b1_1 = (s1->sin_addr.S_un.S_addr >> 8) & 0xFF;
-		unsigned b2_0 = (s2->sin_addr.S_un.S_addr >> 0) & 0xFF;
-		unsigned b2_1 = (s2->sin_addr.S_un.S_addr >> 8) & 0xFF;
+    unsigned b1_0 = (s1->sin_addr.S_un.S_addr >> 0) & 0xFF;
+    unsigned b1_1 = (s1->sin_addr.S_un.S_addr >> 8) & 0xFF;
+    unsigned b2_0 = (s2->sin_addr.S_un.S_addr >> 0) & 0xFF;
+    unsigned b2_1 = (s2->sin_addr.S_un.S_addr >> 8) & 0xFF;
 #else
-		unsigned b1_0 = (s1->sin_addr.s_addr >> 0) & 0xFF;
-		unsigned b1_1 = (s1->sin_addr.s_addr >> 8) & 0xFF;
-		unsigned b2_0 = (s2->sin_addr.s_addr >> 0) & 0xFF;
-		unsigned b2_1 = (s2->sin_addr.s_addr >> 8) & 0xFF;
-		
-		if (b1_0 == b2_0 && b1_0 == 192 &&
-				b1_1 == b2_1 && b1_1 == 168)
-			return true;
-		
-		if (b1_0 == b2_0 && b1_0 == 10)
-			return true;
-		
-		if (b1_0 == b2_0 && b1_0 == 172 &&
-				b1_1 == b2_1 && (b1_1 < 32))
-			return true;
-		
+    unsigned b1_0 = (s1->sin_addr.s_addr >> 0) & 0xFF;
+    unsigned b1_1 = (s1->sin_addr.s_addr >> 8) & 0xFF;
+    unsigned b2_0 = (s2->sin_addr.s_addr >> 0) & 0xFF;
+    unsigned b2_1 = (s2->sin_addr.s_addr >> 8) & 0xFF;
+
+    if (b1_0 == b2_0 && b1_0 == 192 &&
+        b1_1 == b2_1 && b1_1 == 168)
+      return true;
+
+    if (b1_0 == b2_0 && b1_0 == 10)
+      return true;
+
+    if (b1_0 == b2_0 && b1_0 == 172 &&
+        b1_1 == b2_1 && (b1_1 < 32))
+      return true;
+
 #endif
-	}
-	return false;
+  }
+  return false;
 }
 
 void NetworkAddress::setPort(unsigned short port)
 {
   switch(mAddr4.sin_family)
   {
-    case AF_INET:
-      mAddr4.sin_port = htons(port);
-      mInitialized = true;
-      break;
+  case AF_INET:
+    mAddr4.sin_port = htons(port);
+    mInitialized = true;
+    break;
 
-    case AF_INET6:
-      mAddr6.sin6_port = htons(port);
-      mInitialized = true;
-      break;
+  case AF_INET6:
+    mAddr6.sin6_port = htons(port);
+    mInitialized = true;
+    break;
 
-    default:
-      assert(0);
+  default:
+    assert(0);
   }
 }
 
@@ -518,13 +518,13 @@ std::string NetworkAddress::toStdString() const
 
 std::string NetworkAddress::toBriefStdString() const
 {
-    if (!mInitialized)
-        return "";
+  if (!mInitialized)
+    return "";
 
-    char temp[128];
-    sprintf(temp, "%s:%u", ip().c_str(), (unsigned int)port());
+  char temp[128];
+  sprintf(temp, "%s:%u", ip().c_str(), (unsigned int)port());
 
-    return temp;
+  return temp;
 }
 
 #ifdef WIN32
@@ -541,7 +541,7 @@ std::wstring NetworkAddress::toStdWString() const
 #endif
 
 static const unsigned char localhost6[] =
-        { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1 };
+{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1 };
 
 bool NetworkAddress::isLoopback() const
 {
@@ -589,27 +589,27 @@ bool NetworkAddress::isLAN() const
 
   switch (mAddr4.sin_family)
   {
-    case AF_INET:
-    {
-      unsigned char b1 = mAddr4.sin_addr.s_addr & 0xFF;
-      unsigned char b2 = (mAddr4.sin_addr.s_addr >> 8) & 0xFF;
-      if (b1 == 192 && b2 == 168)
-        return true;
-      if (b1 == 10)
-        return true;
-      if (b1 == 172 && (b2 >= 16 && b2 <= 31))
-        return true;
-      
-      // Link local addresses are not routable so report them here
-      if (b1 == 169 && b2 == 254)
-        return true;
-      
-      return false;
-      
-    }
+  case AF_INET:
+  {
+    unsigned char b1 = mAddr4.sin_addr.s_addr & 0xFF;
+    unsigned char b2 = (mAddr4.sin_addr.s_addr >> 8) & 0xFF;
+    if (b1 == 192 && b2 == 168)
+      return true;
+    if (b1 == 10)
+      return true;
+    if (b1 == 172 && (b2 >= 16 && b2 <= 31))
+      return true;
+
+    // Link local addresses are not routable so report them here
+    if (b1 == 169 && b2 == 254)
+      return true;
+
+    return false;
+
+  }
 
   case AF_INET6:
-      return false;
+    return false;
 
   default:
     assert(0);
@@ -624,24 +624,24 @@ bool NetworkAddress::isLinkLocal() const
   switch (mAddr4.sin_family)
   {
   case AF_INET:
-    {
-      unsigned char b1 = mAddr4.sin_addr.s_addr & 0xFF;
-      unsigned char b2 = (mAddr4.sin_addr.s_addr >> 8) & 0xFF;
+  {
+    unsigned char b1 = mAddr4.sin_addr.s_addr & 0xFF;
+    unsigned char b2 = (mAddr4.sin_addr.s_addr >> 8) & 0xFF;
 
-      // Link local addresses are not routable so report them here
-      if (b1 == 169 && b2 == 254)
-        return true;
+    // Link local addresses are not routable so report them here
+    if (b1 == 169 && b2 == 254)
+      return true;
 
-      //if (b1 == 100 && (b2 >= 64 && b2 <= 127))
-      //  return true;
-      
-      return false;
+    //if (b1 == 100 && (b2 >= 64 && b2 <= 127))
+    //  return true;
 
-    }
+    return false;
+
+  }
 
   case AF_INET6:
 #ifdef WIN32
-	return (mAddr6.sin6_addr.u.Byte[0] == 0xFE && mAddr6.sin6_addr.u.Byte[1] == 0x80);
+    return (mAddr6.sin6_addr.u.Byte[0] == 0xFE && mAddr6.sin6_addr.u.Byte[1] == 0x80);
 #else
     return IN6_IS_ADDR_LINKLOCAL(&mAddr6.sin6_addr);
 #endif
@@ -668,17 +668,17 @@ bool NetworkAddress::isZero() const
     return false;
   switch (mAddr4.sin_family)
   {
-    case AF_INET:
-      return mAddr4.sin_addr.s_addr == 0;
-      
-    case AF_INET6:
+  case AF_INET:
+    return mAddr4.sin_addr.s_addr == 0;
+
+  case AF_INET6:
 #ifdef WIN32
-      return !mAddr6.sin6_addr.u.Word[0] && !mAddr6.sin6_addr.u.Word[1] &&
+    return !mAddr6.sin6_addr.u.Word[0] && !mAddr6.sin6_addr.u.Word[1] &&
         !mAddr6.sin6_addr.u.Word[2] && !mAddr6.sin6_addr.u.Word[3] &&
         !mAddr6.sin6_addr.u.Word[4] && !mAddr6.sin6_addr.u.Word[5] &&
         !mAddr6.sin6_addr.u.Word[6] && !mAddr6.sin6_addr.u.Word[7];
 #else
-      return IN6_IS_ADDR_UNSPECIFIED(&mAddr6.sin6_addr);
+    return IN6_IS_ADDR_UNSPECIFIED(&mAddr6.sin6_addr);
 #endif
   }
   return false;
@@ -795,30 +795,30 @@ bool NetworkAddress::isSame(const NetworkAddress& a1, const NetworkAddress& a2)
   // Compare address families
   if (a1.mAddr4.sin_family != a2.mAddr4.sin_family)
     return false;
-	
+
   if (a1.mRelayed != a2.mRelayed)
     return false;
   
   switch (a1.mAddr4.sin_family)
   {
-    case AF_INET:
-      return a1.mAddr4.sin_addr.s_addr == a2.mAddr4.sin_addr.s_addr && a1.mAddr4.sin_port == a2.mAddr4.sin_port;
-      
-    case AF_INET6:
-      return memcmp(&a1.mAddr6.sin6_addr, &a2.mAddr6.sin6_addr, sizeof(a1.mAddr6.sin6_addr)) == 0 &&
-             a1.mAddr6.sin6_port == a2.mAddr6.sin6_port;
-      
-    default:
-      assert(0);
+  case AF_INET:
+    return a1.mAddr4.sin_addr.s_addr == a2.mAddr4.sin_addr.s_addr && a1.mAddr4.sin_port == a2.mAddr4.sin_port;
+
+  case AF_INET6:
+    return memcmp(&a1.mAddr6.sin6_addr, &a2.mAddr6.sin6_addr, sizeof(a1.mAddr6.sin6_addr)) == 0 &&
+        a1.mAddr6.sin6_port == a2.mAddr6.sin6_port;
+
+  default:
+    assert(0);
   }
   return false;
 }
 
 NetworkAddress& NetworkAddress::operator = (const NetworkAddress& src)
 {
-    this->mInitialized = src.mInitialized;
-    this->mRelayed = src.mRelayed;
-    this->mAddr6 = src.mAddr6;
+  this->mInitialized = src.mInitialized;
+  this->mRelayed = src.mRelayed;
+  this->mAddr6 = src.mAddr6;
 
-    return *this;
+  return *this;
 }

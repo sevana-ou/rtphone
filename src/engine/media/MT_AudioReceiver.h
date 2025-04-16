@@ -1,4 +1,4 @@
-/* Copyright(C) 2007-2017 VoIPobjects (voipobjects.com)
+/* Copyright(C) 2007-2025 VoIPobjects (voipobjects.com)
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -8,22 +8,16 @@
 
 #include "MT_Stream.h"
 #include "MT_CodecList.h"
-#include "MT_AudioCodec.h"
 #include "MT_CngHelper.h"
 
-#include "../helper/HL_Pointer.h"
 #include "../helper/HL_Sync.h"
-#include "../helper/HL_Optional.hpp"
 
 #include "jrtplib/src/rtppacket.h"
-#include "jrtplib/src/rtcppacket.h"
 #include "jrtplib/src/rtpsourcedata.h"
 #include "../audio/Audio_DataWindow.h"
 #include "../audio/Audio_Resampler.h"
 
-#include <map>
-
-// #define DUMP_DECODED
+#include <optional>
 
 namespace MT
 {
@@ -101,6 +95,7 @@ namespace MT
     bool mFirstPacketWillGo = true;
     jrtplib::RTPSourceStats mRtpStats;
     std::shared_ptr<Packet> mFetchedPacket;
+    std::optional<uint32_t> mLastSeqno;
 
     // To calculate average interval between packet add. It is close to jitter but more useful in debugging.
     float mLastAddTime = 0.0;
