@@ -6,6 +6,8 @@
 #include "../helper/HL_Log.h"
 #include "../helper/HL_IuUP.h"
 
+#include <iostream>
+
 #define LOG_SUBSYSTEM "AmrCodec"
 using namespace MT;
 

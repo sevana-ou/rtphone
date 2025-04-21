@@ -1,4 +1,4 @@
-/* Copyright(C) 2007-2017 VoIP objects (voipobjects.com)
+/* Copyright(C) 2007-2025 VoIP objects (voipobjects.com)
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -6,7 +6,7 @@
 #ifndef __AUDIO_DSOUND_H
 #define __AUDIO_DSOUND_H
 
-#include "../config.h"
+#include "../engine_config.h"
 
 #include <winsock2.h>
 #include <windows.h>

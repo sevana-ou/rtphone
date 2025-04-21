@@ -14,6 +14,11 @@
 #include <functional>
 #include <assert.h>
 
+#if defined(TARGET_WIN)
+# include <WinSock2.h>
+# include <Windows.h>
+#endif
+
 typedef std::recursive_mutex Mutex;
 typedef std::unique_lock<std::recursive_mutex> Lock;
 

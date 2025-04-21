@@ -8,7 +8,7 @@
 
 #ifdef TARGET_WIN
 
-#include "../config.h"
+#include "../engine_config.h"
 
 #include <winsock2.h>
 #include <windows.h>

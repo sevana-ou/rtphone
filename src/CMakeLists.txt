@@ -28,15 +28,18 @@ include_directories(${OPENSSL_INCLUDE})
 
 if (CMAKE_SYSTEM MATCHES "Windows*")
     add_definitions (-DTARGET_WIN -D_SILENCE_STDEXT_HASH_DEPRECATION_WARNINGS -D_UNICODE -D_CRT_SECURE_NO_WARNINGS)
+    set (TARGET_WIN ON)
 endif()
 
 if (CMAKE_SYSTEM MATCHES "Linux*")
     add_definitions (-DTARGET_LINUX -DHAVE_NETINET_IN_H)
+    set (TARGET_LINUX ON)
 endif()
 
 
 if (CMAKE_SYSTEM MATCHES "Darwin*")
     add_definitions (-DTARGET_OSX)
+    set (TARGET_OSX ON)
 endif()
 
 if (CMAKE_SYSTEM MATCHES "Android")
@@ -45,10 +48,12 @@ if (CMAKE_SYSTEM MATCHES "Android")
     add_subdirectory (${OBOE_DIR} ./oboe)
     include_directories (${OBOE_DIR}/include)
     add_definitions(-DTARGET_ANDROID -DHAVE_NETINET_IN_H)
+    set (TARGET_ANDROID ON)
 endif()
 
 if (USE_MUSL)
     add_definitions(-DTARGET_MUSL)
+    set (TARGET_MUSL ON)
 endif()
 
 set (RTPHONE_SOURCES

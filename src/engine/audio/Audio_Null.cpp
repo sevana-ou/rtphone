@@ -1,6 +1,7 @@
 #include "Audio_Null.h"
 #include "helper/HL_Log.h"
 #include <assert.h>
+#include <chrono>
 #define LOG_SUBSYSTEM "NULL audio"
 
 using namespace Audio;

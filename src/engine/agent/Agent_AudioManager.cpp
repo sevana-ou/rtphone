@@ -6,6 +6,7 @@
 #include "Agent_AudioManager.h"
 #include "../engine/audio/Audio_WavFile.h"
 #include "../engine/audio/Audio_Null.h"
+#include "HL_String.h"
 
 #if defined(TARGET_ANDROID)
 # include "../engine/audio/Audio_Android.h"
@@ -171,7 +172,7 @@ void AudioManager::startPlayFile(int usageId, const std::string& path, AudioTarg
     // Check if file exists
     Audio::PWavFileReader r = std::make_shared<Audio::WavFileReader>();
 #ifdef TARGET_WIN
-    r->open(StringHelper::makeTstring(path));
+    r->open(strx::makeTstring(path));
 #else
     r->open(path);
 #endif

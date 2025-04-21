@@ -3,7 +3,9 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-#define NOMINMAX
+#if defined(TARGET_WIN) && !defined(NOMINMAX)
+#  define NOMINMAX
+#endif
 
 #include "../engine_config.h"
 #include "MT_AudioReceiver.h"
@@ -14,6 +16,7 @@
 #include "../audio/Audio_Interface.h"
 #include "../audio/Audio_Resampler.h"
 #include <cmath>
+#include <iostream>
 
 #if !defined(TARGET_ANDROID) && !defined(TARGET_OPENWRT) && !defined(TARGET_WIN) && !defined(TARGET_RPI) && defined(USE_AMR_CODEC)
 # include "MT_AmrCodec.h"
