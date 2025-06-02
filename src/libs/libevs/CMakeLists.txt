@@ -14,3 +14,5 @@ target_include_directories(evs_codec PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/basic_o
                                              ${CMAKE_CURRENT_SOURCE_DIR}/lib_enc
                                              ${CMAKE_CURRENT_SOURCE_DIR}/lib_dec
                                              ${CMAKE_CURRENT_SOURCE_DIR}/lib_com)
+
+set_property(TARGET evs_codec PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")

@@ -430,10 +430,8 @@ std::string strx::removeQuotes(const std::string& s)
 const void *memmem(const void *haystack, size_t haystack_len,
                    const void * const needle, const size_t needle_len)
 {
-    if (haystack == NULL) return NULL; // or assert(haystack != NULL);
-    if (haystack_len == 0) return NULL;
-    if (needle == NULL) return NULL; // or assert(needle != NULL);
-    if (needle_len == 0) return NULL;
+    if (!haystack || !haystack_len || !needle || !needle_len)
+        return nullptr;
 
     for (const char *h = (const char*)haystack;
          haystack_len >= needle_len;
