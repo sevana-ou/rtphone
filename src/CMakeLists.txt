@@ -1,8 +1,8 @@
-cmake_minimum_required(VERSION 3.10)
+cmake_minimum_required(VERSION 3.20)
 project(rtphone)
 
-# Rely on C++ 17
-set (CMAKE_CXX_STANDARD 20)
+# Rely on C++ 23
+set (CMAKE_CXX_STANDARD 23)
 set (CMAKE_CXX_STANDARD_REQUIRED ON)
 
 set (rtphone_libs libs)
