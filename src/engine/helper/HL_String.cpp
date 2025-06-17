@@ -409,6 +409,13 @@ std::string strx::uppercase(const std::string& s)
     return r;
 }
 
+std::string strx::lowercase(const std::string& s)
+{
+    std::string r(s);
+    std::transform(r.begin(), r.end(), r.begin(), ::tolower);
+    return r;
+}
+
 std::string strx::removeQuotes(const std::string& s)
 {
     std::string r(s);
