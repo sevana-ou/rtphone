@@ -103,8 +103,8 @@ bool Packet::parseV3(const ByteBuffer& packet)
     if (!sourceAddr4.isEmpty())
         mSourceAddress = sourceAddr4;
     else
-        if (!sourceAddr6.isEmpty())
-            mSourceAddress = sourceAddr6;
+    if (!sourceAddr6.isEmpty())
+        mSourceAddress = sourceAddr6;
 
     if (!mSourceAddress.isEmpty())
         mSourceAddress.setPort(sourcePort);
@@ -112,8 +112,8 @@ bool Packet::parseV3(const ByteBuffer& packet)
     if (!destAddr4.isEmpty())
         mDestinationAddress = destAddr4;
     else
-        if (!destAddr6.isEmpty())
-            mDestinationAddress = destAddr6;
+    if (!destAddr6.isEmpty())
+        mDestinationAddress = destAddr6;
 
     if (!mDestinationAddress.isEmpty())
         mDestinationAddress.setPort(destPort);

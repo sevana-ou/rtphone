@@ -108,6 +108,7 @@ public:
         #if defined(USE_RESIP_INTEGRATION)
         static Settings parseSdp(const std::list<resip::Codec>& codeclist);
         #endif
+
         bool operator == (const Settings& rhs) const;
     };
 
