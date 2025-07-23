@@ -139,7 +139,7 @@ static AmrPayload parseAmrPayload(AmrPayloadInfo& input)
         //   avoid the loss of data synchronization in the depacketization
         //   process, which can result in a huge degradation in speech quality.
         bool discard = input.mWideband ? (f.mFrameType >= 10 && f.mFrameType <= 13) : (f.mFrameType >= 9 && f.mFrameType <= 14);
-        discard |= input.mWideband ? f.mFrameType >= 14 : f.mFrameType >= 15;
+        // discard |= input.mWideband ? f.mFrameType >= 14 : f.mFrameType >= 15;
         if (discard)
         {
             result.mDiscardPacket = true;
@@ -163,7 +163,7 @@ static AmrPayload parseAmrPayload(AmrPayloadInfo& input)
                 else
                 {
                     // It is octet aligned scheme, so we are on byte boundary now
-                    size_t byteOffset = bit_reader.count() / 8;
+                    size_t byteOffset = bit_reader.position() / 8;
 
                     // Copy data of AMR frame
                     if (byteOffset + byteLength <= input.mPayloadLength)
@@ -568,8 +568,8 @@ int AmrWbCodec::encode(const void* input, int inputBytes, void* output, int outp
 #define AMR_BITRATE_DTX 15
 int AmrWbCodec::decode(const void* input, int inputBytes, void* output, int outputCapacity)
 {
-    if (mConfig.mOctetAligned)
-        return 0;
+    // if (mConfig.mOctetAligned)
+    //    return 0;
 
     if (mConfig.mIuUP)
     {
