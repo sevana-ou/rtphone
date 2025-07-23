@@ -12,6 +12,7 @@
 #include <vector>
 #include <string>
 #include <memory>
+#include <span>
 #include "ICETypes.h"
 #include "ICEAddress.h"
 
@@ -30,6 +31,8 @@ namespace ice
     ByteBuffer(size_t initialCapacity);
     ByteBuffer(const ByteBuffer& src);
     ByteBuffer(const void* packetPtr, size_t packetSize, CopyBehavior behavior = CopyBehavior::CopyMemory);
+    ByteBuffer(const std::span<const uint8_t>& packet, CopyBehavior behavior = CopyBehavior::CopyMemory);
+
     ~ByteBuffer();
     
     ByteBuffer& operator = (const ByteBuffer& src);
@@ -39,6 +42,7 @@ namespace ice
     size_t        size() const;
     const uint8_t* data() const;
     uint8_t*      mutableData();
+    std::span<const uint8_t> span();
 
     NetworkAddress&   remoteAddress();
     void          setRemoteAddress(const NetworkAddress& addr);

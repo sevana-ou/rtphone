@@ -53,6 +53,10 @@ ByteBuffer::ByteBuffer(const void* packetPtr, size_t packetSize, CopyBehavior be
     }
 }
 
+ByteBuffer::ByteBuffer(const std::span<const uint8_t>& packet, CopyBehavior behavior)
+    : ByteBuffer(packet.data(), packet.size(), behavior)
+{}
+
 ByteBuffer::~ByteBuffer()
 {
     if (mCopyBehavior == CopyBehavior::CopyMemory)
@@ -103,6 +107,11 @@ const uint8_t* ByteBuffer::data() const
 uint8_t* ByteBuffer::mutableData()
 {
     return mDataPtr;
+}
+
+std::span<const uint8_t> ByteBuffer::span()
+{
+    return {mDataPtr, mDataSize};
 }
 
 NetworkAddress& ByteBuffer::remoteAddress()
