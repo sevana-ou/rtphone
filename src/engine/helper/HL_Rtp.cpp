@@ -26,25 +26,25 @@
 
 struct RtpHeader
 {
-    unsigned char cc:4;	/* CSRC count             */
-    unsigned char x:1;		/* header extension flag  */
-    unsigned char p:1;		/* padding flag           */
-    unsigned char version:2;	/* protocol version       */
-    unsigned char pt:7;	/* payload type           */
-    unsigned char m:1;		/* marker bit             */
-    unsigned short seq;		/* sequence number        */
-    unsigned int ts;		/* timestamp              */
-    unsigned int ssrc;	/* synchronization source */
+    unsigned char cc:4;         /* CSRC count             */
+    unsigned char x:1;          /* header extension flag  */
+    unsigned char p:1;          /* padding flag           */
+    unsigned char version:2;	 /* protocol version       */
+    unsigned char pt:7;	     /* payload type           */
+    unsigned char m:1;		     /* marker bit             */
+    unsigned short seq;		 /* sequence number        */
+    unsigned int ts;		     /* timestamp              */
+    unsigned int ssrc;	         /* synchronization source */
 };
 
 struct RtcpHeader
 {
-    unsigned char rc:5;		/* reception report count */
-    unsigned char p:1;		/* padding flag           */
-    unsigned char version:2;	/* protocol version       */
-    unsigned char pt:8;		/* payload type           */
-    uint16_t len;			/* length                 */
-    uint32_t ssrc;	       	/* synchronization source */
+    unsigned char rc:5;		  /* reception report count */
+    unsigned char p:1;          /* padding flag           */
+    unsigned char version:2;    /* protocol version       */
+    unsigned char pt:8;         /* payload type           */
+    uint16_t len;               /* length                 */
+    uint32_t ssrc;	       	     /* synchronization source */
 };
 
 bool RtpHelper::isRtp(const void* buffer, size_t length)
@@ -78,9 +78,9 @@ bool RtpHelper::isRtcp(const void* buffer, size_t length)
 unsigned RtpHelper::findSsrc(const void* buffer, size_t length)
 {
     if (isRtp(buffer, length))
-        return reinterpret_cast<const RtpHeader*>(buffer)->ssrc;
+        return ntohl(reinterpret_cast<const RtpHeader*>(buffer)->ssrc);
     else
-        return reinterpret_cast<const RtcpHeader*>(buffer)->ssrc;
+        return ntohl(reinterpret_cast<const RtcpHeader*>(buffer)->ssrc);
 }
 
 void RtpHelper::setSsrc(void* buffer, size_t length, uint32_t ssrc)
