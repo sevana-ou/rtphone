@@ -151,6 +151,18 @@ static AmrPayload parseAmrPayload(AmrPayloadInfo& input)
                   << ", octet-aligned = " << input.mOctetAligned
                   << ", timestamp = " << static_cast<int>(f.mTimestamp) << std::endl;*/
 
+        if (input.mWideband && f.mFrameType == 15)
+        {
+            // DTX, no sense to decode the data
+            continue;
+        }
+
+        if (input.mWideband && f.mFrameType == 14)
+        {
+            // Speech lost code only
+            continue;
+        }
+
         size_t bitsLength = input.mWideband ? amrwb_framelenbits[f.mFrameType] : amrnb_framelenbits[f.mFrameType];
         size_t byteLength = input.mWideband ? amrwb_framelen[f.mFrameType] : amrnb_framelen[f.mFrameType];
 
