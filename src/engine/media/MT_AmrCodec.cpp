@@ -147,11 +147,6 @@ static AmrPayload parseAmrPayload(AmrPayloadInfo& input)
             continue;
         }
 
-        /*std::cout << "New AMR speech frame: frame type = " << int(FT)
-                  << ", mode = " << int(f.mMode)
-                  << ", octet-aligned = " << input.mOctetAligned
-                  << ", timestamp = " << static_cast<int>(f.mTimestamp) << std::endl;*/
-
         if (input.mWideband && f.mFrameType == 15)
         {
             // DTX, no sense to decode the data
@@ -161,6 +156,12 @@ static AmrPayload parseAmrPayload(AmrPayloadInfo& input)
         if (input.mWideband && f.mFrameType == 14)
         {
             // Speech lost code only
+            continue;
+        }
+
+        if (!f.mGoodQuality)
+        {
+            // Bad quality, frame is damaged
             continue;
         }
 
@@ -630,6 +631,7 @@ int AmrWbCodec::decodePlain(std::span<const uint8_t> input, std::span<uint8_t> o
         return 0;
 
     short* dataOut = (short*)output.data();
+    size_t dataOutSizeInBytes = 0;
     for (AmrFrame& frame: ap.mFrames)
     {
         memset(dataOut, 0, static_cast<size_t>(pcmLength()));
@@ -638,9 +640,10 @@ int AmrWbCodec::decodePlain(std::span<const uint8_t> input, std::span<uint8_t> o
         {
             D_IF_decode(mDecoderCtx, (const unsigned char*)frame.mData->data(), (short*)dataOut, 0);
             dataOut += pcmLength() / 2;
+            dataOutSizeInBytes += pcmLength();
         }
     }
-    return pcmLength() * ap.mFrames.size();
+    return dataOutSizeInBytes;
 }
 
 int AmrWbCodec::decode(const void* input, int inputBytes, void* output, int outputCapacity)
