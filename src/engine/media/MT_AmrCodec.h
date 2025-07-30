@@ -3,6 +3,8 @@
 
 #include "../engine_config.h"
 #include <map>
+#include <span>
+
 #include "MT_Codec.h"
 #include "../helper/HL_Pointer.h"
 
@@ -82,6 +84,9 @@ protected:
     uint64_t mCurrentDecoderTimestamp;
     int mSwitchCounter;
     int mPreviousPacketLength;
+
+    int decodeIuup(std::span<const uint8_t> input, std::span<uint8_t> output);
+    int decodePlain(std::span<const uint8_t> input, std::span<uint8_t> output);
 
 public:
     class CodecFactory: public Factory
