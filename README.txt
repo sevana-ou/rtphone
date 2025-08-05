@@ -138,4 +138,4 @@ For detailed integration instructions and API documentation, please refer to the
 
 ## License
 
-Our source code is licensed under the MIT license. Naturally, any third-party components we use are subject to their respective licenses.
+Our source code is licensed under the MPL license. Naturally, any third-party components we use are subject to their respective licenses.
