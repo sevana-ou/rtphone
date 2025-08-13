@@ -1,4 +1,4 @@
-/* Copyright(C) 2007-2017 VoIPobjects (voipobjects.com)
+/* Copyright(C) 2007-2025 VoIPobjects (voipobjects.com)
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -10,11 +10,8 @@
 # include "jrtplib/src/rtppacket.h"
 #endif
 
-#include "HL_Uuid.h"
-#include "HL_InternetAddress.h"
-
-#include <vector>
-#include <string>
+#include <cstdint>
+#include <stdlib.h>
 
 // Class to carry rtp/rtcp socket pair
 template<class T>

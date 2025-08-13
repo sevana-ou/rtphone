@@ -93,7 +93,11 @@ int strx::toInt(const char *s, int defaultValue, bool* isOk)
 uint64_t strx::toUint64(const char* s, uint64_t def, bool *isOk)
 {
     uint64_t result = def;
-    if (sscanf(s, "%" SCNu64, &result) != 1)
+#if defined(TARGET_WIN)
+    if (sscanf(s, "%I64d", &result) != 1)
+#else
+    if (sscanf(s, "%llu", &result) != 1)
+#endif
     {
         if (isOk)
             *isOk = false;

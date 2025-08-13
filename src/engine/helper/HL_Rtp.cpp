@@ -8,6 +8,10 @@
 # include <Windows.h>
 #endif
 
+#if defined(TARGET_LINUX)
+# include <arpa/inet.h>
+#endif
+
 #include "HL_Rtp.h"
 #include "HL_Exception.h"
 #include "HL_String.h"
