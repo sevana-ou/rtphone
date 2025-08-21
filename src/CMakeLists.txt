@@ -15,6 +15,7 @@ option (USE_MUSL        "Build with MUSL library"               OFF)
 
 # PIC code by default
 set (CMAKE_POSITION_INDEPENDENT_CODE ON)
+set (RUNTIME_CPU_CAPABILITY_DETECTION ON)
 
 set (LIB_PLATFORM ${CMAKE_CURRENT_SOURCE_DIR}/libs/libraries)
 include (${LIB_PLATFORM}/platform_libs.cmake)

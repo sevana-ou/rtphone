@@ -151,7 +151,7 @@ void NetworkHelper::reload(int networkType)
   }
 #else
   mIPList.clear();
-#if defined(TARGET_OS_IPHONE)
+#if TARGET_OS_IPHONE
   ICELogDebug(<< "Obtaining IPv4 interfaces.");
   fillIosInterfaceList(AF_INET, networkType, mIPList);
   ICELogDebug(<< "Obtaining IPv6 interfaces.");

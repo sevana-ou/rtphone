@@ -191,8 +191,8 @@ static AmrPayload parseAmrPayload(AmrPayloadInfo& input)
                     }
                     else
                     {
-                        ICELogError(<< "Problem parsing AMR header: octet-aligned is set, available " << input.mPayloadLength - byteOffset
-                                    << " bytes but requested " << byteLength);
+                        ICELogError(<< "Problem parsing AMR header: octet-aligned is set, available " << int(input.mPayloadLength - byteOffset)
+                                    << " bytes but requested " << (int)byteLength);
                         result.mDiscardPacket = true;
                         continue;
                     }
