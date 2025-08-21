@@ -11,7 +11,7 @@ namespace ice
   {
     public:
         CRC32(void);
-        ~CRC32(void);
+        ~CRC32(void) = default;
 
         void initialize(void);
 

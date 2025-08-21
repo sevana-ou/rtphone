@@ -215,7 +215,7 @@ PCandidatePair CheckList::findEqualPair(CandidatePair& _pair, ComparisionType ct
 
 unsigned CheckList::add(CandidatePair& p)
 {
-  mPairList.push_back(PCandidatePair(new CandidatePair(p)));
+  mPairList.push_back(std::make_shared<CandidatePair>(p));
   
   // Sort list by priority
   std::sort(mPairList.begin(), mPairList.end(), ComparePairByPriority);

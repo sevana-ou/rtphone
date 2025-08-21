@@ -27,7 +27,7 @@ DatagramSocket::DatagramSocket()
 
 DatagramSocket::~DatagramSocket()
 {
-  closeSocket();
+  internalClose();
 }
 
 void DatagramSocket::open(int family)
@@ -85,7 +85,7 @@ unsigned DatagramSocket::recvDatagram(InternetAddress &src, void *packetBuffer, 
     return 0;
 }
 
-void DatagramSocket::closeSocket()
+void DatagramSocket::internalClose()
 {
   if (mHandle != INVALID_SOCKET)
   {
@@ -96,6 +96,11 @@ void DatagramSocket::closeSocket()
 #endif
       mHandle = INVALID_SOCKET;
   }
+}
+
+void DatagramSocket::closeSocket()
+{
+    internalClose();
 }
 
 bool DatagramSocket::isValid() const
@@ -163,7 +168,7 @@ unsigned DatagramAgreggator::count()
 bool DatagramAgreggator::hasDataAtIndex(unsigned index)
 {
   PDatagramSocket socket = mSocketVector[index];
-  return (FD_ISSET(socket->mHandle, &mReadSet) != 0);
+  return FD_ISSET(socket->mHandle, &mReadSet);
 }
 
 PDatagramSocket DatagramAgreggator::socketAt(unsigned index)

@@ -13,7 +13,7 @@ class PacketScheduler
 {
 public:
   PacketScheduler();
-  ~PacketScheduler();
+  ~PacketScheduler() = default;
 
   void setInitialRTO(int value);
   int  initialRTO();

@@ -7,7 +7,7 @@ thread_pool::thread_pool(size_t num_of_threads, const std::string& name)
         num_of_threads = std::thread::hardware_concurrency();
 
     for(size_t idx = 0; idx < num_of_threads; idx++)
-        this->workers.push_back(std::thread(&thread_pool::run_worker, this));
+        this->workers.emplace_back(std::thread(&thread_pool::run_worker, this));
 }
 
 // Add new work item to the pool

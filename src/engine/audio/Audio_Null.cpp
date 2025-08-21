@@ -60,7 +60,7 @@ NullInputDevice::NullInputDevice()
 
 NullInputDevice::~NullInputDevice()
 {
-  close();
+  internalClose();
 }
 
 bool NullInputDevice::open()
@@ -73,7 +73,7 @@ bool NullInputDevice::open()
   return true;
 }
 
-void NullInputDevice::close()
+void NullInputDevice::internalClose()
 {
   mTimer.reset();
   if (mBuffer)
@@ -84,6 +84,10 @@ void NullInputDevice::close()
   ICELogInfo(<<"Pseudocaptured " << mTimeCounter << " milliseconds , " << mDataCounter << " bytes.");
 }
 
+void NullInputDevice::close()
+{
+    internalClose();
+}
 Format NullInputDevice::getFormat()
 {
   assert (Format().sizeFromTime(AUDIO_MIC_BUFFER_LENGTH) == AUDIO_MIC_BUFFER_SIZE);
@@ -106,7 +110,7 @@ NullOutputDevice::NullOutputDevice()
 
 NullOutputDevice::~NullOutputDevice()
 {
-  close();
+  internalClose();
 }
 
 
@@ -119,11 +123,16 @@ bool NullOutputDevice::open()
   return true;
 }
 
-void NullOutputDevice::close()
+void NullOutputDevice::internalClose()
 {
   mTimer.reset();
   free(mBuffer); mBuffer = nullptr;
   ICELogInfo(<< "Pseudoplayed " << mTimeCounter << " milliseconds, " << mDataCounter << " bytes.");
+}
+
+void NullOutputDevice::close()
+{
+    internalClose();
 }
 
 Format NullOutputDevice::getFormat()

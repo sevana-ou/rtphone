@@ -103,7 +103,7 @@ namespace ice
   public:
     BitReader(const void* input, size_t bytes);
     BitReader(const ByteBuffer& buffer);
-    ~BitReader();
+    ~BitReader() = default;
 
     uint8_t readBit();
     uint32_t readBits(size_t nrOfBits);
@@ -126,7 +126,7 @@ namespace ice
   public:
     BitWriter(void* output);
     BitWriter(ByteBuffer& buffer);
-    ~BitWriter();
+    ~BitWriter() = default;
 
     // Bit must be 0 or 1
     BitWriter& writeBit(int bit);

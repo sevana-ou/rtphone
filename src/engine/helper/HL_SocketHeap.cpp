@@ -127,7 +127,7 @@ PDatagramSocket SocketHeap::allocSocket(int family, SocketSink* sink, int port)
     if (sock == INVALID_SOCKET)
     {
         // Return null socket
-        PDatagramSocket result(new DatagramSocket());
+        auto result = std::make_shared<DatagramSocket>();
         result->mLocalPort = port;
         result->mFamily = family;
         return result;
@@ -170,7 +170,7 @@ PDatagramSocket SocketHeap::allocSocket(int family, SocketSink* sink, int port)
         closesocket(sock);
         throw Exception(ERR_NET_FAILED, WSAGetLastError());
     }
-    PDatagramSocket resultObject(new DatagramSocket());
+    auto resultObject = std::make_shared<DatagramSocket>();
     resultObject->mLocalPort = testport;
     resultObject->mHandle = sock;
     if (!resultObject->setBlocking(false))

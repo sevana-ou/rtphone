@@ -29,10 +29,6 @@ TimeSource::TimeSource(int quantTime, int nrOfQuants)
   mTailTime = 0;
 }
 
-TimeSource::~TimeSource()
-{
-}
-
 void TimeSource::start()
 {
 #ifdef TARGET_WIN
@@ -107,7 +103,7 @@ unsigned TimeSource::time()
 
 // --- StubTimer ---
 StubTimer::StubTimer(int bufferTime, int bufferCount)
-:mBufferTime(bufferTime), mBufferCount(bufferCount), mTimeSource(bufferTime, bufferCount), mActive(false)
+:mBufferTime(bufferTime), mBufferCount(bufferCount), mTimeSource(bufferTime, bufferCount), mActive(false), mCurrentTime(0)
 {
 #ifdef TARGET_WIN
     mStubSignal = ::CreateEvent(NULL, FALSE, FALSE, NULL);

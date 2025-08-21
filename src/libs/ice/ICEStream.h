@@ -63,9 +63,7 @@ namespace ice
       :mTag(NULL), mPort4(0), mPort6(0), mNominationWaitIntervalStartTime(0)
     {}
 
-    ~Component()
-    {
-    }
+    ~Component() = default;
   };
 
   typedef std::map<int, Component>   ComponentMap;

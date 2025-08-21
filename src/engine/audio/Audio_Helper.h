@@ -47,7 +47,7 @@ namespace Audio
 
   public:
     TimeSource(int quantTime, int nrOfQuants);
-    ~TimeSource();
+    ~TimeSource() = default;
 
     void start();
     void stop();

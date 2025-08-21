@@ -18,7 +18,7 @@ namespace Audio
 
 
 SpeexResampler::SpeexResampler()
-    :mContext(NULL), mErrorCode(0), mSourceRate(0), mDestRate(0), mLastSample(0)
+    :mContext(NULL), mErrorCode(0), mSourceRate(0), mDestRate(0), mLastSample(0), mChannels(0)
 {
 }
 
@@ -274,7 +274,7 @@ PResampler UniversalResampler::findResampler(int sourceRate, int destRate)
     PResampler r;
     if (resamplerIter == mResamplerMap.end())
     {
-        r = PResampler(new Resampler());
+        r = std::make_shared<Resampler>();
         r->start(AUDIO_CHANNELS, sourceRate, destRate);
         mResamplerMap[RatePair(sourceRate, destRate)] = r;
     }

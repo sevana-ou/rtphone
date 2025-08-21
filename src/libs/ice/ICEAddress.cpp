@@ -68,7 +68,7 @@ NetworkAddress NetworkAddress::parse(const std::string& s)
     if (ip4Pos == std::string::npos && ip6Pos == std::string::npos)
     {
       // Parse usual IP[:port] pair
-      std::string::size_type cp = s.find_last_of(":");
+      std::string::size_type cp = s.find_last_of(':');
       if (cp == std::string::npos)
         result.setIp(cp);
       else
@@ -87,7 +87,7 @@ NetworkAddress NetworkAddress::parse(const std::string& s)
       std::string addr = s.substr(familyPos + 5);
 
       // Find IP substring and port
-      std::string::size_type colonPos = addr.find_last_of(":");
+      std::string::size_type colonPos = addr.find_last_of(':');
       if (colonPos != std::string::npos)
       {
         int port = atoi(addr.substr(colonPos+1).c_str());
@@ -230,10 +230,6 @@ NetworkAddress::NetworkAddress(const NetworkAddress& src)
     memcpy(&mAddr6, &src.mAddr6, sizeof mAddr6);
 }
 
-NetworkAddress::~NetworkAddress()
-{
-}
-
 int NetworkAddress::family() const
 {
   assert(mInitialized == true);
@@ -305,9 +301,10 @@ sockaddr_in6* NetworkAddress::sockaddr6() const
 
 void NetworkAddress::setIp(NetworkAddress ipOnly)
 {
-  // Save port
+  // Setup family
   mAddr4.sin_family = ipOnly.genericsockaddr()->sa_family;
 
+  // Copy address chunk only
   switch (ipOnly.family())
   {
   case AF_INET:
@@ -315,7 +312,7 @@ void NetworkAddress::setIp(NetworkAddress ipOnly)
     break;
 
   case AF_INET6:
-    memcpy(&mAddr4.sin_addr, &ipOnly.sockaddr6()->sin6_addr, 16);
+    memcpy(&mAddr6.sin6_addr, &ipOnly.sockaddr6()->sin6_addr, 16);
     break;
 
   default:

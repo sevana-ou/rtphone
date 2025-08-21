@@ -37,7 +37,7 @@ namespace ice
     NetworkAddress(const in_addr& ip, unsigned short port);
     NetworkAddress(const sockaddr& addr, size_t addrLen);
     NetworkAddress(const NetworkAddress& src);
-    ~NetworkAddress();
+    ~NetworkAddress() = default;
 
     // Returns AF_INET or AF_INET6
     int             family() const;

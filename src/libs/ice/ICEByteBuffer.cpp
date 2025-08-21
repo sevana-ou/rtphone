@@ -284,9 +284,6 @@ void BitReader::init()
     mCurrentBit = 0;
 }
 
-BitReader::~BitReader()
-{}
-
 // Check for valid position
 uint8_t BitReader::readBit()
 {
@@ -356,9 +353,6 @@ void BitWriter::init()
     mCurrentPosition = 0;//mStreamOffset - 1;
     mCurrentBit = 0;
 }
-
-BitWriter::~BitWriter()
-{}
 
 BitWriter& BitWriter::writeBit(int bit)
 {

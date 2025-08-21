@@ -14,7 +14,7 @@ using namespace ice;
 
 AuthTransaction::AuthTransaction()
 :Transaction(), mActive(false), mComposed(false), mConformsToKeepaliveSchedule(true),
-mCredentialsEncoded(false)
+mCredentialsEncoded(false), mErrorCode(0)
 {
 }
 
@@ -29,7 +29,7 @@ void AuthTransaction::init()
     buildAuthenticatedMsg();
   else
   {
-    std::shared_ptr<StunMessage> msg(new StunMessage());
+    auto msg = std::make_shared<StunMessage>();
     msg->setTransactionId(mTransactionID);
     setInitialRequest(*msg);
     mComposed = false;
@@ -44,7 +44,7 @@ void AuthTransaction::buildAuthenticatedMsg()
   md5Bin(key.c_str(), key.size(), mKey);
 
   // Create new authenticated message
-  std::shared_ptr<StunMessage> newMsg( new StunMessage() );
+  auto newMsg = std::make_shared<StunMessage>();
 
   // Optional - generate new transaction ID
   // mTransactionID = StunMessage::TransactionID::GenerateNew();

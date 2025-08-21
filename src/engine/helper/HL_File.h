@@ -12,7 +12,7 @@ public:
     static void remove(const std::string& s);
     static void remove(const char* s);
 
-    static std::string gettempname();
+    // static std::string gettempname();
     static bool isAbsolute(const std::string& s);
 
     static std::string getCurrentDir();

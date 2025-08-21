@@ -278,12 +278,12 @@ std::shared_ptr<std::thread> OsProcess::asyncExecCommand(const std::string& cmdl
             }
             while (r == sizeof(buffer) - 1);
 
-            if (lines.find("\n") != std::string::npos && line_callback)
+            if (lines.find('\n') != std::string::npos && line_callback)
             {
                 std::string::size_type p = 0;
                 while (p < lines.size())
                 {
-                    std::string::size_type d = lines.find("\n", p);
+                    std::string::size_type d = lines.find('\n', p);
                     if (d != std::string::npos)
                     {
                         if (line_callback)

@@ -32,23 +32,24 @@ void FileHelper::remove(const char* s)
     ::remove(s);
 }
 
-std::string FileHelper::gettempname()
-{
-#if defined(TARGET_LINUX) || defined(TARGET_ANDROID)
-    char template_filename[L_tmpnam] = "rtphone_XXXXXXX.tmp";
-    mkstemp(template_filename);
-    return template_filename;
-#elif defined(TARGET_WIN)
-    char buffer[L_tmpnam];
-    tmpnam(buffer);
+// std::string FileHelper::gettempname()
+// {
+// #if defined(TARGET_LINUX) || defined(TARGET_ANDROID)
+//     char template_filename[L_tmpnam] = "rtphone_XXXXXXX.tmp";
+//     int code = mkstemp(template_filename);
 
-    return buffer;
-#elif defined(TARGET_OSX)
-    char template_filename[L_tmpnam] = "rtphone_XXXXXXX.tmp";
-    mktemp(template_filename);
-    return template_filename;
-#endif
-}
+//     return template_filename;
+// #elif defined(TARGET_WIN)
+//     char buffer[L_tmpnam];
+//     tmpnam(buffer);
+
+//     return buffer;
+// #elif defined(TARGET_OSX)
+//     char template_filename[L_tmpnam] = "rtphone_XXXXXXX.tmp";
+//     mktemp(template_filename);
+//     return template_filename;
+// #endif
+// }
 
 bool FileHelper::isAbsolute(const std::string& s)
 {

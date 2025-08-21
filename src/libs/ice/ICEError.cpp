@@ -60,7 +60,7 @@ Exception::Exception(int code, int subcode)
 }
 
 Exception::Exception(const Exception& src)
-:mErrorCode(src.mErrorCode), mErrorMsg(src.mErrorMsg)
+:mErrorCode(src.mErrorCode), mErrorMsg(src.mErrorMsg), mSubcode(0)
 {
 }
 

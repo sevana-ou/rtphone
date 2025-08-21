@@ -40,7 +40,7 @@ using namespace Audio;
 
 // ---------------------- WavFileReader -------------------------
 WavFileReader::WavFileReader()
-    :mHandle(nullptr), mSamplerate(0), mLastError(0)
+    :mHandle(nullptr), mSamplerate(0), mLastError(0), mChannels(0), mBits(0), mDataLength(0)
 {
     mDataOffset = 0;
 }

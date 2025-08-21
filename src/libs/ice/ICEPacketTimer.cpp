@@ -16,10 +16,6 @@ PacketScheduler::PacketScheduler()
   mLastRTO = 100;
 }
 
-PacketScheduler::~PacketScheduler()
-{
-}
-
 void PacketScheduler::setInitialRTO(int value)
 {
   mInitialRTO = value;

@@ -46,7 +46,7 @@ protected:
   int                                 mErrorCode;
   std::string                         mErrorResponse;
   std::deque<std::shared_ptr<StunMessage> >  mOutgoingMsgQueue;
-  unsigned char                       mKey[16];
+  unsigned char                       mKey[16] = {0};
   bool                                mConformsToKeepaliveSchedule;
   std::string                         mRealm;
   std::string                         mNonce;

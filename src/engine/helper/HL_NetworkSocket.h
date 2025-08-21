@@ -36,10 +36,12 @@ public:
   virtual SOCKET    socket() const;
 
   virtual void open(int family);
+
 protected:
   int mFamily;
   SOCKET mHandle;
   int mLocalPort;
+  void internalClose();
 };
 typedef std::shared_ptr<DatagramSocket> PDatagramSocket;
 

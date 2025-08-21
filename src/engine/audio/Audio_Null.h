@@ -38,6 +38,8 @@ namespace Audio
     void* mBuffer = nullptr;
     std::shared_ptr<NullTimer> mTimer;
     int64_t mTimeCounter = 0, mDataCounter = 0;
+    void internalClose();
+
   public:
     NullInputDevice();
     virtual ~NullInputDevice();
@@ -55,6 +57,8 @@ namespace Audio
     std::shared_ptr<NullTimer> mTimer;
     void* mBuffer = nullptr;
     int64_t mDataCounter = 0, mTimeCounter = 0;
+
+    void internalClose();
   public:
     NullOutputDevice();
     virtual ~NullOutputDevice();
