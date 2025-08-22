@@ -8,7 +8,7 @@
 
 #include "../engine_config.h"
 #include "jrtplib/src/rtpexternaltransmitter.h"
-#include "srtp/include/srtp.h"
+#include "libsrtp/include/srtp.h"
 #include "../helper/HL_NetworkSocket.h"
 #include "../helper/HL_InternetAddress.h"
 #include "../helper/HL_Rtp.h"

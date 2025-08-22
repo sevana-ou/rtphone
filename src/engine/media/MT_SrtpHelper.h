@@ -10,7 +10,7 @@
 #include <vector>
 #include <map>
 
-#include "srtp/include/srtp.h"
+#include "libsrtp/include/srtp.h"
 #include "../helper/HL_Sync.h"
 #include "../helper/HL_ByteBuffer.h"
 
