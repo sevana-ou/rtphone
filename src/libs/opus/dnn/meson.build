@@ -1,12 +1,12 @@
 dnn_sources = sources['DEEP_PLC_SOURCES']
 
 dred_sources = sources['DRED_SOURCES']
-if opt_dred.enabled()
+if opt_enable_dred
   dnn_sources += dred_sources
 endif
 
 osce_sources = sources['OSCE_SOURCES']
-if opt_osce.enabled()
+if opt_enable_osce
   dnn_sources += osce_sources
 endif
 
@@ -51,7 +51,7 @@ if host_machine.system() == 'windows'
 endif
 
 
-if opt_deep_plc.enabled()
+if opt_enable_deep_plc
  dnn_lib = static_library('opus-dnn',
   dnn_sources,
   c_args: dnn_c_args,

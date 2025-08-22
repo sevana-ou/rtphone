@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.16)
+cmake_minimum_required(VERSION 3.1)
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
 include(OpusPackageVersion)
@@ -95,12 +95,6 @@ if(APPLE)
   set(OPUS_BUILD_FRAMEWORK_HELP_STR "build Framework bundle for Apple systems.")
   option(OPUS_BUILD_FRAMEWORK ${OPUS_BUILD_FRAMEWORK_HELP_STR} OFF)
   add_feature_info(OPUS_BUILD_FRAMEWORK OPUS_BUILD_FRAMEWORK ${OPUS_BUILD_FRAMEWORK_HELP_STR})
-endif()
-
-if(MSVC)
-  set(OPUS_STATIC_RUNTIME_HELP_STR "build with static runtime library.")
-  option(OPUS_STATIC_RUNTIME ${OPUS_STATIC_RUNTIME_HELP_STR} OFF)
-  add_feature_info(OPUS_STATIC_RUNTIME OPUS_STATIC_RUNTIME ${OPUS_STATIC_RUNTIME_HELP_STR})
 endif()
 
 set(OPUS_FIXED_POINT_DEBUG_HELP_STR "debug fixed-point implementation.")
@@ -271,14 +265,6 @@ if(OPUS_CUSTOM_MODES)
   list(APPEND Opus_PUBLIC_HEADER ${CMAKE_CURRENT_SOURCE_DIR}/include/opus_custom.h)
 endif()
 
-if(MSVC)
-  if(OPUS_STATIC_RUNTIME)
-    set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
-  else()
-    set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>DLL")
-  endif()
-endif()
-
 add_library(opus ${opus_headers} ${opus_sources} ${opus_sources_float} ${Opus_PUBLIC_HEADER})
 add_library(Opus::opus ALIAS opus)
 
@@ -422,7 +408,8 @@ if(NOT OPUS_DISABLE_INTRINSICS)
   if(((OPUS_X86_MAY_HAVE_SSE AND NOT OPUS_X86_PRESUME_SSE) OR
      (OPUS_X86_MAY_HAVE_SSE2 AND NOT OPUS_X86_PRESUME_SSE2) OR
      (OPUS_X86_MAY_HAVE_SSE4_1 AND NOT OPUS_X86_PRESUME_SSE4_1) OR
-     (OPUS_X86_MAY_HAVE_AVX2 AND NOT OPUS_X86_PRESUME_AVX2)))
+     (OPUS_X86_MAY_HAVE_AVX2 AND NOT OPUS_X86_PRESUME_AVX2)) AND
+      RUNTIME_CPU_CAPABILITY_DETECTION)
     target_compile_definitions(opus PRIVATE OPUS_HAVE_RTCD)
     if(NOT MSVC)
       if(CPU_INFO_BY_ASM_SUPPORTED)
@@ -545,7 +532,7 @@ if(NOT OPUS_DISABLE_INTRINSICS)
 
   if(COMPILER_SUPPORT_NEON)
     if(OPUS_MAY_HAVE_NEON)
-      if(TRUE)
+      if(RUNTIME_CPU_CAPABILITY_DETECTION)
         message(STATUS "OPUS_MAY_HAVE_NEON enabling runtime detection")
         target_compile_definitions(opus PRIVATE OPUS_HAVE_RTCD)
         add_sources_group(opus celt ${celt_sources_arm_rtcd})

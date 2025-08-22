@@ -19,7 +19,7 @@ def make_build() -> Path:
     os.mkdir(DIR_BUILD)
     os.chdir(DIR_BUILD)  
     
-    cmd = f'cmake ../src'
+    cmd = f'cmake ../src -G Ninja'
     retcode = os.system(cmd)
     if retcode != 0:
         raise RuntimeError('Problem when configuring the project')

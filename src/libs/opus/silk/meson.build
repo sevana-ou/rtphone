@@ -44,7 +44,9 @@ foreach intr_name : ['sse4_1', 'avx2', 'neon_intr']
   endif
 
   intr_sources = get_variable('silk_sources_' + intr_name)
-  if not opt_fixed_point
+  if opt_fixed_point
+    intr_sources += get_variable('silk_sources_fixed_' + intr_name)
+  else
     intr_sources += get_variable('silk_sources_float_' + intr_name)
   endif
 

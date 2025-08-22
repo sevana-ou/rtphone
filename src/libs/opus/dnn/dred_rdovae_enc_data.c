@@ -127942,295 +127942,295 @@ static const float enc_conv5_bias[96] = {
 #ifndef USE_WEIGHTS_FILE
 const WeightArray rdovaeenc_arrays[] = {
 #ifdef WEIGHTS_enc_dense1_weights_float_DEFINED
-{"enc_dense1_weights_float",WEIGHTS_enc_dense1_weights_float_TYPE,sizeof(enc_dense1_weights_float),enc_dense1_weights_float},
+{"enc_dense1_weights_float", WEIGHTS_enc_dense1_weights_float_TYPE,sizeof(enc_dense1_weights_float),enc_dense1_weights_float},
 #endif
 #ifdef WEIGHTS_enc_dense1_bias_DEFINED
-{"enc_dense1_bias",WEIGHTS_enc_dense1_bias_TYPE,sizeof(enc_dense1_bias),enc_dense1_bias},
+{"enc_dense1_bias", WEIGHTS_enc_dense1_bias_TYPE,sizeof(enc_dense1_bias),enc_dense1_bias},
 #endif
 #ifdef WEIGHTS_enc_zdense_weights_int8_DEFINED
-{"enc_zdense_weights_int8",WEIGHTS_enc_zdense_weights_int8_TYPE,sizeof(enc_zdense_weights_int8),enc_zdense_weights_int8},
+{"enc_zdense_weights_int8", WEIGHTS_enc_zdense_weights_int8_TYPE,sizeof(enc_zdense_weights_int8),enc_zdense_weights_int8},
 #endif
 #ifdef WEIGHTS_enc_zdense_weights_float_DEFINED
-{"enc_zdense_weights_float",WEIGHTS_enc_zdense_weights_float_TYPE,sizeof(enc_zdense_weights_float),enc_zdense_weights_float},
+{"enc_zdense_weights_float", WEIGHTS_enc_zdense_weights_float_TYPE,sizeof(enc_zdense_weights_float),enc_zdense_weights_float},
 #endif
 #ifdef WEIGHTS_enc_zdense_subias_DEFINED
-{"enc_zdense_subias",WEIGHTS_enc_zdense_subias_TYPE,sizeof(enc_zdense_subias),enc_zdense_subias},
+{"enc_zdense_subias", WEIGHTS_enc_zdense_subias_TYPE,sizeof(enc_zdense_subias),enc_zdense_subias},
 #endif
 #ifdef WEIGHTS_enc_zdense_scale_DEFINED
-{"enc_zdense_scale",WEIGHTS_enc_zdense_scale_TYPE,sizeof(enc_zdense_scale),enc_zdense_scale},
+{"enc_zdense_scale", WEIGHTS_enc_zdense_scale_TYPE,sizeof(enc_zdense_scale),enc_zdense_scale},
 #endif
 #ifdef WEIGHTS_enc_zdense_bias_DEFINED
-{"enc_zdense_bias",WEIGHTS_enc_zdense_bias_TYPE,sizeof(enc_zdense_bias),enc_zdense_bias},
+{"enc_zdense_bias", WEIGHTS_enc_zdense_bias_TYPE,sizeof(enc_zdense_bias),enc_zdense_bias},
 #endif
 #ifdef WEIGHTS_gdense1_weights_int8_DEFINED
-{"gdense1_weights_int8",WEIGHTS_gdense1_weights_int8_TYPE,sizeof(gdense1_weights_int8),gdense1_weights_int8},
+{"gdense1_weights_int8", WEIGHTS_gdense1_weights_int8_TYPE,sizeof(gdense1_weights_int8),gdense1_weights_int8},
 #endif
 #ifdef WEIGHTS_gdense1_weights_float_DEFINED
-{"gdense1_weights_float",WEIGHTS_gdense1_weights_float_TYPE,sizeof(gdense1_weights_float),gdense1_weights_float},
+{"gdense1_weights_float", WEIGHTS_gdense1_weights_float_TYPE,sizeof(gdense1_weights_float),gdense1_weights_float},
 #endif
 #ifdef WEIGHTS_gdense1_subias_DEFINED
-{"gdense1_subias",WEIGHTS_gdense1_subias_TYPE,sizeof(gdense1_subias),gdense1_subias},
+{"gdense1_subias", WEIGHTS_gdense1_subias_TYPE,sizeof(gdense1_subias),gdense1_subias},
 #endif
 #ifdef WEIGHTS_gdense1_scale_DEFINED
-{"gdense1_scale",WEIGHTS_gdense1_scale_TYPE,sizeof(gdense1_scale),gdense1_scale},
+{"gdense1_scale", WEIGHTS_gdense1_scale_TYPE,sizeof(gdense1_scale),gdense1_scale},
 #endif
 #ifdef WEIGHTS_gdense1_bias_DEFINED
-{"gdense1_bias",WEIGHTS_gdense1_bias_TYPE,sizeof(gdense1_bias),gdense1_bias},
+{"gdense1_bias", WEIGHTS_gdense1_bias_TYPE,sizeof(gdense1_bias),gdense1_bias},
 #endif
 #ifdef WEIGHTS_gdense2_weights_int8_DEFINED
-{"gdense2_weights_int8",WEIGHTS_gdense2_weights_int8_TYPE,sizeof(gdense2_weights_int8),gdense2_weights_int8},
+{"gdense2_weights_int8", WEIGHTS_gdense2_weights_int8_TYPE,sizeof(gdense2_weights_int8),gdense2_weights_int8},
 #endif
 #ifdef WEIGHTS_gdense2_weights_float_DEFINED
-{"gdense2_weights_float",WEIGHTS_gdense2_weights_float_TYPE,sizeof(gdense2_weights_float),gdense2_weights_float},
+{"gdense2_weights_float", WEIGHTS_gdense2_weights_float_TYPE,sizeof(gdense2_weights_float),gdense2_weights_float},
 #endif
 #ifdef WEIGHTS_gdense2_subias_DEFINED
-{"gdense2_subias",WEIGHTS_gdense2_subias_TYPE,sizeof(gdense2_subias),gdense2_subias},
+{"gdense2_subias", WEIGHTS_gdense2_subias_TYPE,sizeof(gdense2_subias),gdense2_subias},
 #endif
 #ifdef WEIGHTS_gdense2_scale_DEFINED
-{"gdense2_scale",WEIGHTS_gdense2_scale_TYPE,sizeof(gdense2_scale),gdense2_scale},
+{"gdense2_scale", WEIGHTS_gdense2_scale_TYPE,sizeof(gdense2_scale),gdense2_scale},
 #endif
 #ifdef WEIGHTS_gdense2_bias_DEFINED
-{"gdense2_bias",WEIGHTS_gdense2_bias_TYPE,sizeof(gdense2_bias),gdense2_bias},
+{"gdense2_bias", WEIGHTS_gdense2_bias_TYPE,sizeof(gdense2_bias),gdense2_bias},
 #endif
 #ifdef WEIGHTS_enc_gru1_input_weights_int8_DEFINED
-{"enc_gru1_input_weights_int8",WEIGHTS_enc_gru1_input_weights_int8_TYPE,sizeof(enc_gru1_input_weights_int8),enc_gru1_input_weights_int8},
+{"enc_gru1_input_weights_int8", WEIGHTS_enc_gru1_input_weights_int8_TYPE,sizeof(enc_gru1_input_weights_int8),enc_gru1_input_weights_int8},
 #endif
 #ifdef WEIGHTS_enc_gru1_input_weights_float_DEFINED
-{"enc_gru1_input_weights_float",WEIGHTS_enc_gru1_input_weights_float_TYPE,sizeof(enc_gru1_input_weights_float),enc_gru1_input_weights_float},
+{"enc_gru1_input_weights_float", WEIGHTS_enc_gru1_input_weights_float_TYPE,sizeof(enc_gru1_input_weights_float),enc_gru1_input_weights_float},
 #endif
 #ifdef WEIGHTS_enc_gru1_input_weights_idx_DEFINED
-{"enc_gru1_input_weights_idx",WEIGHTS_enc_gru1_input_weights_idx_TYPE,sizeof(enc_gru1_input_weights_idx),enc_gru1_input_weights_idx},
+{"enc_gru1_input_weights_idx", WEIGHTS_enc_gru1_input_weights_idx_TYPE,sizeof(enc_gru1_input_weights_idx),enc_gru1_input_weights_idx},
 #endif
 #ifdef WEIGHTS_enc_gru1_input_subias_DEFINED
-{"enc_gru1_input_subias",WEIGHTS_enc_gru1_input_subias_TYPE,sizeof(enc_gru1_input_subias),enc_gru1_input_subias},
+{"enc_gru1_input_subias", WEIGHTS_enc_gru1_input_subias_TYPE,sizeof(enc_gru1_input_subias),enc_gru1_input_subias},
 #endif
 #ifdef WEIGHTS_enc_gru1_input_scale_DEFINED
-{"enc_gru1_input_scale",WEIGHTS_enc_gru1_input_scale_TYPE,sizeof(enc_gru1_input_scale),enc_gru1_input_scale},
+{"enc_gru1_input_scale", WEIGHTS_enc_gru1_input_scale_TYPE,sizeof(enc_gru1_input_scale),enc_gru1_input_scale},
 #endif
 #ifdef WEIGHTS_enc_gru1_input_bias_DEFINED
-{"enc_gru1_input_bias",WEIGHTS_enc_gru1_input_bias_TYPE,sizeof(enc_gru1_input_bias),enc_gru1_input_bias},
+{"enc_gru1_input_bias", WEIGHTS_enc_gru1_input_bias_TYPE,sizeof(enc_gru1_input_bias),enc_gru1_input_bias},
 #endif
 #ifdef WEIGHTS_enc_gru1_recurrent_weights_int8_DEFINED
-{"enc_gru1_recurrent_weights_int8",WEIGHTS_enc_gru1_recurrent_weights_int8_TYPE,sizeof(enc_gru1_recurrent_weights_int8),enc_gru1_recurrent_weights_int8},
+{"enc_gru1_recurrent_weights_int8", WEIGHTS_enc_gru1_recurrent_weights_int8_TYPE,sizeof(enc_gru1_recurrent_weights_int8),enc_gru1_recurrent_weights_int8},
 #endif
 #ifdef WEIGHTS_enc_gru1_recurrent_weights_float_DEFINED
-{"enc_gru1_recurrent_weights_float",WEIGHTS_enc_gru1_recurrent_weights_float_TYPE,sizeof(enc_gru1_recurrent_weights_float),enc_gru1_recurrent_weights_float},
+{"enc_gru1_recurrent_weights_float", WEIGHTS_enc_gru1_recurrent_weights_float_TYPE,sizeof(enc_gru1_recurrent_weights_float),enc_gru1_recurrent_weights_float},
 #endif
 #ifdef WEIGHTS_enc_gru1_recurrent_subias_DEFINED
-{"enc_gru1_recurrent_subias",WEIGHTS_enc_gru1_recurrent_subias_TYPE,sizeof(enc_gru1_recurrent_subias),enc_gru1_recurrent_subias},
+{"enc_gru1_recurrent_subias", WEIGHTS_enc_gru1_recurrent_subias_TYPE,sizeof(enc_gru1_recurrent_subias),enc_gru1_recurrent_subias},
 #endif
 #ifdef WEIGHTS_enc_gru1_recurrent_scale_DEFINED
-{"enc_gru1_recurrent_scale",WEIGHTS_enc_gru1_recurrent_scale_TYPE,sizeof(enc_gru1_recurrent_scale),enc_gru1_recurrent_scale},
+{"enc_gru1_recurrent_scale", WEIGHTS_enc_gru1_recurrent_scale_TYPE,sizeof(enc_gru1_recurrent_scale),enc_gru1_recurrent_scale},
 #endif
 #ifdef WEIGHTS_enc_gru1_recurrent_bias_DEFINED
-{"enc_gru1_recurrent_bias",WEIGHTS_enc_gru1_recurrent_bias_TYPE,sizeof(enc_gru1_recurrent_bias),enc_gru1_recurrent_bias},
+{"enc_gru1_recurrent_bias", WEIGHTS_enc_gru1_recurrent_bias_TYPE,sizeof(enc_gru1_recurrent_bias),enc_gru1_recurrent_bias},
 #endif
 #ifdef WEIGHTS_enc_gru2_input_weights_int8_DEFINED
-{"enc_gru2_input_weights_int8",WEIGHTS_enc_gru2_input_weights_int8_TYPE,sizeof(enc_gru2_input_weights_int8),enc_gru2_input_weights_int8},
+{"enc_gru2_input_weights_int8", WEIGHTS_enc_gru2_input_weights_int8_TYPE,sizeof(enc_gru2_input_weights_int8),enc_gru2_input_weights_int8},
 #endif
 #ifdef WEIGHTS_enc_gru2_input_weights_float_DEFINED
-{"enc_gru2_input_weights_float",WEIGHTS_enc_gru2_input_weights_float_TYPE,sizeof(enc_gru2_input_weights_float),enc_gru2_input_weights_float},
+{"enc_gru2_input_weights_float", WEIGHTS_enc_gru2_input_weights_float_TYPE,sizeof(enc_gru2_input_weights_float),enc_gru2_input_weights_float},
 #endif
 #ifdef WEIGHTS_enc_gru2_input_weights_idx_DEFINED
-{"enc_gru2_input_weights_idx",WEIGHTS_enc_gru2_input_weights_idx_TYPE,sizeof(enc_gru2_input_weights_idx),enc_gru2_input_weights_idx},
+{"enc_gru2_input_weights_idx", WEIGHTS_enc_gru2_input_weights_idx_TYPE,sizeof(enc_gru2_input_weights_idx),enc_gru2_input_weights_idx},
 #endif
 #ifdef WEIGHTS_enc_gru2_input_subias_DEFINED
-{"enc_gru2_input_subias",WEIGHTS_enc_gru2_input_subias_TYPE,sizeof(enc_gru2_input_subias),enc_gru2_input_subias},
+{"enc_gru2_input_subias", WEIGHTS_enc_gru2_input_subias_TYPE,sizeof(enc_gru2_input_subias),enc_gru2_input_subias},
 #endif
 #ifdef WEIGHTS_enc_gru2_input_scale_DEFINED
-{"enc_gru2_input_scale",WEIGHTS_enc_gru2_input_scale_TYPE,sizeof(enc_gru2_input_scale),enc_gru2_input_scale},
+{"enc_gru2_input_scale", WEIGHTS_enc_gru2_input_scale_TYPE,sizeof(enc_gru2_input_scale),enc_gru2_input_scale},
 #endif
 #ifdef WEIGHTS_enc_gru2_input_bias_DEFINED
-{"enc_gru2_input_bias",WEIGHTS_enc_gru2_input_bias_TYPE,sizeof(enc_gru2_input_bias),enc_gru2_input_bias},
+{"enc_gru2_input_bias", WEIGHTS_enc_gru2_input_bias_TYPE,sizeof(enc_gru2_input_bias),enc_gru2_input_bias},
 #endif
 #ifdef WEIGHTS_enc_gru2_recurrent_weights_int8_DEFINED
-{"enc_gru2_recurrent_weights_int8",WEIGHTS_enc_gru2_recurrent_weights_int8_TYPE,sizeof(enc_gru2_recurrent_weights_int8),enc_gru2_recurrent_weights_int8},
+{"enc_gru2_recurrent_weights_int8", WEIGHTS_enc_gru2_recurrent_weights_int8_TYPE,sizeof(enc_gru2_recurrent_weights_int8),enc_gru2_recurrent_weights_int8},
 #endif
 #ifdef WEIGHTS_enc_gru2_recurrent_weights_float_DEFINED
-{"enc_gru2_recurrent_weights_float",WEIGHTS_enc_gru2_recurrent_weights_float_TYPE,sizeof(enc_gru2_recurrent_weights_float),enc_gru2_recurrent_weights_float},
+{"enc_gru2_recurrent_weights_float", WEIGHTS_enc_gru2_recurrent_weights_float_TYPE,sizeof(enc_gru2_recurrent_weights_float),enc_gru2_recurrent_weights_float},
 #endif
 #ifdef WEIGHTS_enc_gru2_recurrent_subias_DEFINED
-{"enc_gru2_recurrent_subias",WEIGHTS_enc_gru2_recurrent_subias_TYPE,sizeof(enc_gru2_recurrent_subias),enc_gru2_recurrent_subias},
+{"enc_gru2_recurrent_subias", WEIGHTS_enc_gru2_recurrent_subias_TYPE,sizeof(enc_gru2_recurrent_subias),enc_gru2_recurrent_subias},
 #endif
 #ifdef WEIGHTS_enc_gru2_recurrent_scale_DEFINED
-{"enc_gru2_recurrent_scale",WEIGHTS_enc_gru2_recurrent_scale_TYPE,sizeof(enc_gru2_recurrent_scale),enc_gru2_recurrent_scale},
+{"enc_gru2_recurrent_scale", WEIGHTS_enc_gru2_recurrent_scale_TYPE,sizeof(enc_gru2_recurrent_scale),enc_gru2_recurrent_scale},
 #endif
 #ifdef WEIGHTS_enc_gru2_recurrent_bias_DEFINED
-{"enc_gru2_recurrent_bias",WEIGHTS_enc_gru2_recurrent_bias_TYPE,sizeof(enc_gru2_recurrent_bias),enc_gru2_recurrent_bias},
+{"enc_gru2_recurrent_bias", WEIGHTS_enc_gru2_recurrent_bias_TYPE,sizeof(enc_gru2_recurrent_bias),enc_gru2_recurrent_bias},
 #endif
 #ifdef WEIGHTS_enc_gru3_input_weights_int8_DEFINED
-{"enc_gru3_input_weights_int8",WEIGHTS_enc_gru3_input_weights_int8_TYPE,sizeof(enc_gru3_input_weights_int8),enc_gru3_input_weights_int8},
+{"enc_gru3_input_weights_int8", WEIGHTS_enc_gru3_input_weights_int8_TYPE,sizeof(enc_gru3_input_weights_int8),enc_gru3_input_weights_int8},
 #endif
 #ifdef WEIGHTS_enc_gru3_input_weights_float_DEFINED
-{"enc_gru3_input_weights_float",WEIGHTS_enc_gru3_input_weights_float_TYPE,sizeof(enc_gru3_input_weights_float),enc_gru3_input_weights_float},
+{"enc_gru3_input_weights_float", WEIGHTS_enc_gru3_input_weights_float_TYPE,sizeof(enc_gru3_input_weights_float),enc_gru3_input_weights_float},
 #endif
 #ifdef WEIGHTS_enc_gru3_input_weights_idx_DEFINED
-{"enc_gru3_input_weights_idx",WEIGHTS_enc_gru3_input_weights_idx_TYPE,sizeof(enc_gru3_input_weights_idx),enc_gru3_input_weights_idx},
+{"enc_gru3_input_weights_idx", WEIGHTS_enc_gru3_input_weights_idx_TYPE,sizeof(enc_gru3_input_weights_idx),enc_gru3_input_weights_idx},
 #endif
 #ifdef WEIGHTS_enc_gru3_input_subias_DEFINED
-{"enc_gru3_input_subias",WEIGHTS_enc_gru3_input_subias_TYPE,sizeof(enc_gru3_input_subias),enc_gru3_input_subias},
+{"enc_gru3_input_subias", WEIGHTS_enc_gru3_input_subias_TYPE,sizeof(enc_gru3_input_subias),enc_gru3_input_subias},
 #endif
 #ifdef WEIGHTS_enc_gru3_input_scale_DEFINED
-{"enc_gru3_input_scale",WEIGHTS_enc_gru3_input_scale_TYPE,sizeof(enc_gru3_input_scale),enc_gru3_input_scale},
+{"enc_gru3_input_scale", WEIGHTS_enc_gru3_input_scale_TYPE,sizeof(enc_gru3_input_scale),enc_gru3_input_scale},
 #endif
 #ifdef WEIGHTS_enc_gru3_input_bias_DEFINED
-{"enc_gru3_input_bias",WEIGHTS_enc_gru3_input_bias_TYPE,sizeof(enc_gru3_input_bias),enc_gru3_input_bias},
+{"enc_gru3_input_bias", WEIGHTS_enc_gru3_input_bias_TYPE,sizeof(enc_gru3_input_bias),enc_gru3_input_bias},
 #endif
 #ifdef WEIGHTS_enc_gru3_recurrent_weights_int8_DEFINED
-{"enc_gru3_recurrent_weights_int8",WEIGHTS_enc_gru3_recurrent_weights_int8_TYPE,sizeof(enc_gru3_recurrent_weights_int8),enc_gru3_recurrent_weights_int8},
+{"enc_gru3_recurrent_weights_int8", WEIGHTS_enc_gru3_recurrent_weights_int8_TYPE,sizeof(enc_gru3_recurrent_weights_int8),enc_gru3_recurrent_weights_int8},
 #endif
 #ifdef WEIGHTS_enc_gru3_recurrent_weights_float_DEFINED
-{"enc_gru3_recurrent_weights_float",WEIGHTS_enc_gru3_recurrent_weights_float_TYPE,sizeof(enc_gru3_recurrent_weights_float),enc_gru3_recurrent_weights_float},
+{"enc_gru3_recurrent_weights_float", WEIGHTS_enc_gru3_recurrent_weights_float_TYPE,sizeof(enc_gru3_recurrent_weights_float),enc_gru3_recurrent_weights_float},
 #endif
 #ifdef WEIGHTS_enc_gru3_recurrent_subias_DEFINED
-{"enc_gru3_recurrent_subias",WEIGHTS_enc_gru3_recurrent_subias_TYPE,sizeof(enc_gru3_recurrent_subias),enc_gru3_recurrent_subias},
+{"enc_gru3_recurrent_subias", WEIGHTS_enc_gru3_recurrent_subias_TYPE,sizeof(enc_gru3_recurrent_subias),enc_gru3_recurrent_subias},
 #endif
 #ifdef WEIGHTS_enc_gru3_recurrent_scale_DEFINED
-{"enc_gru3_recurrent_scale",WEIGHTS_enc_gru3_recurrent_scale_TYPE,sizeof(enc_gru3_recurrent_scale),enc_gru3_recurrent_scale},
+{"enc_gru3_recurrent_scale", WEIGHTS_enc_gru3_recurrent_scale_TYPE,sizeof(enc_gru3_recurrent_scale),enc_gru3_recurrent_scale},
 #endif
 #ifdef WEIGHTS_enc_gru3_recurrent_bias_DEFINED
-{"enc_gru3_recurrent_bias",WEIGHTS_enc_gru3_recurrent_bias_TYPE,sizeof(enc_gru3_recurrent_bias),enc_gru3_recurrent_bias},
+{"enc_gru3_recurrent_bias", WEIGHTS_enc_gru3_recurrent_bias_TYPE,sizeof(enc_gru3_recurrent_bias),enc_gru3_recurrent_bias},
 #endif
 #ifdef WEIGHTS_enc_gru4_input_weights_int8_DEFINED
-{"enc_gru4_input_weights_int8",WEIGHTS_enc_gru4_input_weights_int8_TYPE,sizeof(enc_gru4_input_weights_int8),enc_gru4_input_weights_int8},
+{"enc_gru4_input_weights_int8", WEIGHTS_enc_gru4_input_weights_int8_TYPE,sizeof(enc_gru4_input_weights_int8),enc_gru4_input_weights_int8},
 #endif
 #ifdef WEIGHTS_enc_gru4_input_weights_float_DEFINED
-{"enc_gru4_input_weights_float",WEIGHTS_enc_gru4_input_weights_float_TYPE,sizeof(enc_gru4_input_weights_float),enc_gru4_input_weights_float},
+{"enc_gru4_input_weights_float", WEIGHTS_enc_gru4_input_weights_float_TYPE,sizeof(enc_gru4_input_weights_float),enc_gru4_input_weights_float},
 #endif
 #ifdef WEIGHTS_enc_gru4_input_weights_idx_DEFINED
-{"enc_gru4_input_weights_idx",WEIGHTS_enc_gru4_input_weights_idx_TYPE,sizeof(enc_gru4_input_weights_idx),enc_gru4_input_weights_idx},
+{"enc_gru4_input_weights_idx", WEIGHTS_enc_gru4_input_weights_idx_TYPE,sizeof(enc_gru4_input_weights_idx),enc_gru4_input_weights_idx},
 #endif
 #ifdef WEIGHTS_enc_gru4_input_subias_DEFINED
-{"enc_gru4_input_subias",WEIGHTS_enc_gru4_input_subias_TYPE,sizeof(enc_gru4_input_subias),enc_gru4_input_subias},
+{"enc_gru4_input_subias", WEIGHTS_enc_gru4_input_subias_TYPE,sizeof(enc_gru4_input_subias),enc_gru4_input_subias},
 #endif
 #ifdef WEIGHTS_enc_gru4_input_scale_DEFINED
-{"enc_gru4_input_scale",WEIGHTS_enc_gru4_input_scale_TYPE,sizeof(enc_gru4_input_scale),enc_gru4_input_scale},
+{"enc_gru4_input_scale", WEIGHTS_enc_gru4_input_scale_TYPE,sizeof(enc_gru4_input_scale),enc_gru4_input_scale},
 #endif
 #ifdef WEIGHTS_enc_gru4_input_bias_DEFINED
-{"enc_gru4_input_bias",WEIGHTS_enc_gru4_input_bias_TYPE,sizeof(enc_gru4_input_bias),enc_gru4_input_bias},
+{"enc_gru4_input_bias", WEIGHTS_enc_gru4_input_bias_TYPE,sizeof(enc_gru4_input_bias),enc_gru4_input_bias},
 #endif
 #ifdef WEIGHTS_enc_gru4_recurrent_weights_int8_DEFINED
-{"enc_gru4_recurrent_weights_int8",WEIGHTS_enc_gru4_recurrent_weights_int8_TYPE,sizeof(enc_gru4_recurrent_weights_int8),enc_gru4_recurrent_weights_int8},
+{"enc_gru4_recurrent_weights_int8", WEIGHTS_enc_gru4_recurrent_weights_int8_TYPE,sizeof(enc_gru4_recurrent_weights_int8),enc_gru4_recurrent_weights_int8},
 #endif
 #ifdef WEIGHTS_enc_gru4_recurrent_weights_float_DEFINED
-{"enc_gru4_recurrent_weights_float",WEIGHTS_enc_gru4_recurrent_weights_float_TYPE,sizeof(enc_gru4_recurrent_weights_float),enc_gru4_recurrent_weights_float},
+{"enc_gru4_recurrent_weights_float", WEIGHTS_enc_gru4_recurrent_weights_float_TYPE,sizeof(enc_gru4_recurrent_weights_float),enc_gru4_recurrent_weights_float},
 #endif
 #ifdef WEIGHTS_enc_gru4_recurrent_subias_DEFINED
-{"enc_gru4_recurrent_subias",WEIGHTS_enc_gru4_recurrent_subias_TYPE,sizeof(enc_gru4_recurrent_subias),enc_gru4_recurrent_subias},
+{"enc_gru4_recurrent_subias", WEIGHTS_enc_gru4_recurrent_subias_TYPE,sizeof(enc_gru4_recurrent_subias),enc_gru4_recurrent_subias},
 #endif
 #ifdef WEIGHTS_enc_gru4_recurrent_scale_DEFINED
-{"enc_gru4_recurrent_scale",WEIGHTS_enc_gru4_recurrent_scale_TYPE,sizeof(enc_gru4_recurrent_scale),enc_gru4_recurrent_scale},
+{"enc_gru4_recurrent_scale", WEIGHTS_enc_gru4_recurrent_scale_TYPE,sizeof(enc_gru4_recurrent_scale),enc_gru4_recurrent_scale},
 #endif
 #ifdef WEIGHTS_enc_gru4_recurrent_bias_DEFINED
-{"enc_gru4_recurrent_bias",WEIGHTS_enc_gru4_recurrent_bias_TYPE,sizeof(enc_gru4_recurrent_bias),enc_gru4_recurrent_bias},
+{"enc_gru4_recurrent_bias", WEIGHTS_enc_gru4_recurrent_bias_TYPE,sizeof(enc_gru4_recurrent_bias),enc_gru4_recurrent_bias},
 #endif
 #ifdef WEIGHTS_enc_gru5_input_weights_int8_DEFINED
-{"enc_gru5_input_weights_int8",WEIGHTS_enc_gru5_input_weights_int8_TYPE,sizeof(enc_gru5_input_weights_int8),enc_gru5_input_weights_int8},
+{"enc_gru5_input_weights_int8", WEIGHTS_enc_gru5_input_weights_int8_TYPE,sizeof(enc_gru5_input_weights_int8),enc_gru5_input_weights_int8},
 #endif
 #ifdef WEIGHTS_enc_gru5_input_weights_float_DEFINED
-{"enc_gru5_input_weights_float",WEIGHTS_enc_gru5_input_weights_float_TYPE,sizeof(enc_gru5_input_weights_float),enc_gru5_input_weights_float},
+{"enc_gru5_input_weights_float", WEIGHTS_enc_gru5_input_weights_float_TYPE,sizeof(enc_gru5_input_weights_float),enc_gru5_input_weights_float},
 #endif
 #ifdef WEIGHTS_enc_gru5_input_weights_idx_DEFINED
-{"enc_gru5_input_weights_idx",WEIGHTS_enc_gru5_input_weights_idx_TYPE,sizeof(enc_gru5_input_weights_idx),enc_gru5_input_weights_idx},
+{"enc_gru5_input_weights_idx", WEIGHTS_enc_gru5_input_weights_idx_TYPE,sizeof(enc_gru5_input_weights_idx),enc_gru5_input_weights_idx},
 #endif
 #ifdef WEIGHTS_enc_gru5_input_subias_DEFINED
-{"enc_gru5_input_subias",WEIGHTS_enc_gru5_input_subias_TYPE,sizeof(enc_gru5_input_subias),enc_gru5_input_subias},
+{"enc_gru5_input_subias", WEIGHTS_enc_gru5_input_subias_TYPE,sizeof(enc_gru5_input_subias),enc_gru5_input_subias},
 #endif
 #ifdef WEIGHTS_enc_gru5_input_scale_DEFINED
-{"enc_gru5_input_scale",WEIGHTS_enc_gru5_input_scale_TYPE,sizeof(enc_gru5_input_scale),enc_gru5_input_scale},
+{"enc_gru5_input_scale", WEIGHTS_enc_gru5_input_scale_TYPE,sizeof(enc_gru5_input_scale),enc_gru5_input_scale},
 #endif
 #ifdef WEIGHTS_enc_gru5_input_bias_DEFINED
-{"enc_gru5_input_bias",WEIGHTS_enc_gru5_input_bias_TYPE,sizeof(enc_gru5_input_bias),enc_gru5_input_bias},
+{"enc_gru5_input_bias", WEIGHTS_enc_gru5_input_bias_TYPE,sizeof(enc_gru5_input_bias),enc_gru5_input_bias},
 #endif
 #ifdef WEIGHTS_enc_gru5_recurrent_weights_int8_DEFINED
-{"enc_gru5_recurrent_weights_int8",WEIGHTS_enc_gru5_recurrent_weights_int8_TYPE,sizeof(enc_gru5_recurrent_weights_int8),enc_gru5_recurrent_weights_int8},
+{"enc_gru5_recurrent_weights_int8", WEIGHTS_enc_gru5_recurrent_weights_int8_TYPE,sizeof(enc_gru5_recurrent_weights_int8),enc_gru5_recurrent_weights_int8},
 #endif
 #ifdef WEIGHTS_enc_gru5_recurrent_weights_float_DEFINED
-{"enc_gru5_recurrent_weights_float",WEIGHTS_enc_gru5_recurrent_weights_float_TYPE,sizeof(enc_gru5_recurrent_weights_float),enc_gru5_recurrent_weights_float},
+{"enc_gru5_recurrent_weights_float", WEIGHTS_enc_gru5_recurrent_weights_float_TYPE,sizeof(enc_gru5_recurrent_weights_float),enc_gru5_recurrent_weights_float},
 #endif
 #ifdef WEIGHTS_enc_gru5_recurrent_subias_DEFINED
-{"enc_gru5_recurrent_subias",WEIGHTS_enc_gru5_recurrent_subias_TYPE,sizeof(enc_gru5_recurrent_subias),enc_gru5_recurrent_subias},
+{"enc_gru5_recurrent_subias", WEIGHTS_enc_gru5_recurrent_subias_TYPE,sizeof(enc_gru5_recurrent_subias),enc_gru5_recurrent_subias},
 #endif
 #ifdef WEIGHTS_enc_gru5_recurrent_scale_DEFINED
-{"enc_gru5_recurrent_scale",WEIGHTS_enc_gru5_recurrent_scale_TYPE,sizeof(enc_gru5_recurrent_scale),enc_gru5_recurrent_scale},
+{"enc_gru5_recurrent_scale", WEIGHTS_enc_gru5_recurrent_scale_TYPE,sizeof(enc_gru5_recurrent_scale),enc_gru5_recurrent_scale},
 #endif
 #ifdef WEIGHTS_enc_gru5_recurrent_bias_DEFINED
-{"enc_gru5_recurrent_bias",WEIGHTS_enc_gru5_recurrent_bias_TYPE,sizeof(enc_gru5_recurrent_bias),enc_gru5_recurrent_bias},
+{"enc_gru5_recurrent_bias", WEIGHTS_enc_gru5_recurrent_bias_TYPE,sizeof(enc_gru5_recurrent_bias),enc_gru5_recurrent_bias},
 #endif
 #ifdef WEIGHTS_enc_conv1_weights_int8_DEFINED
-{"enc_conv1_weights_int8",WEIGHTS_enc_conv1_weights_int8_TYPE,sizeof(enc_conv1_weights_int8),enc_conv1_weights_int8},
+{"enc_conv1_weights_int8", WEIGHTS_enc_conv1_weights_int8_TYPE,sizeof(enc_conv1_weights_int8),enc_conv1_weights_int8},
 #endif
 #ifdef WEIGHTS_enc_conv1_weights_float_DEFINED
-{"enc_conv1_weights_float",WEIGHTS_enc_conv1_weights_float_TYPE,sizeof(enc_conv1_weights_float),enc_conv1_weights_float},
+{"enc_conv1_weights_float", WEIGHTS_enc_conv1_weights_float_TYPE,sizeof(enc_conv1_weights_float),enc_conv1_weights_float},
 #endif
 #ifdef WEIGHTS_enc_conv1_subias_DEFINED
-{"enc_conv1_subias",WEIGHTS_enc_conv1_subias_TYPE,sizeof(enc_conv1_subias),enc_conv1_subias},
+{"enc_conv1_subias", WEIGHTS_enc_conv1_subias_TYPE,sizeof(enc_conv1_subias),enc_conv1_subias},
 #endif
 #ifdef WEIGHTS_enc_conv1_scale_DEFINED
-{"enc_conv1_scale",WEIGHTS_enc_conv1_scale_TYPE,sizeof(enc_conv1_scale),enc_conv1_scale},
+{"enc_conv1_scale", WEIGHTS_enc_conv1_scale_TYPE,sizeof(enc_conv1_scale),enc_conv1_scale},
 #endif
 #ifdef WEIGHTS_enc_conv1_bias_DEFINED
-{"enc_conv1_bias",WEIGHTS_enc_conv1_bias_TYPE,sizeof(enc_conv1_bias),enc_conv1_bias},
+{"enc_conv1_bias", WEIGHTS_enc_conv1_bias_TYPE,sizeof(enc_conv1_bias),enc_conv1_bias},
 #endif
 #ifdef WEIGHTS_enc_conv2_weights_int8_DEFINED
-{"enc_conv2_weights_int8",WEIGHTS_enc_conv2_weights_int8_TYPE,sizeof(enc_conv2_weights_int8),enc_conv2_weights_int8},
+{"enc_conv2_weights_int8", WEIGHTS_enc_conv2_weights_int8_TYPE,sizeof(enc_conv2_weights_int8),enc_conv2_weights_int8},
 #endif
 #ifdef WEIGHTS_enc_conv2_weights_float_DEFINED
-{"enc_conv2_weights_float",WEIGHTS_enc_conv2_weights_float_TYPE,sizeof(enc_conv2_weights_float),enc_conv2_weights_float},
+{"enc_conv2_weights_float", WEIGHTS_enc_conv2_weights_float_TYPE,sizeof(enc_conv2_weights_float),enc_conv2_weights_float},
 #endif
 #ifdef WEIGHTS_enc_conv2_subias_DEFINED
-{"enc_conv2_subias",WEIGHTS_enc_conv2_subias_TYPE,sizeof(enc_conv2_subias),enc_conv2_subias},
+{"enc_conv2_subias", WEIGHTS_enc_conv2_subias_TYPE,sizeof(enc_conv2_subias),enc_conv2_subias},
 #endif
 #ifdef WEIGHTS_enc_conv2_scale_DEFINED
-{"enc_conv2_scale",WEIGHTS_enc_conv2_scale_TYPE,sizeof(enc_conv2_scale),enc_conv2_scale},
+{"enc_conv2_scale", WEIGHTS_enc_conv2_scale_TYPE,sizeof(enc_conv2_scale),enc_conv2_scale},
 #endif
 #ifdef WEIGHTS_enc_conv2_bias_DEFINED
-{"enc_conv2_bias",WEIGHTS_enc_conv2_bias_TYPE,sizeof(enc_conv2_bias),enc_conv2_bias},
+{"enc_conv2_bias", WEIGHTS_enc_conv2_bias_TYPE,sizeof(enc_conv2_bias),enc_conv2_bias},
 #endif
 #ifdef WEIGHTS_enc_conv3_weights_int8_DEFINED
-{"enc_conv3_weights_int8",WEIGHTS_enc_conv3_weights_int8_TYPE,sizeof(enc_conv3_weights_int8),enc_conv3_weights_int8},
+{"enc_conv3_weights_int8", WEIGHTS_enc_conv3_weights_int8_TYPE,sizeof(enc_conv3_weights_int8),enc_conv3_weights_int8},
 #endif
 #ifdef WEIGHTS_enc_conv3_weights_float_DEFINED
-{"enc_conv3_weights_float",WEIGHTS_enc_conv3_weights_float_TYPE,sizeof(enc_conv3_weights_float),enc_conv3_weights_float},
+{"enc_conv3_weights_float", WEIGHTS_enc_conv3_weights_float_TYPE,sizeof(enc_conv3_weights_float),enc_conv3_weights_float},
 #endif
 #ifdef WEIGHTS_enc_conv3_subias_DEFINED
-{"enc_conv3_subias",WEIGHTS_enc_conv3_subias_TYPE,sizeof(enc_conv3_subias),enc_conv3_subias},
+{"enc_conv3_subias", WEIGHTS_enc_conv3_subias_TYPE,sizeof(enc_conv3_subias),enc_conv3_subias},
 #endif
 #ifdef WEIGHTS_enc_conv3_scale_DEFINED
-{"enc_conv3_scale",WEIGHTS_enc_conv3_scale_TYPE,sizeof(enc_conv3_scale),enc_conv3_scale},
+{"enc_conv3_scale", WEIGHTS_enc_conv3_scale_TYPE,sizeof(enc_conv3_scale),enc_conv3_scale},
 #endif
 #ifdef WEIGHTS_enc_conv3_bias_DEFINED
-{"enc_conv3_bias",WEIGHTS_enc_conv3_bias_TYPE,sizeof(enc_conv3_bias),enc_conv3_bias},
+{"enc_conv3_bias", WEIGHTS_enc_conv3_bias_TYPE,sizeof(enc_conv3_bias),enc_conv3_bias},
 #endif
 #ifdef WEIGHTS_enc_conv4_weights_int8_DEFINED
-{"enc_conv4_weights_int8",WEIGHTS_enc_conv4_weights_int8_TYPE,sizeof(enc_conv4_weights_int8),enc_conv4_weights_int8},
+{"enc_conv4_weights_int8", WEIGHTS_enc_conv4_weights_int8_TYPE,sizeof(enc_conv4_weights_int8),enc_conv4_weights_int8},
 #endif
 #ifdef WEIGHTS_enc_conv4_weights_float_DEFINED
-{"enc_conv4_weights_float",WEIGHTS_enc_conv4_weights_float_TYPE,sizeof(enc_conv4_weights_float),enc_conv4_weights_float},
+{"enc_conv4_weights_float", WEIGHTS_enc_conv4_weights_float_TYPE,sizeof(enc_conv4_weights_float),enc_conv4_weights_float},
 #endif
 #ifdef WEIGHTS_enc_conv4_subias_DEFINED
-{"enc_conv4_subias",WEIGHTS_enc_conv4_subias_TYPE,sizeof(enc_conv4_subias),enc_conv4_subias},
+{"enc_conv4_subias", WEIGHTS_enc_conv4_subias_TYPE,sizeof(enc_conv4_subias),enc_conv4_subias},
 #endif
 #ifdef WEIGHTS_enc_conv4_scale_DEFINED
-{"enc_conv4_scale",WEIGHTS_enc_conv4_scale_TYPE,sizeof(enc_conv4_scale),enc_conv4_scale},
+{"enc_conv4_scale", WEIGHTS_enc_conv4_scale_TYPE,sizeof(enc_conv4_scale),enc_conv4_scale},
 #endif
 #ifdef WEIGHTS_enc_conv4_bias_DEFINED
-{"enc_conv4_bias",WEIGHTS_enc_conv4_bias_TYPE,sizeof(enc_conv4_bias),enc_conv4_bias},
+{"enc_conv4_bias", WEIGHTS_enc_conv4_bias_TYPE,sizeof(enc_conv4_bias),enc_conv4_bias},
 #endif
 #ifdef WEIGHTS_enc_conv5_weights_int8_DEFINED
-{"enc_conv5_weights_int8",WEIGHTS_enc_conv5_weights_int8_TYPE,sizeof(enc_conv5_weights_int8),enc_conv5_weights_int8},
+{"enc_conv5_weights_int8", WEIGHTS_enc_conv5_weights_int8_TYPE,sizeof(enc_conv5_weights_int8),enc_conv5_weights_int8},
 #endif
 #ifdef WEIGHTS_enc_conv5_weights_float_DEFINED
-{"enc_conv5_weights_float",WEIGHTS_enc_conv5_weights_float_TYPE,sizeof(enc_conv5_weights_float),enc_conv5_weights_float},
+{"enc_conv5_weights_float", WEIGHTS_enc_conv5_weights_float_TYPE,sizeof(enc_conv5_weights_float),enc_conv5_weights_float},
 #endif
 #ifdef WEIGHTS_enc_conv5_subias_DEFINED
-{"enc_conv5_subias",WEIGHTS_enc_conv5_subias_TYPE,sizeof(enc_conv5_subias),enc_conv5_subias},
+{"enc_conv5_subias", WEIGHTS_enc_conv5_subias_TYPE,sizeof(enc_conv5_subias),enc_conv5_subias},
 #endif
 #ifdef WEIGHTS_enc_conv5_scale_DEFINED
-{"enc_conv5_scale",WEIGHTS_enc_conv5_scale_TYPE,sizeof(enc_conv5_scale),enc_conv5_scale},
+{"enc_conv5_scale", WEIGHTS_enc_conv5_scale_TYPE,sizeof(enc_conv5_scale),enc_conv5_scale},
 #endif
 #ifdef WEIGHTS_enc_conv5_bias_DEFINED
-{"enc_conv5_bias",WEIGHTS_enc_conv5_bias_TYPE,sizeof(enc_conv5_bias),enc_conv5_bias},
+{"enc_conv5_bias", WEIGHTS_enc_conv5_bias_TYPE,sizeof(enc_conv5_bias),enc_conv5_bias},
 #endif
 {NULL,0,0,NULL}
 };
