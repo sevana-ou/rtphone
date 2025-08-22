@@ -143,7 +143,7 @@ add_subdirectory(${rtphone_engine}/helper)
 add_subdirectory(${rtphone_engine}/audio)
 add_subdirectory(${rtphone_engine}/media)
 
-set (LIBS ice_stack jrtplib g729_codec gsm_codec
+set (LIBS ice_stack jrtplib g729_codec gsm_codec opus
     gsmhr_codec g722_codec srtp resiprocate helper_lib audio_lib webrtc speexdsp)
 
 if (CMAKE_SYSTEM MATCHES "Win*")
@@ -176,7 +176,6 @@ target_include_directories(rtphone
         ${CMAKE_CURRENT_SOURCE_DIR}/libs/libevs/lib_enc
         ${CMAKE_CURRENT_SOURCE_DIR}/libs/libevs/lib_dec
         ${CMAKE_CURRENT_SOURCE_DIR}/libs/speex/include
-        ${CMAKE_CURRENT_SOURCE_DIR}/libs/opus/include/
         ${CMAKE_CURRENT_SOURCE_DIR}/libs/json
     )
 

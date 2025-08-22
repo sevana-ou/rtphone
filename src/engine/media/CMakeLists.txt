@@ -68,7 +68,6 @@ if (USE_OPUS_CODEC)
     message("Media: Opus codec will be included.")
     target_compile_definitions(media_lib PUBLIC USE_OPUS_CODEC)
     list (APPEND LIBS_CODEC opus)
-    add_subdirectory(../../libs/opus build_opus)
 endif()
 
 if(CMAKE_SYSTEM MATCHES "Linux*" OR CMAKE_SYSTEM MATCHES "Darwin*")
@@ -101,9 +100,9 @@ target_include_directories(media_lib
             ${CMAKE_CURRENT_SOURCE_DIR}/../../libs/srtp/include
             ${CMAKE_CURRENT_SOURCE_DIR}/../../libs/srtp/crypto/include
             ${CMAKE_CURRENT_SOURCE_DIR}/../../libs/webrtc
-            ${CMAKE_CURRENT_SOURCE_DIR}/../../libs/opus/include/
             ${CMAKE_CURRENT_SOURCE_DIR}/../../libs/resiprocate/
-            ${CMAKE_CURRENT_SOURCE_DIR}/../../libs/libevs/
+            ${CMAKE_CURRENT_SOURCE_DIR}/../../libs/libevs
+            ${LIB_PLATFORM}/opus/include
             )
 
 target_include_directories(media_lib
