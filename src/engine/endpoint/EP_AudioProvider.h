@@ -74,6 +74,7 @@ public:
   void setupMirror(bool enable);
 
   void configureMediaObserver(MT::Stream::MediaObserver* observer, void* userTag);
+  static SrtpSuite processCryptoAttribute(const resip::Data& value, ByteBuffer& key);
 
 protected:
   // SDP's stream name
@@ -109,7 +110,6 @@ protected:
   void* mMediaObserverTag = nullptr;
 
   std::string createCryptoAttribute(SrtpSuite suite);
-  SrtpSuite processCryptoAttribute(const resip::Data& value, ByteBuffer& key);
   void findRfc2833(const resip::SdpContents::Session::Medium::CodecContainer& codecs);
 
   // Implements setState() logic. This allows to be called from constructor (it is not virtual function)

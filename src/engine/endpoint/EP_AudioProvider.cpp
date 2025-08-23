@@ -348,8 +348,8 @@ SrtpSuite AudioProvider::processCryptoAttribute(const resip::Data& value, ByteBu
     if (strcmp(suite, SRTP_SUITE_NAME_1) == 0)
         result = SRTP_AES_128_AUTH_80;
     else
-        if (strcmp(suite, SRTP_SUITE_NAME_2) == 0)
-            result = SRTP_AES_256_AUTH_80;
+    if (strcmp(suite, SRTP_SUITE_NAME_2) == 0)
+        result = SRTP_AES_256_AUTH_80;
 
     return result;
 }

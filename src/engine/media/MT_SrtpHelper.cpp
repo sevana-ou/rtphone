@@ -154,13 +154,13 @@ void SrtpSession::close()
     if (mOutboundSession)
     {
         srtp_dealloc(mOutboundSession);
-        mOutboundSession = NULL;
+        mOutboundSession = nullptr;
     }
 
     if (mInboundSession)
     {
         srtp_dealloc(mInboundSession);
-        mInboundSession = NULL;
+        mInboundSession = nullptr;
     }
 }
 
