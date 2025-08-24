@@ -87,7 +87,8 @@ protected:
     mCaptureResampler32,
     mCaptureResampler48;
     DtmfContext mDtmfContext;
-    char mReceiveBuffer[MAX_VALID_UDPPACKET_SIZE];
+    char mReceiveBuffer[MAX_VALID_UDPPACKET_SIZE],
+         mSrtpDecodeBuffer[MAX_VALID_UDPPACKET_SIZE];
 
     struct
     {

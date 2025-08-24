@@ -48,8 +48,8 @@ public:
   /* bufferPtr is RTP packet data i.e. header + payload. Buffer must be big enough to hold encrypted data. */
   bool protectRtp(void* buffer, int* length);
   bool protectRtcp(void* buffer, int* length);
-  bool unprotectRtp(void* buffer, int* length);
-  bool unprotectRtcp(void* buffer, int* length);
+  bool unprotectRtp(const void* src, size_t srcLength, void* dst, size_t* dstLength);
+  bool unprotectRtcp(const void* src, size_t srcLength, void* dst, size_t* dstLength);
   
 
   static void initSrtp();

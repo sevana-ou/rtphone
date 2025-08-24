@@ -209,36 +209,32 @@ bool SrtpSession::protectRtcp(void* buffer, int* length)
         return false;
 }
 
-bool SrtpSession::unprotectRtp(void* buffer, int* length)
+bool SrtpSession::unprotectRtp(const void* src, size_t srcLength, void* dst, size_t* dstLength)
 {
     //addSsrc(RtpHelper::findSsrc(buffer, *length), sdIncoming);
 
     Lock l(mGuard);
     if (mInboundSession)
     {
-        size_t rtp_len = MAX_VALID_UDPPACKET_SIZE;
-        auto code =  srtp_unprotect(mInboundSession,
-                                    (const uint8_t*)buffer, (size_t)*length,
-                                    (uint8_t*)buffer, &rtp_len);
-        *length = rtp_len;
+        auto code = srtp_unprotect(mInboundSession,
+                                   (const uint8_t*)src, srcLength,
+                                   (uint8_t*)dst, dstLength);
         return code == 0;
     }
     else
         return false;
 }
 
-bool SrtpSession::unprotectRtcp(void* buffer, int* length)
+bool SrtpSession::unprotectRtcp(const void* src, size_t srcLength, void* dst, size_t* dstLength)
 {
     //addSsrc(RtpHelper::findSsrc(buffer, *length), sdIncoming);
 
     Lock l(mGuard);
     if (mInboundSession)
     {
-        size_t rtp_len = MAX_VALID_UDPPACKET_SIZE;
         auto code = srtp_unprotect_rtcp(mInboundSession,
-                                        (const uint8_t*)buffer, (size_t)*length,
-                                        (uint8_t*)buffer, (size_t*)rtp_len);
-        *length = rtp_len;
+                                        (const uint8_t*)src, srcLength,
+                                        (uint8_t*)dst, dstLength);
         return code == 0;
     }
     else

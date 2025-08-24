@@ -306,18 +306,22 @@ void AudioStream::dataArrived(PDatagramSocket s, const void* buffer, int length,
     int receiveLength = length;
     memcpy(mReceiveBuffer, buffer, length);
 
-    bool srtpResult;
     if (mSrtpSession.active())
     {
+        bool srtpResult;
+        size_t srcLength = length; size_t dstLength = sizeof mSrtpDecodeBuffer;
         if (RtpHelper::isRtp(mReceiveBuffer, receiveLength))
-            srtpResult = mSrtpSession.unprotectRtp(mReceiveBuffer, &receiveLength);
+            srtpResult = mSrtpSession.unprotectRtp(mReceiveBuffer, srcLength, mSrtpDecodeBuffer, &dstLength);
         else
-            srtpResult = mSrtpSession.unprotectRtcp(mReceiveBuffer, &receiveLength);
+            srtpResult = mSrtpSession.unprotectRtcp(mReceiveBuffer, srcLength, mSrtpDecodeBuffer, &dstLength);
         if (!srtpResult)
         {
             ICELogError(<<"Cannot decrypt SRTP packet.");
             return;
         }
+
+        memcpy(mReceiveBuffer, mSrtpDecodeBuffer, dstLength);
+        receiveLength = dstLength;
     }
 
     switch (source.family())
