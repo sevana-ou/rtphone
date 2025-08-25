@@ -121,6 +121,7 @@ public:
     Logger& operator << (const int data);
     Logger& operator << (const float data);
     Logger& operator << (const std::string& data);
+    Logger& operator << (const std::string_view& data);
     Logger& operator << (const int64_t data);
     Logger& operator << (const unsigned int data);
     Logger& operator << (const uint64_t data);

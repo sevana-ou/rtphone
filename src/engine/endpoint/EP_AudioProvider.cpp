@@ -303,26 +303,12 @@ std::string AudioProvider::createCryptoAttribute(SrtpSuite suite)
     if (!mActiveStream)
         return "";
 
-    // Use tag 1 - it is ok, as we use only single crypto attribute
-    int   srtpTag = 1;
-
     // Print key to base64 string
     PByteBuffer keyBuffer = mActiveStream->srtp().outgoingKey(suite).first;
     resip::Data d(keyBuffer->data(), keyBuffer->size());
     resip::Data keyText = d.base64encode();
 
-    // Create "crypto" attribute value
-    char buffer[512];
-    const char* suiteName = NULL;
-    switch (suite)
-    {
-    case SRTP_AES_128_AUTH_80: suiteName = SRTP_SUITE_NAME_1; break;
-    case SRTP_AES_256_AUTH_80: suiteName = SRTP_SUITE_NAME_2; break;
-    default: assert(0);
-    }
-    sprintf(buffer, "%d %s inline:%s", srtpTag, suiteName, keyText.c_str());
-
-    return buffer;
+    return std::format("{} {} inline:{}", 1, toString(suite), keyText.c_str());
 }
 
 SrtpSuite AudioProvider::processCryptoAttribute(const resip::Data& value, ByteBuffer& key)
@@ -343,15 +329,7 @@ SrtpSuite AudioProvider::processCryptoAttribute(const resip::Data& value, ByteBu
     resip::Data rawkey = keyText.base64decode();
     key = ByteBuffer(rawkey.c_str(), rawkey.size());
 
-    // Open srtp
-    SrtpSuite result = SRTP_NONE;
-    if (strcmp(suite, SRTP_SUITE_NAME_1) == 0)
-        result = SRTP_AES_128_AUTH_80;
-    else
-    if (strcmp(suite, SRTP_SUITE_NAME_2) == 0)
-        result = SRTP_AES_256_AUTH_80;
-
-    return result;
+    return toSrtpSuite(suite);
 }
 
 void AudioProvider::findRfc2833(const resip::SdpContents::Session::Medium::CodecContainer& codecs)

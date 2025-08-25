@@ -10,6 +10,50 @@
 #include "../helper/HL_Rtp.h"
 #include <openssl/rand.h>
 #include <assert.h>
+#include <format>
+
+BiMap<SrtpSuite, std::string_view> SrtpSuiteNames{{
+        {SRTP_AES_256_AUTH_80,      "AES_CM_256_HMAC_SHA1_80"},
+        {SRTP_AES_128_AUTH_80,      "AES_CM_128_HMAC_SHA1_80"},
+        {SRTP_AES_192_AUTH_80,      "AES_CM_192_HMAC_SHA1_80"},
+        {SRTP_AES_256_AUTH_32,      "AES_CM_256_HMAC_SHA1_32"},
+        {SRTP_AES_192_AUTH_32,      "AES_CM_192_HMAC_SHA1_32"},
+        {SRTP_AES_128_AUTH_32,      "AES_CM_128_HMAC_SHA1_32"},
+        {SRTP_AES_128_AUTH_NULL,    "AES_CM_128_NULL_AUTH"},
+        {SRTP_AED_AES_256_GCM,      "AEAD_AES_256_GCM"},
+        {SRTP_AED_AES_128_GCM,      "AEAD_AES_128_GCM"}}};
+
+extern SrtpSuite   toSrtpSuite(const std::string_view& s)
+{
+    auto* suite = SrtpSuiteNames.find_by_value(s);
+    return !suite ? SRTP_NONE : *suite;
+}
+
+extern std::string_view toString(SrtpSuite suite)
+{
+    auto* s = SrtpSuiteNames.find_by_key(suite);
+    return s ? *s : std::string_view();
+}
+
+typedef void (*set_srtp_policy_function) (srtp_crypto_policy_t*);
+
+set_srtp_policy_function findPolicyFunction(SrtpSuite suite)
+{
+    switch (suite)
+    {
+    case SRTP_AES_128_AUTH_80:      return &srtp_crypto_policy_set_rtp_default; break;
+    case SRTP_AES_192_AUTH_80:      return &srtp_crypto_policy_set_aes_cm_192_hmac_sha1_80; break;
+    case SRTP_AES_256_AUTH_80:      return &srtp_crypto_policy_set_aes_cm_256_hmac_sha1_80; break;
+    case SRTP_AES_128_AUTH_32:      return &srtp_crypto_policy_set_aes_cm_128_hmac_sha1_32; break;
+    case SRTP_AES_192_AUTH_32:      return &srtp_crypto_policy_set_aes_cm_192_hmac_sha1_32; break;
+    case SRTP_AES_256_AUTH_32:      return &srtp_crypto_policy_set_aes_cm_256_hmac_sha1_32; break;
+    case SRTP_AES_128_AUTH_NULL:    return &srtp_crypto_policy_set_aes_cm_128_null_auth; break;
+    case SRTP_AED_AES_256_GCM:      return &srtp_crypto_policy_set_aes_gcm_256_16_auth; break;
+    case SRTP_AED_AES_128_GCM:      return &srtp_crypto_policy_set_aes_gcm_128_16_auth; break;
+    default:
+        throw std::runtime_error(std::format("SRTP suite {} is not supported", toString(suite)));
+    }
+}
 
 // --- SrtpStream ---
 static void configureSrtpStream(SrtpStream& s, uint16_t ssrc, SrtpSuite suite)
@@ -17,21 +61,11 @@ static void configureSrtpStream(SrtpStream& s, uint16_t ssrc, SrtpSuite suite)
     s.second.ssrc.type = ssrc_specific;
     s.second.ssrc.value = ntohl(ssrc);
     s.second.next = nullptr;
-    switch (suite)
-    {
-    case SRTP_AES_128_AUTH_80:
-        srtp_crypto_policy_set_aes_cm_128_hmac_sha1_80(&s.second.rtp);
-        srtp_crypto_policy_set_aes_cm_128_hmac_sha1_80(&s.second.rtcp);
-        break;
-
-    case SRTP_AES_256_AUTH_80:
-        srtp_crypto_policy_set_aes_cm_256_hmac_sha1_80(&s.second.rtp);
-        srtp_crypto_policy_set_aes_cm_256_hmac_sha1_80(&s.second.rtcp);
-        break;
-
-    default:
-        assert(0);
-    }
+    set_srtp_policy_function func = findPolicyFunction(suite);
+    if (!func)
+        throw std::runtime_error(std::format("SRTP suite {} is not supported", toString(suite)));
+    func(&s.second.rtp);
+    func(&s.second.rtcp);
 }
 
 SrtpSession::SrtpSession()
@@ -45,14 +79,19 @@ SrtpSession::SrtpSession()
     memset(&mOutboundPolicy, 0, sizeof mOutboundPolicy);
     mOutboundPolicy.ssrc.type = ssrc_specific;
 
-    // Generate outgoing keys
-    mOutgoingKey[SRTP_AES_128_AUTH_80-1].first = std::make_shared<ByteBuffer>();
-    mOutgoingKey[SRTP_AES_128_AUTH_80-1].first->resize(30);
-    RAND_bytes((unsigned char*)mOutgoingKey[SRTP_AES_128_AUTH_80-1].first->mutableData(), 30);
+    // Generate outgoing keys for all ciphers
+    auto putKey = [this](SrtpSuite suite, size_t length){
+        auto key = std::make_shared<ByteBuffer>();
+        key->resize(length);
+        RAND_bytes(key->mutableData(), key->size());
+        mOutgoingKey[suite].first = key;
+    };
+    putKey(SRTP_AES_128_AUTH_80, 30); putKey(SRTP_AES_128_AUTH_32, 30);
+    putKey(SRTP_AES_192_AUTH_80, 38); putKey(SRTP_AES_192_AUTH_32, 38);
+    putKey(SRTP_AES_256_AUTH_80, 46); putKey(SRTP_AES_256_AUTH_32, 46);
+    putKey(SRTP_AED_AES_128_GCM, 28);
+    putKey(SRTP_AED_AES_256_GCM, 44);
 
-    mOutgoingKey[SRTP_AES_256_AUTH_80-1].first = std::make_shared<ByteBuffer>();
-    mOutgoingKey[SRTP_AES_256_AUTH_80-1].first->resize(46);
-    RAND_bytes((unsigned char*)mOutgoingKey[SRTP_AES_256_AUTH_80-1].first->mutableData(), 46);
 }
 
 SrtpSession::~SrtpSession()
@@ -106,27 +145,17 @@ void SrtpSession::open(ByteBuffer& incomingKey, SrtpSuite suite)
     // Save key
     mIncomingKey.first = std::make_shared<ByteBuffer>(incomingKey);
 
-    // Update policy
-    switch (suite)
-    {
-    case SRTP_AES_128_AUTH_80:
-        srtp_crypto_policy_set_aes_cm_128_hmac_sha1_80(&mInboundPolicy.rtp);
-        srtp_crypto_policy_set_aes_cm_128_hmac_sha1_80(&mInboundPolicy.rtcp);
-        srtp_crypto_policy_set_aes_cm_128_hmac_sha1_80(&mOutboundPolicy.rtp);
-        srtp_crypto_policy_set_aes_cm_128_hmac_sha1_80(&mOutboundPolicy.rtcp);
-        break;
+    auto policyFunction = findPolicyFunction(suite);
+    if (!policyFunction)
+        throw std::runtime_error(std::format("SRTP suite {} not found", toString(suite)));
 
-    case SRTP_AES_256_AUTH_80:
-        srtp_crypto_policy_set_aes_cm_256_hmac_sha1_80(&mInboundPolicy.rtp);
-        srtp_crypto_policy_set_aes_cm_256_hmac_sha1_80(&mInboundPolicy.rtcp);
-        srtp_crypto_policy_set_aes_cm_256_hmac_sha1_80(&mOutboundPolicy.rtp);
-        srtp_crypto_policy_set_aes_cm_256_hmac_sha1_80(&mOutboundPolicy.rtcp);
-        break;
+    // Configure policies
+    policyFunction(&mInboundPolicy.rtp);
+    policyFunction(&mInboundPolicy.rtcp);
+    policyFunction(&mOutboundPolicy.rtp);
+    policyFunction(&mOutboundPolicy.rtcp);
 
-    case SRTP_NONE:
-        break;
-    }
-    mOutboundPolicy.key = (unsigned char*)mOutgoingKey[int(suite)-1].first->mutableData();
+    mOutboundPolicy.key = (unsigned char*)mOutgoingKey[int(suite)].first->mutableData();
     mInboundPolicy.key = (unsigned char*)mIncomingKey.first->mutableData();
 
     // Create SRTP session

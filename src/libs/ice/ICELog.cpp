@@ -304,3 +304,10 @@ Logger::operator << (const std::string& data)
     *mStream << data.c_str();
     return *this;
 }
+
+Logger&
+Logger::operator << (const std::string_view& data)
+{
+    *mStream << data;
+    return *this;
+}

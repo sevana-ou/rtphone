@@ -203,6 +203,7 @@ set (RTPHONE_SOURCES
     ${E}/helper/HL_Time.cpp
     ${E}/helper/HL_Time.h
     ${E}/helper/HL_Types.h
+    ${E}/helper/HL_Types.cpp
     ${E}/helper/HL_Usb.cpp
     ${E}/helper/HL_Usb.h
     ${E}/helper/HL_Uuid.cpp
