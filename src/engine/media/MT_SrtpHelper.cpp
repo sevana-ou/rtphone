@@ -156,7 +156,10 @@ void SrtpSession::open(ByteBuffer& incomingKey, SrtpSuite suite)
     policyFunction(&mOutboundPolicy.rtcp);
 
     mOutboundPolicy.key = (unsigned char*)mOutgoingKey[int(suite)].first->mutableData();
-    mInboundPolicy.key = (unsigned char*)mIncomingKey.first->mutableData();
+    mOutboundPolicy.ssrc.type = ssrc_any_outbound;
+
+    mInboundPolicy.key =  (unsigned char*)mIncomingKey.first->mutableData();
+    mInboundPolicy.ssrc.type = ssrc_any_inbound;
 
     // Create SRTP session
     srtp_err_status_t err;
