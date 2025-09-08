@@ -31,7 +31,11 @@ include_directories(${OPENSSL_INCLUDE})
 set (DEFINES -DUSE_OPENSSL)
 
 # Libraries for our project
-set (LIBS "")
+set (LIBS_STATIC "")
+set (LIBS_DYNAMIC "")
+
+# Try to prefer static libraries anyway
+set (CMAKE_FIND_LIBRARY_SUFFIXES .a .so .dylib)
 
 # Windows-specific definitions
 if (CMAKE_SYSTEM MATCHES "Windows*")
@@ -43,14 +47,14 @@ endif()
 if (CMAKE_SYSTEM MATCHES "Linux*")
     set (DEFINES ${DEFINES} -DTARGET_LINUX -DHAVE_NETINET_IN_H)
     set (TARGET_LINUX ON)
-    set (LIBS ${LIBS} dl uuid)
+    set (LIBS_STATIC ${LIBS_STATIC} dl)
 endif()
 
 # macOS-specific definitions
 if (CMAKE_SYSTEM MATCHES "Darwin*")
     set (DEFINES ${DEFINES} -DTARGET_OSX)
     set (TARGET_OSX ON)
-    set (LIBS ${LIBS} dl uuid)
+    set (LIBS_STATIC ${LIBS_STATIC} dl)
 endif()
 
 # 
@@ -61,7 +65,7 @@ if (CMAKE_SYSTEM MATCHES "Android")
     include_directories (${OBOE_DIR}/include)
     set (DEFINES ${DEFINES} -DTARGET_ANDROID -DHAVE_NETINET_IN_H)
     set (TARGET_ANDROID ON)
-    set (LIBS ${LIBS} oboe)
+    set (LIBS_STATIC ${LIBS} oboe)
 endif()
 
 if (USE_MUSL)
@@ -304,7 +308,9 @@ set (RTPHONE_SOURCES
     ${L}/ice/md5_impl.h
     )
 
+if (USE_OPUS_CODEC)
 set (DEFINES ${DEFINES} -DUSE_OPUS_CODEC)
+endif()
 
 add_library (rtphone STATIC ${RTPHONE_SOURCES})
 
@@ -323,29 +329,28 @@ add_subdirectory(${L}/speexdsp)
 add_subdirectory(${L}/libsrtp)
 add_subdirectory(${L}/webrtc)
 
-set (LIBS ${LIBS} jrtplib g729_codec gsm_codec opus
-                  gsmhr_codec g722_codec srtp3 resiprocate webrtc speexdsp)
+set (LIBS_STATIC ${LIBS_STATIC} jrtplib g729_codec gsm_codec ${OPUS_LIB}
+                                gsmhr_codec g722_codec srtp3 resiprocate webrtc speexdsp)
 
 if (USE_AMR_CODEC)
     include (${LIB_PLATFORM}/platform_libs.cmake)
     message("Media: AMR NB and WB codecs will be included.")
     set (DEFINES ${DEFINES} -DUSE_AMR_CODEC)
-    set (LIBS ${LIBS} ${OPENCORE_AMRNB} ${OPENCORE_AMRWB})
+    set (LIBS_STATIC ${LIBS_STATIC} ${OPENCORE_AMRNB} ${OPENCORE_AMRWB})
 endif()
 
 if (USE_EVS_CODEC)
     message("Media: EVS codec will be included.")
     set (DEFINES ${DEFINES} -DUSE_EVS_CODEC)
-    set (LIBS ${LIBS} evs_codec)
+    set (LIBS_STATIC ${LIBS_STATIC} evs_codec)
 endif()
 
 target_compile_definitions(rtphone PUBLIC ${DEFINES})
 
-target_link_libraries(rtphone
-    ${LIBS}
-    ${OPENSSL_SSL}
-    ${OPENSSL_CRYPTO}
-    )
+target_link_options(rtphone PUBLIC -Wl,-Bstatic)
+target_link_libraries(rtphone PUBLIC ${LIBS_STATIC} ${OPENSSL_SSL} ${OPENSSL_CRYPTO})
+target_link_options(rtphone PUBLIC -Wl,-Bdynamic)
+
 
 target_include_directories(rtphone
     PUBLIC
