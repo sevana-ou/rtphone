@@ -17,9 +17,9 @@ Uuid::Uuid()
 Uuid Uuid::generateOne()
 {
     Uuid result;
-#if defined(TARGET_LINUX)
-    auto id = uuids::uuid_system_generator{}();
-#else
+// #if defined(TARGET_LINUX)
+//     auto id = uuids::uuid_system_generator{}();
+// #else
     std::random_device rd;
     auto seed_data = std::array<int, std::mt19937::state_size> {};
     std::generate(std::begin(seed_data), std::end(seed_data), std::ref(rd));
@@ -28,7 +28,7 @@ Uuid Uuid::generateOne()
     uuids::uuid_random_generator gen{generator};
 
     auto id = gen();
-#endif
+// #endif
     memcpy(result.mUuid, id.as_bytes().data(), id.as_bytes().size_bytes());
     return result;
 }
