@@ -7,3 +7,6 @@
 	path = src/libs/libsrtp
 	url = git@git.sevana.biz:public/libsrtp.git
 	branch = master
+[submodule "src/libs/libraries"]
+	path = src/libs/libraries
+	url = git@git.sevana.biz:public/libraries.git
