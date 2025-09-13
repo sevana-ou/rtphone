@@ -1,7 +1,7 @@
 [submodule "src/libs/resiprocate"]
 	path = src/libs/resiprocate
 	url = git@git.sevana.biz:public/resiprocate.git
-	branch = master
+	branch = sevana
 
 [submodule "src/libs/libsrtp"]
 	path = src/libs/libsrtp
