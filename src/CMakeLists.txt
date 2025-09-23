@@ -347,10 +347,14 @@ endif()
 
 target_compile_definitions(rtphone PUBLIC ${DEFINES})
 
-target_link_options(rtphone PUBLIC -Wl,-Bstatic)
+if (TARGET_LINUX)
+    target_link_options(rtphone PUBLIC -Wl,-Bstatic)
+endif()
 target_link_libraries(rtphone PUBLIC ${LIBS_STATIC} ${OPENSSL_SSL} ${OPENSSL_CRYPTO})
-target_link_options(rtphone PUBLIC -Wl,-Bdynamic)
 
+if (TARGET_LINUX)
+    target_link_options(rtphone PUBLIC -Wl,-Bdynamic)
+endif()
 
 target_include_directories(rtphone
     PUBLIC
