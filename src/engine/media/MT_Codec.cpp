@@ -11,8 +11,6 @@ int Codec::Factory::channels()
 {
   return 1;
 }
-
-#if defined(USE_RESIP_INTEGRATION)
 void Codec::Factory::create(CodecMap& codecs)
 {
   codecs[payloadType()] = std::shared_ptr<Codec>(create());
@@ -38,4 +36,4 @@ int Codec::Factory::processSdp(const resip::SdpContents::Session::Medium::CodecC
   }
   return -1;
 }
-#endif
+

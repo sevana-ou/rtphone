@@ -10,7 +10,6 @@ set (CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # Produce PIC code always
 set (CMAKE_POSITION_INDEPENDENT_CODE ON)
-option (USE_RESIP_INTEGRATION "Integrate with resiprocate project" OFF)
 
 set (SOURCES
     MT_Statistics.cpp
@@ -113,8 +112,4 @@ target_include_directories(media_lib
             ${CMAKE_CURRENT_SOURCE_DIR}/../../libs/libevs/basic_math
 )
 
-if (USE_RESIP_INTEGRATION)
-    message("USE_RESIP_INTEGRATION is turned on!")
-    target_compile_definitions(media_lib PUBLIC -DUSE_RESIP_INTEGRATION)
-endif()
 

@@ -239,12 +239,9 @@ int AmrNbCodec::CodecFactory::payloadType()
     return mConfig.mPayloadType;
 }
 
-#ifdef USE_RESIP_INTEGRATION
 
 void AmrNbCodec::CodecFactory::updateSdp(resip::SdpContents::Session::Medium::CodecContainer& codecs, SdpDirection direction)
-{
-
-}
+{}
 
 int AmrNbCodec::CodecFactory::processSdp(const resip::SdpContents::Session::Medium::CodecContainer& codecs, SdpDirection direction)
 {
@@ -256,7 +253,6 @@ void AmrNbCodec::CodecFactory::create(CodecMap& codecs)
     codecs[payloadType()] = std::shared_ptr<Codec>(new AmrNbCodec(mConfig));
 }
 
-#endif
 PCodec AmrNbCodec::CodecFactory::create()
 {
     return PCodec(new AmrNbCodec(mConfig));
@@ -483,8 +479,6 @@ int AmrWbCodec::CodecFactory::payloadType()
     return mConfig.mPayloadType;
 }
 
-#ifdef USE_RESIP_INTEGRATION
-
 void AmrWbCodec::CodecFactory::updateSdp(resip::SdpContents::Session::Medium::CodecContainer& codecs, SdpDirection direction)
 {}
 
@@ -497,8 +491,6 @@ void AmrWbCodec::CodecFactory::create(CodecMap& codecs)
 {
     codecs[payloadType()] = std::shared_ptr<Codec>(new AmrWbCodec(mConfig));
 }
-
-#endif
 
 PCodec AmrWbCodec::CodecFactory::create()
 {
@@ -706,8 +698,6 @@ int GsmEfrCodec::GsmEfrFactory::payloadType()
     return mPayloadType;
 }
 
-#ifdef USE_RESIP_INTEGRATION
-
 void GsmEfrCodec::GsmEfrFactory::updateSdp(resip::SdpContents::Session::Medium::CodecContainer& codecs, SdpDirection direction)
 {
 
@@ -722,8 +712,6 @@ void GsmEfrCodec::GsmEfrFactory::create(CodecMap& codecs)
 {
     codecs[payloadType()] = std::shared_ptr<Codec>(new GsmEfrCodec(mIuUP));
 }
-
-#endif
 
 PCodec GsmEfrCodec::GsmEfrFactory::create()
 {

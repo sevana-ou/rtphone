@@ -206,7 +206,6 @@ CodecList::Settings::OpusSpec CodecList::Settings::OpusSpec::parse(const std::st
     return result;
 }
 
-#if defined(USE_RESIP_INTEGRATION)
 static int findOctetMode(const char* line)
 {
     const char* param_name = "octet-align=";
@@ -276,8 +275,6 @@ CodecList::Settings CodecList::Settings::parseSdp(const std::list<resip::Codec>&
     }
     return r;
 }
-#endif
-
 
 bool CodecList::Settings::operator == (const Settings& rhs) const
 {

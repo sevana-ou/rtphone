@@ -6,9 +6,7 @@
 #ifndef __MT_CODEC_H
 #define __MT_CODEC_H
 
-#if defined(USE_RESIP_INTEGRATION)
-# include "resiprocate/resip/stack/SdpContents.hxx"
-#endif
+#include "resiprocate/resip/stack/SdpContents.hxx"
 #include "../helper/HL_Types.h"
 #include <map>
 #include "../helper/HL_Pointer.h"
@@ -36,14 +34,12 @@ public:
         virtual PCodec create() = 0;
 
         virtual int channels();
-#if defined(USE_RESIP_INTEGRATION)
         typedef std::map<int, PCodec > CodecMap;
         virtual void create(CodecMap& codecs);
         virtual void updateSdp(resip::SdpContents::Session::Medium::CodecContainer& codecs, SdpDirection direction);
         // Returns payload type from chosen codec if success. -1 is returned for negative result.
         virtual int processSdp(const resip::SdpContents::Session::Medium::CodecContainer& codecs, SdpDirection direction);
         resip::Codec resipCodec();
-#endif
     };
     virtual ~Codec() {}
     virtual const char* name() = 0;

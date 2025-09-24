@@ -58,17 +58,13 @@ int G729Codec::G729Factory::payloadType()
     return 18;
 }
 
-#if defined(USE_RESIP_INTEGRATION)
 void G729Codec::G729Factory::updateSdp(resip::SdpContents::Session::Medium::CodecContainer& codecs, SdpDirection direction)
-{
-}
+{}
 
 int G729Codec::G729Factory::processSdp(const resip::SdpContents::Session::Medium::CodecContainer& codecs, SdpDirection direction)
 {
     return 0;
 }
-
-#endif
 
 PCodec G729Codec::G729Factory::create()
 {
@@ -241,7 +237,6 @@ OpusCodec::Params::Params()
     mTargetBitrate = OPUS_TARGET_BITRATE;
 }
 
-#if defined(USE_RESIP_INTEGRATION)
 resip::Data OpusCodec::Params::toString() const
 {
     std::ostringstream oss;
@@ -324,7 +319,7 @@ void OpusCodec::Params::parse(const resip::Data &params)
                         mPtime = strx::toInt(paramIter->mValue.c_str(), 20);
     }
 }
-#endif
+
 OpusCodec::OpusFactory::OpusFactory(int samplerate, int channels, int ptype)
 {
     mSamplerate = samplerate;
@@ -352,7 +347,6 @@ int OpusCodec::OpusFactory::payloadType()
     return mPType;
 }
 
-#if defined(USE_RESIP_INTEGRATION)
 void OpusCodec::OpusFactory::updateSdp(resip::SdpContents::Session::Medium::CodecContainer& codecs, SdpDirection direction)
 {
     // Put opus codec record
@@ -394,7 +388,6 @@ int OpusCodec::OpusFactory::processSdp(const resip::SdpContents::Session::Medium
     }
     return -1;
 }
-#endif
 
 PCodec OpusCodec::OpusFactory::create()
 {
@@ -719,7 +712,6 @@ PCodec IlbcCodec::IlbcFactory::create()
     return PCodec(new IlbcCodec(mPtime));
 }
 
-#if defined(USE_RESIP_INTEGRATION)
 void IlbcCodec::IlbcFactory::create(CodecMap& codecs)
 {
     codecs[mPType20ms] = PCodec(create());
@@ -780,8 +772,6 @@ int IlbcCodec::IlbcFactory::processSdp(const resip::SdpContents::Session::Medium
         mPtime = ptime;
     return pt;
 }
-
-#endif
 
 // --- IsacCodec(s) ---
 #define ISAC_CODEC_NAME "ISAC"

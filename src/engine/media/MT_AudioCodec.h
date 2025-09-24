@@ -46,10 +46,9 @@ public:
         int samplerate() override;
         int payloadType() override;
 
-#if defined(USE_RESIP_INTEGRATION)
         void updateSdp(resip::SdpContents::Session::Medium::CodecContainer& codecs, SdpDirection direction) override;
         int processSdp(const resip::SdpContents::Session::Medium::CodecContainer& codecs, SdpDirection direction) override;
-#endif
+
         PCodec create() override;
     };
     G729Codec();
@@ -82,10 +81,8 @@ public:
         int mPtime, mTargetBitrate, mExpectedPacketLoss;
 
         Params();
-#if defined(USE_RESIP_INTEGRATION)
         resip::Data toString() const;
         void parse(const resip::Data& params);
-#endif
     };
 
     class OpusFactory: public Factory
@@ -103,10 +100,8 @@ public:
         int channels() override;
         int samplerate() override;
         int payloadType() override;
-#if defined(USE_RESIP_INTEGRATION)
         void updateSdp(resip::SdpContents::Session::Medium::CodecContainer& codecs, SdpDirection direction) override;
         int processSdp(const resip::SdpContents::Session::Medium::CodecContainer& codecs, SdpDirection direction) override;
-#endif
         PCodec create() override;
     };
 
@@ -146,11 +141,9 @@ public:
         const char* name();
         int samplerate();
         int payloadType();
-#if defined(USE_RESIP_INTEGRATION)
         void updateSdp(resip::SdpContents::Session::Medium::CodecContainer& codecs, SdpDirection direction);
         int processSdp(const resip::SdpContents::Session::Medium::CodecContainer& codecs, SdpDirection direction);
         void create(CodecMap& codecs);
-#endif
         PCodec create();
     };
 

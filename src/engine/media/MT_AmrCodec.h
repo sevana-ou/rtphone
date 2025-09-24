@@ -43,11 +43,10 @@ public:
         int samplerate() override;
         int payloadType() override;
 
-#ifdef USE_RESIP_INTEGRATION
         void updateSdp(resip::SdpContents::Session::Medium::CodecContainer& codecs, SdpDirection direction) override;
         int processSdp(const resip::SdpContents::Session::Medium::CodecContainer& codecs, SdpDirection direction) override;
         void create(CodecMap& codecs) override;
-#endif
+
         PCodec create() override;
 
     protected:
@@ -98,11 +97,10 @@ public:
         int samplerate() override;
         int payloadType() override;
 
-#ifdef USE_RESIP_INTEGRATION
         void updateSdp(resip::SdpContents::Session::Medium::CodecContainer& codecs, SdpDirection direction) override;
         int processSdp(const resip::SdpContents::Session::Medium::CodecContainer& codecs, SdpDirection direction) override;
         void create(CodecMap& codecs) override;
-#endif
+
         PCodec create() override;
 
     protected:
@@ -140,11 +138,10 @@ public:
         int samplerate() override;
         int payloadType() override;
 
-#ifdef USE_RESIP_INTEGRATION
         void updateSdp(resip::SdpContents::Session::Medium::CodecContainer& codecs, SdpDirection direction) override;
         int processSdp(const resip::SdpContents::Session::Medium::CodecContainer& codecs, SdpDirection direction) override;
         void create(CodecMap& codecs) override;
-#endif
+
         PCodec create() override;
 
     protected:

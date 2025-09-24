@@ -8,9 +8,7 @@
 
 #include "../engine_config.h"
 
-#if defined(USE_RESIP_INTEGRATION)
-# include "resiprocate/resip/stack/SdpContents.hxx"
-#endif
+#include "resiprocate/resip/stack/SdpContents.hxx"
 
 #include "MT_Codec.h"
 #include <vector>
@@ -105,9 +103,7 @@ public:
 
         static Settings DefaultSettings;
 
-        #if defined(USE_RESIP_INTEGRATION)
         static Settings parseSdp(const std::list<resip::Codec>& codeclist);
-        #endif
 
         bool operator == (const Settings& rhs) const;
     };
