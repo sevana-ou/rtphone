@@ -174,7 +174,7 @@ void UserAgent::start()
 #if defined(TARGET_WIN)
     s = new resip::WinSecurity();
 #elif defined(TARGET_OSX)
-    s = new resip::MacSecurity();
+    s = new resip::Security();
 #elif defined(TARGET_LINUX)
     s = new resip::Security("/etc/ssl/certs");
 #elif defined(TARGET_ANDROID)
