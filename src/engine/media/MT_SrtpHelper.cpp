@@ -12,27 +12,40 @@
 #include <assert.h>
 #include <format>
 
-BiMap<SrtpSuite, std::string_view> SrtpSuiteNames{{
-        {SRTP_AES_256_AUTH_80,      "AES_CM_256_HMAC_SHA1_80"},
-        {SRTP_AES_128_AUTH_80,      "AES_CM_128_HMAC_SHA1_80"},
-        {SRTP_AES_192_AUTH_80,      "AES_CM_192_HMAC_SHA1_80"},
-        {SRTP_AES_256_AUTH_32,      "AES_CM_256_HMAC_SHA1_32"},
-        {SRTP_AES_192_AUTH_32,      "AES_CM_192_HMAC_SHA1_32"},
-        {SRTP_AES_128_AUTH_32,      "AES_CM_128_HMAC_SHA1_32"},
-        {SRTP_AES_128_AUTH_NULL,    "AES_CM_128_NULL_AUTH"},
-        {SRTP_AED_AES_256_GCM,      "AEAD_AES_256_GCM"},
-        {SRTP_AED_AES_128_GCM,      "AEAD_AES_128_GCM"}}};
+struct SrtpSuiteAndName
+{
+    SrtpSuite mSuite;
+    std::string mName, mAltName;
+};
+
+std::vector<SrtpSuiteAndName> SrtpSuiteList {
+    { SRTP_AES_256_AUTH_80,     "AES_CM_256_HMAC_SHA1_80", "AES_256_CM_HMAC_SHA1_80" },
+    { SRTP_AES_128_AUTH_80,     "AES_CM_128_HMAC_SHA1_80", "AES_128_CM_HMAC_SHA1_80" },
+    { SRTP_AES_192_AUTH_80,     "AES_CM_192_HMAC_SHA1_80", "AES_192_CM_HMAC_SHA1_80" },
+    { SRTP_AES_256_AUTH_32,     "AES_CM_256_HMAC_SHA1_32", "AES_256_CM_HMAC_SHA1_32" },
+    { SRTP_AES_192_AUTH_32,     "AES_CM_192_HMAC_SHA1_32", "AES_192_CM_HMAC_SHA1_32" },
+    { SRTP_AES_128_AUTH_32,     "AES_CM_128_HMAC_SHA1_32", "AES_128_CM_HMAC_SHA1_32" },
+    { SRTP_AES_128_AUTH_NULL,   "AES_CM_128_NULL_AUTH", "AES_128_CM_NULL_AUTH"},
+    { SRTP_AED_AES_256_GCM,     "AEAD_AES_256_GCM"},
+    { SRTP_AED_AES_128_GCM,     "AEAD_AES_128_GCM"}
+};
 
 extern SrtpSuite   toSrtpSuite(const std::string_view& s)
 {
-    auto* suite = SrtpSuiteNames.find_by_value(s);
-    return !suite ? SRTP_NONE : *suite;
+    for (const auto& suite: SrtpSuiteList)
+        if (s == suite.mName || s == suite.mAltName)
+            return suite.mSuite;
+
+    return SRTP_NONE;
 }
 
 extern std::string_view toString(SrtpSuite suite)
 {
-    auto* s = SrtpSuiteNames.find_by_key(suite);
-    return s ? *s : std::string_view();
+    for (const auto& item: SrtpSuiteList)
+        if (item.mSuite == suite)
+            return item.mName;
+
+    return {};
 }
 
 typedef void (*set_srtp_policy_function) (srtp_crypto_policy_t*);
@@ -50,9 +63,10 @@ set_srtp_policy_function findPolicyFunction(SrtpSuite suite)
     case SRTP_AES_128_AUTH_NULL:    return &srtp_crypto_policy_set_aes_cm_128_null_auth; break;
     case SRTP_AED_AES_256_GCM:      return &srtp_crypto_policy_set_aes_gcm_256_16_auth; break;
     case SRTP_AED_AES_128_GCM:      return &srtp_crypto_policy_set_aes_gcm_128_16_auth; break;
-    default:
-        throw std::runtime_error(std::format("SRTP suite {} is not supported", toString(suite)));
+    case SRTP_NONE:                 return nullptr;
     }
+
+    return nullptr;
 }
 
 // --- SrtpStream ---
