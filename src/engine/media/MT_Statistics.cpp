@@ -1,9 +1,7 @@
-#include <math.h>
+#include <cmath>
 #include <iostream>
 
 #include "MT_Statistics.h"
-#include "audio/Audio_Interface.h"
-#include "helper/HL_Log.h"
 #define LOG_SUBSYSTEM "Statistics"
 
 using namespace MT;
@@ -14,7 +12,7 @@ void JitterStatistics::process(jrtplib::RTPPacket* packet, int rate)
     uint32_t timestamp = packet->GetTimestamp();
     jrtplib::RTPTime receiveTime = packet->GetReceiveTime();
 
-    if (!mLastJitter.is_initialized())
+    if (!mLastJitter)
     {
         // First packet
         mReceiveTime = receiveTime;
@@ -69,40 +67,10 @@ void JitterStatistics::process(jrtplib::RTPPacket* packet, int rate)
 
 
 Statistics::Statistics()
-    :mReceived(0), mSent(0), mReceivedRtp(0), mSentRtp(0),
-      mReceivedRtcp(0), mSentRtcp(0), mDuplicatedRtp(0), mOldRtp(0), mIllegalRtp(0),
-      mPacketLoss(0), mJitter(0.0), mAudioTime(0), mDecodedSize(0), mSsrc(0), mPacketDropped(0)
-{
-    mBitrateSwitchCounter = 0;
-    memset(mLoss, 0, sizeof mLoss);
-
-    // It is to keep track of statistics instance via grep | wc -l
-    //ICELogDebug(<< "Create statistics instance.");
-}
+{}
 
 Statistics::~Statistics()
-{
-}
-
-void Statistics::reset()
-{
-    mReceived = 0;
-    mSent = 0;
-    mReceivedRtp = 0;
-    mSentRtp = 0;
-    mReceivedRtcp = 0;
-    mSentRtcp = 0;
-    mDuplicatedRtp = 0;
-    mOldRtp = 0;
-    mPacketLoss = 0;
-    mIllegalRtp = 0;
-    mJitter = 0.0;
-    mAudioTime = 0;
-    mPacketDropped = 0;
-    mDecodedSize = 0;
-
-    memset(mLoss, 0, sizeof mLoss);
-}
+{}
 
 void Statistics::calculateBurstr(double* burstr, double* lossr) const
 {
@@ -131,7 +99,7 @@ void Statistics::calculateBurstr(double* burstr, double* lossr) const
     }
     else
         *burstr = 0;
-    //printf("total loss: %d\n", lost);
+
     if (mReceivedRtp > 0)
         *lossr = (double)((double)lost / (double)mReceivedRtp);
     else
@@ -173,17 +141,17 @@ double Statistics::calculateMos(double maximalMos) const
 
 Statistics& Statistics::operator += (const Statistics& src)
 {
-    mReceived += src.mReceived;
-    mSent += src.mSent;
-    mReceivedRtp += src.mReceivedRtp;
-    mSentRtp += src.mSentRtp;
-    mReceivedRtcp += src.mReceivedRtcp;
-    mSentRtcp += src.mSentRtcp;
-    mDuplicatedRtp += src.mDuplicatedRtp;
-    mOldRtp += src.mOldRtp;
-    mPacketLoss += src.mPacketLoss;
-    mPacketDropped += src.mPacketDropped;
-    mAudioTime += src.mAudioTime;
+    mReceived       += src.mReceived;
+    mSent           += src.mSent;
+    mReceivedRtp    += src.mReceivedRtp;
+    mSentRtp        += src.mSentRtp;
+    mReceivedRtcp   += src.mReceivedRtcp;
+    mSentRtcp       += src.mSentRtcp;
+    mDuplicatedRtp  += src.mDuplicatedRtp;
+    mOldRtp         += src.mOldRtp;
+    mPacketLoss     += src.mPacketLoss;
+    mPacketDropped  += src.mPacketDropped;
+    mAudioTime      += src.mAudioTime;
 
 
     for (auto codecStat: src.mCodecCount)
@@ -194,49 +162,49 @@ Statistics& Statistics::operator += (const Statistics& src)
             mCodecCount[codecStat.first] += codecStat.second;
     }
 
-    mJitter = src.mJitter;
-    mRttDelay = src.mRttDelay;
-    mDecodingInterval = src.mDecodingInterval;
-    mDecodeRequested = src.mDecodeRequested;
+    mJitter             = src.mJitter;
+    mRttDelay           = src.mRttDelay;
+    mDecodingInterval   = src.mDecodingInterval;
+    mDecodeRequested    = src.mDecodeRequested;
 
     if (!src.mCodecName.empty())
         mCodecName = src.mCodecName;
 
     // Find minimal
-    if (mFirstRtpTime.is_initialized())
+    if (mFirstRtpTime)
     {
-        if (src.mFirstRtpTime.is_initialized())
+        if (src.mFirstRtpTime)
         {
             if (mFirstRtpTime.value() > src.mFirstRtpTime.value())
                 mFirstRtpTime = src.mFirstRtpTime;
         }
     }
     else
-        if (src.mFirstRtpTime.is_initialized())
-            mFirstRtpTime = src.mFirstRtpTime;
+    if (src.mFirstRtpTime)
+        mFirstRtpTime = src.mFirstRtpTime;
 
-    mBitrateSwitchCounter += src.mBitrateSwitchCounter;
-    mRemotePeer = src.mRemotePeer;
-    mSsrc = src.mSsrc;
+    mBitrateSwitchCounter   += src.mBitrateSwitchCounter;
+    mRemotePeer             = src.mRemotePeer;
+    mSsrc                   = src.mSsrc;
 
     return *this;
 }
 
 Statistics& Statistics::operator -= (const Statistics& src)
 {
-    mReceived -= src.mReceived;
-    mSent -= src.mSent;
-    mReceivedRtp -= src.mReceivedRtp;
-    mIllegalRtp -= src.mIllegalRtp;
-    mSentRtp -= src.mSentRtp;
-    mReceivedRtcp -= src.mReceivedRtcp;
-    mSentRtcp -= src.mSentRtcp;
-    mDuplicatedRtp -= src.mDuplicatedRtp;
-    mOldRtp -= src.mOldRtp;
-    mPacketLoss -= src.mPacketLoss;
-    mPacketDropped -= src.mPacketDropped;
+    mReceived           -= src.mReceived;
+    mSent               -= src.mSent;
+    mReceivedRtp        -= src.mReceivedRtp;
+    mIllegalRtp         -= src.mIllegalRtp;
+    mSentRtp            -= src.mSentRtp;
+    mReceivedRtcp       -= src.mReceivedRtcp;
+    mSentRtcp           -= src.mSentRtcp;
+    mDuplicatedRtp      -= src.mDuplicatedRtp;
+    mOldRtp             -= src.mOldRtp;
+    mPacketLoss         -= src.mPacketLoss;
+    mPacketDropped      -= src.mPacketDropped;
+    mAudioTime          -= src.mAudioTime;
 
-    mAudioTime -= src.mAudioTime;
     for (auto codecStat: src.mCodecCount)
     {
         if (mCodecCount.find(codecStat.first) != mCodecCount.end())
@@ -250,13 +218,13 @@ Statistics& Statistics::operator -= (const Statistics& src)
 std::string Statistics::toString() const
 {
     std::ostringstream oss;
-    oss << "Received: "     << mReceivedRtp
-        << ", lost: "       << mPacketLoss
-        << ", dropped: "    << mPacketDropped
-        << ", sent: "       << mSentRtp
-        << ", decoding interval: " << mDecodingInterval.average()
-        << ", decode requested: " << mDecodeRequested.average()
-        << ", packet interval: " << mPacketInterval.average();
+    oss << "Received: "             << mReceivedRtp
+        << ", lost: "               << mPacketLoss
+        << ", dropped: "            << mPacketDropped
+        << ", sent: "               << mSentRtp
+        << ", decoding interval: "  << mDecodingInterval.average()
+        << ", decode requested: "   << mDecodeRequested.average()
+        << ", packet interval: "    << mPacketInterval.average();
 
     return oss.str();
 }

@@ -445,7 +445,6 @@ void Session::getSessionInfo(Session::InfoOptions options, VariantMap& info)
     MT::Statistics stat;
 
     // Iterate all session providers
-    stat.reset();
     Stream* media = nullptr;
     for (Stream& stream: mStreamList)
     {
@@ -469,7 +468,7 @@ void Session::getSessionInfo(Session::InfoOptions options, VariantMap& info)
     info[SessionInfo_SentRtp] = static_cast<int>(stat.mSentRtp);
     info[SessionInfo_SentRtcp] = static_cast<int>(stat.mSentRtcp);
     if (stat.mFirstRtpTime)
-        info[SessionInfo_Duration] = static_cast<int>(std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now() - *(stat.mFirstRtpTime)).count());
+        info[SessionInfo_Duration] = static_cast<int>(std::chrono::duration_cast<std::chrono::seconds>(std::chrono::steady_clock::now() - *(stat.mFirstRtpTime)).count());
     else
         info[SessionInfo_Duration] = 0;
 

@@ -347,8 +347,8 @@ void AudioStream::dataArrived(PDatagramSocket s, const void* buffer, int length,
     mStat.mReceived += length;
     if (RtpHelper::isRtp(mReceiveBuffer, receiveLength))
     {
-        if (!mStat.mFirstRtpTime.is_initialized())
-            mStat.mFirstRtpTime = std::chrono::system_clock::now();
+        if (!mStat.mFirstRtpTime)
+            mStat.mFirstRtpTime = std::chrono::steady_clock::now();
         mStat.mReceivedRtp++;
     }
     else

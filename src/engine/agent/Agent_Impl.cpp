@@ -481,41 +481,6 @@ void AgentImpl::processWaitForEvent(JsonCpp::Value &request, JsonCpp::Value &ans
     answer["status"] = Status_Ok;
 }
 
-#if defined(USE_PVQA_LIBRARY)
-/*static JsonCpp::Value CsvReportToJson(const std::string& report)
-{
-    JsonCpp::Value detectorValues;
-    std::istringstream iss(report);
-    CsvReader reader(iss);
-    std::vector<std::string> cells;
-    if (reader.readLine(cells))
-    {
-        JsonCpp::Value detectorNames;
-        for (size_t nameIndex = 0; nameIndex < cells.size(); nameIndex++)
-            detectorNames[static_cast<int>(nameIndex)] = strx::trim(cells[nameIndex]);
-        // Put first line name of columns
-        detectorValues[0] = detectorNames;
-
-        int rowIndex = 1;
-        while (reader.readLine(cells))
-        {
-            // Skip last column for now
-            JsonCpp::Value row;
-            for (size_t valueIndex = 0; valueIndex < cells.size(); valueIndex++)
-            {
-                bool isFloat = true;
-                float v = strx::toFloat(cells[valueIndex], 0.0, &isFloat);
-                if (isFloat)
-                    row[static_cast<int>(valueIndex)] = static_cast<double>(v);
-                else
-                    row[static_cast<int>(valueIndex)] = cells[valueIndex];
-            }
-            detectorValues[rowIndex++] = row;
-        }
-    }
-    return detectorValues;
-}*/
-#endif
 
 void AgentImpl::processGetMediaStats(JsonCpp::Value& request, JsonCpp::Value& answer)
 {

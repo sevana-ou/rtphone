@@ -157,4 +157,8 @@ private:
     std::unordered_map<V, K, HashV, EqV> reverse_;
 };
 
+#include <chrono>
+typedef std::chrono::steady_clock::time_point timepoint_t;
+typedef std::chrono::steady_clock             monoclock_t;
+
 #endif
