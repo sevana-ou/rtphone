@@ -309,14 +309,14 @@ void OpusCodec::Params::parse(const resip::Data &params)
         if (paramIter->mName == "usedtx")
             mUseDtx = paramIter->mValue == "1";
         else
-            if (paramIter->mName == "useinbandfec")
-                mUseInbandFec = paramIter->mValue == "1";
-            else
-                if (paramIter->mName == "stereo")
-                    mStereo = paramIter->mValue == "1";
-                else
-                    if (paramIter->mName == "ptime")
-                        mPtime = strx::toInt(paramIter->mValue.c_str(), 20);
+        if (paramIter->mName == "useinbandfec")
+            mUseInbandFec = paramIter->mValue == "1";
+        else
+        if (paramIter->mName == "stereo")
+            mStereo = paramIter->mValue == "1";
+        else
+        if (paramIter->mName == "ptime")
+            mPtime = strx::toInt(paramIter->mValue.c_str(), 20);
     }
 }
 
@@ -406,8 +406,6 @@ OpusCodec::OpusCodec(int samplerate, int channels, int ptime)
     mEncoderCtx = opus_encoder_create(mSamplerate, mChannels, OPUS_APPLICATION_VOIP, &status);
     if (OPUS_OK != opus_encoder_ctl(mEncoderCtx, OPUS_SET_COMPLEXITY(OPUS_CODEC_COMPLEXITY)))
         ICELogError(<< "Failed to set Opus encoder complexity");
-    //if (OPUS_OK != opus_encoder_ctl(mEncoderCtx, OPUS_SET_FORCE_CHANNELS(AUDIO_CHANNELS)))
-    //  ICELogCritical(<<"Failed to set channel number in Opus encoder");
     // Decoder creation is postponed until first packet arriving (because it may use different channel number
 }
 
@@ -521,8 +519,12 @@ int OpusCodec::decode(const void* input, int inputBytes, void* output, int outpu
     int decoded = opus_decode(mDecoderCtx,
                               reinterpret_cast<const unsigned char *>(input), inputBytes,
                               buffer_decode, nr_of_frames, 0);
+    if (decoded < 0)
+    {
+        ICELogCritical(<< "opus_decode() returned " << decoded);
+        return 0;
+    }
 
-    size_t resampler_processed = 0;
     opus_int16 *buffer_stereo = nullptr;
     int buffer_stereo_capacity = buffer_capacity * 2;
 
@@ -1150,8 +1152,8 @@ int GsmCodec::plc(int lostFrames, void* output, int outputCapacity)
 
 G722Codec::G722Codec()
 {
-    mEncoder = g722_encode_init(NULL, 64000, 0);
-    mDecoder = g722_decode_init(NULL, 64000, 0);
+    mEncoder = g722_encode_init(nullptr, 64000, 0);
+    mDecoder = g722_decode_init(nullptr, 64000, 0);
 
 }
 

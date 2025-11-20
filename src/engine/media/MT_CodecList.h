@@ -95,11 +95,11 @@ public:
         std::vector<OpusSpec> mOpusSpec;
 
         // Payload type
-        bool contains(int ptype) const;
+        bool        contains(int ptype) const;
 
         // Textual representation - used in logging
         std::string toString() const;
-        void clear();
+        void        clear();
 
         static Settings DefaultSettings;
 
@@ -110,16 +110,17 @@ public:
 
     CodecList(const Settings& settings);
     ~CodecList();
-    void setSettings(const Settings& settings) {
+    void setSettings(const Settings& settings)
+    {
         init(settings);
     }
 
-    int count() const;
+    int             count() const;
     Codec::Factory& codecAt(int index) const;
-    int findCodec(const std::string& name) const;
-    void fillCodecMap(CodecMap& cm);
-    PCodec createCodecByPayloadType(int payloadType);
-    void clear();
+    int             findCodec(const std::string& name) const;
+    void            fillCodecMap(CodecMap& cm);
+    PCodec          createCodecByPayloadType(int payloadType);
+    void            clear();
 
 protected:
     typedef std::vector<std::shared_ptr<Codec::Factory>> FactoryList;

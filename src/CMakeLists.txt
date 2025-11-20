@@ -26,6 +26,8 @@ set (OPENSSL_INCLUDE ${LIB_PLATFORM}/openssl/1.1/include)
 message ("Using OpenSSL include files from ${OPENSSL_INCLUDE}")
 message ("Using OpenSSL libs: ${OPENSSL_SSL} and ${OPENSSL_CRYPTO}")
 include_directories(${OPENSSL_INCLUDE})
+message ("Using Opus include files: ${OPUS_INCLUDE}")
+message ("Using Opus lib: ${OPUS_LIB}")
 
 # Used defines for our project
 set (DEFINES -DUSE_OPENSSL)
@@ -309,7 +311,7 @@ set (RTPHONE_SOURCES
     )
 
 if (USE_OPUS_CODEC)
-set (DEFINES ${DEFINES} -DUSE_OPUS_CODEC)
+    set (DEFINES ${DEFINES} -DUSE_OPUS_CODEC)
 endif()
 
 add_library (rtphone STATIC ${RTPHONE_SOURCES})
@@ -363,6 +365,7 @@ target_include_directories(rtphone
         ${CMAKE_CURRENT_SOURCE_DIR}/libs
         ${LIB_PLATFORM}/opus/include
         ${E}/helper
+        ${E}/audio
         ${E}/media
         ${L}
         ${L}/ice

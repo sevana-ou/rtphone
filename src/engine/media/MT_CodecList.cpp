@@ -151,7 +151,7 @@ CodecList::Settings::EvsSpec CodecList::Settings::EvsSpec::parse(const std::stri
 {
     EvsSpec result;
 
-    auto parts = strx::split(spec, "-/");
+    auto parts = strx::split(spec, "-/ ,:");
     if (parts.size() == 3)
     {
         // Payload type number
@@ -162,10 +162,10 @@ CodecList::Settings::EvsSpec CodecList::Settings::EvsSpec::parse(const std::stri
         if (encoding_type == "mime")
             result.mEncodingType = Encoding_MIME;
         else
-            if (encoding_type == "g192")
-                result.mEncodingType = Encoding_G192;
-            else
-                throw std::logic_error("Bad EVS codec encoding type");
+        if (encoding_type == "g192")
+            result.mEncodingType = Encoding_G192;
+        else
+            throw std::logic_error("Bad EVS codec encoding type");
 
         // Bandwidth
         std::string& bandwidth = parts.back();
@@ -196,7 +196,7 @@ CodecList::Settings::OpusSpec CodecList::Settings::OpusSpec::parse(const std::st
 {
     OpusSpec result;
 
-    auto parts = strx::split(spec, "-/");
+    auto parts = strx::split(spec, "-/ ,:");
     if (parts.size() == 3)
     {
         result.mPayloadType = strx::toInt(strx::trim(parts.front()).c_str(), -1);
@@ -215,7 +215,7 @@ static int findOctetMode(const char* line)
 
     p += strlen(param_name);
     char int_buf[8] = {0};
-    int int_buf_offset = 0;
+    size_t int_buf_offset = 0;
     while (*p && isdigit(*p) && int_buf_offset < sizeof(int_buf))
         int_buf[int_buf_offset++] = *p++;
     return atoi(int_buf);
@@ -337,8 +337,7 @@ void CodecList::init(const Settings& settings)
 #if !defined(TARGET_ANDROID) && !defined(TARGET_OPENWRT) && !defined(TARGET_RPI)
 #if defined(USE_AMR_CODEC)
     for (int pt: mSettings.mAmrWbPayloadType)
-        mFactoryList.push_back(std::make_shared<AmrWbCodec::CodecFactory>(
-            AmrCodecConfig{mSettings.mWrapIuUP, false, pt}));
+        mFactoryList.push_back(std::make_shared<AmrWbCodec::CodecFactory>(AmrCodecConfig{mSettings.mWrapIuUP, false, pt}));
     for (int pt: mSettings.mAmrWbOctetPayloadType)
         mFactoryList.push_back(std::make_shared<AmrWbCodec::CodecFactory>(AmrCodecConfig{mSettings.mWrapIuUP, true, pt}));
 
