@@ -12,6 +12,8 @@
 #include <string>
 #include <memory>
 #include <mutex>
+#include <filesystem>
+#include <fstream>
 
 
 namespace Audio
@@ -20,24 +22,26 @@ namespace Audio
 class WavFileReader
 {
 protected:
-    FILE*           mHandle;
-    uint16_t        mChannels;
-    uint16_t        mBits;
-    int             mSamplerate;
-    std::tstring    mFileName;
-    mutable std::recursive_mutex
-        mFileMtx;
-    size_t          mDataOffset;
-    size_t          mDataLength;
-    Resampler       mResampler;
-    unsigned        mLastError;
+    uint16_t                        mChannels = 0;
+    uint16_t                        mBits = 0;
+    int                             mSamplerate = 0;
+    std::filesystem::path           mPath;
+    mutable std::recursive_mutex    mFileMtx;
+    size_t                          mDataOffset = 0;
+    size_t                          mDataLength = 0;
+    Resampler                       mResampler;
+    unsigned                        mLastError = 0;
+    std::unique_ptr<std::ifstream>  mInput;
 
-    std::string readChunk();
+    std::string         readChunk();
+    void                readBuffer(void* buffer, size_t sz);       // This raises an exception if sz bytes are not read
+    size_t              tryReadBuffer(void* buffer, size_t sz);  // This doesn't raise an exception
+
 public:
     WavFileReader();
     ~WavFileReader();
 
-    bool open(const std::tstring& filename);
+    bool open(const std::filesystem::path& p);
     void close();
     bool isOpened();
     void rewind();
@@ -52,7 +56,7 @@ public:
     size_t read(short* buffer, size_t samples);
     size_t readRaw(short* buffer, size_t samples);
 
-    std::tstring filename() const;
+    std::filesystem::path path() const;
     size_t size() const;
 
     unsigned lastError() const;
@@ -63,25 +67,25 @@ typedef std::shared_ptr<WavFileReader> PWavFileReader;
 class WavFileWriter
 {
 protected:
-    FILE*                   mHandle;        /// Handle of audio file.
-    std::tstring            mFileName;      /// Path to requested audio file.
-    std::recursive_mutex    mFileMtx;       /// Mutex to protect this instance.
-    size_t                  mWritten;       /// Amount of written data (in bytes)
-    size_t                  mLengthOffset;  /// Position of length field.
-    int                     mRate,
-        mChannels;
+    std::unique_ptr<std::ofstream>  mOutput;            /// Handle of audio file.
+    std::filesystem::path           mPath;              /// Path to requested audio file.
+    mutable std::recursive_mutex    mFileMtx;           /// Mutex to protect this instance.
+    size_t                          mWritten = 0;       /// Amount of written data (in bytes)
+    size_t                          mLengthOffset = 0;  /// Position of length field.
+    int                             mSamplerate = 0,
+                                    mChannels = 0;
 
     void checkWriteResult(int result);
-
+    void writeBuffer(const void* buffer, size_t sz);
 public:
     WavFileWriter();
     ~WavFileWriter();
 
-    bool open(const std::tstring& filename, int rate, int channels);
+    bool open(const std::filesystem::path& p, int samplerate, int channels);
     void close();
-    bool isOpened();
+    bool isOpened() const;
     size_t write(const void* buffer, size_t bytes);
-    std::tstring filename();
+    std::filesystem::path path() const;
 };
 
 typedef std::shared_ptr<WavFileWriter> PWavFileWriter;

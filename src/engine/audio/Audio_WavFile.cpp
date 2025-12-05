@@ -40,7 +40,7 @@ using namespace Audio;
 
 // ---------------------- WavFileReader -------------------------
 WavFileReader::WavFileReader()
-    :mHandle(nullptr), mSamplerate(0), mLastError(0), mChannels(0), mBits(0), mDataLength(0)
+    :mSamplerate(0), mLastError(0), mChannels(0), mBits(0), mDataLength(0)
 {
     mDataOffset = 0;
 }
@@ -53,38 +53,51 @@ WavFileReader::~WavFileReader()
 
 std::string WavFileReader::readChunk()
 {
-    char name[5];
-    if (fread(name, 1, 4, mHandle) != 4)
-        THROW_READERROR;
+    char name[5] = {0};
+    readBuffer(name, 4);
 
-    name[4] = 0;
     std::string result = name;
-    unsigned size;
-    if (fread(&size, 4, 1, mHandle) != 1)
-        THROW_READERROR;
+    uint32_t size = 0;
+    readBuffer(&size, 4);
 
     if (result == "fact")
-        fread(&mDataLength, 4, 1, mHandle);
+    {
+        uint32_t dataLength = 0;
+        readBuffer(&dataLength, sizeof dataLength);
+        mDataLength = dataLength;
+    }
     else
-        if (result != "data")
-            fseek(mHandle, size, SEEK_CUR);
-        else
-            mDataLength = size;
+    if (result != "data")
+        mInput->seekg(size, std::ios_base::beg);
+    else
+        mDataLength = size;
 
     return result;
 }
 
-bool WavFileReader::open(const std::tstring& filename)
+void  WavFileReader::readBuffer(void* buffer, size_t sz)
+{
+    auto p = mInput->tellg();
+    mInput->read(reinterpret_cast<char*>(buffer), sz);
+    if (mInput->tellg() - p != sz)
+        throw Exception(ERR_WAVFILE_FAILED);
+}
+
+size_t WavFileReader::tryReadBuffer(void* buffer, size_t sz)
+{
+    auto p = mInput->tellg();
+    mInput->read(reinterpret_cast<char*>(buffer), sz);
+    return mInput->tellg() - p;
+}
+
+bool WavFileReader::open(const std::filesystem::path& p)
 {
     LOCK;
     try
     {
-#ifdef WIN32
-        mHandle = _wfopen(filename.c_str(), L"rb");
-#else
-        mHandle = fopen(strx::makeUtf8(filename).c_str(), "rb");
-#endif
-        if (NULL == mHandle)
+        mPath = p;
+        mInput = std::make_unique<std::ifstream>(p, std::ios::binary | std::ios::in);
+        if (!mInput->is_open())
         {
 #if defined(TARGET_ANDROID) || defined(TARGET_LINUX) || defined(TARGET_OSX)
             mLastError = errno;
@@ -98,75 +111,62 @@ bool WavFileReader::open(const std::tstring& filename)
 
         // Read the .WAV header
         char riff[4];
-        if (fread(riff, 4, 1, mHandle) < 1)
-            THROW_READERROR;
+        readBuffer(riff, sizeof riff);
 
         if (!(riff[0] == 'R' && riff[1] == 'I' && riff[2] == 'F' && riff[3] == 'F'))
             THROW_READERROR;
 
         // Read the file size
         uint32_t filesize = 0;
-        if (fread(&filesize, 4, 1, mHandle) < 1)
-            THROW_READERROR;
+        readBuffer(&filesize, sizeof(filesize));
 
-        char wavefmt[9];
-        if (fread(wavefmt, 8, 1, mHandle) < 1)
-            THROW_READERROR;
-
-        wavefmt[8] = 0;
+        char wavefmt[9] = {0};
+        readBuffer(wavefmt, 8);
         if (strcmp(wavefmt, "WAVEfmt ") != 0)
             THROW_READERROR;
 
         uint32_t fmtSize = 0;
-        if (fread(&fmtSize, 4, 1, mHandle) < 1)
-            THROW_READERROR;
+        readBuffer(&fmtSize, sizeof(fmtSize));
 
-        uint32_t fmtStart = ftell(mHandle);
+        auto fmtStart = mInput->tellg();
 
         uint16_t formattag  = 0;
-        if (fread(&formattag, 2, 1, mHandle) < 1)
-            THROW_READERROR;
+        readBuffer(&formattag, sizeof(formattag));
 
         if (formattag != 1/*WAVE_FORMAT_PCM*/)
             THROW_READERROR;
 
-        if (fread(&mChannels, 2, 1, mHandle) < 1)
-            THROW_READERROR;
+        mChannels = 0;
+        readBuffer(&mChannels, sizeof(mChannels));
 
         mSamplerate = 0;
-        if (fread(&mSamplerate, 4, 1, mHandle) < 1)
-            THROW_READERROR;
+        readBuffer(&mSamplerate, sizeof(mSamplerate));
 
-        unsigned int avgbytespersec = 0;
-        if (fread(&avgbytespersec, 4, 1, mHandle) < 1)
-            THROW_READERROR;
+        uint32_t avgbytespersec = 0;
+        readBuffer(&avgbytespersec, sizeof(avgbytespersec));
 
-        unsigned short blockalign = 0;
-        if (fread(&blockalign, 2, 1, mHandle) < 1)
-            THROW_READERROR;
+        uint16_t blockalign = 0;
+        readBuffer(&blockalign, sizeof(blockalign));
 
         mBits = 0;
-        if (fread(&mBits, 2, 1, mHandle) < 1)
-            THROW_READERROR;
+        readBuffer(&mBits, sizeof(mBits));
 
         if (mBits !=8 && mBits != 16)
             THROW_READERROR;
 
-        // Read the "chunk"
-        fseek(mHandle, fmtStart + fmtSize, SEEK_SET);
-        //unsigned pos = ftell(mHandle);
+        // Look for the chunk 'data'
+        mInput->seekg(fmtStart + std::streampos(fmtSize));
+
         mDataLength = 0;
         while (readChunk() != "data")
             ;
 
-        mFileName = filename;
-        mDataOffset = ftell(mHandle);
-
+        mDataOffset = mInput->tellg();
         mResampler.start(AUDIO_CHANNELS, mSamplerate, AUDIO_SAMPLERATE);
     }
     catch(...)
     {
-        fclose(mHandle); mHandle = nullptr;
+        mInput.reset();
         mLastError = static_cast<unsigned>(-1);
     }
     return isOpened();
@@ -175,10 +175,7 @@ bool WavFileReader::open(const std::tstring& filename)
 void WavFileReader::close()
 {
     LOCK;
-
-    if (nullptr != mHandle)
-        fclose(mHandle);
-    mHandle = nullptr;
+    mInput.reset();
 }
 
 int WavFileReader::samplerate() const
@@ -205,7 +202,7 @@ size_t WavFileReader::read(short* buffer, size_t samples)
 {
     LOCK;
 
-    if (!mHandle)
+    if (!mInput)
         return 0;
 
     // Get number of samples that must be read from source file
@@ -216,14 +213,14 @@ size_t WavFileReader::read(short* buffer, size_t samples)
     // Find required size of input buffer
     if (mDataLength)
     {
-        unsigned filePosition = ftell(mHandle);
+        auto filePosition = mInput->tellg();
 
         // Check how much data we can read
         size_t fileAvailable = mDataLength + mDataOffset - filePosition;
         requiredBytes = fileAvailable < requiredBytes ? fileAvailable : requiredBytes;
     }
 
-    size_t readBytes = fread(temp, 1, requiredBytes, mHandle);
+    size_t readBytes = tryReadBuffer(temp, requiredBytes);
 
     size_t processedBytes = 0;
     size_t result = mResampler.processBuffer(temp, readBytes, processedBytes,
@@ -237,54 +234,50 @@ size_t WavFileReader::readRaw(short* buffer, size_t samples)
 {
     LOCK;
 
-    if (!mHandle)
+    if (!mInput)
         return 0;
 
     // Get number of samples that must be read from source file
-    int requiredBytes = samples * channels() * sizeof(short);
+    size_t requiredBytes = samples * channels() * sizeof(short);
 
     // Find required size of input buffer
     if (mDataLength)
     {
-        unsigned filePosition = ftell(mHandle);
+        auto filePosition = mInput->tellg();
 
         // Check how much data we can read
-        unsigned fileAvailable = mDataLength + mDataOffset - filePosition;
+        size_t fileAvailable = mDataLength + mDataOffset - filePosition;
         requiredBytes = (int)fileAvailable < requiredBytes ? (int)fileAvailable : requiredBytes;
     }
 
-    size_t readBytes = fread(buffer, 1, requiredBytes, mHandle);
-
-
+    size_t readBytes = tryReadBuffer(buffer, requiredBytes);
     return readBytes / channels() / sizeof(short);
 }
 
 bool WavFileReader::isOpened()
 {
     LOCK;
-
-    return (mHandle != 0);
+    if (!mInput)
+        return false;
+    return mInput->is_open();
 }
 
 void WavFileReader::rewind()
 {
     LOCK;
-
-    if (mHandle)
-        fseek(mHandle, mDataOffset, SEEK_SET);
+    if (mInput)
+        mInput->seekg(mDataOffset);
 }
 
-std::tstring WavFileReader::filename() const
+std::filesystem::path WavFileReader::path() const
 {
     LOCK;
-
-    return mFileName;
+    return mPath;
 }
 
 size_t WavFileReader::size() const
 {
     LOCK;
-
     return mDataLength;
 }
 
@@ -298,9 +291,8 @@ unsigned WavFileReader::lastError() const
 #define BITS_PER_CHANNEL  16
 
 WavFileWriter::WavFileWriter()
-    :mHandle(nullptr), mLengthOffset(0), mRate(AUDIO_SAMPLERATE), mChannels(1), mWritten(0)
-{
-}
+    :mLengthOffset(0), mSamplerate(AUDIO_SAMPLERATE), mChannels(1), mWritten(0)
+{}
 
 WavFileWriter::~WavFileWriter()
 {
@@ -313,70 +305,74 @@ void WavFileWriter::checkWriteResult(int result)
         throw Exception(ERR_WAVFILE_FAILED, errno);
 }
 
-bool WavFileWriter::open(const std::tstring& filename, int rate, int channels)
+void WavFileWriter::writeBuffer(const void* buffer, size_t sz)
+{
+    if (!mOutput)
+        return;
+
+    auto p = mOutput->tellp();
+    mOutput->write(reinterpret_cast<const char*>(buffer), sz);
+    if (mOutput->tellp() - p != sz)
+        throw Exception(ERR_WAVFILE_FAILED);
+}
+
+bool WavFileWriter::open(const std::filesystem::path& p, int samplerate, int channels)
 {
     LOCK;
-
     close();
-
-    mRate = rate;
+    mSamplerate = samplerate;
     mChannels = channels;
 
-#ifdef WIN32
-    mHandle = _wfopen(filename.c_str(), L"wb");
-#else
-    auto filename_utf8 = strx::makeUtf8(filename);
-    mHandle = fopen(filename_utf8.c_str(), "wb");
-#endif
-    if (nullptr == mHandle)
+    mOutput = std::make_unique<std::ofstream>(p, std::ios::binary | std::ios::trunc);
+    if (!mOutput)
     {
         int errorcode = errno;
-        ICELogError(<< "Failed to create .wav file: filename = " << strx::makeUtf8(filename) << " , error = " << errorcode);
+        ICELogError(<< "Failed to create .wav file: filename = " << p << " , error = " << errorcode);
         return false;
     }
 
     // Write the .WAV header
     const char* riff = "RIFF";
-    checkWriteResult( fwrite(riff, 4, 1, mHandle) );
+    writeBuffer(riff, 4);
 
     // Write the file size
-    unsigned int filesize = 0;
-    checkWriteResult( fwrite(&filesize, 4, 1, mHandle) );
+    uint32_t filesize = 0;
+    writeBuffer(&filesize, sizeof filesize);
 
     const char* wavefmt = "WAVEfmt ";
-    checkWriteResult( fwrite(wavefmt, 8, 1, mHandle) );
+    writeBuffer(wavefmt, 8);
 
     // Set the format description
-    DWORD dwFmtSize = 16; /*= 16L*/;
-    checkWriteResult( fwrite(&dwFmtSize, sizeof(dwFmtSize), 1, mHandle) );
+    uint32_t dwFmtSize = 16; /*= 16L*/;
+    writeBuffer(&dwFmtSize, sizeof(dwFmtSize));
 
     WaveFormatEx format;
     format.wFormatTag = WAVE_FORMAT_PCM;
-    checkWriteResult( fwrite(&format.wFormatTag, sizeof(format.wFormatTag), 1, mHandle) );
+    writeBuffer(&format.wFormatTag, sizeof(format.wFormatTag));
 
     format.nChannels = mChannels;
-    checkWriteResult( fwrite(&format.nChannels, sizeof(format.nChannels), 1, mHandle) );
+    writeBuffer(&format.nChannels, sizeof(format.nChannels));
 
-    format.nSamplesPerSec = mRate;
-    checkWriteResult( fwrite(&format.nSamplesPerSec, sizeof(format.nSamplesPerSec), 1, mHandle) );
+    format.nSamplesPerSec = mSamplerate;
+    writeBuffer(&format.nSamplesPerSec, sizeof(format.nSamplesPerSec));
 
-    format.nAvgBytesPerSec = mRate * 2 * mChannels;
-    checkWriteResult( fwrite(&format.nAvgBytesPerSec, sizeof(format.nAvgBytesPerSec), 1, mHandle) );
+    format.nAvgBytesPerSec = mSamplerate * 2 * mChannels;
+    writeBuffer(&format.nAvgBytesPerSec, sizeof(format.nAvgBytesPerSec));
 
     format.nBlockAlign = 2 * mChannels;
-    checkWriteResult( fwrite(&format.nBlockAlign, sizeof(format.nBlockAlign), 1, mHandle) );
+    writeBuffer(&format.nBlockAlign, sizeof(format.nBlockAlign));
 
     format.wBitsPerSample = BITS_PER_CHANNEL;
-    checkWriteResult( fwrite(&format.wBitsPerSample, sizeof(format.wBitsPerSample), 1, mHandle) );
+    writeBuffer(&format.wBitsPerSample, sizeof(format.wBitsPerSample));
 
     const char* data = "data";
-    checkWriteResult( fwrite(data, 4, 1, mHandle));
+    writeBuffer(data, 4);
 
-    mFileName = filename;
+    mPath = p;
     mWritten  = 0;
 
-    mLengthOffset = ftell(mHandle);
-    checkWriteResult( fwrite(&mWritten, 4, 1, mHandle) );
+    mLengthOffset = mOutput->tellp();
+    writeBuffer(&mWritten, sizeof mWritten);
 
     return isOpened();
 }
@@ -384,51 +380,44 @@ bool WavFileWriter::open(const std::tstring& filename, int rate, int channels)
 void WavFileWriter::close()
 {
     LOCK;
-
-    if (mHandle)
-    {
-        fclose(mHandle);
-        mHandle = nullptr;
-    }
+    mOutput.reset();
 }
 
 size_t WavFileWriter::write(const void* buffer, size_t bytes)
 {
     LOCK;
 
-    if (!mHandle)
+    if (!mOutput)
         return 0;
 
-    // Seek the end of file
-    fseek(mHandle, 0, SEEK_END);
+    // Seek the end of file - here new data will be written
+    mOutput->seekp(0, std::ios_base::end);
     mWritten += bytes;
 
     // Write the data
-    fwrite(buffer, bytes, 1, mHandle);
+    writeBuffer(buffer, bytes);
 
     // Write file length
-    fseek(mHandle, 4, SEEK_SET);
-    int32_t fl = mWritten + 36;
-    fwrite(&fl, sizeof(fl), 1, mHandle);
+    mOutput->seekp(4, std::ios_base::beg);
+    uint32_t fl = mWritten + 36;
+    writeBuffer(&fl, sizeof(fl));
 
     // Write data length
-    fseek(mHandle, static_cast<long>(mLengthOffset), SEEK_SET);
-    checkWriteResult( fwrite(&mWritten, 4, 1, mHandle) );
+    mOutput->seekp(mLengthOffset, std::ios_base::beg);
+    writeBuffer(&mWritten, sizeof(mWritten));
 
     return bytes;
 }
 
-bool WavFileWriter::isOpened()
+bool WavFileWriter::isOpened() const
 {
     LOCK;
-
-    return (mHandle != nullptr);
+    return mOutput.get();
 }
 
-std::tstring WavFileWriter::filename()
+std::filesystem::path WavFileWriter::path() const
 {
     LOCK;
-
-    return mFileName;
+    return mPath;
 }
 
