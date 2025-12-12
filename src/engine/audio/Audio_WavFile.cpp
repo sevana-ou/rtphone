@@ -207,7 +207,13 @@ size_t WavFileReader::read(short* buffer, size_t samples)
 
     // Get number of samples that must be read from source file
     size_t requiredBytes = mResampler.getSourceLength(samples) * mChannels * mBits / 8;
-    void* temp = alloca(requiredBytes);
+    bool useHeap = requiredBytes > sizeof mTempBuffer;
+    void* temp;
+    if (useHeap)
+        temp = malloc(requiredBytes);
+    else
+        temp = mTempBuffer;
+
     memset(temp, 0, requiredBytes);
 
     // Find required size of input buffer
@@ -226,6 +232,8 @@ size_t WavFileReader::read(short* buffer, size_t samples)
     size_t result = mResampler.processBuffer(temp, readBytes, processedBytes,
                                              buffer, samples * 2 * AUDIO_CHANNELS);
 
+    if (useHeap)
+        free(temp);
     return result / 2 / AUDIO_CHANNELS;
 }
 

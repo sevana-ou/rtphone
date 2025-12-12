@@ -32,6 +32,7 @@ protected:
     Resampler                       mResampler;
     unsigned                        mLastError = 0;
     std::unique_ptr<std::ifstream>  mInput;
+    uint8_t                         mTempBuffer[16384];
 
     std::string         readChunk();
     void                readBuffer(void* buffer, size_t sz);       // This raises an exception if sz bytes are not read
