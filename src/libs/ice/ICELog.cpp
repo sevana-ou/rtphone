@@ -311,3 +311,10 @@ Logger::operator << (const std::string_view& data)
     *mStream << data;
     return *this;
 }
+
+Logger&
+Logger::operator << (const std::filesystem::path& p)
+{
+    *mStream << p;
+    return *this;
+}

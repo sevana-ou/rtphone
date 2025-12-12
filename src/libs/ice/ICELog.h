@@ -8,6 +8,7 @@
 
 #include <string>
 #include <sstream>
+#include <filesystem>
 
 #ifdef _WIN32
 # include <winsock2.h>
@@ -125,6 +126,7 @@ public:
     Logger& operator << (const int64_t data);
     Logger& operator << (const unsigned int data);
     Logger& operator << (const uint64_t data);
+    Logger& operator << (const std::filesystem::path& p);
 
 protected:
     LogGuard            mGuard;
