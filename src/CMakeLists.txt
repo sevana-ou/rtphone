@@ -26,8 +26,6 @@ set (OPENSSL_INCLUDE ${LIB_PLATFORM}/openssl/1.1/include)
 message ("Using OpenSSL include files from ${OPENSSL_INCLUDE}")
 message ("Using OpenSSL libs: ${OPENSSL_SSL} and ${OPENSSL_CRYPTO}")
 include_directories(${OPENSSL_INCLUDE})
-message ("Using Opus include files: ${OPUS_INCLUDE}")
-message ("Using Opus lib: ${OPUS_LIB}")
 
 # Used defines for our project
 set (DEFINES -DUSE_OPENSSL)
@@ -330,8 +328,9 @@ add_subdirectory(${L}/g722)
 add_subdirectory(${L}/speexdsp)
 add_subdirectory(${L}/libsrtp)
 add_subdirectory(${L}/webrtc)
+add_subdirectory(${L}/opus)
 
-set (LIBS_STATIC ${LIBS_STATIC} jrtplib g729_codec gsm_codec ${OPUS_LIB}
+set (LIBS_STATIC ${LIBS_STATIC} jrtplib g729_codec gsm_codec opus
                                 gsmhr_codec g722_codec srtp3 resiprocate webrtc speexdsp)
 
 if (USE_AMR_CODEC)
@@ -378,4 +377,4 @@ target_include_directories(rtphone
     )
 
 # For MSVC static builds
-set_property(TARGET rtphone PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+# set_property(TARGET rtphone PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")

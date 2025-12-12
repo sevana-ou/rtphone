@@ -26,4 +26,4 @@ target_include_directories(speexdsp PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/libspeexdsp
     ${CMAKE_CURRENT_SOURCE_DIR}/include)
 
-set_property(TARGET speexdsp PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+# set_property(TARGET speexdsp PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")

@@ -180,4 +180,4 @@ target_include_directories(webrtc PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/utility
     )
 
-set_property(TARGET webrtc PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+# set_property(TARGET webrtc PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
