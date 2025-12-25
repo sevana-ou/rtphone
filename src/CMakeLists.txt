@@ -330,6 +330,17 @@ add_subdirectory(${L}/libsrtp)
 add_subdirectory(${L}/webrtc)
 add_subdirectory(${L}/opus)
 
+# Suppose the subproject defines target "mylib"
+if(MSVC)
+  target_compile_options(opus PRIVATE /O2 /DNDEBUG)
+  # Optional: enable whole program optimization on MSVC
+  # target_compile_options(mylib PRIVATE /GL)
+  # target_link_options(mylib PRIVATE /LTCG)
+else()
+  target_compile_options(opus PRIVATE -O3 -DNDEBUG)
+endif()
+
+
 set (LIBS_STATIC ${LIBS_STATIC} jrtplib g729_codec gsm_codec opus
                                 gsmhr_codec g722_codec srtp3 resiprocate webrtc speexdsp)
 
