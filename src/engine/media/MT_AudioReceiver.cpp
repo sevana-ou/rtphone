@@ -224,11 +224,6 @@ RtpBuffer::FetchResult RtpBuffer::fetch(ResultList& rl)
     }
     else
     {
-        // Did we fetch any packet before ?
-        bool is_fetched_packet = mFetchedPacket.get() != nullptr;
-        if (is_fetched_packet)
-            is_fetched_packet &= mFetchedPacket->rtp().get() != nullptr;
-
         if (mLastSeqno.has_value())
         {
             if (mPacketList.empty())
@@ -239,7 +234,8 @@ RtpBuffer::FetchResult RtpBuffer::fetch(ResultList& rl)
             else
             {
                 // Current sequence number ?
-                uint32_t seqno = mPacketList.front()->rtp()->GetExtendedSequenceNumber();
+                auto& packet = *mPacketList.front();
+                uint32_t seqno = packet.rtp()->GetExtendedSequenceNumber();
 
                 // Gap between new packet and previous on
                 int gap = (int64_t)seqno - (int64_t)*mLastSeqno - 1;
@@ -248,7 +244,8 @@ RtpBuffer::FetchResult RtpBuffer::fetch(ResultList& rl)
                 {
                     // std::cout << "Increase the packet loss for SSRC " << std::hex << mSsrc << std::endl;
                     mStat.mPacketLoss++;
-                    //mStat.mLoss[gap]++;
+                    auto currentTimestamp = uint64_t(packet.rtp()->GetReceiveTime().GetDouble() * 1000000);
+                    mStat.mPacketLossTimeline.push_back({gap, std::chrono::microseconds(currentTimestamp)});
                     mLastSeqno = *mLastSeqno + 1;
                     result = FetchResult::Gap;
                 }

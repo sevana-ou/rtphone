@@ -50,6 +50,12 @@ protected:
     float                   mMaxDelta = 0.0f;
 };
 
+struct PacketLossEvent
+{
+    int mGap = 0;
+    std::chrono::microseconds mTimestamp;
+};
+
 class Statistics
 {
 public:
@@ -78,13 +84,15 @@ public:
     // AMR codec bitrate switch counter
     int                         mBitrateSwitchCounter = 0;
     std::string                 mCodecName;
-    float                       mJitter = 0.0f;          // Jitter
-    TestResult<float>           mRttDelay; // RTT delay
+    float                       mJitter = 0.0f;         // Jitter
+    TestResult<float>           mRttDelay;              // RTT delay
 
     // Timestamp when first RTP packet has arrived
     std::optional<timepoint_t>  mFirstRtpTime;
 
-    std::map<int, int>          mCodecCount;          // Stats on used codecs
+    std::map<int, int>          mCodecCount;            // Stats on used codecs
+
+    std::vector<PacketLossEvent> mPacketLossTimeline;   // Packet loss timeline
 
     // It is to calculate network MOS
     void calculateBurstr(double* burstr, double* loss) const;

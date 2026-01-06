@@ -18,37 +18,44 @@
 #include "../audio/Audio_Resampler.h"
 
 #include <optional>
+#include <chrono>
+using namespace std::chrono_literals;
 
 namespace MT
 {
-  using jrtplib::RTPPacket;
-  class RtpBuffer
-  {
-  public:
+using jrtplib::RTPPacket;
+class RtpBuffer
+{
+public:
     enum class FetchResult
     {
-      RegularPacket,
-      Gap,
-      NoPacket
+        RegularPacket,
+        Gap,
+        NoPacket
     };
 
     // Owns rtp packet data
     class Packet
     {
     public:
-      Packet(const std::shared_ptr<RTPPacket>& packet, int timelen, int rate);
-      std::shared_ptr<RTPPacket> rtp() const;
+        Packet(const std::shared_ptr<RTPPacket>& packet, int timelen, int rate);
+        std::shared_ptr<RTPPacket> rtp() const;
 
-      int timelength() const;
-      int rate() const;
+        int timelength() const;
+        int rate() const;
 
-      const std::vector<short>& pcm() const;
-      std::vector<short>& pcm();
+        const std::vector<short>& pcm() const;
+        std::vector<short>& pcm();
+
+        const std::chrono::microseconds& timestamp() const;
+        std::chrono::microseconds& timestamp();
 
     protected:
-      std::shared_ptr<RTPPacket> mRtp;
-      int mTimelength = 0, mRate = 0;
-      std::vector<short> mPcm;
+        std::shared_ptr<RTPPacket> mRtp;
+        int mTimelength = 0,
+            mRate = 0;
+        std::vector<short> mPcm;
+        std::chrono::microseconds mTimestamp = 0us;
     };
 
     RtpBuffer(Statistics& stat);
@@ -80,13 +87,13 @@ namespace MT
 
     FetchResult fetch(ResultList& rl);
     
-  protected:
+protected:
     unsigned mSsrc = 0;
     int mHigh = RTP_BUFFER_HIGH,
-        mLow = RTP_BUFFER_LOW,
-        mPrebuffer = RTP_BUFFER_PREBUFFER;
+    mLow = RTP_BUFFER_LOW,
+    mPrebuffer = RTP_BUFFER_PREBUFFER;
     int mReturnedCounter = 0,
-        mAddCounter = 0;
+    mAddCounter = 0;
 
     mutable Mutex mGuard;
     typedef std::vector<std::shared_ptr<Packet>> PacketList;
@@ -99,21 +106,21 @@ namespace MT
 
     // To calculate average interval between packet add. It is close to jitter but more useful in debugging.
     float mLastAddTime = 0.0;
-  };
+};
 
-  class Receiver
-  {
-  public:
+class Receiver
+{
+public:
     Receiver(Statistics& stat);
     virtual ~Receiver();
 
-  protected:
+protected:
     Statistics& mStat;
-  };
+};
 
-  class AudioReceiver: public Receiver
-  {
-  public:
+class AudioReceiver: public Receiver
+{
+public:
     AudioReceiver(const CodecList::Settings& codecSettings, Statistics& stat);
     ~AudioReceiver();
     
@@ -127,10 +134,10 @@ namespace MT
     // Returns false when there is no rtp data from jitter
     enum DecodeOptions
     {
-      DecodeOptions_ResampleToMainRate = 0,
-      DecodeOptions_DontResample = 1,
-      DecodeOptions_FillCngGap = 2,
-      DecodeOptions_SkipDecode = 4
+        DecodeOptions_ResampleToMainRate = 0,
+        DecodeOptions_DontResample = 1,
+        DecodeOptions_FillCngGap = 2,
+        DecodeOptions_SkipDecode = 4
     };
 
     enum DecodeResult
@@ -155,9 +162,9 @@ namespace MT
     // Return samplerate for given packet
     int samplerateFor(jrtplib::RTPPacket& p);
 
-  protected:
+protected:
     RtpBuffer mBuffer;
-    CodecMap mCodecMap;    
+    CodecMap mCodecMap;
     PCodec mCodec;
     int mFrameCount = 0;
     CodecList::Settings mCodecSettings;
@@ -186,7 +193,7 @@ namespace MT
 
     int mFailedCount = 0;
     Audio::Resampler  mResampler8, mResampler16,
-                      mResampler32, mResampler48;
+    mResampler32, mResampler48;
 
     Audio::PWavFileWriter mDecodedDump;
 
@@ -202,16 +209,16 @@ namespace MT
     void processDecoded(Audio::DataWindow& output, int options);
 
     void processStatisticsWithAmrCodec(Codec* c);
-  };
-  
-  class DtmfReceiver: public Receiver
-  {
-  public:
+};
+
+class DtmfReceiver: public Receiver
+{
+public:
     DtmfReceiver(Statistics& stat);
     ~DtmfReceiver();
 
     void add(std::shared_ptr<RTPPacket> p);
-  };
+};
 }
 
 #endif
