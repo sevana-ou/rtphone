@@ -1,0 +1,89 @@
+# Build directories
+build/
+build_*/
+out/
+bin/
+lib/
+Release/
+Debug/
+x64/
+x86/
+
+# CMake generated files
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+Makefile
+*.cmake
+!CMakeLists.txt
+compile_commands.json
+CTestTestfile.cmake
+_deps/
+
+# QtCreator
+*.user
+*.user.*
+*.qmlproject.user
+*.creator.user
+.qmake.stash
+
+# Visual Studio
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+.vs/
+*.vcxproj.user
+*.ncb
+*.sdf
+*.opensdf
+*.VC.db
+*.VC.VC.opendb
+ipch/
+
+# Compiled object files
+*.o
+*.obj
+*.ko
+*.elf
+
+# Precompiled headers
+*.gch
+*.pch
+
+# Compiled libraries
+# *.lib
+# *.a
+*.la
+*.lo
+*.so
+*.so.*
+*.dylib
+
+# Executables
+*.exe
+*.out
+*.app
+
+# IDE caches
+.cache/
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Downloaded archives
+*.tar.gz
+*.tar.bz2
+*.tar.xz
+*.zip
+
+# OS specific
+.DS_Store
+Thumbs.db
+
+# Logs and temp files
+*.log
+*.tmp
+*.temp
