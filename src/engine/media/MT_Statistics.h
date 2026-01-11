@@ -52,7 +52,10 @@ protected:
 
 struct PacketLossEvent
 {
-    int mGap = 0;
+    // This is extended sequence numbers (not the raw uint16_t seqno)
+    uint32_t    mStartSeqno = 0,
+                mEndSeqno = 0;
+    int         mGap = 0;
     std::chrono::microseconds mTimestamp;
 };
 

@@ -6,6 +6,7 @@
 #ifndef __MT_AUDIO_RECEIVER_H
 #define __MT_AUDIO_RECEIVER_H
 
+#include "../engine_config.h"
 #include "MT_Stream.h"
 #include "MT_CodecList.h"
 #include "MT_CngHelper.h"
@@ -61,17 +62,17 @@ public:
     RtpBuffer(Statistics& stat);
     ~RtpBuffer();
 
-    unsigned ssrc();
+    unsigned ssrc() const;
     void setSsrc(unsigned ssrc);
 
     void setHigh(int milliseconds);
-    int high();
+    int high() const;
 
     void setLow(int milliseconds);
-    int low();
+    int low() const;
 
     void setPrebuffer(int milliseconds);
-    int prebuffer();
+    int prebuffer() const;
 
     int getNumberOfReturnedPackets() const;
     int getNumberOfAddPackets() const;
@@ -88,12 +89,12 @@ public:
     FetchResult fetch(ResultList& rl);
     
 protected:
-    unsigned mSsrc = 0;
-    int mHigh = RTP_BUFFER_HIGH,
-    mLow = RTP_BUFFER_LOW,
-    mPrebuffer = RTP_BUFFER_PREBUFFER;
-    int mReturnedCounter = 0,
-    mAddCounter = 0;
+    unsigned    mSsrc = 0;
+    int         mHigh = RTP_BUFFER_HIGH,
+                mLow = RTP_BUFFER_LOW,
+                mPrebuffer = RTP_BUFFER_PREBUFFER;
+    int         mReturnedCounter = 0,
+                mAddCounter = 0;
 
     mutable Mutex mGuard;
     typedef std::vector<std::shared_ptr<Packet>> PacketList;
@@ -105,7 +106,7 @@ protected:
     std::optional<uint32_t> mLastSeqno;
 
     // To calculate average interval between packet add. It is close to jitter but more useful in debugging.
-    float mLastAddTime = 0.0;
+    float mLastAddTime = 0.0f;
 };
 
 class Receiver
@@ -125,29 +126,37 @@ public:
     ~AudioReceiver();
     
     // Update codec settings
-    void setCodecSettings(const CodecList::Settings& codecSettings);
-    CodecList::Settings& getCodecSettings();
+    void                    setCodecSettings(const CodecList::Settings& codecSettings);
+    CodecList::Settings&    getCodecSettings();
+
     // Returns false when packet is rejected as illegal. codec parameter will show codec which will be used for decoding.
     // Lifetime of pointer to codec is limited by lifetime of AudioReceiver (it is container).
     bool add(const std::shared_ptr<jrtplib::RTPPacket>& p, Codec** codec = nullptr);
 
     // Returns false when there is no rtp data from jitter
-    enum DecodeOptions
+    /*enum DecodeOptions
     {
         DecodeOptions_ResampleToMainRate = 0,
         DecodeOptions_DontResample = 1,
         DecodeOptions_FillCngGap = 2,
         DecodeOptions_SkipDecode = 4
+    };*/
+
+    struct DecodeOptions
+    {
+        bool mResampleToMainRate = true;
+        bool mFillGapByCNG = false;
+        bool mSkipDecode = false;
     };
 
     enum DecodeResult
     {
-        DecodeResult_Ok,
-        DecodeResult_Skip,
-        DecodeResult_BadPacket
+        DecodeResult_Ok,        // Decoded ok
+        DecodeResult_Skip,      // Just no data - emit silence instead
+        DecodeResult_BadPacket  // Error happened during the decode
     };
 
-    DecodeResult getAudio(Audio::DataWindow& output, int options = DecodeOptions_ResampleToMainRate, int* rate = nullptr);
+    DecodeResult getAudio(Audio::DataWindow& output, DecodeOptions options = {.mResampleToMainRate = true, .mFillGapByCNG = false, .mSkipDecode = false}, int* rate = nullptr);
 
     // Looks for codec by payload type
     Codec* findCodec(int payloadType);
@@ -163,52 +172,57 @@ public:
     int samplerateFor(jrtplib::RTPPacket& p);
 
 protected:
-    RtpBuffer mBuffer;
-    CodecMap mCodecMap;
-    PCodec mCodec;
-    int mFrameCount = 0;
-    CodecList::Settings mCodecSettings;
-    CodecList mCodecList;
-    JitterStatistics mJitterStats;
+    RtpBuffer                           mBuffer;                // Jitter buffer itself
+    CodecMap                            mCodecMap;
+    PCodec                              mCodec;
+    int                                 mFrameCount = 0;
+    CodecList::Settings                 mCodecSettings;
+    CodecList                           mCodecList;
+    JitterStatistics                    mJitterStats;
     std::shared_ptr<jrtplib::RTPPacket> mCngPacket;
-    CngDecoder mCngDecoder;
-
-    // Decode RTP early, do not wait for speaker callback
-    bool mEarlyDecode = false;
+    CngDecoder                          mCngDecoder;
+    size_t                              mDTXSamplesToEmit = 0;   // How much silence (or CNG) should be emited before next RTP packet gets into the action
 
     // Buffer to hold decoded data
-    char mDecodedFrame[65536];
-    int mDecodedLength = 0;
+    int16_t mDecodedFrame[MT_MAX_DECODEBUFFER];
+    size_t mDecodedLength = 0;
 
-    // Buffer to hold data converted to stereo/mono
-    char mConvertedFrame[32768];
-    int mConvertedLength = 0;
+    // Buffer to hold data converted to stereo/mono; there is multiplier 2 as it can be stereo audio
+    int16_t mConvertedFrame[MT_MAX_DECODEBUFFER * 2];
+    size_t mConvertedLength = 0;
 
     // Buffer to hold data resampled to AUDIO_SAMPLERATE
-    char mResampledFrame[65536];
-    int mResampledLength = 0;
+    int16_t mResampledFrame[MT_MAX_DECODEBUFFER];
+    size_t mResampledLength = 0;
 
     // Last packet time length
     int mLastPacketTimeLength = 0;
+    std::optional<uint32_t> mLastPacketTimestamp;
 
     int mFailedCount = 0;
-    Audio::Resampler  mResampler8, mResampler16,
-    mResampler32, mResampler48;
+    Audio::Resampler  mResampler8, mResampler16, mResampler32, mResampler48;
 
     Audio::PWavFileWriter mDecodedDump;
 
-    float mLastDecodeTime = 0.0; // Time last call happened to codec->decode()
+    std::optional<std::chrono::steady_clock::time_point> mLastDecodeTimestamp; // Time last call happened to codec->decode()
 
-    float mIntervalSum = 0.0;
+    float mIntervalSum = 0.0f;
     int mIntervalCount = 0;
 
     // Zero rate will make audio mono but resampling will be skipped
     void makeMonoAndResample(int rate, int channels);
 
     // Resamples, sends to analysis, writes to dump and queues to output decoded frames from mDecodedFrame
-    void processDecoded(Audio::DataWindow& output, int options);
+    void processDecoded(Audio::DataWindow& output, DecodeOptions options);
+    void produceSilence(std::chrono::milliseconds length, Audio::DataWindow& output, DecodeOptions options);
+    void produceCNG(std::chrono::milliseconds length, Audio::DataWindow& output, DecodeOptions options);
 
-    void processStatisticsWithAmrCodec(Codec* c);
+    // Calculate bitrate switch statistics for AMR codecs
+    void updateAmrCodecStats(Codec* c);
+
+    DecodeResult decodeGap(Audio::DataWindow& output, DecodeOptions options);
+    DecodeResult decodePacket(const RtpBuffer::ResultList& rl, Audio::DataWindow& output, DecodeOptions options, int* rate = nullptr);
+    DecodeResult decodeNone(Audio::DataWindow& output, DecodeOptions options);
 };
 
 class DtmfReceiver: public Receiver

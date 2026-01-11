@@ -35,7 +35,7 @@ void SingleAudioStream::copyPcmTo(Audio::DataWindow& output, int needed)
 {
     while (output.filled() < needed)
     {
-        if (mReceiver.getAudio(output) != AudioReceiver::DecodeResult_Ok)
+        if (mReceiver.getAudio(output, {}) != AudioReceiver::DecodeResult_Ok)
             break;
     }
 

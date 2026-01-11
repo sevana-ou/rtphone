@@ -114,4 +114,7 @@
 // In milliseconds
 #define MT_SEVANA_FRAME_TIME 680
 
+// Number of samples
+#define MT_MAX_DECODEBUFFER  32768
+
 #endif
