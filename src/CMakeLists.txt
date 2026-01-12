@@ -332,7 +332,7 @@ add_subdirectory(${L}/opus)
 
 # Suppose the subproject defines target "mylib"
 if(MSVC)
-  target_compile_options(opus PRIVATE /O2 /DNDEBUG)
+  # target_compile_options(opus PRIVATE /O2 /DNDEBUG)
   # Optional: enable whole program optimization on MSVC
   # target_compile_options(mylib PRIVATE /GL)
   # target_link_options(mylib PRIVATE /LTCG)

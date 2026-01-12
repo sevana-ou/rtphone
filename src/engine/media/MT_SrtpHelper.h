@@ -11,9 +11,9 @@
 #include <map>
 
 #include "libsrtp/include/srtp.h"
-#include "HL_Sync.h"
-#include "HL_ByteBuffer.h"
-#include "HL_Types.h"
+#include "helper/HL_Sync.h"
+#include "helper/HL_ByteBuffer.h"
+#include "helper/HL_Types.h"
 
 #define NAME_SRTP_AES_256_AUTH_80 "AES_CM_256_HMAC_SHA1_80"
 #define NAME_SRTP_AES_128_AUTH_80 "AES_CM_128_HMAC_SHA1_80"
