@@ -34,11 +34,12 @@ namespace iolib {
 constexpr int32_t kBufferSizeInBursts = 2; // Use 2 bursts as the buffer size (double buffer)
 
 SimpleMultiPlayer::SimpleMultiPlayer()
-  : mChannelCount(0), mOutputReset(false)
+  : mChannelCount(0), mOutputReset(false), mSampleRate(0), mNumSampleBuffers(0)
 {}
 
-DataCallbackResult SimpleMultiPlayer::onAudioReady(AudioStream *oboeStream, void *audioData,
-        int32_t numFrames) {
+DataCallbackResult SimpleMultiPlayer::MyDataCallback::onAudioReady(AudioStream *oboeStream,
+                                                                   void *audioData,
+                                                                   int32_t numFrames) {
 
     StreamState streamState = oboeStream->getState();
     if (streamState != StreamState::Open && streamState != StreamState::Started) {
@@ -48,40 +49,43 @@ DataCallbackResult SimpleMultiPlayer::onAudioReady(AudioStream *oboeStream, void
         __android_log_print(ANDROID_LOG_ERROR, TAG, "  streamState::Disconnected");
     }
 
-    memset(audioData, 0, numFrames * mChannelCount * sizeof(float));
+    memset(audioData, 0, static_cast<size_t>(numFrames) * static_cast<size_t>
+            (mParent->mChannelCount) * sizeof(float));
 
     // OneShotSampleSource* sources = mSampleSources.get();
-    for(int32_t index = 0; index < mNumSampleBuffers; index++) {
-        if (mSampleSources[index]->isPlaying()) {
-            mSampleSources[index]->mixAudio((float*)audioData, mChannelCount, numFrames);
+    for(int32_t index = 0; index < mParent->mNumSampleBuffers; index++) {
+        if (mParent->mSampleSources[index]->isPlaying()) {
+            mParent->mSampleSources[index]->mixAudio((float*)audioData, mParent->mChannelCount,
+                                                     numFrames);
         }
     }
 
     return DataCallbackResult::Continue;
 }
 
-void SimpleMultiPlayer::onErrorAfterClose(AudioStream *oboeStream, Result error) {
+void SimpleMultiPlayer::MyErrorCallback::onErrorAfterClose(AudioStream *oboeStream, Result error) {
     __android_log_print(ANDROID_LOG_INFO, TAG, "==== onErrorAfterClose() error:%d", error);
 
-    resetAll();
-    if (openStream() && startStream()) {
-        mOutputReset = true;
+    mParent->resetAll();
+    if (mParent->openStream() && mParent->startStream()) {
+        mParent->mOutputReset = true;
     }
 }
 
-void SimpleMultiPlayer::onErrorBeforeClose(AudioStream *, Result error) {
-    __android_log_print(ANDROID_LOG_INFO, TAG, "==== onErrorBeforeClose() error:%d", error);
-}
-
-bool SimpleMultiPlayer::openStream() {
+bool SimpleMultiPlayer::openStream(PerformanceMode performanceMode) {
     __android_log_print(ANDROID_LOG_INFO, TAG, "openStream()");
+
+    // Use shared_ptr to prevent use of a deleted callback.
+    mDataCallback = std::make_shared<MyDataCallback>(this);
+    mErrorCallback = std::make_shared<MyErrorCallback>(this);
 
     // Create an audio stream
     AudioStreamBuilder builder;
     builder.setChannelCount(mChannelCount);
     // we will resample source data to device rate, so take default sample rate
-    builder.setCallback(this);
-    builder.setPerformanceMode(PerformanceMode::LowLatency);
+    builder.setDataCallback(mDataCallback);
+    builder.setErrorCallback(mErrorCallback);
+    builder.setPerformanceMode(performanceMode);
     builder.setSharingMode(SharingMode::Exclusive);
     builder.setSampleRateConversionQuality(SampleRateConversionQuality::Medium);
 
@@ -97,8 +101,11 @@ bool SimpleMultiPlayer::openStream() {
     // Reduce stream latency by setting the buffer size to a multiple of the burst size
     // Note: this will fail with ErrorUnimplemented if we are using a callback with OpenSL ES
     // See oboe::AudioStreamBuffered::setBufferSizeInFrames
-    result = mAudioStream->setBufferSizeInFrames(
-            mAudioStream->getFramesPerBurst() * kBufferSizeInBursts);
+    if (mAudioStream->getPerformanceMode() != oboe::PerformanceMode::PowerSavingOffloaded ||
+            !OboeExtensions::isMMapUsed(mAudioStream.get())) {
+        result = mAudioStream->setBufferSizeInFrames(mAudioStream->getFramesPerBurst() * kBufferSizeInBursts);
+    }
+
     if (result != Result::OK) {
         __android_log_print(
                 ANDROID_LOG_WARN,
@@ -112,23 +119,38 @@ bool SimpleMultiPlayer::openStream() {
 }
 
 bool SimpleMultiPlayer::startStream() {
-    Result result = mAudioStream->requestStart();
-    if (result != Result::OK){
-        __android_log_print(
-                ANDROID_LOG_ERROR,
-                TAG,
-                "requestStart failed. Error: %s", convertToText(result));
-        return false;
+    int tryCount = 0;
+    while (tryCount < 3) {
+        bool wasOpenSuccessful = true;
+        // Assume that openStream() was called successfully before startStream() call.
+        if (tryCount > 0) {
+            usleep(20 * 1000); // Sleep between tries to give the system time to settle.
+            wasOpenSuccessful = openStream(); // Try to open the stream again after the first try.
+        }
+        if (wasOpenSuccessful) {
+            Result result = mAudioStream->requestStart();
+            if (result != Result::OK){
+                __android_log_print(
+                        ANDROID_LOG_ERROR,
+                        TAG,
+                        "requestStart failed. Error: %s", convertToText(result));
+                mAudioStream->close();
+                mAudioStream.reset();
+            } else {
+                return true;
+            }
+        }
+        tryCount++;
     }
 
-    return true;
+    return false;
 }
 
-void SimpleMultiPlayer::setupAudioStream(int32_t channelCount) {
+void SimpleMultiPlayer::setupAudioStream(int32_t channelCount, oboe::PerformanceMode performanceMode) {
     __android_log_print(ANDROID_LOG_INFO, TAG, "setupAudioStream()");
     mChannelCount = channelCount;
 
-    openStream();
+    openStream(performanceMode);
 }
 
 void SimpleMultiPlayer::teardownAudioStream() {
@@ -164,7 +186,7 @@ void SimpleMultiPlayer::unloadSampleData() {
     mNumSampleBuffers = 0;
 }
 
-void SimpleMultiPlayer::triggerDown(int32_t index) {
+void SimpleMultiPlayer::triggerDown(int32_t index, oboe::PerformanceMode /* performanceMode */) {
     if (index < mNumSampleBuffers) {
         mSampleSources[index]->setPlayMode();
     }
@@ -196,6 +218,10 @@ void SimpleMultiPlayer::setGain(int index, float gain) {
 
 float SimpleMultiPlayer::getGain(int index) {
     return mSampleSources[index]->getGain();
+}
+
+void SimpleMultiPlayer::setLoopMode(int index, bool isLoopMode) {
+    mSampleSources[index]->setLoopMode(isLoopMode);
 }
 
 }

@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef _PLAYER_SIMIPLEMULTIPLAYER_H_
-#define _PLAYER_SIMIPLEMULTIPLAYER_H_
+#ifndef _PLAYER_SIMPLEMULTIPLAYER_H_
+#define _PLAYER_SIMPLEMULTIPLAYER_H_
 
 #include <vector>
 
@@ -26,32 +26,24 @@
 
 namespace iolib {
 
-typedef unsigned char byte;     // an 8-bit unsigned value
-
 /**
  * A simple streaming player for multiple SampleBuffers.
  */
-class SimpleMultiPlayer : public oboe::AudioStreamCallback  {
+class SimpleMultiPlayer  {
 public:
     SimpleMultiPlayer();
 
-    // Inherited from oboe::AudioStreamCallback
-    oboe::DataCallbackResult onAudioReady(oboe::AudioStream *oboeStream, void *audioData,
-            int32_t numFrames) override;
-    virtual void onErrorAfterClose(oboe::AudioStream *oboeStream, oboe::Result error) override;
-    virtual void onErrorBeforeClose(oboe::AudioStream * oboeStream, oboe::Result error) override;
-
-    void setupAudioStream(int32_t channelCount);
+    virtual void setupAudioStream(int32_t channelCount, oboe::PerformanceMode performanceMode = oboe::PerformanceMode::LowLatency);
     void teardownAudioStream();
 
-    bool openStream();
+    virtual bool openStream(oboe::PerformanceMode performanceMode = oboe::PerformanceMode::LowLatency);
     bool startStream();
 
     int getSampleRate() { return mSampleRate; }
 
     // Wave Sample Loading...
     /**
-     * Adds the SampleSource/Samplebuffer pair to the list of source channels.
+     * Adds the SampleSource/SampleBuffer pair to the list of source channels.
      * Transfers ownership of those objects so that they can be deleted/unloaded.
      * The indexes associated with each source channel is the order in which they
      * are added.
@@ -62,8 +54,8 @@ public:
      */
     void unloadSampleData();
 
-    void triggerDown(int32_t index);
-    void triggerUp(int32_t index);
+    virtual void triggerDown(int32_t index, oboe::PerformanceMode performanceMode = oboe::PerformanceMode::LowLatency);
+    virtual void triggerUp(int32_t index);
 
     void resetAll();
 
@@ -76,12 +68,40 @@ public:
     void setGain(int index, float gain);
     float getGain(int index);
 
-private:
+    void setLoopMode(int index, bool isLoopMode);
+
+protected:
+    class MyDataCallback : public oboe::AudioStreamDataCallback {
+    public:
+        MyDataCallback(SimpleMultiPlayer *parent) : mParent(parent) {}
+
+        oboe::DataCallbackResult onAudioReady(
+                oboe::AudioStream *audioStream,
+                void *audioData,
+                int32_t numFrames) override;
+
+    private:
+        SimpleMultiPlayer *mParent;
+    };
+
+    class MyErrorCallback : public oboe::AudioStreamErrorCallback {
+    public:
+        MyErrorCallback(SimpleMultiPlayer *parent) : mParent(parent) {}
+
+        virtual ~MyErrorCallback() {
+        }
+
+        void onErrorAfterClose(oboe::AudioStream *oboeStream, oboe::Result error) override;
+
+    private:
+        SimpleMultiPlayer *mParent;
+    };
+
     // Oboe Audio Stream
     std::shared_ptr<oboe::AudioStream> mAudioStream;
 
     // Playback Audio attributes
-    int32_t mChannelCount;
+    int32_t mChannelCount; // Default To Stereo
     int32_t mSampleRate;
 
     // Sample Data
@@ -90,7 +110,10 @@ private:
     std::vector<SampleSource*>  mSampleSources;
 
     bool    mOutputReset;
+
+    std::shared_ptr<MyDataCallback> mDataCallback;
+    std::shared_ptr<MyErrorCallback> mErrorCallback;
 };
 
 }
-#endif //_PLAYER_SIMIPLEMULTIPLAYER_H_
+#endif //_PLAYER_SIMPLEMULTIPLAYER_H_

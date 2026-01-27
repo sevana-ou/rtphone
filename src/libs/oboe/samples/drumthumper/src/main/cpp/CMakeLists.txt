@@ -14,7 +14,7 @@
 # limitations under the License.
 #
 
-cmake_minimum_required(VERSION 3.4.1)
+cmake_minimum_required(VERSION 3.22.1)
 
 # Pull in parselib
 set (PARSELIB_DIR ../../../../parselib)
@@ -56,7 +56,7 @@ add_library(drumthumper SHARED
 
 # Enable optimization flags: if having problems with source level debugging,
 # disable -Ofast ( and debug ), re-enable after done debugging.
-target_compile_options(drumthumper PRIVATE -Wall -Werror "$<$<CONFIG:RELEASE>:-Ofast>")
+target_compile_options(drumthumper PRIVATE -Wall -Werror "$<$<CONFIG:RELEASE>:-O3 -ffast-math>")
 
 target_link_libraries( # Specifies the target library.
         drumthumper
@@ -71,3 +71,4 @@ target_link_libraries( # Specifies the target library.
         # Links the target library to the log library
         # included in the NDK.
         log)
+target_link_options(drumthumper PRIVATE "-Wl,-z,max-page-size=16384")

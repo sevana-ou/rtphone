@@ -5,7 +5,29 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="vertical"
+    android:fitsSystemWindows="true"
     tools:context="com.plausiblesoftware.drumthumper.DrumThumperActivity">
+
+    <LinearLayout
+        android:id="@+id/title_bar"
+        android:layout_width="match_parent"
+        android:layout_height="?attr/actionBarSize"
+        android:orientation="horizontal"
+        android:elevation="4dp"
+        android:gravity="center_vertical"
+        android:background="@color/colorPrimary"
+        android:paddingStart="16dp"
+        android:paddingEnd="16dp">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="DrumThumper"
+            android:textColor="@android:color/white"
+            android:textSize="20sp"
+            android:textStyle="bold" />
+
+    </LinearLayout>
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -68,6 +90,20 @@
                         android:layout_marginTop="5dp"
                         android:max="200" />
                 </LinearLayout>
+
+                <Button
+                    android:id="@+id/kickLoopBtn"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center"
+                    android:layout_marginTop="5dp"
+                    android:minHeight="0dp"
+                    android:minWidth="0dp"
+                    android:padding="0dp"
+                    android:text="Loop"
+                    android:textSize="12sp"
+                    android:layout_marginStart="60dp"
+                    android:layout_marginEnd="60dp"/>
             </LinearLayout>
         </LinearLayout>
 
@@ -128,6 +164,20 @@
                         android:max="200" />
 
                 </LinearLayout>
+
+                <Button
+                    android:id="@+id/snareLoopBtn"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center"
+                    android:layout_marginTop="5dp"
+                    android:minHeight="0dp"
+                    android:minWidth="0dp"
+                    android:padding="0dp"
+                    android:text="Loop"
+                    android:textSize="12sp"
+                    android:layout_marginStart="60dp"
+                    android:layout_marginEnd="60dp"/>
             </LinearLayout>
         </LinearLayout>
     </LinearLayout>
@@ -193,6 +243,20 @@
                         android:layout_marginTop="5dp"
                         android:max="200" />
                 </LinearLayout>
+
+                <Button
+                    android:id="@+id/hihatOpenLoopBtn"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center"
+                    android:layout_marginTop="5dp"
+                    android:minHeight="0dp"
+                    android:minWidth="0dp"
+                    android:padding="0dp"
+                    android:text="Loop"
+                    android:textSize="12sp"
+                    android:layout_marginStart="60dp"
+                    android:layout_marginEnd="60dp"/>
             </LinearLayout>
         </LinearLayout>
 
@@ -251,7 +315,21 @@
                         android:layout_height="20dp"
                         android:layout_marginTop="5dp"
                         android:max="200" />
-            </LinearLayout>
+                </LinearLayout>
+
+                <Button
+                    android:id="@+id/hihatClosedLoopBtn"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center"
+                    android:layout_marginTop="5dp"
+                    android:minHeight="0dp"
+                    android:minWidth="0dp"
+                    android:padding="0dp"
+                    android:text="Loop"
+                    android:textSize="12sp"
+                    android:layout_marginStart="60dp"
+                    android:layout_marginEnd="60dp"/>
             </LinearLayout>
         </LinearLayout>
     </LinearLayout>
@@ -317,6 +395,20 @@
                         android:layout_marginTop="5dp"
                         android:max="200" />
                 </LinearLayout>
+
+                <Button
+                    android:id="@+id/midTomLoopBtn"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center"
+                    android:layout_marginTop="5dp"
+                    android:minHeight="0dp"
+                    android:minWidth="0dp"
+                    android:padding="0dp"
+                    android:text="Loop"
+                    android:textSize="12sp"
+                    android:layout_marginStart="60dp"
+                    android:layout_marginEnd="60dp"/>
             </LinearLayout>
         </LinearLayout>
 
@@ -376,6 +468,20 @@
                         android:layout_marginTop="5dp"
                         android:max="200" />
                 </LinearLayout>
+
+                <Button
+                    android:id="@+id/lowTomLoopBtn"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center"
+                    android:layout_marginTop="5dp"
+                    android:minHeight="0dp"
+                    android:minWidth="0dp"
+                    android:padding="0dp"
+                    android:text="Loop"
+                    android:textSize="12sp"
+                    android:layout_marginStart="60dp"
+                    android:layout_marginEnd="60dp"/>
             </LinearLayout>
         </LinearLayout>
     </LinearLayout>
@@ -441,6 +547,20 @@
                         android:layout_marginTop="5dp"
                         android:max="200" />
                 </LinearLayout>
+
+                <Button
+                    android:id="@+id/rideLoopBtn"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center"
+                    android:layout_marginTop="5dp"
+                    android:minHeight="0dp"
+                    android:minWidth="0dp"
+                    android:padding="0dp"
+                    android:text="Loop"
+                    android:textSize="12sp"
+                    android:layout_marginStart="60dp"
+                    android:layout_marginEnd="60dp"/>
             </LinearLayout>
         </LinearLayout>
 
@@ -500,6 +620,20 @@
                         android:layout_marginTop="5dp"
                         android:max="200" />
                 </LinearLayout>
+
+                <Button
+                    android:id="@+id/crashLoopBtn"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center"
+                    android:layout_marginTop="5dp"
+                    android:minHeight="0dp"
+                    android:minWidth="0dp"
+                    android:padding="0dp"
+                    android:text="Loop"
+                    android:textSize="12sp"
+                    android:layout_marginStart="60dp"
+                    android:layout_marginEnd="60dp"/>
             </LinearLayout>
         </LinearLayout>
     </LinearLayout>

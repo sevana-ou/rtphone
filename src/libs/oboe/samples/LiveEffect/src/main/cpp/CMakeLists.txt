@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-cmake_minimum_required(VERSION 3.4.1)
+cmake_minimum_required(VERSION 3.22.1)
 project(liveEffect LANGUAGES C CXX)
 
 get_filename_component(SAMPLE_ROOT_DIR
@@ -26,7 +26,6 @@ add_subdirectory(${OBOE_DIR} ./oboe-bin)
 add_library(liveEffect
     SHARED
         LiveEffectEngine.cpp
-        FullDuplexStream.cpp
         jni_bridge.cpp
         ${SAMPLE_ROOT_DIR}/debug-utils/trace.cpp)
 target_include_directories(liveEffect
@@ -39,6 +38,7 @@ target_link_libraries(liveEffect
         android
         atomic
         log)
+target_link_options(liveEffect PRIVATE "-Wl,-z,max-page-size=16384")
 
 # Enable optimization flags: if having problems with source level debugging,
 # disable -Ofast ( and debug ), re-enable it after done debugging.

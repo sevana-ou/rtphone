@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.4.1)
+cmake_minimum_required(VERSION 3.22.1)
 
 include_directories(third_party)
 
@@ -60,8 +60,8 @@ else()
     set (TARGET_LIBS ${TARGET_LIBS} mediandk)
 endif()
 
-target_link_libraries( native-lib ${TARGET_LIBS} )
-
+target_link_libraries(native-lib ${TARGET_LIBS} )
+target_link_options(native-lib PRIVATE "-Wl,-z,max-page-size=16384")
 
 # Set the path to the Oboe directory.
 set (OBOE_DIR ../..)
@@ -75,4 +75,4 @@ include_directories (${OBOE_DIR}/include ${OBOE_DIR}/samples)
 # Enable optimization flags: if having problems with source level debugging,
 # disable -Ofast ( and debug ), re-enable after done debugging.
 target_compile_options(native-lib
-    PRIVATE -std=c++14 -Wall -Werror "$<$<CONFIG:RELEASE>:-Ofast>")
+    PRIVATE -std=c++17 -Wall -Werror "$<$<CONFIG:RELEASE>:-Ofast>")

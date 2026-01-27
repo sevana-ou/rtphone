@@ -31,9 +31,20 @@ class StreamClosedReturnValues : public ::testing::Test {
 protected:
 
     bool openStream() {
-        Result r = mBuilder.openStream(&mStream);
+        Result r = mBuilder.openStream(mStream);
         EXPECT_EQ(r, Result::OK) << "Failed to open stream " << convertToText(r);
         return (r == Result::OK);
+    }
+
+    bool releaseStream() {
+        Result r = mStream->release();
+        if (getSdkVersion() > __ANDROID_API_R__ && mBuilder.getAudioApi() != AudioApi::OpenSLES) {
+            EXPECT_EQ(r, Result::OK) << "Failed to release stream. " << convertToText(r);
+            return (r == Result::OK);
+        } else {
+            EXPECT_EQ(r, Result::ErrorUnimplemented) << "Did not get  ErrorUnimplemented" << convertToText(r);
+            return (r == Result::ErrorUnimplemented);
+        }
     }
 
     bool closeStream() {
@@ -50,8 +61,35 @@ protected:
         return (s == StreamState::Closed);
     }
 
+    static int64_t getNanoseconds() {
+        struct timespec time;
+        int result = clock_gettime(CLOCK_MONOTONIC, &time);
+        if (result < 0) {
+            return result;
+        }
+        return (time.tv_sec * (int64_t)1e9) + time.tv_nsec;
+    }
+
+	// ASSERT_* requires a void return type.
+    void measureCloseTime(int32_t delayMillis) {
+        ASSERT_TRUE(openStream());
+        mStream->setDelayBeforeCloseMillis(delayMillis);
+        ASSERT_EQ(delayMillis, mStream->getDelayBeforeCloseMillis());
+        // Measure time it takes to close.
+        int64_t startTimeMillis = getNanoseconds() / 1e6;
+        ASSERT_TRUE(closeStream());
+        int64_t stopTimeMillis = getNanoseconds() / 1e6;
+        int32_t elapsedTimeMillis = (int32_t)(stopTimeMillis - startTimeMillis);
+        ASSERT_GE(elapsedTimeMillis, delayMillis);
+    }
+
+    void testDelayBeforeClose() {
+        const int32_t delayMillis = 500;
+        measureCloseTime(delayMillis);
+    }
+
     AudioStreamBuilder mBuilder;
-    AudioStream       *mStream = nullptr;
+    std::shared_ptr<AudioStream> mStream;
 
 };
 
@@ -211,11 +249,12 @@ TEST_F(StreamClosedReturnValues, GetFramesWrittenReturnsLastKnownValue){
     mBuilder.setFormat(AudioFormat::I16);
     mBuilder.setChannelCount(1);
     ASSERT_TRUE(openStream());
+    ASSERT_EQ(mStream->setBufferSizeInFrames(mStream->getBufferCapacityInFrames()), Result::OK);
     mStream->start();
 
     int16_t buffer[4] = { 1, 2, 3, 4 };
     Result r = mStream->write(&buffer, 4, 0);
-    if (r != Result::OK){
+    if (r != Result::OK) {
         FAIL() << "Could not write to audio stream";
     }
 
@@ -226,7 +265,6 @@ TEST_F(StreamClosedReturnValues, GetFramesWrittenReturnsLastKnownValue){
     ASSERT_EQ(mStream->getFramesWritten(), f);
 }
 
-// TODO: Reading a positive value doesn't work on OpenSL ES in this test - why?
 TEST_F(StreamClosedReturnValues, GetFramesReadReturnsLastKnownValue) {
 
     mBuilder.setDirection(Direction::Input);
@@ -236,14 +274,12 @@ TEST_F(StreamClosedReturnValues, GetFramesReadReturnsLastKnownValue) {
     ASSERT_TRUE(openStream());
     mStream->start();
 
-/*
     int16_t buffer[192];
-    auto r = mStream->read(&buffer, 192, 0);
+    auto r = mStream->read(&buffer, 192, 1000 * kNanosPerMillisecond);
     ASSERT_EQ(r.value(), 192);
-*/
 
     auto f = mStream->getFramesRead();
-//    ASSERT_EQ(f, 192);
+    ASSERT_EQ(f, 192);
 
     ASSERT_TRUE(closeStream());
     ASSERT_EQ(mStream->getFramesRead(), f);
@@ -301,7 +337,7 @@ TEST_F(StreamClosedReturnValues, WaitForStateChangeReturnsClosed){
     ASSERT_TRUE(openAndCloseStream());
     StreamState next;
     Result r = mStream->waitForStateChange(StreamState::Open, &next, 0);
-    ASSERT_EQ(r, Result::ErrorClosed) << convertToText(r);
+    EXPECT_TRUE(r == Result::OK || r == Result::ErrorClosed) << convertToText(r);
 }
 
 TEST_F(StreamClosedReturnValues, SetBufferSizeInFramesReturnsClosed){
@@ -337,4 +373,60 @@ TEST_F(StreamClosedReturnValues, WriteReturnsClosed){
     int buffer[8]{0};
     auto r = mStream->write(buffer, 1, 0);
     ASSERT_EQ(r.error(), Result::ErrorClosed);
+}
+
+TEST_F(StreamClosedReturnValues, DelayBeforeCloseInput){
+    if (AudioStreamBuilder::isAAudioRecommended()) {
+        mBuilder.setDirection(Direction::Input);
+        testDelayBeforeClose();
+    }
+}
+
+TEST_F(StreamClosedReturnValues, DelayBeforeCloseOutput){
+    if (AudioStreamBuilder::isAAudioRecommended()) {
+        mBuilder.setDirection(Direction::Output);
+        testDelayBeforeClose();
+    }
+}
+
+TEST_F(StreamClosedReturnValues, DelayBeforeCloseInputOpenSL){
+    mBuilder.setAudioApi(AudioApi::OpenSLES);
+    mBuilder.setDirection(Direction::Input);
+    testDelayBeforeClose();
+}
+
+TEST_F(StreamClosedReturnValues, DelayBeforeCloseOutputOpenSL){
+    mBuilder.setAudioApi(AudioApi::OpenSLES);
+    mBuilder.setDirection(Direction::Output);
+    testDelayBeforeClose();
+}
+
+TEST_F(StreamClosedReturnValues, TestReleaseInput){
+    mBuilder.setDirection(Direction::Input);
+    ASSERT_TRUE(openStream());
+    ASSERT_TRUE(releaseStream());
+    ASSERT_TRUE(closeStream());
+}
+
+TEST_F(StreamClosedReturnValues, TestReleaseInputOpenSLES){
+    mBuilder.setAudioApi(AudioApi::OpenSLES);
+    mBuilder.setDirection(Direction::Input);
+    ASSERT_TRUE(openStream());
+    ASSERT_TRUE(releaseStream());
+    ASSERT_TRUE(closeStream());
+}
+
+TEST_F(StreamClosedReturnValues, TestReleaseOutput){
+    mBuilder.setDirection(Direction::Output);
+    ASSERT_TRUE(openStream());
+    ASSERT_TRUE(releaseStream());
+    ASSERT_TRUE(closeStream());
+}
+
+TEST_F(StreamClosedReturnValues, TestReleaseOutputOpenSLES){
+    mBuilder.setAudioApi(AudioApi::OpenSLES);
+    mBuilder.setDirection(Direction::Output);
+    ASSERT_TRUE(openStream());
+    ASSERT_TRUE(releaseStream());
+    ASSERT_TRUE(closeStream());
 }

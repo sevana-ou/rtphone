@@ -39,13 +39,25 @@ public:
     static constexpr float PAN_CENTER = 0.0f;
 
     SampleSource(SampleBuffer *sampleBuffer, float pan)
-     : mSampleBuffer(sampleBuffer), mCurFrameIndex(0), mIsPlaying(false), mGain(1.0f) {
+     : mSampleBuffer(sampleBuffer), mCurSampleIndex(0), mIsPlaying(false), mIsLoopMode(false), mGain(1.0f) {
         setPan(pan);
     }
     virtual ~SampleSource() {}
 
-    void setPlayMode() { mCurFrameIndex = 0; mIsPlaying = true; }
-    void setStopMode() { mIsPlaying = false; mCurFrameIndex = 0; }
+    void setPlayMode(bool fromPause = true) {
+        mIsPlaying = true;
+        if (fromPause) {
+            mCurSampleIndex = 0;
+        }
+    }
+    void setStopMode(bool isPause = false) {
+        mIsPlaying = false;
+        if (!isPause) {
+            mCurSampleIndex = 0;
+        }
+    }
+
+    void setLoopMode(bool isLoopMode) { mIsLoopMode = isLoopMode; }
 
     bool isPlaying() { return mIsPlaying; }
 
@@ -76,9 +88,10 @@ public:
 protected:
     SampleBuffer    *mSampleBuffer;
 
-    int32_t mCurFrameIndex;
+    int32_t mCurSampleIndex;
 
     bool mIsPlaying;
+    std::atomic<bool> mIsLoopMode;
 
     // Logical pan value
     float mPan;

@@ -1,4 +1,7 @@
 # Adding Oboe to your project
+
+Oboe is a C++ library. So your Android Studio project will need to [support native C++ code](https://developer.android.com/studio/projects/add-native-code).
+
 There are two ways use Oboe in your Android Studio project: 
 
 1) **Use the Oboe pre-built library binaries and headers**. Use this approach if you just want to use a stable version of the Oboe library in your project.
@@ -11,11 +14,15 @@ or
 
 Oboe is distributed as a [prefab](https://github.com/google/prefab) package via [Google Maven](https://maven.google.com/web/index.html) (search for "oboe"). [Prefab support was added](https://android-developers.googleblog.com/2020/02/native-dependencies-in-android-studio-40.html) to [Android Studio 4.0](https://developer.android.com/studio) so you'll need to be using this version of Android Studio or above. 
 
-Add the oboe dependency to your app's `build.gradle` file. Replace "1.6.0" with the [latest stable version](https://github.com/google/oboe/releases/) of Oboe:
+Add the oboe dependency to your app's `build.gradle` file. Replace "X.X.X" with the [latest stable version](https://github.com/google/oboe/releases/) of Oboe:
 
     dependencies {
-        implementation 'com.google.oboe:oboe:1.6.0'
+        implementation 'com.google.oboe:oboe:X.X.X'
     }
+
+For `build.gradle.kts` add parentheses:
+
+        implementation("com.google.oboe:oboe:X.X.X")
 
 Also enable prefab by adding:
 
@@ -24,6 +31,10 @@ Also enable prefab by adding:
             prefab true
         }
     }
+
+For `build.gradle.kts` add an equal sign:
+
+            prefab = true
     
 Include and link to oboe by updating your `CMakeLists.txt`: 
 
@@ -32,7 +43,7 @@ Include and link to oboe by updating your `CMakeLists.txt`:
 
 Here's a complete example `CMakeLists.txt` file:
 
-    cmake_minimum_required(VERSION 3.4.1)
+    cmake_minimum_required(VERSION 3.22.1)
 
     # Build our own native library
     add_library (native-lib SHARED native-lib.cpp )
@@ -51,9 +62,13 @@ Configure your app to use the shared STL by updating your `app/build.gradle`:
                 cmake {
                     arguments "-DANDROID_STL=c++_shared"
                 }
-	        }
+            }
         }
     }
+
+For `app/build.gradle.kts` add parentheses:
+
+          arguments("-DANDROID_STL=c++_shared")
 
 ## Option 2) Building from source
 
@@ -102,7 +117,7 @@ Add `oboe` to the list of libraries which your app's library depends on. For exa
 
 Here's a complete example `CMakeLists.txt` file:
 
-    cmake_minimum_required(VERSION 3.4.1)
+    cmake_minimum_required(VERSION 3.22.1)
 
     # Build our own native library
     add_library (native-lib SHARED native-lib.cpp )
@@ -248,6 +263,7 @@ renders a sine wave.
 ```
 #include <oboe/Oboe.h>
 #include <math.h>
+using namespace oboe;
 
 class OboeSinePlayer: public oboe::AudioStreamDataCallback {
 public:
@@ -263,7 +279,7 @@ public:
                 ->setPerformanceMode(oboe::PerformanceMode::LowLatency)
                 ->setChannelCount(kChannelCount)
                 ->setSampleRate(kSampleRate)
-		->setSampleRateConversionQuality(oboe::SampleRateConversionQuality::Medium);
+		->setSampleRateConversionQuality(oboe::SampleRateConversionQuality::Medium)
                 ->setFormat(oboe::AudioFormat::Float)
                 ->setDataCallback(this)
                 ->openStream(mStream);
@@ -320,7 +336,7 @@ rather than pre-computing them.
 Additionally, best practice is to implement a separate data callback class, rather
 than managing the stream and defining its data callback in the same class.
 
-For more examples on how to use Oboe look in the [samples](https://github.com/google/oboe/tree/master/samples) folder.
+For more examples on how to use Oboe look in the [samples](https://github.com/google/oboe/tree/main/samples) folder.
 
 ## Obtaining optimal latency
 One of the goals of the Oboe library is to provide low latency audio streams on the widest range of hardware configurations.
@@ -356,5 +372,5 @@ Here's a code sample showing how to set these default values.
 Note that the values from Java are for built-in audio devices. Peripheral devices, such as Bluetooth may need larger framesPerBurst.
 
 # Further information
-- [Code samples](https://github.com/google/oboe/tree/master/samples)
+- [Code samples](https://github.com/google/oboe/tree/main/samples)
 - [Full guide to Oboe](FullGuide.md)

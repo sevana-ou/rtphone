@@ -1,16 +1,18 @@
 apply plugin: 'com.android.application'
+apply plugin: 'kotlin-android'
 
 android {
-    compileSdkVersion 28
     defaultConfig {
         applicationId "com.google.oboe.samples.rhythmgame"
-        targetSdkVersion 28
+        minSdkVersion 23
+        targetSdkVersion 36
+        compileSdkVersion 36
         versionCode 1
         versionName "1.0"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         externalNativeBuild {
             cmake {
-                cppFlags "-std=c++14"
+                cppFlags "-std=c++17"
                 abiFilters 'armeabi-v7a', 'arm64-v8a', 'x86', 'x86_64'
             }
         }
@@ -20,6 +22,10 @@ android {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_18
+        targetCompatibility JavaVersion.VERSION_18
     }
     externalNativeBuild {
         cmake {
@@ -46,7 +52,7 @@ android {
          * - Uncomment this block
          * - Change the build variant to ffmpegExtractor
          * - Update the FFMPEG_DIR variable in CMakeLists.txt to the local FFmpeg path
-        */
+         */
         /*
         ffmpegExtractor {
             dimension "extractorLibrary"
@@ -59,10 +65,14 @@ android {
         }
         */
     }
+    namespace 'com.google.oboe.samples.rhythmgame'
+    buildFeatures {
+        buildConfig true
+    }
 }
 
 dependencies {
     implementation fileTree(dir: 'libs', include: ['*.jar'])
-    implementation 'androidx.appcompat:appcompat:1.0.0-rc02'
-    implementation 'androidx.constraintlayout:constraintlayout:1.1.3'
+    implementation 'androidx.appcompat:appcompat:1.7.0'
+    implementation 'androidx.constraintlayout:constraintlayout:2.2.1'
 }

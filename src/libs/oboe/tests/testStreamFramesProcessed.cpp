@@ -28,7 +28,7 @@ public:
     }
 };
 
-using StreamFramesProcessedParams = std::tuple<Direction, int32_t>;
+using StreamFramesProcessedParams = std::tuple<Direction, int32_t, bool>;
 
 class StreamFramesProcessed : public ::testing::Test,
                               public ::testing::WithParamInterface<StreamFramesProcessedParams> {
@@ -39,30 +39,32 @@ protected:
     static constexpr int PROCESS_TIME_SECONDS = 5;
 
     AudioStreamBuilder mBuilder;
-    AudioStream *mStream = nullptr;
+    std::shared_ptr<AudioStream> mStream;
 };
 
 void StreamFramesProcessed::TearDown() {
-    if (mStream != nullptr) {
+    if (mStream) {
         mStream->close();
-        mStream = nullptr;
     }
 }
 
 TEST_P(StreamFramesProcessed, VerifyFramesProcessed) {
     const Direction direction = std::get<0>(GetParam());
     const int32_t sampleRate = std::get<1>(GetParam());
+    const bool useOboeSampleRateConversion = std::get<2>(GetParam());
+
+    SampleRateConversionQuality srcQuality = useOboeSampleRateConversion ?
+            SampleRateConversionQuality::Medium : SampleRateConversionQuality::None;
 
     AudioStreamDataCallback *callback = new FramesProcessedCallback();
     mBuilder.setDirection(direction)
-            ->setFormat(AudioFormat::Float)
+            ->setFormat(AudioFormat::I16)
             ->setSampleRate(sampleRate)
-            ->setSampleRateConversionQuality(SampleRateConversionQuality::Medium)
+            ->setSampleRateConversionQuality(srcQuality)
             ->setPerformanceMode(PerformanceMode::LowLatency)
             ->setSharingMode(SharingMode::Exclusive)
             ->setDataCallback(callback);
-    mStream = nullptr;
-    Result r = mBuilder.openStream(&mStream);
+    Result r = mBuilder.openStream(mStream);
     ASSERT_EQ(r, Result::OK) << "Failed to open stream." << convertToText(r);
 
     r = mStream->start();
@@ -70,21 +72,28 @@ TEST_P(StreamFramesProcessed, VerifyFramesProcessed) {
     sleep(PROCESS_TIME_SECONDS);
 
     // The frames written should be close to sampleRate * PROCESS_TIME_SECONDS
+    const int kDeltaFramesWindowInFrames = 30000;
     const int64_t framesWritten = mStream->getFramesWritten();
     const int64_t framesRead = mStream->getFramesRead();
-    EXPECT_NEAR(framesWritten, sampleRate * PROCESS_TIME_SECONDS, sampleRate / 2);
-    EXPECT_NEAR(framesRead, sampleRate * PROCESS_TIME_SECONDS, sampleRate / 2);
+    EXPECT_NEAR(framesWritten, sampleRate * PROCESS_TIME_SECONDS, kDeltaFramesWindowInFrames);
+    EXPECT_NEAR(framesRead, sampleRate * PROCESS_TIME_SECONDS, kDeltaFramesWindowInFrames);
 }
 
 INSTANTIATE_TEST_CASE_P(
         StreamFramesProcessedTest,
         StreamFramesProcessed,
         ::testing::Values(
-                StreamFramesProcessedParams({Direction::Output, 8000}),
-                StreamFramesProcessedParams({Direction::Output, 44100}),
-                StreamFramesProcessedParams({Direction::Output, 96000}),
-                StreamFramesProcessedParams({Direction::Input, 8000}),
-                StreamFramesProcessedParams({Direction::Input, 44100}),
-                StreamFramesProcessedParams({Direction::Input, 96000})
+                StreamFramesProcessedParams({Direction::Output, 8000, true}),
+                StreamFramesProcessedParams({Direction::Output, 44100, true}),
+                StreamFramesProcessedParams({Direction::Output, 96000, true}),
+                StreamFramesProcessedParams({Direction::Input, 8000, true}),
+                StreamFramesProcessedParams({Direction::Input, 44100, true}),
+                StreamFramesProcessedParams({Direction::Input, 96000, true}),
+                StreamFramesProcessedParams({Direction::Output, 8000, false}),
+                StreamFramesProcessedParams({Direction::Output, 44100, false}),
+                StreamFramesProcessedParams({Direction::Output, 96000, false}),
+                StreamFramesProcessedParams({Direction::Input, 8000, false}),
+                StreamFramesProcessedParams({Direction::Input, 44100, false}),
+                StreamFramesProcessedParams({Direction::Input, 96000, false})
                 )
         );

@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.4.1)
+cmake_minimum_required(VERSION 3.22.1)
 
 
 ### INCLUDE OBOE LIBRARY ###
@@ -21,8 +21,9 @@ add_library( megadrone SHARED
         MegaDroneEngine.cpp
         )
 
-target_link_libraries( megadrone log oboe )
+target_link_libraries(megadrone log oboe )
+target_link_options(megadrone PRIVATE "-Wl,-z,max-page-size=16384")
 
 # Enable optimization flags: if having problems with source level debugging,
 # disable -Ofast ( and debug ), re-enable it after done debugging.
-target_compile_options(megadrone PRIVATE -Wall -Werror -Ofast)
+target_compile_options(megadrone PRIVATE -Wall -Werror -O3 -ffast-math)

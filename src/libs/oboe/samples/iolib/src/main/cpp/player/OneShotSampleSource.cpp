@@ -23,38 +23,60 @@
 namespace iolib {
 
 void OneShotSampleSource::mixAudio(float* outBuff, int numChannels, int32_t numFrames) {
-    int32_t numSampleFrames = mSampleBuffer->getNumSampleFrames();
-    int32_t numWriteFrames = mIsPlaying
-                         ? std::min(numFrames, numSampleFrames - mCurFrameIndex)
-                         : 0;
+    int32_t numSamples = mSampleBuffer->getNumSamples();
+    int32_t sampleChannels = mSampleBuffer->getProperties().channelCount;
+    int32_t totalSamplesNeeded = numFrames * numChannels; // Total samples to fill the output buffer
+    int32_t samplesProcessed = 0;
+    bool isLoopMode = mIsLoopMode;
 
-    if (numWriteFrames != 0) {
-        // Mix in the samples
+    while (samplesProcessed < totalSamplesNeeded && mIsPlaying) {
+        int32_t samplesLeft = numSamples - mCurSampleIndex;
+        int32_t framesLeft = (totalSamplesNeeded - samplesProcessed) / numChannels;
+        int32_t numWriteFrames = std::min(framesLeft, samplesLeft / sampleChannels);
 
-        // investigate unrolling these loops...
-        const float* data  = mSampleBuffer->getSampleData();
-        if (numChannels == 1) {
-            // MONO output
-            for (int32_t frameIndex = 0; frameIndex < numWriteFrames; frameIndex++) {
-                outBuff[frameIndex] += data[mCurFrameIndex++] * mGain;
+        if (numWriteFrames > 0) {
+            const float* data = mSampleBuffer->getSampleData();
+            if ((sampleChannels == 1) && (numChannels == 1)) {
+                // MONO output from MONO samples
+                for (int32_t frameIndex = 0; frameIndex < numWriteFrames; frameIndex++) {
+                    outBuff[samplesProcessed + frameIndex] += data[mCurSampleIndex++] * mGain;
+                }
+            } else if ((sampleChannels == 1) && (numChannels == 2)) {
+                // STEREO output from MONO samples
+                int dstSampleIndex = samplesProcessed;
+                for (int32_t frameIndex = 0; frameIndex < numWriteFrames; frameIndex++) {
+                    outBuff[dstSampleIndex++] += data[mCurSampleIndex] * mLeftGain;
+                    outBuff[dstSampleIndex++] += data[mCurSampleIndex++] * mRightGain;
+                }
+            } else if ((sampleChannels == 2) && (numChannels == 1)) {
+                // MONO output from STEREO samples
+                int dstSampleIndex = samplesProcessed;
+                for (int32_t frameIndex = 0; frameIndex < numWriteFrames; frameIndex++) {
+                    outBuff[dstSampleIndex++] += data[mCurSampleIndex++] * mLeftGain +
+                                                 data[mCurSampleIndex++] * mRightGain;
+                }
+            } else if ((sampleChannels == 2) && (numChannels == 2)) {
+                // STEREO output from STEREO samples
+                int dstSampleIndex = samplesProcessed;
+                for (int32_t frameIndex = 0; frameIndex < numWriteFrames; frameIndex++) {
+                    outBuff[dstSampleIndex++] += data[mCurSampleIndex++] * mLeftGain;
+                    outBuff[dstSampleIndex++] += data[mCurSampleIndex++] * mRightGain;
+                }
             }
-        } else if (numChannels == 2) {
-            // STEREO output
-            int dstSampleIndex = 0;
-            for (int32_t frameIndex = 0; frameIndex < numWriteFrames; frameIndex++) {
-                outBuff[dstSampleIndex++] += data[mCurFrameIndex] * mLeftGain;
-                outBuff[dstSampleIndex++] += data[mCurFrameIndex++] * mRightGain;
-            }
-        }
 
-        if (mCurFrameIndex >= numSampleFrames) {
-            mIsPlaying = false;
+            samplesProcessed += numWriteFrames * numChannels;
+
+            if (mCurSampleIndex >= numSamples) {
+                if (isLoopMode) {
+                    mCurSampleIndex = 0;
+                } else {
+                    mIsPlaying = false;
+                }
+            }
+        } else {
+            break; // No more samples to write in the current chunk
         }
     }
-
-    // silence
-    // no need as the output buffer would need to have been filled with silence
-    // to be mixed into
 }
 
 } // namespace wavlib
