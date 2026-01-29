@@ -10,7 +10,6 @@ set (E engine)
 
 option (USE_AMR_CODEC   "Use AMR codec. Requires libraries."    ON)
 option (USE_EVS_CODEC   "Use EVS codec."                        ON)
-option (USE_OPUS_CODEC  "Use Opus codec."                       ON)
 option (USE_MUSL        "Build with MUSL library"               OFF)
 
 # PIC code by default
@@ -307,10 +306,6 @@ set (RTPHONE_SOURCES
     ${L}/ice/md5_impl.cpp
     ${L}/ice/md5_impl.h
     )
-
-if (USE_OPUS_CODEC)
-    set (DEFINES ${DEFINES} -DUSE_OPUS_CODEC)
-endif()
 
 add_library (rtphone STATIC ${RTPHONE_SOURCES})
 

@@ -326,12 +326,10 @@ void CodecList::init(const Settings& settings)
 {
     mFactoryList.clear();
     mSettings = settings;
-#if defined(USE_OPUS_CODEC)
     for (auto spec: settings.mOpusSpec)
     {
         mFactoryList.push_back(std::make_shared<OpusCodec::OpusFactory>(spec.mRate, spec.mChannels, spec.mPayloadType));
     }
-#endif
 
 
 #if !defined(TARGET_ANDROID) && !defined(TARGET_OPENWRT) && !defined(TARGET_RPI)

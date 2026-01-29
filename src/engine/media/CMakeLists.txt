@@ -63,11 +63,8 @@ if (USE_EVS_CODEC)
     list (APPEND LIBS_CODEC evs_codec)
 endif()
 
-if (USE_OPUS_CODEC)
-    message("Media: Opus codec will be included.")
-    target_compile_definitions(media_lib PUBLIC USE_OPUS_CODEC)
-    list (APPEND LIBS_CODEC opus)
-endif()
+message("Media: Opus codec will be included.")
+list (APPEND LIBS_CODEC opus)
 
 if(CMAKE_SYSTEM MATCHES "Linux*" OR CMAKE_SYSTEM MATCHES "Darwin*")
     target_compile_definitions(media_lib PUBLIC HAVE_NETINET_IN_H)

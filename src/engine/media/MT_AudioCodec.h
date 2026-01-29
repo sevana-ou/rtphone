@@ -24,9 +24,7 @@ extern "C"
 #include "libg729/g729_typedef.h"
 #include "libg729/g729_ld8a.h"
 
-#if defined(USE_OPUS_CODEC)
-#   include "opus.h"
-#endif
+#include "opus.h"
 
 namespace MT 
 {
@@ -65,7 +63,6 @@ public:
     int plc(int lostFrames, void* output, int outputCapacity) override;
 };
 
-#if defined(USE_OPUS_CODEC)
 class OpusCodec: public Codec
 {
 protected:
@@ -119,7 +116,7 @@ public:
     int decode(const void* input, int inputBytes, void* output, int outputCapacity);
     int plc(int lostFrames, void* output, int outputCapacity);
 };
-#endif
+
 
 class IlbcCodec: public Codec
 {
