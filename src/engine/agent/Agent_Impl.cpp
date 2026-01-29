@@ -258,6 +258,8 @@ void AgentImpl::processCreateAccount(JsonCpp::Value &d, JsonCpp::Value& answer)
     (*c)[CONFIG_USERNAME] = d["username"].asString();
     (*c)[CONFIG_PASSWORD] = d["password"].asString();
     (*c)[CONFIG_DOMAIN] = d["domain"].asString();
+    if (d.isMember("domain_port"))
+        (*c)[CONFIG_DOMAINPORT] = d["domain_port"].asInt();
     (*c)[CONFIG_EXTERNALIP] = d["use_external_ip"].asBool();
 
     auto nameAndPort = strx::parseHost(d["stun_server"].asString(), 3478);
