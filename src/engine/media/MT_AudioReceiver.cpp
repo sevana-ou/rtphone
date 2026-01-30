@@ -423,13 +423,13 @@ bool AudioReceiver::add(const std::shared_ptr<jrtplib::RTPPacket>& p, Codec** de
         payloadLength = p->GetPayloadLength(),
         ptype = p->GetPayloadType();
 
-    // ICELogInfo(<< "Adding packet No " << p->GetSequenceNumber());
+    ICELogInfo(<< "Adding packet No " << p->GetSequenceNumber());
     // Increase codec counter
     mStat.mCodecCount[ptype]++;
 
     // Check if codec can be handled
     Codec* codec = nullptr;
-    CodecMap::iterator codecIter = mCodecMap.find(ptype);
+    auto codecIter = mCodecMap.find(ptype);
     if (codecIter == mCodecMap.end())
     {
         time_length = 10;
@@ -618,7 +618,17 @@ AudioReceiver::DecodeResult AudioReceiver::decodePacket(const RtpBuffer::ResultL
 
         // Find codec by payload type
         int ptype = p->rtp()->GetPayloadType();
-        mCodec = mCodecMap[ptype];
+
+        // Look into mCodecMap if exists
+        auto codecIter = mCodecMap.find(ptype);
+        if (codecIter == mCodecMap.end())
+            return  {};
+
+
+        if (!codecIter->second)
+            codecIter->second = mCodecList.createCodecByPayloadType(ptype);
+
+        mCodec = codecIter->second;
         if (mCodec)
         {
             if (rate)
@@ -695,7 +705,7 @@ AudioReceiver::DecodeResult AudioReceiver::decodePacket(const RtpBuffer::ResultL
 
 AudioReceiver::DecodeResult AudioReceiver::decodeNone(Audio::DataWindow& output, DecodeOptions options)
 {
-    ICELogDebug(<< "No packet available in jitter buffer");
+    // ICELogDebug(<< "No packet available in jitter buffer");
     mFailedCount++;
     return DecodeResult_Skip;
 }

@@ -25,6 +25,17 @@ using namespace MT;
 
 using strx = strx;
 
+CodecList::Settings CodecList::Settings::getAnalyzerSettings()
+{
+    return {};
+}
+
+CodecList::Settings CodecList::Settings::getClientSettings()
+{
+    Settings r;
+    r.mOpusSpec.push_back(Settings::OpusSpec(MT_OPUS_CODEC_PT, 48000, 2));
+    return r;
+}
 
 bool CodecList::Settings::contains(int ptype) const
 {
@@ -223,7 +234,7 @@ static int findOctetMode(const char* line)
 
 CodecList::Settings CodecList::Settings::parseSdp(const std::list<resip::Codec>& codeclist)
 {
-    CodecList::Settings r{DefaultSettings};
+    CodecList::Settings r;
 
     for (auto& c: codeclist)
     {
@@ -235,41 +246,27 @@ CodecList::Settings CodecList::Settings::parseSdp(const std::list<resip::Codec>&
         auto params = c.parameters();
 
         // Dynamic payload type codecs only - ISAC / iLBC / Speex / etc.
-        if (codec_name == "OPUS")
-        {
+        if (codec_name == "OPUS") {
             // Check the parameters
             int channels = strx::toInt(enc_params.c_str(), 1);
             r.mOpusSpec.push_back({ptype, samplerate, channels});
-        }
-        else
-        if (codec_name == "AMR-WB")
-        {
+        } else if (codec_name == "AMR-WB") {
             int octet_mode = findOctetMode(params.c_str());
-            if (octet_mode != -1)
-            {
+            if (octet_mode != -1) {
                 if (octet_mode == 0)
                     r.mAmrWbPayloadType.insert(ptype);
-                else
-                if (octet_mode == 1)
+                else if (octet_mode == 1)
                     r.mAmrWbOctetPayloadType.insert(ptype);
             }
-        }
-        else
-        if (codec_name == "AMR" || codec_name == "AMR-NB")
-        {
+        } else if (codec_name == "AMR" || codec_name == "AMR-NB") {
             int octet_mode = findOctetMode(params.c_str());
-            if (octet_mode != -1)
-            {
+            if (octet_mode != -1) {
                 if (octet_mode == 0)
                     r.mAmrNbPayloadType.insert(ptype);
-                else
-                if (octet_mode == 1)
+                else if (octet_mode == 1)
                     r.mAmrNbOctetPayloadType.insert(ptype);
             }
-        }
-        else
-        if (codec_name == "EVS")
-        {
+        } else if (codec_name == "EVS") {
             r.mEvsSpec.push_back({ptype});
         }
     }
@@ -314,7 +311,6 @@ bool CodecList::Settings::operator == (const Settings& rhs) const
 
 
 // ----------------------------------------
-CodecList::Settings CodecList::Settings::DefaultSettings;
 
 CodecList::CodecList(const Settings& settings)
     :mSettings(settings)
@@ -405,8 +401,8 @@ void CodecList::fillCodecMap(CodecMap& cm)
     for (auto& factory: mFactoryList)
     {
         // Create codec here. Although they are not needed right now - they can be needed to find codec's info.
-        // PCodec c = factory->create();
-        cm.insert({factory->payloadType(), PCodec()});
+        PCodec c = factory->create();
+        cm.insert({factory->payloadType(), c});
     }
 }
 
@@ -438,7 +434,7 @@ bool CodecListPriority::compare(const Item& item1, const Item& item2)
 
 void CodecListPriority::setupFrom(PVariantMap vmap)
 {
-    CodecList::Settings settings;
+    auto settings = CodecList::Settings::getClientSettings();
     CodecList cl(settings);
     //mPriorityList.resize(cl.count());
     bool emptyVmap = vmap ? vmap->empty() : true;

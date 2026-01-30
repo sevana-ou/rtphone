@@ -18,19 +18,19 @@
 
 namespace MT
 {
-  class NativeRtpSender: public jrtplib::RTPExternalSender
-  {
-  public:
+class NativeRtpSender: public jrtplib::RTPExternalSender
+{
+public:
     NativeRtpSender(Statistics& stat);
     ~NativeRtpSender();
     
-	  /** This member function will be called when RTP data needs to be transmitted. */
-	  bool SendRTP(const void *data, size_t len);
+    /** This member function will be called when RTP data needs to be transmitted. */
+    bool SendRTP(const void *data, size_t len);
 
-	  /** This member function will be called when an RTCP packet needs to be transmitted. */
-	  bool SendRTCP(const void *data, size_t len);
+    /** This member function will be called when an RTCP packet needs to be transmitted. */
+    bool SendRTCP(const void *data, size_t len);
 
-	  /** Used to identify if an RTPAddress instance originated from this sender (to be able to detect own packets). */
+    /** Used to identify if an RTPAddress instance originated from this sender (to be able to detect own packets). */
     bool ComesFromThisSender(const jrtplib::RTPAddress *a);
     
     void setDestination(RtpPair<InternetAddress> destination);
@@ -46,7 +46,7 @@ namespace MT
     void setSrtpSession(SrtpSession* srtp);
     SrtpSession* srtpSession();
 
-  protected:
+protected:
     RtpPair<PDatagramSocket> mSocket;
     RtpPair<InternetAddress> mTarget;
     Statistics& mStat;
@@ -55,7 +55,7 @@ namespace MT
 #endif
     SrtpSession* mSrtpSession;
     char mSendBuffer[MAX_VALID_UDPPACKET_SIZE];
-  };
+};
 }
 
 #endif

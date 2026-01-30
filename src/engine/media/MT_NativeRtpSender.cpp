@@ -1,15 +1,17 @@
-/* Copyright(C) 2007-2019 VoIP objects (voipobjects.com)
+/* Copyright(C) 2007-2026 VoIP objects (voipobjects.com)
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 #include "MT_NativeRtpSender.h"
+#include "ICELog.h"
 #include <assert.h>
 
+#define LOG_SUBSYSTEM "MT"
 using namespace MT;
 
 NativeRtpSender::NativeRtpSender(Statistics& stat)
-:mStat(stat), mSrtpSession(nullptr)
+    :mStat(stat), mSrtpSession(nullptr)
 {
 }
 
@@ -19,107 +21,108 @@ NativeRtpSender::~NativeRtpSender()
 
 bool NativeRtpSender::SendRTP(const void *data, size_t len)
 {
-  if (mTarget.mRtp.isEmpty() || !mSocket.mRtp)
-    return false;
-  
+    if (mTarget.mRtp.isEmpty() || !mSocket.mRtp)
+        return false;
+
 #if defined(USE_RTPDUMP)
-  if (mDumpWriter)
-    mDumpWriter->add(data, len);
+    if (mDumpWriter)
+        mDumpWriter->add(data, len);
 #endif
 
-  // Copy data to intermediary buffer bigger that original
-  int sendLength = len;
-  memcpy(mSendBuffer, data, len);
+    // Copy data to intermediary buffer bigger that original
+    int sendLength = len;
+    memcpy(mSendBuffer, data, len);
 
-  // Encrypt SRTP if needed
-  if (mSrtpSession)
-  {
-    if (mSrtpSession->active())
+    // Encrypt SRTP if needed
+    if (mSrtpSession)
     {
-      if (!mSrtpSession->protectRtp(mSendBuffer, &sendLength))
-        return false;
+        if (mSrtpSession->active())
+        {
+            if (!mSrtpSession->protectRtp(mSendBuffer, &sendLength))
+                return false;
+        }
     }
-  }
 
-  mSocket.mRtp->sendDatagram(mTarget.mRtp, mSendBuffer, sendLength);
-  mStat.mSentRtp++;
-  mStat.mSent += len;
+    ICELogInfo(<< "Sending " << sendLength <<" bytes to " << mTarget.mRtp.toBriefStdString());
+    mSocket.mRtp->sendDatagram(mTarget.mRtp, mSendBuffer, sendLength);
+    mStat.mSentRtp++;
+    mStat.mSent += len;
 
-  return true;
+    return true;
 }
 
 /** This member function will be called when an RTCP packet needs to be transmitted. */
 bool NativeRtpSender::SendRTCP(const void *data, size_t len)
 {
-  if (mTarget.mRtp.isEmpty() || !mSocket.mRtcp)
-    return false;
-  // Copy data to intermediary buffer bigger that original
-  int sendLength = len;
-  memcpy(mSendBuffer, data, len);
-
-  // Encrypt SRTP if needed
-  if (mSrtpSession)
-  {
-    if (mSrtpSession->active())
-    {
-      if (!mSrtpSession->protectRtcp(mSendBuffer, &sendLength))
+    if (mTarget.mRtp.isEmpty() || !mSocket.mRtcp)
         return false;
+    // Copy data to intermediary buffer bigger that original
+    int sendLength = len;
+    memcpy(mSendBuffer, data, len);
+
+    // Encrypt SRTP if needed
+    if (mSrtpSession)
+    {
+        if (mSrtpSession->active())
+        {
+            if (!mSrtpSession->protectRtcp(mSendBuffer, &sendLength))
+                return false;
+        }
     }
-  }
 
-  mSocket.mRtcp->sendDatagram(mTarget.mRtcp, mSendBuffer, sendLength);
-  mStat.mSentRtcp++;
-  mStat.mSent += len;
+    mSocket.mRtcp->sendDatagram(mTarget.mRtcp, mSendBuffer, sendLength);
+    mStat.mSentRtcp++;
+    mStat.mSent += len;
 
-  return true;
+    return true;
 }
 
 
 /** Used to identify if an RTPAddress instance originated from this sender (to be able to detect own packets). */
 bool NativeRtpSender::ComesFromThisSender(const jrtplib::RTPAddress *a)
 {
-  return false;
+    return false;
 }
 
 void NativeRtpSender::setDestination(RtpPair<InternetAddress> target)
 {
-  mTarget = target;
+    mTarget = target;
 }
 
 RtpPair<InternetAddress> NativeRtpSender::destination()
 {
-  return mTarget;
+    return mTarget;
 }
 
 void NativeRtpSender::setSocket(const RtpPair<PDatagramSocket>& socket)
 {
-  mSocket = socket;
+    mSocket = socket;
 }
 
 RtpPair<PDatagramSocket>& NativeRtpSender::socket()
 {
-  return mSocket;
+    return mSocket;
 }
 
 #if defined(USE_RTPDUMP)
 void NativeRtpSender::setDumpWriter(RtpDump *dump)
 {
-  mDumpWriter = dump;
+    mDumpWriter = dump;
 }
 
 RtpDump* NativeRtpSender::dumpWriter()
 {
-  return mDumpWriter;
+    return mDumpWriter;
 }
 #endif
 
 void NativeRtpSender::setSrtpSession(SrtpSession* srtp)
 {
-  mSrtpSession = srtp;
+    mSrtpSession = srtp;
 }
 
 SrtpSession* NativeRtpSender::srtpSession()
 {
-  return mSrtpSession;
+    return mSrtpSession;
 }
 

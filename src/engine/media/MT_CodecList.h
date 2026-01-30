@@ -101,11 +101,12 @@ public:
         std::string toString() const;
         void        clear();
 
-        static Settings DefaultSettings;
-
         static Settings parseSdp(const std::list<resip::Codec>& codeclist);
 
         bool operator == (const Settings& rhs) const;
+
+        static Settings getClientSettings();
+        static Settings getAnalyzerSettings();
     };
 
     CodecList(const Settings& settings);

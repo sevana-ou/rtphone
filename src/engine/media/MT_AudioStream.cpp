@@ -225,9 +225,9 @@ void AudioStream::addData(const void* buffer, int bytes)
             if (packetTime <= encodedTime)
             {
                 // Time to send packet
-                ICELogMedia(<< "Sending RTP packet pt = " << mTransmittingPayloadType << ", plength = " << (int)mEncodedAudio.size());
+                ICELogMedia(<< "Sending RTP packet pt = " << mTransmittingPayloadType << ", plength = " << (int)mEncodedAudio.size() << " to ");
                 mRtpSession.SendPacketEx(mEncodedAudio.data(), mEncodedAudio.size(), mTransmittingPayloadType, false,
-                                         packetTime * codec->samplerate()/1000, 0, NULL, 0);
+                                         packetTime * codec->samplerate()/1000, 0, nullptr, 0);
                 mEncodedAudio.clear();
                 encodedTime = 0;
             }
@@ -365,9 +365,11 @@ void AudioStream::dataArrived(PDatagramSocket s, const void* buffer, int length,
 
             // Find right handler for rtp stream
             SingleAudioStream* rtpStream = nullptr;
-            AudioStreamMap::iterator streamIter = mStreamMap.find(packet->GetSSRC());
-            if (streamIter == mStreamMap.end())
-                mStreamMap[packet->GetSSRC()] = rtpStream = new SingleAudioStream(mCodecSettings, mStat);
+            auto streamIter = mStreamMap.find(packet->GetSSRC());
+            if (streamIter == mStreamMap.end()) {
+                rtpStream = new SingleAudioStream(mCodecSettings, mStat);
+                mStreamMap.insert({packet->GetSSRC(), rtpStream});
+            }
             else
                 rtpStream = streamIter->second;
 

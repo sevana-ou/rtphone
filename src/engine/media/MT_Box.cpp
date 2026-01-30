@@ -40,7 +40,7 @@ PStream Terminal::createStream(int type, VariantMap& /*config*/)
   switch (type)
   {
   case Stream::Audio:
-    result = std::make_shared<AudioStream>(MT::CodecList::Settings::DefaultSettings);
+    result = std::make_shared<AudioStream>(MT::CodecList::Settings::getClientSettings());
     mAudioList.add(result);
     break;
 

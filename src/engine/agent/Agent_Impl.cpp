@@ -5,6 +5,7 @@
 #include "helper/HL_VariantMap.h"
 #include "helper/HL_CsvReader.h"
 #include "helper/HL_Base64.h"
+#include "media/MT_CodecList.h"
 #include <fstream>
 
 
@@ -210,7 +211,8 @@ void AgentImpl::processStart(JsonCpp::Value& request, JsonCpp::Value &answer)
     SocketHeap::instance().start();
 
     // Initialize terminal
-    MT::CodecList::Settings settings;
+    auto settings = MT::CodecList::Settings::getClientSettings();
+
     mTerminal = std::make_shared<MT::Terminal>(settings);
 
     // Enable/disable codecs
@@ -220,10 +222,10 @@ void AgentImpl::processStart(JsonCpp::Value& request, JsonCpp::Value &answer)
         priorityConfig->at(i) = i;
 
     // Disable dynamic payload codec types - commented for now
-        /*if (cl.codecAt(i).payloadType() < 96)
-            priorityConfig->at(i) = i;
-        else
-            priorityConfig->at(i) = -1;*/
+    // if (cl.codecAt(i).payloadType() < 96)
+    //    priorityConfig->at(i) = i;
+    // else
+    //    priorityConfig->at(i) = -1;
 
     config()[CONFIG_CODEC_PRIORITY] = priorityConfig;
 

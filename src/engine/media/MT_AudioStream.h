@@ -62,16 +62,16 @@ public:
 protected:
     Audio::DataWindow mCapturedAudio;     // Data from microphone
     Audio::DataWindow mStereoCapturedAudio;
-    char mIncomingPcmBuffer[AUDIO_MIC_BUFFER_SIZE]; // Temporary buffer to allow reading from file
-    char mResampleBuffer[AUDIO_MIC_BUFFER_SIZE*8];  // Temporary buffer to hold data
-    char mStereoBuffer[AUDIO_MIC_BUFFER_SIZE*16];   // Temporary buffer to hold data converted to stereo
+    char mIncomingPcmBuffer[AUDIO_MIC_BUFFER_SIZE] = {0}; // Temporary buffer to allow reading from file
+    char mResampleBuffer[AUDIO_MIC_BUFFER_SIZE*8] = {0};  // Temporary buffer to hold data
+    char mStereoBuffer[AUDIO_MIC_BUFFER_SIZE*16] = {0};   // Temporary buffer to hold data converted to stereo
     PCodec mTransmittingCodec;                      // Current encoding codec
-    int mTransmittingPayloadType;                   // Payload type to mark outgoing packets
-    int mPacketTime;                                // Required packet time
+    int mTransmittingPayloadType = -1;              // Payload type to mark outgoing packets
+    int mPacketTime = 0;                            // Required packet time
     char mFrameBuffer[MT_MAXAUDIOFRAME];            // Temporary buffer to hold results of encoder
     ByteBuffer mEncodedAudio;                       // Encoded frame(s)
-    int mEncodedTime;                               // Time length of encoded audio
-    const CodecList::Settings& mCodecSettings;      // Configuration for stream
+    int mEncodedTime = 0;                           // Time length of encoded audio
+    CodecList::Settings mCodecSettings;             // Configuration for stream
     Mutex mMutex;                      	            // Mutex
     int mRemoteTelephoneCodec;                      // Payload for remote telephone codec
     jrtplib::RTPSession mRtpSession;                // Rtp session
@@ -83,12 +83,12 @@ protected:
     RtpDump* mRtpDump = nullptr;
 #endif
     Audio::Resampler  mCaptureResampler8,
-    mCaptureResampler16,
-    mCaptureResampler32,
-    mCaptureResampler48;
+                      mCaptureResampler16,
+                      mCaptureResampler32,
+                      mCaptureResampler48;
     DtmfContext mDtmfContext;
-    char mReceiveBuffer[MAX_VALID_UDPPACKET_SIZE],
-         mSrtpDecodeBuffer[MAX_VALID_UDPPACKET_SIZE];
+    char mReceiveBuffer[MAX_VALID_UDPPACKET_SIZE] = {0},
+         mSrtpDecodeBuffer[MAX_VALID_UDPPACKET_SIZE] = {0};
 
     struct
     {
@@ -106,7 +106,7 @@ protected:
 
     Statistics* mFinalStatistics = nullptr;
 
-    bool decryptSrtp(void* data, int* len);
+    // bool decryptSrtp(void* data, int* len);
 };
 };
 
