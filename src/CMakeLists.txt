@@ -17,11 +17,11 @@ set (CMAKE_POSITION_INDEPENDENT_CODE ON)
 set (RUNTIME_CPU_CAPABILITY_DETECTION ON)
 
 set (LIB_PLATFORM ${CMAKE_CURRENT_SOURCE_DIR}/libs/libraries)
-include (${LIB_PLATFORM}/platform_libs.cmake)
+#include (${LIB_PLATFORM}/platform_libs.cmake)
 
 
 message("Libraries: ${LIB_PLATFORM}")
-set (OPENSSL_INCLUDE ${LIB_PLATFORM}/openssl/1.1/include)
+# set (OPENSSL_INCLUDE ${LIB_PLATFORM}/openssl/1.1/include)
 message ("Using OpenSSL include files from ${OPENSSL_INCLUDE}")
 message ("Using OpenSSL libs: ${OPENSSL_SSL} and ${OPENSSL_CRYPTO}")
 include_directories(${OPENSSL_INCLUDE})
@@ -340,7 +340,7 @@ set (LIBS_STATIC ${LIBS_STATIC} jrtplib g729_codec gsm_codec opus
                                 gsmhr_codec g722_codec srtp3 resiprocate webrtc speexdsp)
 
 if (USE_AMR_CODEC)
-    include (${LIB_PLATFORM}/platform_libs.cmake)
+    #include (${LIB_PLATFORM}/platform_libs.cmake)
     message("Media: AMR NB and WB codecs will be included.")
     set (DEFINES ${DEFINES} -DUSE_AMR_CODEC)
     set (LIBS_STATIC ${LIBS_STATIC} ${OPENCORE_AMRNB} ${OPENCORE_AMRWB})

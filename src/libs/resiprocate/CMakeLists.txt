@@ -1,8 +1,8 @@
 project (resiprocate)
 
-if (NOT OPENSSL_INCLUDE)
-    message(FATAL_ERROR "OPENSSL_INCLUDE has to be directory with OpenSSL 1.1.x include files.")
-endif()
+#if (NOT OPENSSL_INCLUDE)
+#    message(FATAL_ERROR "OPENSSL_INCLUDE has to be directory with OpenSSL 1.1.x include files.")
+#endif()
 
 # Rely on C++ 20
 set (CMAKE_CXX_STANDARD 20)

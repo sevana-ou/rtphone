@@ -1,3 +1,0 @@
-[submodule "src/libs/libraries"]
-	path = src/libs/libraries
-	url = git@git.sevana.biz:public/libraries.git
