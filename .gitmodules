@@ -1,8 +1,3 @@
-[submodule "src/libs/resiprocate"]
-	path = src/libs/resiprocate
-	url = git@git.sevana.biz:public/resiprocate.git
-	branch = sevana
-
 [submodule "src/libs/libraries"]
 	path = src/libs/libraries
 	url = git@git.sevana.biz:public/libraries.git
