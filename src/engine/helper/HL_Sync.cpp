@@ -32,24 +32,12 @@ void SyncHelper::delay(unsigned int microseconds)
 #endif
 }
 
-long SyncHelper::increment(long *value)
-{
-    assert(value);
-#ifdef TARGET_WIN
-    return ::InterlockedIncrement((LONG*)value);
-#elif TARGET_OSX
-    return OSAtomicIncrement32((int32_t*)value);
-#elif TARGET_LINUX
-    return -1;
-#else
-    return -1;
-#endif
-}
 
 // ------------------- ThreadHelper -------------------
 void ThreadHelper::setName(const std::string &name)
 {
 #if defined(TARGET_LINUX)
+    // The name will be truncated to 8 or 16 characters
     int retcode = pthread_setname_np(pthread_self(), name.c_str());
     if (retcode != 0)
     {
@@ -128,7 +116,7 @@ uint64_t chronox::toTimestamp(const timeval& ts)
 int64_t chronox::getDelta(const timespec& a, const timespec& b)
 {
     uint64_t ms_a = a.tv_sec * 1000 + a.tv_nsec / 10000000;
-    uint64_t ms_b = b.tv_sec * 1000 + a.tv_nsec / 10000000;
+    uint64_t ms_b = b.tv_sec * 1000 + b.tv_nsec / 10000000;
     return ms_a - ms_b;
 }
 
@@ -208,10 +196,10 @@ void Semaphore::wait()
     m_count--;
 }
 
-bool Semaphore::waitFor(int milliseconds) {
+bool Semaphore::waitFor(std::chrono::milliseconds timeout) {
     std::unique_lock<std::mutex> lock(m_mtx);
 
-    if (!m_cv.wait_for(lock, std::chrono::milliseconds(milliseconds), [this]() { return m_count > 0; }))
+    if (!m_cv.wait_for(lock, timeout, [this]() { return m_count > 0; }))
         return false;
 
     m_count--;
@@ -317,11 +305,8 @@ void TimerQueue::run()
         auto end = calcWaitTime();
         if (end.first)
         {
-            // Timers found, so wait until it expires (or something else
-            // changes)
-            int milliseconds = std::chrono::duration_cast<std::chrono::milliseconds>
-                    (end.second - std::chrono::steady_clock::now()).count();
-            //std::cout << "Waiting m_checkWork for " << milliseconds * 1000 << "ms." << std::endl;
+            // Timers found, so wait until it expires (or something else changes)
+            auto milliseconds = std::chrono::duration_cast<std::chrono::milliseconds>(end.second - std::chrono::steady_clock::now());
             m_checkWork.waitFor(milliseconds);
         } else {
             // No timers exist, so wait forever until something changes

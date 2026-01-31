@@ -472,7 +472,10 @@ void AgentImpl::processWaitForEvent(JsonCpp::Value &request, JsonCpp::Value &ans
     //int x = 0;
     //int y = 1/x;
 
-    int timeout = request["timeout"].asInt();
+    int timeout = 0;
+    if (request.isMember("timeout"))
+        timeout = request["timeout"].asInt();
+
     std::unique_lock<std::mutex> eventLock(mEventListMutex);
     if (mEventList.empty())
         mEventListChangeCondVar.wait_for(eventLock, chrono::milliseconds(timeout));

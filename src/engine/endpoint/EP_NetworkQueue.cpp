@@ -8,7 +8,7 @@ WatcherQueue::WatcherQueue(UserAgent& ua)
 WatcherQueue::~WatcherQueue()
 {}
 
-int WatcherQueue::add(std::string peer, std::string package, void* tag)
+int WatcherQueue::add(const std::string& peer, const std::string& package, void* tag)
 {
     ice::Lock l(mGuard);
 
@@ -16,8 +16,7 @@ int WatcherQueue::add(std::string peer, std::string package, void* tag)
     for (unsigned i=0; i<mItemList.size(); i++)
     {
         Item& item = mItemList[i];
-        if (item.mTarget == peer && item.mPackage == package &&
-            item.mState != Item::State_Deleting)
+        if (item.mTarget == peer && item.mPackage == package && item.mState != Item::State_Deleting)
             return item.mId;
     }
 
@@ -44,10 +43,9 @@ void WatcherQueue::remove(int id)
     ice::Lock l(mGuard);
 
     // Check if queue has similar item
-    for (unsigned i=0; i<mItemList.size(); i++)
+    for (auto& item: mItemList)
     {
-        Item& item = mItemList[i];
-        if (item.mId == id && !id)
+        if (item.mId == id && id)
         {
             if (item.mState != Item::State_Deleting)
                 item.mState = Item::State_ScheduledToDelete;
@@ -62,10 +60,9 @@ void WatcherQueue::refresh(int id)
     ice::Lock l(mGuard);
 
     // Check if queue has similar item
-    for (unsigned i=0; i<mItemList.size(); i++)
+    for (auto& item: mItemList)
     {
-        Item& item = mItemList[i];
-        if (item.mId == id && !id)
+        if (item.mId == id && id)
         {
             if (item.mState == Item::State_ScheduledToDelete || item.mState == Item::State_Active)
                 item.mState = Item::State_ScheduledToRefresh;
@@ -142,9 +139,9 @@ void WatcherQueue::onTerminated(int id, int code)
     {
         if (i->mSession)
             i->mSession->runTerminatedEvent(ResipSession::Type_Subscription, code, 0);
-        mItemList.erase(i);
         if (i->mId == mActiveId)
             mActiveId = 0;
+        mItemList.erase(i);
     }
     process();
 }

@@ -10,7 +10,7 @@
 #endif
 #include <set>
 #include <assert.h>
-
+#include <chrono>
 #if !defined(TARGET_WIN)
 # include <unistd.h> // Responsible for close() call on Linux
 #endif
@@ -28,6 +28,7 @@
 #define WSAEADDRINUSE EADDRINUSE
 #endif
 
+using namespace std::chrono_literals;
 
 // ----------------------------- SocketSink -------------------------
 SocketSink::~SocketSink()
@@ -253,7 +254,7 @@ void SocketHeap::thread()
         // If set is not empty
         if (agreggator.count() > 0)
         {
-            if (agreggator.waitForData(10))
+            if (agreggator.waitForData(10ms))
             {
                 ICELogMedia(<< "There is data on UDP sockets");
                 Lock l(mGuard);

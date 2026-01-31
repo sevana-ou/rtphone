@@ -27,16 +27,15 @@ public:
             State_Deleting
         };
 
-        resip::ClientSubscriptionHandle mHandle; // Subscription handle
-        ResipSession* mSession;
-        State mState;
-        std::string mTarget; // Target's address
-        std::string mPackage; // Event package
-        void* mTag; // User tag
-        int mId;
+        resip::ClientSubscriptionHandle mHandle;    // Subscription handle
+        ResipSession* mSession = nullptr;
+        State mState = State::State_None;
+        std::string mTarget;                        // Target's address
+        std::string mPackage;                       // Event package
+        void* mTag = nullptr;                       // User tag
+        int mId = 0;                                // Related session ID - it is always non-zero (zero is here for initialization only)
 
         Item()
-            :mSession(NULL), mState(State_None), mTag(NULL), mId(0)
         {}
 
         bool scheduled()
@@ -47,7 +46,7 @@ public:
     WatcherQueue(UserAgent& agent);
     ~WatcherQueue();
 
-    int add(std::string peer, std::string package, void* tag);
+    int add(const std::string& peer, const std::string& package, void* tag);
     void remove(int id);
     void refresh(int id);
     void clear();

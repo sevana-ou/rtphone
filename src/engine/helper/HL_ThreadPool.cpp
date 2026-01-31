@@ -59,8 +59,11 @@ void thread_pool::run_worker()
             std::unique_lock<std::mutex> lock(this->queue_mutex);
 
             this->condition.wait(lock, [this]{return !this->tasks.empty() || this->stop;});
-            t = this->tasks.front();
-            this->tasks.pop();
+            if (!tasks.empty())
+            {
+                t = tasks.front();
+                tasks.pop();
+            }
         }
         t(); // function<void()> type
     }

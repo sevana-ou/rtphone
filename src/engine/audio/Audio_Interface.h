@@ -16,46 +16,46 @@
 
 namespace Audio
 {
-  enum 
-  {
+enum
+{
     myMicrophone = 1,
     mySpeaker = 2
-  };
+};
 
-  struct Format
-  {
+struct Format
+{
     int mRate;
     int mChannels;
 
     Format()
-      :mRate(AUDIO_SAMPLERATE), mChannels(AUDIO_CHANNELS)
+        :mRate(AUDIO_SAMPLERATE), mChannels(AUDIO_CHANNELS)
     {}
 
     Format(int rate, int channels)
-            :mRate(rate), mChannels(channels)
+        :mRate(rate), mChannels(channels)
     {}
 
     size_t samplesFromSize(size_t length) const
     {
-      return length / 2 / mChannels;
+        return length / 2 / mChannels;
     }
 
     // Returns milliseconds
     float timeFromSize(size_t length) const
     {
-      return float(samplesFromSize(length) / (mRate / 1000.0));
+        return float(samplesFromSize(length) / (mRate / 1000.0));
     }
 
     float sizeFromTime(size_t milliseconds) const
     {
-      return float((milliseconds * mRate) / 500.0 * mChannels);
+        return float((milliseconds * mRate) / 500.0 * mChannels);
     }
 
     std::string toString()
     {
-      char buffer[64];
-      sprintf(buffer, "%dHz %dch", mRate, mChannels);
-      return std::string(buffer);
+        char buffer[64];
+        std::snprintf(buffer, sizeof(buffer), "%dHz %dch", mRate, mChannels);
+        return std::string(buffer);
     }
 
     bool operator == (const Format& rhs) const
@@ -78,19 +78,19 @@ namespace Audio
         return mChannels;
     }
 
-  };
+};
 
-  class DataConnection
-  {
-  public:
+class DataConnection
+{
+public:
     virtual void onMicData(const Format& format, const void* buffer, int length) = 0;
     virtual void onSpkData(const Format& format, void* buffer, int length) = 0;
-  };
+};
 
 
-  class Device
-  {
-  public:
+class Device
+{
+public:
     Device();
     virtual ~Device();
 
@@ -100,34 +100,34 @@ namespace Audio
     virtual bool open() = 0;
     virtual void close() = 0;
     virtual Format getFormat() = 0;
-  protected:
+protected:
     DataConnection* mConnection;
-  };
-  
+};
 
-  class InputDevice: public Device
-  {
-  public:
+
+class InputDevice: public Device
+{
+public:
     InputDevice();
     virtual ~InputDevice();
     
     static InputDevice* make(int devId);
-  };
-  typedef std::shared_ptr<InputDevice> PInputDevice;
+};
+typedef std::shared_ptr<InputDevice> PInputDevice;
 
-  class OutputDevice: public Device
-  {
-  public:
+class OutputDevice: public Device
+{
+public:
     OutputDevice();
     virtual ~OutputDevice();
 
     static OutputDevice* make(int devId);
-  };
-  typedef std::shared_ptr<OutputDevice> POutputDevice;
+};
+typedef std::shared_ptr<OutputDevice> POutputDevice;
 
-  class Enumerator
-  {
-  public:
+class Enumerator
+{
+public:
     Enumerator();
     virtual ~Enumerator();
     int nameToIndex(const std::tstring& name);
@@ -141,16 +141,16 @@ namespace Audio
     virtual int indexOfDefaultDevice() = 0;
     
     static Enumerator* make(bool useNull = false);
-  };
+};
 
-  class OsEngine
-  {
-  public:
+class OsEngine
+{
+public:
     virtual void open() = 0;
     virtual void close() = 0;
 
     static OsEngine* instance();
-  };
+};
 };
 
 #endif

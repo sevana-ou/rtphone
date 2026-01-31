@@ -25,8 +25,7 @@ typedef std::unique_lock<std::recursive_mutex> Lock;
 class SyncHelper
 {
 public:
-  static void delay(unsigned microseconds);
-  static long increment(long* value);
+    static void delay(unsigned microseconds);
 };
 
 class Semaphore
@@ -36,7 +35,7 @@ public:
 
     void notify();
     void wait();
-    bool waitFor(int milliseconds);
+    bool waitFor(std::chrono::milliseconds timeout);
 
 private:
     std::mutex m_mtx;
@@ -47,42 +46,42 @@ private:
 class ThreadHelper
 {
 public:
-  static void setName(const std::string& name);
-  static uint64_t getCurrentId();
+    static void setName(const std::string& name);
+    static uint64_t getCurrentId();
 };
 
 class chronox
 {
 public:
-  // Returns current timestamp in milliseconds
-  static uint64_t getTimestamp();
+    // Returns current timestamp in milliseconds
+    static uint64_t getTimestamp();
 
-  // Returns uptime (of calling process) in milliseconds
-  static uint64_t getUptime();
+    // Returns uptime (of calling process) in milliseconds
+    static uint64_t getUptime();
 
-  // Finds time delta between 'later' and 'earlier' time points.
-  // Handles cases when clock is wrapped.
-  static uint32_t getDelta(uint32_t later, uint32_t earlier);
+    // Finds time delta between 'later' and 'earlier' time points.
+    // Handles cases when clock is wrapped.
+    static uint32_t getDelta(uint32_t later, uint32_t earlier);
 
-  // Converts number of milliseconds starting from Epoch begin to timespec.
-  static timespec toTimespec(uint64_t milliseconds);
-  static uint64_t toTimestamp(const timeval& ts);
+    // Converts number of milliseconds starting from Epoch begin to timespec.
+    static timespec toTimespec(uint64_t milliseconds);
+    static uint64_t toTimestamp(const timeval& ts);
 
-  // Returns difference between timestamps in milliseconds
-  static int64_t getDelta(const timespec& a, const timespec& b);
-  static int64_t getDelta(const timeval& a, const timeval& b);
+    // Returns difference between timestamps in milliseconds
+    static int64_t getDelta(const timespec& a, const timespec& b);
+    static int64_t getDelta(const timeval& a, const timeval& b);
 
-  class ExecutionTime
-  {
-  public:
-      ExecutionTime();
-      uint64_t getSpentTime() const;
-  protected:
-      uint64_t mStart;
-  };
+    class ExecutionTime
+    {
+    public:
+        ExecutionTime();
+        uint64_t getSpentTime() const;
+    protected:
+        uint64_t mStart;
+    };
 };
 
-	
+
 class BufferQueue
 {
 public:
@@ -160,7 +159,7 @@ private:
     std::mutex m_mtx;
     // Inheriting from priority_queue, so we can access the internal container
     class Queue : public std::priority_queue<WorkItem, std::vector<WorkItem>,
-                                             std::greater<WorkItem>>
+            std::greater<WorkItem>>
     {
     public:
         std::vector<WorkItem>& getContainer();

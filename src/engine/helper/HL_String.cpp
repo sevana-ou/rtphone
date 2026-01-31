@@ -113,7 +113,7 @@ uint64_t strx::toUint64(const char* s, uint64_t def, bool *isOk)
 std::string strx::toHex(unsigned int value)
 {
     char buffer[32];
-    sprintf(buffer, "%x", value);
+    std::snprintf(buffer, sizeof(buffer), "%x", value);
     return buffer;
 }
 
@@ -252,7 +252,7 @@ std::pair<std::string, std::string> strx::parseAssignment(const std::string& s, 
 std::string strx::intToString(int value)
 {
     char buffer[32];
-    sprintf(buffer, "%d", value);
+    std::snprintf(buffer, sizeof(buffer), "%d", value);
     return buffer;
 }
 
@@ -304,7 +304,10 @@ std::string strx::millisecondsToString(uint64_t t)
 int strx::fromHex2Int(const std::string &s)
 {
     int result = 0;
-    sscanf(s.c_str(), "%x", &result);
+    int retcode = sscanf(s.c_str(), "%x", &result);
+    if (retcode == 0)
+        return 0;
+
     return result;
 }
 
@@ -338,7 +341,7 @@ std::string strx::replace(const std::string& s, char f, char r)
 {
     std::string result(s);
     for (std::string::size_type i = 0; i < result.size(); i++)
-        if (result[i] == 'f')
+        if (result[i] == f)
             result[i] = r;
 
     return result;

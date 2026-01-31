@@ -36,10 +36,10 @@ ResipSessionAppDialog::~ResipSessionAppDialog()
 std::atomic_int ResipSession::InstanceCounter;
 
 ResipSession::ResipSession(resip::DialogUsageManager& dum) 
-    : resip::AppDialogSet(dum), mUserAgent(NULL), mType(Type_None), mSessionId(0), mSession(0)
+    : resip::AppDialogSet(dum), mUserAgent(nullptr), mType(Type_None), mSessionId(0), mSession(0)
 {
     ResipSession::InstanceCounter++;
-    mTag = NULL;
+    mTag = nullptr;
     mTerminated = false;
     mOnWatchingStartSent = false;
     mSessionId = Session::generateId();

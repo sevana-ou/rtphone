@@ -299,18 +299,18 @@ std::string Variant::asStdString() const
         return mString;
 
     case VTYPE_INT:
-        sprintf(buffer, "%d", mInt);
+        std::snprintf(buffer, sizeof(buffer), "%d", mInt);
         return buffer;
 
     case VTYPE_INT64:
-        sprintf(buffer, "%lli", static_cast<long long int>(mInt64));
+        std::snprintf(buffer, sizeof(buffer), "%lli", static_cast<long long int>(mInt64));
         return buffer;
 
     case VTYPE_BOOL:
         return mBool ? "true" : "false";
 
     case VTYPE_FLOAT:
-        sprintf(buffer, "%f", mFloat);
+        std::snprintf(buffer, sizeof(buffer), "%f", mFloat);
         return buffer;
 
     default:

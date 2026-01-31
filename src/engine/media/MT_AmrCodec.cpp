@@ -313,10 +313,10 @@ int AmrNbCodec::encode(const void* input, int inputBytes, void* output, int outp
         return 0;
 
     // Declare the data input pointer
-    const short *dataIn = (const short *)input;
+    auto *dataIn = (const short *)input;
 
     // Declare the data output pointer
-    unsigned char *dataOut = (unsigned char *)output;
+    auto *dataOut = (unsigned char *)output;
 
     // Find how much RTP frames will be generated
     unsigned int frames = inputBytes / pcmLength();
@@ -328,7 +328,7 @@ int AmrNbCodec::encode(const void* input, int inputBytes, void* output, int outp
         dataIn += pcmLength() / 2;
     }
 
-    return frames * rtpLength();
+    return dataOut - (unsigned char*)output;
 }
 
 #define L_FRAME 160

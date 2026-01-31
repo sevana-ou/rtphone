@@ -591,7 +591,7 @@ UserAgent::SipAddress UserAgent::parseSipAddress(const std::string& sip)
             if (nameaddr.uri().port())
             {
                 char porttext[32];
-                sprintf(porttext, ":%u", (unsigned)nameaddr.uri().port());
+                std::snprintf(porttext, sizeof(porttext), ":%u", (unsigned)nameaddr.uri().port());
                 result.mDomain += porttext;
             }
 
