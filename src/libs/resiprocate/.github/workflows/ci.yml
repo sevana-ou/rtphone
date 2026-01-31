@@ -1,0 +1,92 @@
+name: CI
+on: [push, pull_request]
+
+jobs:
+  build:
+    name: Build with ${{ matrix.c-compiler }}
+    runs-on: ubuntu-20.04
+    container:
+      image: debian:bullseye-slim
+      options: --ulimit memlock=-1
+    strategy:
+      fail-fast: false
+      matrix:
+        c-compiler: [gcc-10, clang-13]
+        include:
+          - c-compiler: gcc-10
+            cxx-compiler: g++-10
+          - c-compiler: clang-13
+            cxx-compiler: clang++-13
+    env:
+      CC: /usr/bin/${{ matrix.c-compiler }}
+      CXX: /usr/bin/${{ matrix.cxx-compiler }}
+    steps:
+      - name: Get number of CPU cores
+        uses: SimenB/github-actions-cpu-cores@v1.1.0
+        id: cpu-cores
+
+      - name: Install Dependencies
+        run: |
+          echo "deb http://deb.debian.org/debian bullseye-backports main" > /etc/apt/sources.list.d/backports.list
+          apt-get update -qq
+          apt-get install -qq wget
+          wget -O - http://apt.debify.org/add-apt-debify | bash
+          apt-get update -qq
+          apt-get install -qq \
+            clang-13 \
+            clang-tidy-13 \
+            cmake \
+            default-libmysqlclient-dev \
+            g++-10 \
+            git \
+            gperf \
+            libasio-dev \
+            libboost-all-dev \
+            libc-ares-dev \
+            libcajun-dev \
+            libcppunit-dev \
+            libdb++-dev \
+            libfmt-dev \
+            libgeoip-dev \
+            libgloox-dev \
+            libgstreamermm-1.0-dev \
+            libpcre3-dev \
+            libpopt-dev \
+            libpq-dev \
+            postgresql-server-dev-all \
+            libqpid-proton-cpp12-dev \
+            libradcli-dev \
+            libsipxtapi-dev \
+            libsnmp-dev \
+            libsoci-dev \
+            libsrtp2-dev \
+            libssl-dev \
+            libtelepathy-qt5-dev \
+            libwebsocketpp-dev \
+            libxerces-c-dev \
+            lld-13 \
+            make \
+            perl \
+            python3-cxx-dev \
+            python3-dev \
+            sox \
+            xxd
+
+      - name: Checkout source
+        uses: actions/checkout@v3
+
+      - name: Bootstrap
+        run: ./build/travis/bootstrap
+
+      - name: Configure
+        run: ./build/travis/configure
+
+      - name: Build
+        run: ./build/travis/build
+
+      - name: Analyse
+        if: ${{ matrix.c-compiler == 'clang-13' }}
+        run: run-clang-tidy-13 -j ${{ steps.cpu-cores.outputs.count }} -quiet
+
+      - name: Test
+        run: make -j1 CTEST_OUTPUT_ON_FAILURE=1 test
