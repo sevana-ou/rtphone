@@ -357,7 +357,7 @@ target_compile_definitions(rtphone PUBLIC ${DEFINES})
 if (TARGET_LINUX)
     target_link_options(rtphone PUBLIC -Wl,-Bstatic)
 endif()
-target_link_libraries(rtphone PUBLIC ${LIBS_STATIC} ${OPENSSL_SSL} ${OPENSSL_CRYPTO})
+target_link_libraries(rtphone PUBLIC ${LIBS_STATIC})
 
 if (TARGET_LINUX)
     target_link_options(rtphone PUBLIC -Wl,-Bdynamic)
@@ -384,3 +384,7 @@ target_include_directories(rtphone
 
 # For MSVC static builds
 # set_property(TARGET rtphone PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+
+find_package(OpenSSL REQUIRED)
+target_link_libraries(rtphone PUBLIC OpenSSL::SSL)
+target_link_libraries(rtphone PUBLIC OpenSSL::Crypto)

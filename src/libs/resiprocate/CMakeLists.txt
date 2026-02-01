@@ -368,5 +368,8 @@ else()
     set (RESIP_DEFINES ${RESIP_DEFINES} -DHAVE_ARPA_NAMESER_H)
 endif()
 
+find_package(OpenSSL)
 target_compile_definitions(resiprocate PUBLIC ${RESIP_DEFINES})
-target_link_libraries     (resiprocate PUBLIC ${OPENSSL_SSL} ${OPENSSL_CRYPTO})
+
+target_link_libraries(resiprocate PUBLIC OpenSSL::SSL)
+target_link_libraries(resiprocate PUBLIC OpenSSL::Crypto)
