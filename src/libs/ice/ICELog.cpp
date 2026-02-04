@@ -82,7 +82,7 @@ Logger::~Logger()
     if (mFile)
     {
         fclose(mFile);
-        mFile = NULL;
+        mFile = nullptr;
     }
 }
 
@@ -128,10 +128,10 @@ Logger::useNull()
     {
         fflush(mFile);
         fclose(mFile);
-        mFile = NULL;
+        mFile = nullptr;
     }
 
-    mDelegate = NULL;
+    mDelegate = nullptr;
 }
 
 void Logger::closeFile()
@@ -240,7 +240,7 @@ Logger::endLine()
     if (mDelegate)
         mDelegate->onIceLog(mMsgLevel, mFilename, mLine, mSubsystem, mStream->str());
 
-    delete mStream; mStream = NULL;
+    delete mStream; mStream = nullptr;
 }
 
 Logger& 
