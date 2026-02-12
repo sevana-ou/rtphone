@@ -76,7 +76,7 @@ std::string AgentImpl::command(const std::string& command)
             return "";
 
         std::string cmd = d["command"].asString();
-        if (cmd != "wait_for_event")
+        if (cmd != "wait_for_event" && cmd != "agent_add_root_cert")
         {
             ICELogInfo(<< command);
         }
@@ -98,8 +98,12 @@ std::string AgentImpl::command(const std::string& command)
         if (cmd == "account_setuserinfo")
             processSetUserInfoToAccount(d, answer);
         else
-        if (cmd == "session_create")
+        if (cmd == "session_create") {
+            // For Bugsnag test
+            // int* v = nullptr;
+            // *v = 0;
             processCreateSession(d, answer);
+        }
         else
         if (cmd == "session_start")
             processStartSession(d, answer);

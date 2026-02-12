@@ -423,7 +423,7 @@ bool AudioReceiver::add(const std::shared_ptr<jrtplib::RTPPacket>& p, Codec** de
         payloadLength = p->GetPayloadLength(),
         ptype = p->GetPayloadType();
 
-    ICELogInfo(<< "Adding packet No " << p->GetSequenceNumber());
+    ICELogMedia(<< "Adding packet No " << p->GetSequenceNumber());
     // Increase codec counter
     mStat.mCodecCount[ptype]++;
 

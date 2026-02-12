@@ -43,7 +43,7 @@ bool NativeRtpSender::SendRTP(const void *data, size_t len)
         }
     }
 
-    ICELogInfo(<< "Sending " << sendLength <<" bytes to " << mTarget.mRtp.toBriefStdString());
+    ICELogMedia(<< "Sending " << sendLength <<" bytes to " << mTarget.mRtp.toBriefStdString());
     mSocket.mRtp->sendDatagram(mTarget.mRtp, mSendBuffer, sendLength);
     mStat.mSentRtp++;
     mStat.mSent += len;

@@ -18,6 +18,106 @@
 
 using namespace ice;
 
+#include <stdio.h>
+#include <stdlib.h>
+#include <errno.h>
+#include <string.h>
+
+#define KEEP_SIZE (128 * 1024)  // 128 KB = 131,072 bytes
+
+/**
+ * Truncates a file to its last 128 KB of content.
+ *
+ * @param filename Path to the file to truncate
+ * @return 0 on success, -1 on error (check errno for details)
+ *
+ * Behavior:
+ * - Files ≤128 KB remain unchanged
+ * - Files >128 KB are replaced with their last 128 KB
+ * - Uses binary mode to avoid newline translation issues
+ * - Preserves file existence but NOT original inode/permissions (reopens in write mode)
+ */
+int truncate_file_to_last_128k(const char *filename) {
+    if (!filename || *filename == '\0') {
+        errno = EINVAL;
+        return -1;
+    }
+
+    // Step 1: Open file for reading (binary mode for exact byte handling)
+    FILE *fp = fopen(filename, "rb");
+    if (!fp) {
+        return -1;  // errno set by fopen
+    }
+
+    // Step 2: Get file size
+    if (fseek(fp, 0, SEEK_END) != 0) {
+        int err = errno;
+        fclose(fp);
+        errno = err;
+        return -1;
+    }
+
+    long size = ftell(fp);
+    if (size < 0) {
+        int err = errno;
+        fclose(fp);
+        errno = err;
+        return -1;
+    }
+
+    // Step 3: Nothing to do if file is small enough
+    if (size <= KEEP_SIZE) {
+        fclose(fp);
+        return 0;
+    }
+
+    // Step 4: Position at start of region to keep (last 128 KB)
+    long start_pos = size - KEEP_SIZE;
+    if (fseek(fp, start_pos, SEEK_SET) != 0) {
+        int err = errno;
+        fclose(fp);
+        errno = err;
+        return -1;
+    }
+
+    // Step 5: Read the last 128 KB into buffer
+    char *buffer = (char*)malloc(KEEP_SIZE);
+    if (!buffer) {
+        fclose(fp);
+        errno = ENOMEM;
+        return -1;
+    }
+
+    size_t read_bytes = fread(buffer, 1, KEEP_SIZE, fp);
+    int read_err = ferror(fp);
+    fclose(fp);
+
+    if (read_bytes != KEEP_SIZE || read_err) {
+        free(buffer);
+        errno = read_err ? ferror(fp) : EIO;
+        return -1;
+    }
+
+    // Step 6: Reopen file in write mode (truncates existing content)
+    fp = fopen(filename, "wb");
+    if (!fp) {
+        free(buffer);
+        return -1;  // errno set by fopen
+    }
+
+    // Step 7: Write preserved content back to file
+    size_t written = fwrite(buffer, 1, KEEP_SIZE, fp);
+    int write_err = ferror(fp);
+    fclose(fp);
+    free(buffer);
+
+    if (written != KEEP_SIZE || write_err) {
+        errno = write_err ? ferror(fp) : EIO;
+        return -1;
+    }
+
+    return 0;
+}
 
 LogLevel LogLevelHelper::parse(const std::string& t)
 {
@@ -103,6 +203,9 @@ Logger::useFile(const char* filepath)
     if (mLogPath.empty())
         return;
 
+    // Keep only last 128Kb
+    truncate_file_to_last_128k(filepath);
+
     FILE* f = fopen(filepath, "at");
     if (f)
     {
@@ -116,6 +219,10 @@ Logger::useFile(const char* filepath)
         fprintf(f, "New log chunk starts here.\n");
         fflush(f);
     }
+}
+
+const std::string& Logger::getLogPath() const {
+    return mLogPath;
 }
 
 void 
@@ -151,10 +258,51 @@ void Logger::openFile()
     if (mLogPath.empty())
         return;
 
-    remove(mLogPath.c_str());
+    // remove(mLogPath.c_str());
     useFile(mLogPath.c_str());
 }
 
+std::string Logger::getLastContent(size_t bytes) {
+    LogGuard l(mGuard);
+    std::string r;
+
+    bool fileOpenNeeded = false;
+    if (mFile)
+    {
+        fclose(mFile); mFile = nullptr;
+        fileOpenNeeded = true;
+    }
+
+    mFile = fopen(mLogPath.c_str(), "rt");
+
+    if (mFile) {
+        fseek(mFile, 0, SEEK_END);
+        auto size = ftell(mFile);
+
+        if (size < bytes)
+            fseek(mFile, 0, SEEK_SET);
+        else
+            fseek(mFile, size - (long)bytes, SEEK_SET);
+
+        auto contentPos = ftell(mFile);
+        size_t contentLength = size - contentPos;
+        if (bytes < contentLength)
+            contentLength = bytes;
+
+        r.resize(contentLength, ' ');
+        auto readCount = fread(r.data(), 1, contentLength, mFile);
+        if (readCount >= 0)
+            r.resize(readCount);
+        fclose(mFile); mFile = nullptr;
+    }
+
+    if (fileOpenNeeded)
+    {
+        mFile = fopen(mLogPath.c_str(), "at");
+    }
+
+    return r;
+}
 
 void Logger::useDelegate(LogHandler* delegate_)
 {

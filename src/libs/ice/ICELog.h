@@ -110,7 +110,10 @@ public:
     void useNull();
     void closeFile();
     void openFile();
-    
+
+    std::string getLastContent(size_t bytes);
+    const std::string& getLogPath() const;
+
     LogGuard&             mutex();
     LogLevel              level();
     void                  setLevel(LogLevel level);
