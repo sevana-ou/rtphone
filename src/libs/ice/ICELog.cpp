@@ -466,3 +466,10 @@ Logger::operator << (const std::filesystem::path& p)
     *mStream << p;
     return *this;
 }
+
+Logger&
+Logger::operator << (const std::chrono::milliseconds t)
+{
+    *mStream << t.count() << "ms";
+    return *this;
+}

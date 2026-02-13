@@ -130,6 +130,7 @@ public:
     Logger& operator << (const unsigned int data);
     Logger& operator << (const uint64_t data);
     Logger& operator << (const std::filesystem::path& p);
+    Logger& operator << (const std::chrono::milliseconds t);
 
 protected:
     LogGuard            mGuard;

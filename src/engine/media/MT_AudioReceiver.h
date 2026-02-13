@@ -39,11 +39,11 @@ public:
     class Packet
     {
     public:
-        Packet(const std::shared_ptr<RTPPacket>& packet, int timelen, int rate);
+        Packet(const std::shared_ptr<RTPPacket>& packet, std::chrono::milliseconds timelen, int samplerate);
         std::shared_ptr<RTPPacket> rtp() const;
 
-        int timelength() const;
-        int rate() const;
+        std::chrono::milliseconds timelength() const;
+        int samplerate() const;
 
         const std::vector<short>& pcm() const;
         std::vector<short>& pcm();
@@ -53,8 +53,8 @@ public:
 
     protected:
         std::shared_ptr<RTPPacket> mRtp;
-        int mTimelength = 0,
-            mRate = 0;
+        std::chrono::milliseconds mTimelength = 0ms;
+        int mSamplerate = 0;
         std::vector<short> mPcm;
         std::chrono::microseconds mTimestamp = 0us;
     };
@@ -65,23 +65,23 @@ public:
     unsigned ssrc() const;
     void setSsrc(unsigned ssrc);
 
-    void setHigh(int milliseconds);
-    int high() const;
+    void setHigh(std::chrono::milliseconds t);
+    std::chrono::milliseconds high() const;
 
-    void setLow(int milliseconds);
-    int low() const;
+    void setLow(std::chrono::milliseconds t);
+    std::chrono::milliseconds low() const;
 
-    void setPrebuffer(int milliseconds);
-    int prebuffer() const;
+    void setPrebuffer(std::chrono::milliseconds t);
+    std::chrono::milliseconds prebuffer() const;
 
     int getNumberOfReturnedPackets() const;
     int getNumberOfAddPackets() const;
 
-    int findTimelength();
+    std::chrono::milliseconds findTimelength();
     int getCount() const;
 
     // Returns false if packet was not add - maybe too old or too new or duplicate
-    std::shared_ptr<Packet> add(std::shared_ptr<RTPPacket> packet, int timelength, int rate);
+    std::shared_ptr<Packet> add(std::shared_ptr<RTPPacket> packet, std::chrono::milliseconds timelength, int rate);
 
     typedef std::vector<std::shared_ptr<Packet>> ResultList;
     typedef std::shared_ptr<ResultList> PResultList;
@@ -90,9 +90,9 @@ public:
     
 protected:
     unsigned    mSsrc = 0;
-    int         mHigh = RTP_BUFFER_HIGH,
-                mLow = RTP_BUFFER_LOW,
-                mPrebuffer = RTP_BUFFER_PREBUFFER;
+    std::chrono::milliseconds   mHigh = std::chrono::milliseconds(RTP_BUFFER_HIGH),
+                                mLow = std::chrono::milliseconds(RTP_BUFFER_LOW),
+                                mPrebuffer = std::chrono::milliseconds(RTP_BUFFER_PREBUFFER);
     int         mReturnedCounter = 0,
                 mAddCounter = 0;
 

@@ -31,8 +31,8 @@
 using namespace MT;
 
 // ----------------- RtpBuffer::Packet --------------
-RtpBuffer::Packet::Packet(const std::shared_ptr<RTPPacket>& packet, int timelength, int rate)
-    :mRtp(packet), mTimelength(timelength), mRate(rate)
+RtpBuffer::Packet::Packet(const std::shared_ptr<RTPPacket>& packet, std::chrono::milliseconds timelength, int samplerate)
+    :mRtp(packet), mTimelength(timelength), mSamplerate(samplerate)
 {
 }
 
@@ -41,14 +41,14 @@ std::shared_ptr<RTPPacket> RtpBuffer::Packet::rtp() const
     return mRtp;
 }
 
-int RtpBuffer::Packet::timelength() const
+std::chrono::milliseconds RtpBuffer::Packet::timelength() const
 {
     return mTimelength;
 }
 
-int RtpBuffer::Packet::rate() const
+int RtpBuffer::Packet::samplerate() const
 {
-    return mRate;
+    return mSamplerate;
 }
 
 const std::vector<short>& RtpBuffer::Packet::pcm() const
@@ -74,32 +74,32 @@ RtpBuffer::~RtpBuffer()
     ICELogDebug(<< "Number of add packets: " << mAddCounter << ", number of retrieved packets " << mReturnedCounter);
 }
 
-void RtpBuffer::setHigh(int milliseconds)
+void RtpBuffer::setHigh(std::chrono::milliseconds t)
 {
-    mHigh = milliseconds;
+    mHigh = t;
 }
 
-int RtpBuffer::high() const
+std::chrono::milliseconds RtpBuffer::high() const
 {
     return mHigh;
 }
 
-void RtpBuffer::setLow(int milliseconds)
+void RtpBuffer::setLow(std::chrono::milliseconds t)
 {
-    mLow = milliseconds;
+    mLow = t;
 }
 
-int RtpBuffer::low() const
+std::chrono::milliseconds RtpBuffer::low() const
 {
     return mLow;
 }
 
-void RtpBuffer::setPrebuffer(int milliseconds)
+void RtpBuffer::setPrebuffer(std::chrono::milliseconds t)
 {
-    mPrebuffer = milliseconds;
+    mPrebuffer = t;
 }
 
-int RtpBuffer::prebuffer() const
+std::chrono::milliseconds RtpBuffer::prebuffer() const
 {
     return mPrebuffer;
 }
@@ -115,7 +115,7 @@ bool SequenceSort(const std::shared_ptr<RtpBuffer::Packet>& p1, const std::share
     return p1->rtp()->GetExtendedSequenceNumber() < p2->rtp()->GetExtendedSequenceNumber();
 }
 
-std::shared_ptr<RtpBuffer::Packet> RtpBuffer::add(std::shared_ptr<jrtplib::RTPPacket> packet, int timelength, int rate)
+std::shared_ptr<RtpBuffer::Packet> RtpBuffer::add(std::shared_ptr<jrtplib::RTPPacket> packet, std::chrono::milliseconds timelength, int rate)
 {
     if (!packet)
         return std::shared_ptr<Packet>();
@@ -161,7 +161,7 @@ std::shared_ptr<RtpBuffer::Packet> RtpBuffer::add(std::shared_ptr<jrtplib::RTPPa
     }
 
     // Get amount of available audio (in milliseconds) in jitter buffer
-    int available = findTimelength();
+    auto available = findTimelength();
 
     if (newSeqno > minno || (available < mHigh))
     {
@@ -199,9 +199,9 @@ RtpBuffer::FetchResult RtpBuffer::fetch(ResultList& rl)
     rl.clear();
 
     // See if there is enough information in buffer
-    int total = findTimelength();
+    auto total = findTimelength();
 
-    while (total > mHigh && mPacketList.size() && 0 != mHigh)
+    while (total > mHigh && mPacketList.size() && 0ms != mHigh)
     {
         ICELogMedia( << "Dropping RTP packets from jitter buffer");
         total -= mPacketList.front()->timelength();
@@ -303,12 +303,12 @@ RtpBuffer::FetchResult RtpBuffer::fetch(ResultList& rl)
     return result;
 }
 
-int RtpBuffer::findTimelength()
+std::chrono::milliseconds RtpBuffer::findTimelength()
 {
-    int available = 0;
-    for (unsigned i = 0; i < mPacketList.size(); i++)
-        available += mPacketList[i]->timelength();
-    return available;
+    std::chrono::milliseconds r = 0ms;
+    for (const auto& p: mPacketList)
+        r += p->timelength();
+    return r;
 }
 
 int RtpBuffer::getNumberOfReturnedPackets() const
@@ -424,6 +424,7 @@ bool AudioReceiver::add(const std::shared_ptr<jrtplib::RTPPacket>& p, Codec** de
         ptype = p->GetPayloadType();
 
     ICELogMedia(<< "Adding packet No " << p->GetSequenceNumber());
+
     // Increase codec counter
     mStat.mCodecCount[ptype]++;
 
@@ -432,7 +433,7 @@ bool AudioReceiver::add(const std::shared_ptr<jrtplib::RTPPacket>& p, Codec** de
     auto codecIter = mCodecMap.find(ptype);
     if (codecIter == mCodecMap.end())
     {
-        time_length = 10;
+        // Well, there is no information about the codec; skip this packet
     }
     else
     {
@@ -467,6 +468,9 @@ bool AudioReceiver::add(const std::shared_ptr<jrtplib::RTPPacket>& p, Codec** de
     mJitterStats.process(p.get(), samplerate);
     mStat.mJitter = static_cast<float>(mJitterStats.get());
 
+    if (!codec)
+        return false; // There is no sense to add this packet into jitter buffer - we can't decode this
+
     // Check if packet is CNG
     if (payloadLength >= 1 && payloadLength <= 6 && (ptype == 0 || ptype == 8))
         time_length = mLastPacketTimeLength ? mLastPacketTimeLength : 20;
@@ -476,12 +480,12 @@ bool AudioReceiver::add(const std::shared_ptr<jrtplib::RTPPacket>& p, Codec** de
     {
         // It will cause statistics to report about bad RTP packet
         // I have to replay last packet payload here to avoid report about lost packet
-        mBuffer.add(p, time_length, samplerate);
+        mBuffer.add(p, std::chrono::milliseconds(time_length), samplerate);
         return false;
     }
 
     // Queue packet to buffer
-    auto packet = mBuffer.add(p, time_length, samplerate).get();
+    auto packet = mBuffer.add(p, std::chrono::milliseconds(time_length), samplerate).get();
 
     return packet;
 }
