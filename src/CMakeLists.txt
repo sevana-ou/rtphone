@@ -16,15 +16,13 @@ option (USE_MUSL        "Build with MUSL library"               OFF)
 set (CMAKE_POSITION_INDEPENDENT_CODE ON)
 set (RUNTIME_CPU_CAPABILITY_DETECTION ON)
 
-set (LIB_PLATFORM ${CMAKE_CURRENT_SOURCE_DIR}/libs/libraries)
-#include (${LIB_PLATFORM}/platform_libs.cmake)
+find_package(OpenSSL REQUIRED)
+set (OPENSSL_SSL OpenSSL::SSL)
+set (OPENSSL_CRYPTO OpenSSL::Crypto)
 
-
-message("Libraries: ${LIB_PLATFORM}")
-# set (OPENSSL_INCLUDE ${LIB_PLATFORM}/openssl/1.1/include)
 message ("Using OpenSSL include files from ${OPENSSL_INCLUDE}")
 message ("Using OpenSSL libs: ${OPENSSL_SSL} and ${OPENSSL_CRYPTO}")
-include_directories(${OPENSSL_INCLUDE})
+# include_directories(${OPENSSL_INCLUDE})
 
 # Used defines for our project
 set (DEFINES -DUSE_OPENSSL)

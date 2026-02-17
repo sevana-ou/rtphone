@@ -626,7 +626,7 @@ int AmrWbCodec::decodePlain(std::span<const uint8_t> input, std::span<uint8_t> o
     size_t dataOutSizeInBytes = 0;
     for (AmrFrame& frame: ap.mFrames)
     {
-        memset(dataOut, 0, static_cast<size_t>(pcmLength()));
+        memset(dataOut, 0, static_cast<size_t>(output.size()));
 
         if (frame.mData)
         {
