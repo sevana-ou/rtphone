@@ -26,13 +26,13 @@ struct AmrCodecConfig
 class AmrNbCodec : public Codec
 {
 protected:
-    void* mEncoderCtx;
-    void* mDecoderCtx;
+    void* mEncoderCtx = nullptr;
+    void* mDecoderCtx = nullptr;
     AmrCodecConfig mConfig;
-    unsigned mCurrentDecoderTimestamp;
-    int mSwitchCounter;
-    int mPreviousPacketLength;
-
+    unsigned mCurrentDecoderTimestamp = 0;
+    int mPreviousPacketLength = 0;
+    size_t mCngCounter = 0;
+    size_t mSwitchCounter = 0;
 public:
     class CodecFactory: public Factory
     {
@@ -65,6 +65,7 @@ public:
     int decode(const void* input, int inputBytes, void* output, int outputCapacity) override;
     int plc(int lostFrames, void* output, int outputCapacity) override;
     int getSwitchCounter() const;
+    int getCngCounter() const;
 };
 
 struct AmrWbStatistics
@@ -77,11 +78,13 @@ extern AmrWbStatistics GAmrWbStatistics;
 class AmrWbCodec : public Codec
 {
 protected:
-    void* mEncoderCtx;
-    void* mDecoderCtx;
+    void* mEncoderCtx = nullptr;
+    void* mDecoderCtx = nullptr;
     AmrCodecConfig mConfig;
-    uint64_t mCurrentDecoderTimestamp;
-    int mSwitchCounter;
+    uint64_t mCurrentDecoderTimestamp = 0;
+    size_t mSwitchCounter = 0;
+    size_t mCngCounter = 0;
+
     int mPreviousPacketLength;
 
     int decodeIuup(std::span<const uint8_t> input, std::span<uint8_t> output);
@@ -119,14 +122,15 @@ public:
     int decode(const void* input, int inputBytes, void* output, int outputCapacity) override;
     int plc(int lostFrames, void* output, int outputCapacity) override;
     int getSwitchCounter() const;
+    int getCngCounter() const;
 };
 
 class GsmEfrCodec : public Codec
 {
 protected:
-    void* mEncoderCtx;
-    void* mDecoderCtx;
-    bool mIuUP;
+    void* mEncoderCtx = nullptr;
+    void* mDecoderCtx = nullptr;
+    bool mIuUP = false;
 
 public:
     class GsmEfrFactory: public Factory

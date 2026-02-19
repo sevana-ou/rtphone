@@ -33,9 +33,10 @@ void SingleAudioStream::process(const std::shared_ptr<jrtplib::RTPPacket>& packe
 
 void SingleAudioStream::copyPcmTo(Audio::DataWindow& output, int needed)
 {
+    // Packet by packet
     while (output.filled() < needed)
     {
-        if (mReceiver.getAudio(output, {}) != AudioReceiver::DecodeResult_Ok)
+        if (mReceiver.getAudioTo(output, {}).mStatus != AudioReceiver::DecodeResult::Status::Ok)
             break;
     }
 

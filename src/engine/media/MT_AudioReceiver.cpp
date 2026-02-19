@@ -553,7 +553,7 @@ void AudioReceiver::produceCNG(std::chrono::milliseconds length, Audio::DataWind
     }
 }
 
-AudioReceiver::DecodeResult AudioReceiver::decodeGap(Audio::DataWindow& output, DecodeOptions options)
+AudioReceiver::DecodeResult AudioReceiver::decodeGapTo(Audio::DataWindow& output, DecodeOptions options)
 {
     ICELogDebug(<< "Gap detected.");
 
@@ -588,20 +588,21 @@ AudioReceiver::DecodeResult AudioReceiver::decodeGap(Audio::DataWindow& output, 
     if (mDecodedLength)
     {
         processDecoded(output, options);
-        return DecodeResult_Ok;
+        return {.mStatus = DecodeResult::Status::Ok,.mChannels = mCodec->channels(), .mSamplerate = mCodec->samplerate()};
     }
     else
-        return DecodeResult_Skip;
+        return {.mStatus = DecodeResult::Status::Skip};
 }
 
-AudioReceiver::DecodeResult AudioReceiver::decodePacket(const RtpBuffer::ResultList& rl, Audio::DataWindow& output, DecodeOptions options, int* rate)
+AudioReceiver::DecodeResult AudioReceiver::decodePacketTo(Audio::DataWindow& output, DecodeOptions options, const RtpBuffer::ResultList& rl)
 {
-    DecodeResult result = DecodeResult_Skip;
+    DecodeResult result = {.mStatus = DecodeResult::Status::Skip};
 
     mFailedCount = 0;
     for (const std::shared_ptr<RtpBuffer::Packet>& p: rl)
     {
         assert(p);
+
         // Check if we need to emit silence or CNG - previously CNG packet was detected. Emit CNG audio here if needed.
         if (mLastPacketTimestamp && mLastPacketTimeLength && mCodec)
         {
@@ -635,8 +636,8 @@ AudioReceiver::DecodeResult AudioReceiver::decodePacket(const RtpBuffer::ResultL
         mCodec = codecIter->second;
         if (mCodec)
         {
-            if (rate)
-                *rate = mCodec->samplerate();
+            result.mChannels = mCodec->channels();
+            result.mSamplerate = mCodec->samplerate();
 
             // Check if it is CNG packet
             if ((ptype == 0 || ptype == 8) && p->rtp()->GetPayloadLength() >= 1 && p->rtp()->GetPayloadLength() <= 6)
@@ -654,7 +655,7 @@ AudioReceiver::DecodeResult AudioReceiver::decodePacket(const RtpBuffer::ResultL
                     if (mDecodedLength)
                         processDecoded(output, options);
                 }
-                result = DecodeResult_Ok;
+                result.mStatus = DecodeResult::Status::Ok;
             }
             else
             {
@@ -691,7 +692,7 @@ AudioReceiver::DecodeResult AudioReceiver::decodePacket(const RtpBuffer::ResultL
                                 processDecoded(output, options);
                         }
                     }
-                    result = mFrameCount > 0 ? DecodeResult_Ok : DecodeResult_Skip;
+                    result.mStatus = mFrameCount > 0 ? DecodeResult::Status::Ok : DecodeResult::Status::Skip;
 
                     // Check for bitrate counter
                     updateAmrCodecStats(mCodec.get());
@@ -699,7 +700,7 @@ AudioReceiver::DecodeResult AudioReceiver::decodePacket(const RtpBuffer::ResultL
                 else
                 {
                     // RTP packet with tail - it should not happen
-                    result = DecodeResult_BadPacket;
+                    result.mStatus = DecodeResult::Status::BadPacket;
                 }
             }
         }
@@ -707,39 +708,55 @@ AudioReceiver::DecodeResult AudioReceiver::decodePacket(const RtpBuffer::ResultL
     return result;
 }
 
-AudioReceiver::DecodeResult AudioReceiver::decodeNone(Audio::DataWindow& output, DecodeOptions options)
+AudioReceiver::DecodeResult AudioReceiver::decodeEmptyTo(Audio::DataWindow& output, DecodeOptions options)
 {
-    // ICELogDebug(<< "No packet available in jitter buffer");
+    // No packet available in jitter buffer - just increase the counter for now
     mFailedCount++;
-    return DecodeResult_Skip;
+    return {.mStatus = DecodeResult::Status::Skip};
 }
 
-AudioReceiver::DecodeResult AudioReceiver::getAudio(Audio::DataWindow& output, DecodeOptions options, int* rate)
+AudioReceiver::DecodeResult AudioReceiver::getAudioTo(Audio::DataWindow& output, DecodeOptions options)
 {
-    DecodeResult result = DecodeResult_Skip;
+    DecodeResult result = {.mStatus = DecodeResult::Status::Skip};
 
-    // Get next packet from buffer
-    RtpBuffer::ResultList rl;
-    RtpBuffer::FetchResult fr = mBuffer.fetch(rl);
-    switch (fr)
+    size_t initialOffset = output.filled();   // Size in bytes
+    std::chrono::milliseconds decoded = 0ms;
+    do
     {
-    case RtpBuffer::FetchResult::Gap:           result = decodeGap(output, options);                break;
-    case RtpBuffer::FetchResult::NoPacket:      result = decodeNone(output, options);               break;
-    case RtpBuffer::FetchResult::RegularPacket: result = decodePacket(rl, output, options, rate);   break;
-    default:
-        assert(0);
-    }
+        // Get next packet from buffer
+        RtpBuffer::ResultList rl;
+        RtpBuffer::FetchResult fr = mBuffer.fetch(rl);
+        switch (fr)
+        {
+        case RtpBuffer::FetchResult::Gap:           result = decodeGapTo(output, options);          break;
+        case RtpBuffer::FetchResult::NoPacket:      result = decodeEmptyTo(output, options);        break;
+        case RtpBuffer::FetchResult::RegularPacket: result = decodePacketTo(output, options, rl);   break;
+        default:
+            assert(0);
+        }
 
-    if (result == DecodeResult_Ok)
+        size_t available = output.filled() - initialOffset;
+        if (!available)
+            break;
+        initialOffset  = output.filled();
+
+        // ToDo: calculate how much milliseconds was decoded
+        int samplerate = options.mResampleToMainRate ? AUDIO_SAMPLERATE : result.mSamplerate;
+        decoded += std::chrono::milliseconds(available / sizeof(short) / (samplerate / 1000));
+    }
+    while (decoded < options.mElapsed);
+
+    // Time statistics
+    if (result.mStatus == DecodeResult::Status::Ok)
     {
         // Decode statistics
-        if (!mLastDecodeTimestamp)
-            mLastDecodeTimestamp = std::chrono::steady_clock::now();
+        if (!mDecodeTimestamp)
+            mDecodeTimestamp = std::chrono::steady_clock::now();
         else
         {
             auto t = std::chrono::steady_clock::now();
-            mStat.mDecodingInterval.process(std::chrono::duration_cast<std::chrono::milliseconds>(t - *mLastDecodeTimestamp).count());
-            mLastDecodeTimestamp = t;
+            mStat.mDecodingInterval.process(std::chrono::duration_cast<std::chrono::milliseconds>(t - *mDecodeTimestamp).count());
+            mDecodeTimestamp = t;
         }
     }
     return result;
@@ -795,10 +812,16 @@ void AudioReceiver::updateAmrCodecStats(Codec* c)
     AmrWbCodec* wb = dynamic_cast<AmrWbCodec*>(c);
 
     if (nb != nullptr)
+    {
         mStat.mBitrateSwitchCounter = nb->getSwitchCounter();
+        mStat.mCng = nb->getCngCounter();
+    }
     else
     if (wb != nullptr)
+    {
         mStat.mBitrateSwitchCounter = wb->getSwitchCounter();
+        mStat.mCng = wb->getCngCounter();
+    }
 #endif
 }
 

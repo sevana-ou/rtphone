@@ -483,6 +483,7 @@ void Session::getSessionInfo(Session::InfoOptions options, VariantMap& info)
         info[SessionInfo_Rtt] = static_cast<float>(stat.mRttDelay * 1000);
 #if defined(USE_AMR_CODEC)
     info[SessionInfo_BitrateSwitchCounter] = stat.mBitrateSwitchCounter;
+    info[SessionInfo_CngCounter] = stat.mCng;
 #endif
     info[SessionInfo_SSRC] = stat.mSsrc;
     info[SessionInfo_RemotePeer] = stat.mRemotePeer.toStdString();

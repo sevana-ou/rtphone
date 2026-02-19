@@ -144,19 +144,27 @@ public:
 
     struct DecodeOptions
     {
-        bool mResampleToMainRate = true;
-        bool mFillGapByCNG = false;
-        bool mSkipDecode = false;
+        bool mResampleToMainRate = true;                // Resample all decoded audio to AUDIO_SAMPLERATE
+        bool mFillGapByCNG = false;                     // Use CNG information if available
+        bool mSkipDecode = false;                       // Don't do decode, just dry run - fetch packets, remove them from the jitter buffer
+        std::chrono::milliseconds mElapsed = 0ms;       // How much milliseconds should be decoded; zero value means "decode just next packet from the buffer"
     };
 
-    enum DecodeResult
+    struct DecodeResult
     {
-        DecodeResult_Ok,        // Decoded ok
-        DecodeResult_Skip,      // Just no data - emit silence instead
-        DecodeResult_BadPacket  // Error happened during the decode
+        enum class Status
+        {
+            Ok,        // Decoded ok
+            Skip,      // Just no data - emit silence instead
+            BadPacket  // Error happened during the decode
+        };
+
+        Status          mStatus = Status::Ok;
+        int             mSamplerate = 0;
+        int             mChannels = 0;
     };
 
-    DecodeResult getAudio(Audio::DataWindow& output, DecodeOptions options = {.mResampleToMainRate = true, .mFillGapByCNG = false, .mSkipDecode = false}, int* rate = nullptr);
+    DecodeResult getAudioTo(Audio::DataWindow& output, DecodeOptions options);
 
     // Looks for codec by payload type
     Codec* findCodec(int payloadType);
@@ -204,7 +212,7 @@ protected:
 
     Audio::PWavFileWriter mDecodedDump;
 
-    std::optional<std::chrono::steady_clock::time_point> mLastDecodeTimestamp; // Time last call happened to codec->decode()
+    std::optional<std::chrono::steady_clock::time_point> mDecodeTimestamp; // Time last call happened to codec->decode()
 
     float mIntervalSum = 0.0f;
     int mIntervalCount = 0;
@@ -220,9 +228,9 @@ protected:
     // Calculate bitrate switch statistics for AMR codecs
     void updateAmrCodecStats(Codec* c);
 
-    DecodeResult decodeGap(Audio::DataWindow& output, DecodeOptions options);
-    DecodeResult decodePacket(const RtpBuffer::ResultList& rl, Audio::DataWindow& output, DecodeOptions options, int* rate = nullptr);
-    DecodeResult decodeNone(Audio::DataWindow& output, DecodeOptions options);
+    DecodeResult decodeGapTo(Audio::DataWindow& output, DecodeOptions options);
+    DecodeResult decodePacketTo(Audio::DataWindow& output, DecodeOptions options, const RtpBuffer::ResultList& rl);
+    DecodeResult decodeEmptyTo(Audio::DataWindow& output, DecodeOptions options);
 };
 
 class DtmfReceiver: public Receiver

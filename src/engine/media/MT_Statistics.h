@@ -86,6 +86,7 @@ public:
 
     // AMR codec bitrate switch counter
     int                         mBitrateSwitchCounter = 0;
+    int                         mCng = 0;
     std::string                 mCodecName;
     float                       mJitter = 0.0f;         // Jitter
     TestResult<float>           mRttDelay;              // RTT delay

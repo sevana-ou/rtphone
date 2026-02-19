@@ -72,6 +72,7 @@ enum SessionInfo
   SessionInfo_BitrateSwitchCounter, // It is for AMR codecs only
   SessionInfo_RemotePeer,
   SessionInfo_SSRC,
+  SessionInfo_CngCounter            // For AMR codecs only
 };
 
 

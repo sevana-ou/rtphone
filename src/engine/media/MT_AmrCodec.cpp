@@ -61,7 +61,7 @@ struct AmrPayload
 //   Header
 //   Table of Contents
 //   Frames
-static AmrPayload parseAmrPayload(AmrPayloadInfo& input)
+static AmrPayload parseAmrPayload(AmrPayloadInfo& input, size_t& cngCounter)
 {
     AmrPayload result;
 
@@ -128,6 +128,8 @@ static AmrPayload parseAmrPayload(AmrPayloadInfo& input)
         frame.mTimestamp = input.mCurrentTimestamp;
         result.mFrames.push_back(frame);
         input.mCurrentTimestamp += input.mWideband ? 320 : 160;
+        if (FT == SID_FT)
+            cngCounter++;
     }
     while (F != 0);
 
@@ -140,11 +142,15 @@ static AmrPayload parseAmrPayload(AmrPayloadInfo& input)
         //   avoid the loss of data synchronization in the depacketization
         //   process, which can result in a huge degradation in speech quality.
         bool discard = input.mWideband ? (f.mFrameType >= 10 && f.mFrameType <= 13) : (f.mFrameType >= 9 && f.mFrameType <= 14);
-        // discard |= input.mWideband ? f.mFrameType >= 14 : f.mFrameType >= 15;
         if (discard)
         {
             result.mDiscardPacket = true;
             continue;
+        }
+
+        if (input.mWideband && f.mMode == 0xFF /* CNG */)
+        {
+            int a = 1;
         }
 
         if (input.mWideband && f.mFrameType == 15)
@@ -165,8 +171,8 @@ static AmrPayload parseAmrPayload(AmrPayloadInfo& input)
             continue;
         }
 
-        size_t bitsLength = input.mWideband ? amrwb_framelenbits[f.mFrameType] : amrnb_framelenbits[f.mFrameType];
-        size_t byteLength = input.mWideband ? amrwb_framelen[f.mFrameType] : amrnb_framelen[f.mFrameType];
+        size_t bitsLength = input.mWideband ? amrwb_framelenbits[f.mFrameType]  : amrnb_framelenbits[f.mFrameType];
+        size_t byteLength = input.mWideband ? amrwb_framelen[f.mFrameType]      : amrnb_framelen[f.mFrameType];
 
         if (bitsLength > 0)
         {
@@ -260,8 +266,7 @@ PCodec AmrNbCodec::CodecFactory::create()
 
 
 AmrNbCodec::AmrNbCodec(const AmrCodecConfig& config)
-    :mEncoderCtx(nullptr), mDecoderCtx(nullptr), mConfig(config), mCurrentDecoderTimestamp(0),
-      mSwitchCounter(0), mPreviousPacketLength(0)
+    :mConfig(config)
 {
     mEncoderCtx = Encoder_Interface_init(1);
     mDecoderCtx = Decoder_Interface_init();
@@ -397,7 +402,7 @@ int AmrNbCodec::decode(const void* input, int inputBytes, void* output, int outp
         AmrPayload ap;
         try
         {
-            ap = parseAmrPayload(info);
+            ap = parseAmrPayload(info, mCngCounter);
         }
         catch(...)
         {
@@ -457,6 +462,11 @@ int AmrNbCodec::plc(int lostFrames, void* output, int outputCapacity)
 int AmrNbCodec::getSwitchCounter() const
 {
     return mSwitchCounter;
+}
+
+int AmrNbCodec::getCngCounter() const
+{
+    return mCngCounter;
 }
 
 // -------- AMR WB codec
@@ -600,7 +610,7 @@ int AmrWbCodec::decodePlain(std::span<const uint8_t> input, std::span<uint8_t> o
     AmrPayload ap;
     try
     {
-        ap = parseAmrPayload(info);
+        ap = parseAmrPayload(info, mCngCounter);
     }
     catch(...)
     {
@@ -674,6 +684,10 @@ int AmrWbCodec::getSwitchCounter() const
     return mSwitchCounter;
 }
 
+int AmrWbCodec::getCngCounter() const
+{
+    return mCngCounter;
+}
 
 // ------------- GSM EFR -----------------
 

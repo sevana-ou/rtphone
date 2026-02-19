@@ -526,6 +526,8 @@ void AgentImpl::processGetMediaStats(JsonCpp::Value& request, JsonCpp::Value& an
             answer["rtt"] = result[SessionInfo_Rtt].asFloat();
         if (result.exists(SessionInfo_BitrateSwitchCounter))
             answer["bitrate_switch_counter"] = result[SessionInfo_BitrateSwitchCounter].asInt();
+        if (result.exists(SessionInfo_CngCounter))
+            answer["cng_counter"] = result[SessionInfo_CngCounter].asInt();
         if (result.exists(SessionInfo_SSRC))
             answer["rtp_ssrc"] = result[SessionInfo_SSRC].asInt();
         if (result.exists(SessionInfo_RemotePeer))
