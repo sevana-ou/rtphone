@@ -28,13 +28,6 @@ using jrtplib::RTPPacket;
 class RtpBuffer
 {
 public:
-    enum class FetchResult
-    {
-        RegularPacket,
-        Gap,
-        NoPacket
-    };
-
     // Owns rtp packet data
     class Packet
     {
@@ -59,6 +52,29 @@ public:
         std::chrono::microseconds mTimestamp = 0us;
     };
 
+    struct FetchResult
+    {
+        enum class Status
+        {
+            RegularPacket,
+            Gap,
+            NoPacket
+        };
+
+        Status mStatus = Status::NoPacket;
+        std::shared_ptr<Packet> mPacket;
+
+        std::string toString() const
+        {
+            switch (mStatus)
+            {
+                case Status::RegularPacket: return "packet";
+                case Status::Gap:           return "gap";
+                case Status::NoPacket:      return "empty";
+            }
+        }
+    };
+
     RtpBuffer(Statistics& stat);
     ~RtpBuffer();
 
@@ -81,12 +97,12 @@ public:
     int getCount() const;
 
     // Returns false if packet was not add - maybe too old or too new or duplicate
-    std::shared_ptr<Packet> add(std::shared_ptr<RTPPacket> packet, std::chrono::milliseconds timelength, int rate);
+    std::shared_ptr<Packet> add(const std::shared_ptr<RTPPacket>& packet, std::chrono::milliseconds timelength, int rate);
 
     typedef std::vector<std::shared_ptr<Packet>> ResultList;
     typedef std::shared_ptr<ResultList> PResultList;
 
-    FetchResult fetch(ResultList& rl);
+    FetchResult fetch();
     
 protected:
     unsigned    mSsrc = 0;
@@ -133,15 +149,6 @@ public:
     // Lifetime of pointer to codec is limited by lifetime of AudioReceiver (it is container).
     bool add(const std::shared_ptr<jrtplib::RTPPacket>& p, Codec** codec = nullptr);
 
-    // Returns false when there is no rtp data from jitter
-    /*enum DecodeOptions
-    {
-        DecodeOptions_ResampleToMainRate = 0,
-        DecodeOptions_DontResample = 1,
-        DecodeOptions_FillCngGap = 2,
-        DecodeOptions_SkipDecode = 4
-    };*/
-
     struct DecodeOptions
     {
         bool mResampleToMainRate = true;                // Resample all decoded audio to AUDIO_SAMPLERATE
@@ -168,7 +175,7 @@ public:
 
     // Looks for codec by payload type
     Codec* findCodec(int payloadType);
-    RtpBuffer& getRtpBuffer() { return mBuffer; }
+    RtpBuffer&  getRtpBuffer() { return mBuffer; }
 
     // Returns size of AudioReceiver's instance in bytes (including size of all data + codecs + etc.)
     int getSize() const;
@@ -187,11 +194,14 @@ protected:
     CodecList::Settings                 mCodecSettings;
     CodecList                           mCodecList;
     JitterStatistics                    mJitterStats;
-    std::shared_ptr<jrtplib::RTPPacket> mCngPacket;
+    std::shared_ptr<RtpBuffer::Packet>  mCngPacket;
     CngDecoder                          mCngDecoder;
     size_t                              mDTXSamplesToEmit = 0;   // How much silence (or CNG) should be emited before next RTP packet gets into the action
 
-    // Buffer to hold decoded data
+    // Already decoded data that can be retrieved without actual decoding - it may happen because of getAudioTo() may be limited by time interval
+    Audio::DataWindow mAvailable;
+
+    // Temporary buffer to hold decoded data (it is better than allocate data on stack)
     int16_t mDecodedFrame[MT_MAX_DECODEBUFFER];
     size_t mDecodedLength = 0;
 
@@ -208,7 +218,10 @@ protected:
     std::optional<uint32_t> mLastPacketTimestamp;
 
     int mFailedCount = 0;
-    Audio::Resampler  mResampler8, mResampler16, mResampler32, mResampler48;
+    Audio::Resampler  mResampler8,
+                      mResampler16,
+                      mResampler32,
+                      mResampler48;
 
     Audio::PWavFileWriter mDecodedDump;
 
@@ -229,7 +242,7 @@ protected:
     void updateAmrCodecStats(Codec* c);
 
     DecodeResult decodeGapTo(Audio::DataWindow& output, DecodeOptions options);
-    DecodeResult decodePacketTo(Audio::DataWindow& output, DecodeOptions options, const RtpBuffer::ResultList& rl);
+    DecodeResult decodePacketTo(Audio::DataWindow& output, DecodeOptions options, const std::shared_ptr<RtpBuffer::Packet>& p);
     DecodeResult decodeEmptyTo(Audio::DataWindow& output, DecodeOptions options);
 };
 

@@ -58,9 +58,10 @@ public:
     int frameTime() override;
     int samplerate() override;
     int channels() override;
-    int encode(const void* input, int inputBytes, void* output, int outputCapacity) override;
-    int decode(const void* input, int inputBytes, void* output, int outputCapacity) override;
-    int plc(int lostFrames, void* output, int outputCapacity) override;
+
+    EncodeResult    encode(std::span<const uint8_t> input, std::span<uint8_t> output) override;
+    DecodeResult    decode(std::span<const uint8_t> input, std::span<uint8_t> output) override;
+    size_t          plc(int lostFrames, std::span<uint8_t> output) override;
 };
 
 class OpusCodec: public Codec
@@ -112,9 +113,10 @@ public:
     int frameTime();
     int samplerate();
     int channels();
-    int encode(const void* input, int inputBytes, void* output, int outputCapacity);
-    int decode(const void* input, int inputBytes, void* output, int outputCapacity);
-    int plc(int lostFrames, void* output, int outputCapacity);
+
+    EncodeResult    encode(std::span<const uint8_t> input, std::span<uint8_t> output);
+    DecodeResult    decode(std::span<const uint8_t> input, std::span<uint8_t> output);
+    size_t          plc(int lostFrames, std::span<uint8_t> output);
 };
 
 
@@ -146,14 +148,15 @@ public:
 
     IlbcCodec(int packetTime);
     virtual ~IlbcCodec();
-    const char* name();
-    int pcmLength();
-    int rtpLength();
-    int frameTime();
-    int samplerate();
-    int encode(const void* input, int inputBytes, void* output, int outputCapacity);
-    int decode(const void* input, int inputBytes, void* output, int outputCapacity);
-    int plc(int lostFrames, void* output, int outputCapacity);
+    const char* name() override;
+    int pcmLength() override;
+    int rtpLength() override;
+    int frameTime() override;
+    int samplerate() override;
+
+    EncodeResult    encode(std::span<const uint8_t> input, std::span<uint8_t> output) override;
+    DecodeResult    decode(std::span<const uint8_t> input, std::span<uint8_t> output) override;
+    size_t          plc(int lostFrames, std::span<uint8_t> output) override;
 };
 
 class G711Codec: public Codec
@@ -186,15 +189,15 @@ public:
     G711Codec(int type);
     ~G711Codec();
     
-    const char* name();
-    int    pcmLength();
-    int    frameTime();
-    int    rtpLength();
-    int    samplerate();
+    const char* name()  override;
+    int    pcmLength()  override;
+    int    frameTime()  override;
+    int    rtpLength()  override;
+    int    samplerate()  override;
 
-    int encode(const void* input, int inputBytes, void* output, int outputCapacity);
-    int decode(const void* input, int inputBytes, void* output, int outputCapacity);
-    int plc(int lostSamples, void* output, int outputCapacity);
+    EncodeResult encode(std::span<const uint8_t> input, std::span<uint8_t> output) override;
+    DecodeResult decode(std::span<const uint8_t> input, std::span<uint8_t> output) override;
+    size_t       plc(int lostSamples, std::span<uint8_t> output) override ;
 
 protected:
     int mType;    /// Determines if it is u-law or a-law codec. Its value is ALaw or ULaw.
@@ -237,15 +240,15 @@ public:
     IsacCodec(int sampleRate);
     ~IsacCodec();
     
-    const char* name();
-    int pcmLength();
-    int rtpLength();
-    int frameTime();
-    int samplerate();
+    const char* name() override;
+    int pcmLength() override;
+    int rtpLength() override;
+    int frameTime() override;
+    int samplerate() override;
 
-    int encode(const void* input, int inputBytes, void* output, int outputCapacity);
-    int decode(const void* input, int inputBytes, void* output, int outputCapacity);
-    int plc(int lostFrames, void* output, int outputCapacity);
+    EncodeResult    encode(std::span<const uint8_t> input, std::span<uint8_t> output) override;
+    DecodeResult    decode(std::span<const uint8_t> input, std::span<uint8_t> output) override;
+    size_t          plc(int lostFrames, std::span<uint8_t> output) override;
 };
 
 
@@ -311,11 +314,11 @@ public:
     /*! Destructor. */
     virtual ~GsmCodec();
 
-    const char* name();
-    int pcmLength();
-    int rtpLength();
-    int frameTime();
-    int samplerate();
+    const char* name() override;
+    int pcmLength() override;
+    int rtpLength() override;
+    int frameTime() override;
+    int samplerate() override;
 
     int encode(const void* input, int inputBytes, void* output, int outputCapacity);
     int decode(const void* input, int inputBytes, void* output, int outputCapacity);

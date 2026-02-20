@@ -635,10 +635,10 @@ int IlbcCodec::samplerate()
     return 8000;
 }
 
-int IlbcCodec::encode(const void *input, int inputBytes, void* outputBuffer, int outputCapacity)
+Codec::EncodeResult IlbcCodec::encode(const void *input, int inputBytes, void* outputBuffer, int outputCapacity)
 {
     if (inputBytes % pcmLength())
-        return 0;
+        return {};
 
     // Declare the data input pointer
     short *dataIn = (short *)input;
@@ -657,10 +657,10 @@ int IlbcCodec::encode(const void *input, int inputBytes, void* outputBuffer, int
         dataOut += rtpLength();
     }
 
-    return frames * rtpLength();
+    return {frames * rtpLength()};
 }
 
-int IlbcCodec::decode(const void* input, int inputBytes, void* output, int outputCapacity)
+Codec::DecodeResult IlbcCodec::decode(const void* input, int inputBytes, void* output, int outputCapacity)
 {
     unsigned frames = inputBytes / rtpLength();
 
@@ -675,12 +675,12 @@ int IlbcCodec::decode(const void* input, int inputBytes, void* output, int outpu
         dataOut += pcmLength() / 2;
     }
 
-    return frames * pcmLength();
+    return {frames * pcmLength()};
 }
 
-int IlbcCodec::plc(int lostFrames, void* output, int outputCapacity)
+int IlbcCodec::plc(int lostFrames, std::span<uint8_t> output)
 {
-    return 2 * WebRtcIlbcfix_DecodePlc(mDecoderCtx, (WebRtc_Word16*)output, lostFrames);
+    return sizeof(short) * WebRtcIlbcfix_DecodePlc(mDecoderCtx, (WebRtc_Word16*)output.data(), lostFrames);
 }
 
 // --- IlbcFactory ---

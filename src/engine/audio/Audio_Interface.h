@@ -51,6 +51,11 @@ struct Format
         return float((milliseconds * mRate) / 500.0 * mChannels);
     }
 
+    size_t sizeFromTime(std::chrono::milliseconds ms) const
+    {
+        return sizeFromTime(ms.count());
+    }
+
     std::string toString()
     {
         char buffer[64];

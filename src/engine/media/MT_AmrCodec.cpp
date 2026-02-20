@@ -31,30 +31,30 @@ const uint16_t amrwb_framelenbits[10] =
 
 struct AmrPayloadInfo
 {
-    const uint8_t*  mPayload;
-    int             mPayloadLength;
-    bool            mOctetAligned;
-    bool            mInterleaving;
-    bool            mWideband;
-    uint64_t        mCurrentTimestamp;
+    const uint8_t*  mPayload = nullptr;
+    int             mPayloadLength = 0;
+    bool            mOctetAligned = false;
+    bool            mInterleaving = false;
+    bool            mWideband = false;
+    uint64_t        mCurrentTimestamp = 0;
 };
 
 
 struct AmrFrame
 {
-    uint8_t               mFrameType;
-    uint8_t               mMode;
-    bool                  mGoodQuality;
-    uint64_t              mTimestamp;
+    uint8_t               mFrameType = 0;
+    uint8_t               mMode = 0;
+    bool                  mGoodQuality = false;
+    uint64_t              mTimestamp = 0;
     std::shared_ptr<ByteBuffer> mData;
-    uint8_t               mSTI;
+    uint8_t               mSTI = 0;
 };
 
 struct AmrPayload
 {
-    uint8_t               mCodeModeRequest;
+    uint8_t               mCodeModeRequest = 0;
     std::vector<AmrFrame> mFrames;
-    bool                  mDiscardPacket;
+    bool                  mDiscardPacket = false;
 };
 
 // ARM RTP payload has next structure
@@ -148,10 +148,10 @@ static AmrPayload parseAmrPayload(AmrPayloadInfo& input, size_t& cngCounter)
             continue;
         }
 
-        if (input.mWideband && f.mMode == 0xFF /* CNG */)
-        {
-            int a = 1;
-        }
+        // if (input.mWideband && f.mMode == 0xFF /* CNG */)
+        // {
+        //     int a = 1;
+        // }
 
         if (input.mWideband && f.mFrameType == 15)
         {
@@ -600,12 +600,12 @@ int AmrWbCodec::decodeIuup(std::span<const uint8_t> input, std::span<uint8_t> ou
 int AmrWbCodec::decodePlain(std::span<const uint8_t> input, std::span<uint8_t> output)
 {
     AmrPayloadInfo info;
-    info.mCurrentTimestamp = mCurrentDecoderTimestamp;
-    info.mOctetAligned = mConfig.mOctetAligned;
-    info.mPayload = input.data();
-    info.mPayloadLength = input.size();
-    info.mWideband = true;
-    info.mInterleaving = false;
+    info.mCurrentTimestamp  = mCurrentDecoderTimestamp;
+    info.mOctetAligned      = mConfig.mOctetAligned;
+    info.mPayload           = input.data();
+    info.mPayloadLength     = input.size();
+    info.mWideband          = true;
+    info.mInterleaving      = false;
 
     AmrPayload ap;
     try
@@ -628,21 +628,30 @@ int AmrWbCodec::decodePlain(std::span<const uint8_t> input, std::span<uint8_t> o
         return 0;
     }
 
-    // Check for output buffer capacity
-    if (output.size() < (int)ap.mFrames.size() * pcmLength())
+    // Find the required output capacity
+    size_t capacity = 0;
+    for (AmrFrame& frame: ap.mFrames)
+        capacity += frame.mMode == 0xFF /* CNG */ ? pcmLength() * 8 : pcmLength();
+
+    if (output.size() < capacity)
         return 0;
 
     short* dataOut = (short*)output.data();
     size_t dataOutSizeInBytes = 0;
     for (AmrFrame& frame: ap.mFrames)
     {
-        memset(dataOut, 0, static_cast<size_t>(pcmLength()));
+        size_t frameOutputSize = frame.mMode == 0xFF ? pcmLength() * 8 : pcmLength();
+        memset(dataOut, 0, frameOutputSize);
 
         if (frame.mData)
         {
+            if (frame.mMode == 0xFF)
+            {
+                // int bp = 1;
+            }
             D_IF_decode(mDecoderCtx, (const unsigned char*)frame.mData->data(), (short*)dataOut, 0);
-            dataOut += pcmLength() / 2;
-            dataOutSizeInBytes += pcmLength();
+            dataOut += frameOutputSize / 2;
+            dataOutSizeInBytes += frameOutputSize;
         }
     }
     return dataOutSizeInBytes;

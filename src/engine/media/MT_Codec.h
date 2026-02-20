@@ -10,7 +10,7 @@
 #include "../helper/HL_Types.h"
 #include <map>
 #include "../helper/HL_Pointer.h"
-
+#include "../audio/Audio_Interface.h"
 
 namespace MT
 {
@@ -18,8 +18,7 @@ class Codec;
 typedef std::shared_ptr<Codec> PCodec;
 
 class CodecMap: public std::map<int, PCodec>
-{
-};
+{};
 
 class Codec
 {
@@ -58,18 +57,28 @@ public:
     // Number of audio channels
     virtual int channels() { return 1; }
 
-
     // Returns size of encoded data (RTP) in bytes
-    virtual int encode(const void* input, int inputBytes, void* output, int outputCapacity) = 0;
+    struct EncodeResult
+    {
+        size_t mEncoded = 0; // Number of encoded bytes
+    };
+    virtual EncodeResult encode(std::span<const uint8_t> input, std::span<uint8_t> output) = 0;
 
     // Returns size of decoded data (PCM signed short) in bytes
-    virtual int decode(const void* input, int inputBytes, void* output, int outputCapacity) = 0;
+    struct DecodeResult
+    {
+        size_t  mDecoded = 0;    // Number of decoded bytes
+        bool    mIsCng = false;    // Should this packet to be used as CNG ? (used for AMR codecs)
+    };
+    virtual DecodeResult decode(std::span<const uint8_t> input, std::span<uint8_t> output) = 0;
 
     // Returns size of produced data (PCM signed short) in bytes
-    virtual int plc(int lostFrames, void* output, int outputCapacity) = 0;
+    virtual size_t plc(int lostFrames, std::span<uint8_t> output) = 0;
 
     // Returns size of codec in memory
-    virtual int getSize() const { return 0; };
+    virtual size_t getSize() const { return 0; };
+
+    virtual Audio::Format getAudioFormat() { return Audio::Format(this->samplerate(), this->channels());};
 };
 }
 #endif
