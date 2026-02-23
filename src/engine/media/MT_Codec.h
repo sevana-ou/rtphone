@@ -23,6 +23,7 @@ class CodecMap: public std::map<int, PCodec>
 class Codec
 {
 public:
+
     class Factory
     {
     public:
@@ -41,21 +42,30 @@ public:
         resip::Codec resipCodec();
     };
     virtual ~Codec() {}
-    virtual const char* name() = 0;
-    virtual int samplerate() = 0;
-    virtual float timestampUnit() { return float(1.0 / samplerate()); }
 
-    // Size of decoded audio frame in bytes
-    virtual int pcmLength() = 0;
+    struct Info
+    {
+        std::string mName;
+        int mSamplerate = 0;    // Hz
+        int mChannels = 0;
+        int mPcmLength = 0;     // In bytes
+        int mFrameTime = 0;     // In milliseconds
+        int mRtpLength = 0;     // In bytes
+    };
+    // Returns information about this codec instance
+    virtual Info info() = 0;
 
-    // Time length of single audio frame
-    virtual int frameTime() = 0;
+    // Helper functions to return information - they are based on info() method
+    int pcmLength()     { return info().mPcmLength;  }
+    int rtpLength()     { return info().mRtpLength;  }
+    int channels()      { return info().mChannels;   }
+    int samplerate()    { return info().mSamplerate; }
+    int frameTime()     { return info().mFrameTime;  }
+    std::string name()  { return info().mName;       }
 
-    // Size of RTP frame in bytes. Can be zero for variable sized codecs.
-    virtual int rtpLength() = 0;
-
-    // Number of audio channels
-    virtual int channels() { return 1; }
+    Audio::Format getAudioFormat() {
+        return Audio::Format(this->info().mSamplerate, this->info().mChannels);
+    }
 
     // Returns size of encoded data (RTP) in bytes
     struct EncodeResult
@@ -75,10 +85,6 @@ public:
     // Returns size of produced data (PCM signed short) in bytes
     virtual size_t plc(int lostFrames, std::span<uint8_t> output) = 0;
 
-    // Returns size of codec in memory
-    virtual size_t getSize() const { return 0; };
-
-    virtual Audio::Format getAudioFormat() { return Audio::Format(this->samplerate(), this->channels());};
 };
 }
 #endif

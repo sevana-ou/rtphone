@@ -17,18 +17,19 @@ def make_build() -> Path:
     if Path(DIR_BUILD).exists():
         shutil.rmtree(DIR_BUILD)
     os.mkdir(DIR_BUILD)
-    os.chdir(DIR_BUILD)  
-    
-    cmd = f'cmake ../src -G Ninja'
+    os.chdir(DIR_BUILD)
+
+    # OPUS_X86_MAY_HAVE_SSE4_1 is for clang builds
+    cmd = f'cmake ../src -G Ninja -D OPUS_X86_MAY_HAVE_SSE4_1=ON'
     retcode = os.system(cmd)
     if retcode != 0:
         raise RuntimeError('Problem when configuring the project')
-    
+
     cmd = f'cmake --build . -j {multiprocessing.cpu_count()}'
     retcode = os.system(cmd)
     if retcode != 0:
         raise RuntimeError('Problem when building the project')
-    
+
     os.chdir('..')
     return Path(DIR_BUILD) / 'librtphone.a'
 

@@ -65,6 +65,7 @@ void thread_pool::run_worker()
                 tasks.pop();
             }
         }
-        t(); // function<void()> type
+        if (t)
+            t(); // function<void()> type
     }
 }

@@ -40,24 +40,19 @@ public:
     {
     public:
         const char* name() override;
-        int channels() override;
-        int samplerate() override;
-        int payloadType() override;
+        int  channels() override;
+        int  samplerate() override;
+        int  payloadType() override;
 
         void updateSdp(resip::SdpContents::Session::Medium::CodecContainer& codecs, SdpDirection direction) override;
-        int processSdp(const resip::SdpContents::Session::Medium::CodecContainer& codecs, SdpDirection direction) override;
+        int  processSdp(const resip::SdpContents::Session::Medium::CodecContainer& codecs, SdpDirection direction) override;
 
         PCodec create() override;
     };
     G729Codec();
     ~G729Codec() override;
 
-    const char* name() override;
-    int pcmLength() override;
-    int rtpLength() override;
-    int frameTime() override;
-    int samplerate() override;
-    int channels() override;
+    Info info() override;
 
     EncodeResult    encode(std::span<const uint8_t> input, std::span<uint8_t> output) override;
     DecodeResult    decode(std::span<const uint8_t> input, std::span<uint8_t> output) override;
@@ -67,16 +62,19 @@ public:
 class OpusCodec: public Codec
 {
 protected:
-    OpusEncoder        *mEncoderCtx;
-    OpusDecoder        *mDecoderCtx;
-    int mPTime, mSamplerate, mChannels;
-    // Audio::SpeexResampler mDecodeResampler;
-    int mDecoderChannels;
+    OpusEncoder        *mEncoderCtx = nullptr;
+    OpusDecoder        *mDecoderCtx = nullptr;
+    int mPTime = 0, mSamplerate = 0, mChannels = 0;
+    int mDecoderChannels = 0;
 public:
     struct Params
     {
-        bool mUseDtx, mUseInbandFec, mStereo;
-        int mPtime, mTargetBitrate, mExpectedPacketLoss;
+        bool mUseDtx = false,
+             mUseInbandFec = false,
+             mStereo = false;
+        int mPtime = 0,
+            mTargetBitrate = 0,
+            mExpectedPacketLoss = 0;
 
         Params();
         resip::Data toString() const;
@@ -103,29 +101,24 @@ public:
         PCodec create() override;
     };
 
-    OpusCodec(int samplerate, int channels, int ptime);
+    OpusCodec(Audio::Format fmt, int ptime);
     ~OpusCodec();
     void applyParams(const Params& params);
 
-    const char* name();
-    int pcmLength();
-    int rtpLength();
-    int frameTime();
-    int samplerate();
-    int channels();
+    Info info() override;
 
-    EncodeResult    encode(std::span<const uint8_t> input, std::span<uint8_t> output);
-    DecodeResult    decode(std::span<const uint8_t> input, std::span<uint8_t> output);
-    size_t          plc(int lostFrames, std::span<uint8_t> output);
+    EncodeResult    encode(std::span<const uint8_t> input, std::span<uint8_t> output) override;
+    DecodeResult    decode(std::span<const uint8_t> input, std::span<uint8_t> output) override;
+    size_t          plc(int lostFrames, std::span<uint8_t> output) override;
 };
 
 
 class IlbcCodec: public Codec
 {
 protected:
-    int                 mPacketTime;          /// Single frame time (20 or 30 ms)
-    iLBC_encinst_t*     mEncoderCtx;
-    iLBC_decinst_t*     mDecoderCtx;
+    int                 mPacketTime = 0;          /// Single frame time (20 or 30 ms)
+    iLBC_encinst_t*     mEncoderCtx = nullptr;
+    iLBC_decinst_t*     mDecoderCtx = nullptr;
     
 public:
     class IlbcFactory: public Factory
@@ -148,11 +141,7 @@ public:
 
     IlbcCodec(int packetTime);
     virtual ~IlbcCodec();
-    const char* name() override;
-    int pcmLength() override;
-    int rtpLength() override;
-    int frameTime() override;
-    int samplerate() override;
+    Info info() override;
 
     EncodeResult    encode(std::span<const uint8_t> input, std::span<uint8_t> output) override;
     DecodeResult    decode(std::span<const uint8_t> input, std::span<uint8_t> output) override;
@@ -189,11 +178,7 @@ public:
     G711Codec(int type);
     ~G711Codec();
     
-    const char* name()  override;
-    int    pcmLength()  override;
-    int    frameTime()  override;
-    int    rtpLength()  override;
-    int    samplerate()  override;
+    Info info() override;
 
     EncodeResult encode(std::span<const uint8_t> input, std::span<uint8_t> output) override;
     DecodeResult decode(std::span<const uint8_t> input, std::span<uint8_t> output) override;
@@ -206,9 +191,9 @@ protected:
 class IsacCodec: public Codec
 {
 protected:
-    int                       mSamplerate;
-    ISACFIX_MainStruct*       mEncoderCtx;
-    ISACFIX_MainStruct*       mDecoderCtx;
+    int                       mSamplerate = 0;
+    ISACFIX_MainStruct*       mEncoderCtx = nullptr;
+    ISACFIX_MainStruct*       mDecoderCtx = nullptr;
 public:
     class IsacFactory16K: public Factory
     {
@@ -240,11 +225,7 @@ public:
     IsacCodec(int sampleRate);
     ~IsacCodec();
     
-    const char* name() override;
-    int pcmLength() override;
-    int rtpLength() override;
-    int frameTime() override;
-    int samplerate() override;
+    Info info() override;
 
     EncodeResult    encode(std::span<const uint8_t> input, std::span<uint8_t> output) override;
     DecodeResult    decode(std::span<const uint8_t> input, std::span<uint8_t> output) override;
@@ -312,17 +293,13 @@ public:
     GsmCodec(Type codecType);
 
     /*! Destructor. */
-    virtual ~GsmCodec();
+    ~GsmCodec();
 
-    const char* name() override;
-    int pcmLength() override;
-    int rtpLength() override;
-    int frameTime() override;
-    int samplerate() override;
+    Info info() override;
 
-    int encode(const void* input, int inputBytes, void* output, int outputCapacity);
-    int decode(const void* input, int inputBytes, void* output, int outputCapacity);
-    int plc(int lostFrames, void* output, int outputCapacity);
+    EncodeResult encode(std::span<const uint8_t> input, std::span<uint8_t> output) override;
+    DecodeResult decode(std::span<const uint8_t> input, std::span<uint8_t> output) override;
+    size_t plc(int lostFrames, std::span<uint8_t> output) override;
 };
 
 /// GSM MIME name
@@ -361,25 +338,19 @@ public:
         PCodec create();
     };
     G722Codec();
-    virtual ~G722Codec();
+    ~G722Codec();
 
-    const char* name();
-    int pcmLength();
-    int rtpLength();
-    int frameTime();
-    int samplerate();
+    Info info() override;
 
-    int encode(const void* input, int inputBytes, void* output, int outputCapacity);
-    int decode(const void* input, int inputBytes, void* output, int outputCapacity);
-    int plc(int lostFrames, void* output, int outputCapacity);
-
-    //unsigned GetSamplerate() { return 16000; }
+    EncodeResult encode(std::span<const uint8_t> input, std::span<uint8_t> output) override;
+    DecodeResult decode(std::span<const uint8_t> input, std::span<uint8_t> output) override;
+    size_t plc(int lostFrames, std::span<uint8_t> output) override;
 };
 
 class GsmHrCodec: public Codec
 {
 protected:
-    void* mDecoder;
+    void* mDecoder = nullptr;
 
 public:
     class GsmHrFactory: public Factory
@@ -399,15 +370,11 @@ public:
     GsmHrCodec();
     ~GsmHrCodec() override;
 
-    const char* name() override;
-    int pcmLength() override;
-    int rtpLength() override;
-    int frameTime() override;
-    int samplerate() override;
+    Info info() override;
 
-    int encode(const void* input, int inputBytes, void* output, int outputCapacity) override;
-    int decode(const void* input, int inputBytes, void* output, int outputCapacity) override;
-    int plc(int lostFrames, void* output, int outputCapacity) override;
+    EncodeResult    encode(std::span<const uint8_t> input, std::span<uint8_t> output) override;
+    DecodeResult    decode(std::span<const uint8_t> input, std::span<uint8_t> output) override;
+    size_t          plc(int lostFrames, std::span<uint8_t> output) override;
 };
 }
 

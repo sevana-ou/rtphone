@@ -91,38 +91,20 @@ G729Codec::~G729Codec()
     }
 }
 
-const char* G729Codec::name()
+Codec::Info G729Codec::info()
 {
-    return "G729";
-}
-
-int G729Codec::pcmLength()
-{
-    return 10 * 8 * 2;
-}
-
-int G729Codec::rtpLength()
-{
-    return 10;
-}
-
-int G729Codec::frameTime()
-{
-    return 10;
-}
-
-int G729Codec::samplerate()
-{
-    return 8000;
-}
-
-int G729Codec::channels()
-{
-    return 1;
+    return {
+        .mName = "G729",
+        .mSamplerate = 8000,
+        .mChannels = 1,
+        .mPcmLength = 10 * 8 * 2,
+        .mFrameTime = 10,
+        .mRtpLength = 10
+    };
 }
 
 // static const int SamplesPerFrame = 80;
-int G729Codec::encode(const void* input, int inputBytes, void* output, int outputCapacity)
+Codec::EncodeResult G729Codec::encode(std::span<const uint8_t> input, std::span<uint8_t> output)
 {
     // Create encoder if it is not done yet
     if (!mEncoder)
@@ -131,24 +113,24 @@ int G729Codec::encode(const void* input, int inputBytes, void* output, int outpu
         if (mEncoder)
             Init_Pre_Process(mEncoder);
     }
-    int result = 0;
+    size_t result = 0;
     if (mEncoder)
     {
-        int nrOfFrames = inputBytes / 160; // 10ms frames
-        Word16 parm[PRM_SIZE]; // ITU's service buffer
+        int nrOfFrames = input.size_bytes() / 160;  // 10ms frames
+        Word16 parm[PRM_SIZE];                      // ITU's service buffer
         for (int frameIndex = 0; frameIndex < nrOfFrames; frameIndex++)
         {
-            Copy((int16_t*)input + frameIndex * pcmLength() / 2, mEncoder->new_speech, pcmLength() / 2);
-            Pre_Process(mEncoder, mEncoder->new_speech, pcmLength() / 2);
+            Copy((int16_t*)input.data() + frameIndex * info().mPcmLength / 2, mEncoder->new_speech, info().mPcmLength / 2);
+            Pre_Process(mEncoder, mEncoder->new_speech, info().mPcmLength / 2);
             Coder_ld8a(mEncoder, parm);
-            Store_Params(parm, (uint8_t*)output + frameIndex * rtpLength());
-            result += rtpLength();
+            Store_Params(parm, output.data() + frameIndex * info().mRtpLength);
+            result += info().mRtpLength;
         }
     }
-    return result;
+    return {result};
 }
 
-int G729Codec::decode(const void* input, int inputBytes, void* output, int outputCapacity)
+Codec::DecodeResult G729Codec::decode(std::span<const uint8_t> input, std::span<uint8_t> output)
 {
     if (!mDecoder)
     {
@@ -160,29 +142,29 @@ int G729Codec::decode(const void* input, int inputBytes, void* output, int outpu
         }
     }
 
-    int result = 0;
+    size_t result = 0;
     if (mDecoder)
     {
         // See if there are silence bytes in the end
-        bool isSilence = (inputBytes % rtpLength()) / 2 != 0;
+        bool isSilence = (input.size_bytes() % info().mRtpLength) / 2 != 0;
 
         // Find number of frames
-        int nrOfFrames = inputBytes / rtpLength();
-        nrOfFrames = std::min(outputCapacity / pcmLength(), nrOfFrames);
+        int nrOfFrames = input.size_bytes() / info().mRtpLength;
+        nrOfFrames = std::min(output.size_bytes() / info().mPcmLength, (size_t)nrOfFrames);
 
         for (int frameIndex = 0; frameIndex < nrOfFrames; frameIndex++)
-            decodeFrame((const uint8_t*)input + frameIndex * rtpLength(), (int16_t*)output + frameIndex * pcmLength());
+            decodeFrame(input.data() + frameIndex * info().mRtpLength, (int16_t*)output.data() + frameIndex * info().mPcmLength);
 
-        result += nrOfFrames * pcmLength();
+        result += nrOfFrames * info().mPcmLength;
 
-        if (isSilence && nrOfFrames < outputCapacity / pcmLength())
+        if (isSilence && nrOfFrames < output.size_bytes() / info().mPcmLength)
         {
-            memset((uint8_t*)output + nrOfFrames * pcmLength(), 0, pcmLength());
-            result += pcmLength();
+            memset(output.data() + nrOfFrames * info().mPcmLength, 0, info().mPcmLength);
+            result += info().mPcmLength;
         }
     }
 
-    return result;
+    return {.mDecoded = result, .mIsCng = false};
 }
 
 void G729Codec::decodeFrame(const uint8_t* rtp, int16_t* pcm)
@@ -217,7 +199,7 @@ void G729Codec::decodeFrame(const uint8_t* rtp, int16_t* pcm)
 }
 
 
-int G729Codec::plc(int lostFrames, void* output, int outputCapacity)
+size_t G729Codec::plc(int lostFrames, std::span<uint8_t> output)
 {
     return 0;
 }
@@ -390,7 +372,7 @@ int OpusCodec::OpusFactory::processSdp(const resip::SdpContents::Session::Medium
 
 PCodec OpusCodec::OpusFactory::create()
 {
-    OpusCodec* result = new OpusCodec(mSamplerate, mChannels, mParams.mPtime);
+    OpusCodec* result = new OpusCodec(Audio::Format(mSamplerate, mChannels), mParams.mPtime);
     result->applyParams(mParams);
     PCodec c(result);
     mCodecList.push_back(c);
@@ -398,8 +380,8 @@ PCodec OpusCodec::OpusFactory::create()
     return c;
 }
 
-OpusCodec::OpusCodec(int samplerate, int channels, int ptime)
-    :mEncoderCtx(nullptr), mDecoderCtx(nullptr), mChannels(channels), mPTime(ptime), mSamplerate(samplerate), mDecoderChannels(0)
+OpusCodec::OpusCodec(Audio::Format fmt, int ptime)
+    :mEncoderCtx(nullptr), mDecoderCtx(nullptr), mChannels(fmt.channels()), mPTime(ptime), mSamplerate(fmt.rate()), mDecoderChannels(0)
 {
     int status;
     mEncoderCtx = opus_encoder_create(mSamplerate, mChannels, OPUS_APPLICATION_VOIP, &status);
@@ -441,52 +423,34 @@ OpusCodec::~OpusCodec()
     }
 }
 
-const char* OpusCodec::name()
-{
-    return OPUS_CODEC_NAME;
+Codec::Info OpusCodec::info() {
+    return {
+        .mName = OPUS_CODEC_NAME,
+        .mSamplerate = mSamplerate,
+        .mChannels = mChannels,
+        .mPcmLength = (int)(mSamplerate / 1000 * sizeof(short) * mChannels * mPTime),
+        .mFrameTime = mPTime,
+        .mRtpLength = 0 /* VBR */
+    };
 }
 
-int OpusCodec::pcmLength()
-{
-    return (samplerate() / 1000 ) * frameTime() * sizeof(short) * channels();
-}
-
-int OpusCodec::channels()
-{
-    return mChannels;
-}
-
-int OpusCodec::rtpLength()
-{
-    return 0; // VBR
-}
-
-int OpusCodec::frameTime()
-{
-    return mPTime;
-}
-
-int OpusCodec::samplerate()
-{
-    return mSamplerate;
-}
-
-int OpusCodec::encode(const void* input, int inputBytes, void* output, int outputCapacity)
+Codec::EncodeResult OpusCodec::encode(std::span<const uint8_t> input, std::span<uint8_t> output)
 {
     // Send number of samples for input and number of bytes for output
-    int written = opus_encode(mEncoderCtx, (const opus_int16*)input, inputBytes / (sizeof(short) * channels()), (unsigned char*)output, outputCapacity / (sizeof(short) * channels()));
+    int written = opus_encode(mEncoderCtx, (const opus_int16*)input.data(), input.size_bytes() / (sizeof(short) * channels()),
+                              output.data(), output.size_bytes() / (sizeof(short) * channels()));
     if (written < 0)
-        return 0;
+        return {.mEncoded = 0};
     else
-        return written;
+        return {.mEncoded = (size_t)written};
 }
 
-int OpusCodec::decode(const void* input, int inputBytes, void* output, int outputCapacity)
+Codec::DecodeResult OpusCodec::decode(std::span<const uint8_t> input, std::span<uint8_t> output)
 {
     int result = 0;
 
     // Examine the number of channels available in incoming packet
-    int nr_of_channels = opus_packet_get_nb_channels((const unsigned char *) input);
+    int nr_of_channels = opus_packet_get_nb_channels(input.data());
 
     // Recreate decoder if needed
     if (mDecoderChannels != nr_of_channels)
@@ -504,24 +468,22 @@ int OpusCodec::decode(const void* input, int inputBytes, void* output, int outpu
         int status = 0;
         mDecoderCtx = opus_decoder_create(mSamplerate, mDecoderChannels, &status);
         if (status)
-            return 0;
+            return {0};
     }
 
-    int nr_of_frames = opus_decoder_get_nb_samples(mDecoderCtx, (const unsigned char *) input,
-                                                   inputBytes);
+    int nr_of_frames = opus_decoder_get_nb_samples(mDecoderCtx, input.data(), input.size_bytes());
     if (nr_of_frames <= 0)
-        return 0;
+        return {0};
 
     // We support stereo and mono here.
     int buffer_capacity = nr_of_frames * sizeof(opus_int16) * nr_of_channels;
     opus_int16 *buffer_decode = (opus_int16 *)alloca(buffer_capacity);
-    int decoded = opus_decode(mDecoderCtx,
-                              reinterpret_cast<const unsigned char *>(input), inputBytes,
+    int decoded = opus_decode(mDecoderCtx, input.data(), input.size_bytes(),
                               buffer_decode, nr_of_frames, 0);
     if (decoded < 0)
     {
         ICELogCritical(<< "opus_decode() returned " << decoded);
-        return 0;
+        return {0};
     }
 
     opus_int16 *buffer_stereo = nullptr;
@@ -535,14 +497,14 @@ int OpusCodec::decode(const void* input, int inputBytes, void* output, int outpu
                 buffer_stereo[i * 2 + 1] = buffer_decode[i];
                 buffer_stereo[i * 2] = buffer_decode[i];
             }
-            assert(buffer_stereo_capacity <= outputCapacity);
-            memcpy(output, buffer_stereo, buffer_stereo_capacity);
+            assert(buffer_stereo_capacity <= output.size_bytes());
+            memcpy(output.data(), buffer_stereo, buffer_stereo_capacity);
             result = buffer_stereo_capacity;
             break;
 
         case 2:
-            assert(buffer_capacity <= outputCapacity);
-            memcpy(output, buffer_decode, buffer_capacity);
+            assert(buffer_capacity <= output.size_bytes());
+            memcpy(output.data(), buffer_decode, buffer_capacity);
             result = buffer_capacity;
             break;
 
@@ -550,17 +512,17 @@ int OpusCodec::decode(const void* input, int inputBytes, void* output, int outpu
             assert(0);
     }
 
-    return result;
+    return {.mDecoded = (size_t)result};
 }
 
-int OpusCodec::plc(int lostPackets, void* output, int outputCapacity)
+size_t OpusCodec::plc(int lostPackets, std::span<uint8_t> output)
 {
     // Find how much frames do we need to produce and prefill it with silence
     int frames_per_packet = (int)pcmLength() / (sizeof(opus_int16) * channels());
-    memset(output, 0, outputCapacity);
+    memset(output.data(), 0, output.size_bytes());
 
     // Use this pointer as output
-    opus_int16* data_output = reinterpret_cast<opus_int16*>(output);
+    opus_int16* data_output = reinterpret_cast<opus_int16*>(output.data());
 
     int nr_of_decoded_frames = 0;
 
@@ -575,10 +537,7 @@ int OpusCodec::plc(int lostPackets, void* output, int outputCapacity)
             case 1:
                 // Convert mono to stereo
                 for (int i=0; i < nr_of_decoded_frames; i++)
-                {
-                    data_output[i * 2] = buffer_plc[i];
-                    data_output[i * 2 + 1] = buffer_plc[i+1];
-                }
+                    data_output[i * 2] = data_output[i * 2 + 1] = buffer_plc[i];
                 data_output += frames_per_packet * mChannels;
                 break;
 
@@ -589,14 +548,14 @@ int OpusCodec::plc(int lostPackets, void* output, int outputCapacity)
                 break;
         }
     }
-    return ((char*)data_output - (char*)output) * sizeof(opus_int16);
+    return ((uint8_t*)data_output - output.data());
 }
 
 // -------------- ILBC -------------------
 #define ILBC_CODEC_NAME "ILBC"
 
 IlbcCodec::IlbcCodec(int packetTime)
-    :mPacketTime(packetTime), mEncoderCtx(nullptr), mDecoderCtx(nullptr)
+    :mPacketTime(packetTime)
 {
     WebRtcIlbcfix_EncoderCreate(&mEncoderCtx);
     WebRtcIlbcfix_DecoderCreate(&mDecoderCtx);
@@ -610,44 +569,31 @@ IlbcCodec::~IlbcCodec()
     WebRtcIlbcfix_EncoderFree(mEncoderCtx);
 }
 
-const char* IlbcCodec::name()
+Codec::Info IlbcCodec::info()
 {
-    return "ilbc";
+    return {
+        .mName = ILBC_CODEC_NAME,
+        .mSamplerate = 8000,
+        .mChannels = 1,
+        .mPcmLength = mPacketTime * 8 * (int)sizeof(short),
+        .mFrameTime = mPacketTime,
+        .mRtpLength = (mPacketTime == 20) ? 38 : 50
+    };
 }
 
-int IlbcCodec::rtpLength()
+Codec::EncodeResult IlbcCodec::encode(std::span<const uint8_t> input, std::span<uint8_t> output)
 {
-    return (mPacketTime == 20 ) ? 38 : 50;
-}
-
-int IlbcCodec::pcmLength()
-{
-    return mPacketTime * 16;
-}
-
-int IlbcCodec::frameTime()
-{
-    return mPacketTime;
-}
-
-int IlbcCodec::samplerate()
-{
-    return 8000;
-}
-
-Codec::EncodeResult IlbcCodec::encode(const void *input, int inputBytes, void* outputBuffer, int outputCapacity)
-{
-    if (inputBytes % pcmLength())
+    if (input.size_bytes() % pcmLength())
         return {};
 
     // Declare the data input pointer
-    short *dataIn = (short *)input;
+    short *dataIn = (short *)input.data();
 
     // Declare the data output pointer
-    char *dataOut = (char *)outputBuffer;
+    char *dataOut = (char *)output.data();
 
     // Find how much RTP frames will be generated
-    unsigned int frames = inputBytes / pcmLength();
+    unsigned int frames = input.size_bytes() / pcmLength();
 
     // Generate frames
     for (unsigned int i=0; i<frames; i++)
@@ -660,12 +606,12 @@ Codec::EncodeResult IlbcCodec::encode(const void *input, int inputBytes, void* o
     return {frames * rtpLength()};
 }
 
-Codec::DecodeResult IlbcCodec::decode(const void* input, int inputBytes, void* output, int outputCapacity)
+Codec::DecodeResult IlbcCodec::decode(std::span<const uint8_t> input, std::span<uint8_t> output)
 {
-    unsigned frames = inputBytes / rtpLength();
+    unsigned frames = input.size_bytes() / rtpLength();
 
-    char* dataIn = (char*)input;
-    short* dataOut = (short*)output;
+    char* dataIn = (char*)input.data();
+    short* dataOut = (short*)output.data();
 
     for (unsigned i=0; i < frames; ++i)
     {
@@ -678,7 +624,7 @@ Codec::DecodeResult IlbcCodec::decode(const void* input, int inputBytes, void* o
     return {frames * pcmLength()};
 }
 
-int IlbcCodec::plc(int lostFrames, std::span<uint8_t> output)
+size_t IlbcCodec::plc(int lostFrames, std::span<uint8_t> output)
 {
     return sizeof(short) * WebRtcIlbcfix_DecodePlc(mDecoderCtx, (WebRtc_Word16*)output.data(), lostFrames);
 }
@@ -795,38 +741,24 @@ IsacCodec::~IsacCodec()
     WebRtcIsacfix_Free(mDecoderCtx); mDecoderCtx = NULL;
 }
 
-const char* IsacCodec::name()
-{
-    return "isac";
+Codec::Info IsacCodec::info() {
+    return {
+        .mName = "isac",
+        .mSamplerate = mSamplerate,
+        .mChannels = 1,
+        .mPcmLength = 60 * mSamplerate / 1000 * 2,
+        .mFrameTime = 60,
+        .mRtpLength = 0
+    };
 }
 
-int IsacCodec::frameTime()
+Codec::EncodeResult IsacCodec::encode(std::span<const uint8_t> input, std::span<uint8_t> output)
 {
-    return 60;
-}
-
-int IsacCodec::samplerate()
-{
-    return mSamplerate;
-}
-
-int IsacCodec::pcmLength()
-{
-    return frameTime() * samplerate() / 1000 * sizeof(short);
-}
-
-int IsacCodec::rtpLength()
-{
-    return 0;
-}
-
-int IsacCodec::encode(const void* input, int inputBytes, void* output, int outputCapacity)
-{
-    unsigned nrOfSamples = inputBytes / 2;
+    unsigned nrOfSamples = input.size_bytes() / 2;
     unsigned timeLength = nrOfSamples / (mSamplerate / 1000);
     int encoded = 0;
-    char* dataOut = (char*)output;
-    const WebRtc_Word16* dataIn = (const WebRtc_Word16*)input;
+    char* dataOut = (char*)output.data();
+    const WebRtc_Word16* dataIn = (const WebRtc_Word16*)input.data();
 
     // Iterate 10 milliseconds chunks
     for (unsigned i=0; i<timeLength/10; i++)
@@ -835,25 +767,25 @@ int IsacCodec::encode(const void* input, int inputBytes, void* output, int outpu
         if (encoded > 0)
             dataOut += encoded;
     }
-    return dataOut - (char*)output;
+    return {.mEncoded = (size_t)(dataOut - (char*)output.data())};
 }
 
-int IsacCodec::decode(const void* input, int inputBytes, void* output, int outputCapacity)
+Codec::DecodeResult IsacCodec::decode(std::span<const uint8_t> input, std::span<uint8_t> output)
 {
     WebRtc_Word16 speechType = 0;
-    unsigned produced = WebRtcIsacfix_Decode(mDecoderCtx, (const WebRtc_UWord16*)input, inputBytes, (WebRtc_Word16*)output, &speechType);
+    unsigned produced = WebRtcIsacfix_Decode(mDecoderCtx, (const WebRtc_UWord16*)input.data(), input.size_bytes(), (WebRtc_Word16*)output.data(), &speechType);
     if (produced == (unsigned)-1)
-        return 0;
+        return {.mDecoded = 0};
 
-    return produced * 2;
+    return {.mDecoded = produced * 2};
 }
 
-int IsacCodec::plc(int lostFrames, void* output, int outputCapacity)
+size_t IsacCodec::plc(int lostFrames, std::span<uint8_t> output)
 {
     // lostFrames are 30-milliseconds frames; but used encoding mode is 60 milliseconds.
     // So lostFrames * 2
     lostFrames *=2 ;
-    if (-1 == WebRtcIsacfix_DecodePlc(mDecoderCtx, (WebRtc_Word16*)output, lostFrames ))
+    if (-1 == WebRtcIsacfix_DecodePlc(mDecoderCtx, (WebRtc_Word16*)output.data(), lostFrames ))
         return 0;
 
     return lostFrames * 30 * (samplerate()/1000 * sizeof(short));
@@ -916,71 +848,55 @@ PCodec IsacCodec::IsacFactory32K::create()
 
 G711Codec::G711Codec(int type)
     :mType(type)
-{
-}
+{}
 
 G711Codec::~G711Codec()
-{
+{}
+
+Codec::Info G711Codec::info() {
+    return {
+        .mName = mType == ALaw ? "PCMA" : "PCMU",
+        .mSamplerate = 8000,
+        .mChannels = 1,
+        .mPcmLength = 10 * 16,
+        .mFrameTime = 10,
+        .mRtpLength = 10 * 8
+    };
 }
 
-const char* G711Codec::name()
-{
-    return "g711";
-}
-
-int G711Codec::pcmLength()
-{
-    return frameTime() * 16;
-}
-
-int G711Codec::rtpLength()
-{
-    return frameTime() * 8;
-}
-
-int G711Codec::frameTime()
-{
-    return 10;
-}
-
-int G711Codec::samplerate()
-{
-    return 8000;
-}
-
-int G711Codec::encode(const void* input, int inputBytes, void* output, int outputCapacity)
+Codec::EncodeResult G711Codec::encode(std::span<const uint8_t> input, std::span<uint8_t> output)
 {
     int result;
     if (mType == ALaw)
-        result = WebRtcG711_EncodeA(NULL, (WebRtc_Word16*)input, inputBytes/2, (WebRtc_Word16*)output);
+        result = WebRtcG711_EncodeA(nullptr, (WebRtc_Word16*)input.data(), input.size_bytes() / 2, (WebRtc_Word16*)output.data());
     else
-        result = WebRtcG711_EncodeU(NULL, (WebRtc_Word16*)input, inputBytes/2, (WebRtc_Word16*)output);
+        result = WebRtcG711_EncodeU(nullptr, (WebRtc_Word16*)input.data(), input.size_bytes() / 2, (WebRtc_Word16*)output.data());
 
-    if (result == -1)
-        throw Exception(ERR_WEBRTC, -1);
+    if (result < 0)
+        return {.mEncoded = 0};
 
-    return result;
+    return {.mEncoded = (size_t) result};
 }
 
-int G711Codec::decode(const void* input, int inputBytes, void* output, int outputCapacity)
+Codec::DecodeResult G711Codec::decode(std::span<const uint8_t> input, std::span<uint8_t> output)
 {
-    assert(outputCapacity >= inputBytes * 2);
+    assert(output.size_bytes() >= input.size_bytes() * 2);
 
     int result;
     WebRtc_Word16 speechType;
 
     if (mType == ALaw)
-        result = WebRtcG711_DecodeA(NULL, (WebRtc_Word16*)input, inputBytes, (WebRtc_Word16*)output, &speechType);
+        result = WebRtcG711_DecodeA(nullptr, (WebRtc_Word16*)input.data(), input.size_bytes(), (WebRtc_Word16*)output.data(), &speechType);
     else
-        result = WebRtcG711_DecodeU(NULL, (WebRtc_Word16*)input, inputBytes, (WebRtc_Word16*)output, &speechType);
+        result = WebRtcG711_DecodeU(nullptr, (WebRtc_Word16*)input.data(), input.size_bytes(), (WebRtc_Word16*)output.data(), &speechType);
 
-    if (result == -1)
-        throw Exception(ERR_WEBRTC, -1);
+    if (result < 0)
+        return {.mDecoded = 0};
 
-    return result * 2;
+    return {.mDecoded = (size_t)result * 2};
 }
 
-int G711Codec::plc(int lostSamples, void* output, int outputCapacity)
+size_t G711Codec::plc(int lostSamples, std::span<uint8_t> output)
 {
     return 0;
 }
@@ -1060,86 +976,64 @@ GsmCodec::GsmCodec(Type codecType)
 
 GsmCodec::~GsmCodec()
 {
-    gsm_destroy(mGSM);
+    gsm_destroy(mGSM); mGSM = nullptr;
 }
 
-const char* GsmCodec::name()
-{
-    return "GSM-06.10";
-}
-
-int GsmCodec::rtpLength()
-{
+Codec::Info GsmCodec::info() {
+    int rtpLength = 0;
     switch (mCodecType)
     {
-    case Type::Bytes_31:
-        return GSM_RTPFRAME_SIZE_31;
-        break;
-
-    case Type::Bytes_32:
-        return GSM_RTPFRAME_SIZE_32;
-
-    case Type::Bytes_33:
-        return GSM_RTPFRAME_SIZE_33;
-
-    case Type::Bytes_65:
-        return GSM_RTPFRAME_SIZE_32 + GSM_RTPFRAME_SIZE_33;
-
+    case Type::Bytes_31: rtpLength = GSM_RTPFRAME_SIZE_31; break;
+    case Type::Bytes_32: rtpLength = GSM_RTPFRAME_SIZE_32; break;
+    case Type::Bytes_33: rtpLength = GSM_RTPFRAME_SIZE_33; break;
+    case Type::Bytes_65: rtpLength = GSM_RTPFRAME_SIZE_32 + GSM_RTPFRAME_SIZE_33; break;
+    default:             rtpLength = GSM_RTPFRAME_SIZE_33;
     }
 
-    return GSM_RTPFRAME_SIZE_33;
+    return {
+        .mName = "GSM-06.10",
+        .mSamplerate = 8000,
+        .mChannels = 1,
+        .mPcmLength = GSM_AUDIOFRAME_TIME * 16,
+        .mFrameTime = GSM_AUDIOFRAME_TIME,
+        .mRtpLength = rtpLength
+    };
 }
 
-int GsmCodec::pcmLength()
-{
-    return GSM_AUDIOFRAME_TIME * 16;
-}
-
-int GsmCodec::frameTime()
-{
-    return GSM_AUDIOFRAME_TIME;
-}
-
-int GsmCodec::samplerate()
-{
-    return 8000;
-}
-
-int GsmCodec::encode(const void* input, int inputBytes, void* output, int outputCapacity)
+Codec::EncodeResult GsmCodec::encode(std::span<const uint8_t> input, std::span<uint8_t> output)
 {
     int outputBytes = 0;
+    char* outputBuffer = (char*)output.data();
 
-    char* outputBuffer = (char*)output;
-
-    for (int i = 0; i < inputBytes/pcmLength(); i++)
+    for (int i = 0; i < input.size_bytes() / pcmLength(); i++)
     {
-        gsm_encode(mGSM, (gsm_signal *)input+160*i, (gsm_byte*)outputBuffer);
+        gsm_encode(mGSM, (gsm_signal *)input.data()+160*i, (gsm_byte*)outputBuffer);
         outputBuffer += rtpLength();
         outputBytes += rtpLength();
     }
-    return outputBytes;
+    return {.mEncoded = (size_t)outputBytes};
 }
 
 
-int GsmCodec::decode(const void* input, int inputBytes, void* output, int outputCapacity)
+Codec::DecodeResult GsmCodec::decode(std::span<const uint8_t> input, std::span<uint8_t> output)
 {
-    if (inputBytes % rtpLength() != 0)
-        return 0;
+    if (input.size_bytes() % rtpLength() != 0)
+        return {.mDecoded = 0};
 
     int i=0;
-    for (i = 0; i < inputBytes/rtpLength(); i++)
-        gsm_decode(mGSM, (gsm_byte *)input + 33 * i, (gsm_signal *)output + 160 * i);
+    for (i = 0; i < input.size_bytes() / rtpLength(); i++)
+        gsm_decode(mGSM, (gsm_byte *)input.data() + 33 * i, (gsm_signal *)output.data() + 160 * i);
 
-    return i * 320;
+    return {.mDecoded = (size_t)i * 320};
 }
 
-int GsmCodec::plc(int lostFrames, void* output, int outputCapacity)
+size_t GsmCodec::plc(int lostFrames, std::span<uint8_t> output)
 {
-    if (outputCapacity < lostFrames * pcmLength())
+    if (output.size_bytes() < lostFrames * pcmLength())
         return 0;
 
     // Return silence frames
-    memset(output, 0, lostFrames * pcmLength());
+    memset(output.data(), 0, lostFrames * pcmLength());
     return lostFrames * pcmLength();
 }
 
@@ -1155,58 +1049,52 @@ G722Codec::G722Codec()
 
 G722Codec::~G722Codec()
 {
-    g722_decode_release((g722_decode_state_t*)mDecoder);
-    g722_encode_release((g722_encode_state_t*)mEncoder);
+    g722_decode_release((g722_decode_state_t*)mDecoder); mDecoder = nullptr;
+    g722_encode_release((g722_encode_state_t*)mEncoder); mEncoder = nullptr;
 }
 
-const char* G722Codec::name()
-{
-    return G722_MIME_NAME;
+Codec::Info G722Codec::info() {
+    // ToDo: double check the G722 calls - remember RFC has bug about samplerate
+    return {
+        .mName = G722_MIME_NAME,
+        .mSamplerate = 8000,
+        .mChannels = 1,
+        .mPcmLength = 640,
+        .mFrameTime = 20,
+        .mRtpLength = 160
+    };
 }
 
-int G722Codec::pcmLength()
+Codec::EncodeResult G722Codec::encode(std::span<const uint8_t> input, std::span<uint8_t> output)
 {
-    return 640;
+    if (output.size_bytes() < input.size_bytes() / 4)
+        return {.mEncoded = 0}; // Destination buffer not big enough
+
+    int r = g722_encode((g722_encode_state_t *)mEncoder, (unsigned char*)output.data(), ( short*)input.data(), input.size_bytes() / 2);
+    if (r < 0)
+        return {.mEncoded = 0};
+
+    return {.mEncoded = (size_t)r};
 }
 
-int G722Codec::frameTime()
+Codec::DecodeResult G722Codec::decode(std::span<const uint8_t> input, std::span<uint8_t> output)
 {
-    return 20;
+    if (output.size_bytes() < input.size_bytes() * 4)
+        return {.mDecoded = 0}; // Destination buffer not big enough
+
+    int r = g722_decode((g722_decode_state_t *)mDecoder, (short*)output.data(), (unsigned char*)input.data(), input.size_bytes()) * 2;
+    if (r < 0)
+        return {.mDecoded = 0};
+    return {.mDecoded = (size_t)r};
 }
 
-int G722Codec::rtpLength()
+size_t G722Codec::plc(int lostFrames, std::span<uint8_t> output)
 {
-    return 160;
-}
-
-int G722Codec::samplerate()
-{
-    return 8000;
-}
-
-int G722Codec::encode(const void* input, int inputBytes, void* output, int outputCapacity)
-{
-    if (outputCapacity < inputBytes / 4)
-        return 0; // Destination buffer not big enough
-
-    return g722_encode((g722_encode_state_t *)mEncoder, (unsigned char*)output, ( short*)input, inputBytes / 2);
-}
-
-int G722Codec::decode(const void* input, int inputBytes, void* output, int outputCapacity)
-{
-    if (outputCapacity < inputBytes * 4)
-        return 0; // Destination buffer not big enough
-
-    return g722_decode((g722_decode_state_t *)mDecoder, ( short*)output, (unsigned char*)input, inputBytes) * 2;
-}
-
-int G722Codec::plc(int lostFrames, void* output, int outputCapacity)
-{
-    if (outputCapacity < lostFrames * pcmLength())
+    if (output.size_bytes() < lostFrames * pcmLength())
         return 0;
 
     // Return silence frames
-    memset(output, 0, lostFrames * pcmLength());
+    memset(output.data(), 0, lostFrames * pcmLength());
     return lostFrames * pcmLength();
 }
 
@@ -1318,7 +1206,6 @@ static bool repackHalfRate(BitReader& br, uint16_t frame[22], bool& lastItem)
 }
 
 GsmHrCodec::GsmHrCodec()
-    :mDecoder(nullptr)
 {
     mDecoder = new GsmHr::Codec();
 }
@@ -1329,34 +1216,21 @@ GsmHrCodec::~GsmHrCodec()
     mDecoder = nullptr;
 }
 
-const char* GsmHrCodec::name()
-{
-    return "GSM-HR-08";
+Codec::Info GsmHrCodec::info() {
+    return {
+        .mName = "GSM-HR-08",
+        .mSamplerate = 8000,
+        .mChannels = 1,
+        .mPcmLength = 20 * 8 * 2,
+        .mFrameTime = 20,
+        .mRtpLength = 0
+    };
 }
 
-int GsmHrCodec::pcmLength()
+Codec::EncodeResult GsmHrCodec::encode(std::span<const uint8_t> input, std::span<uint8_t> output)
 {
-    return frameTime() * 8 * 2;
-}
-
-int GsmHrCodec::rtpLength()
-{
-    return 0;
-}
-
-int GsmHrCodec::frameTime()
-{
-    return 20;
-}
-
-int GsmHrCodec::samplerate()
-{
-    return 8000;
-}
-
-int GsmHrCodec::encode(const void* input, int inputBytes, void* output, int outputCapacity)
-{
-    return 0;
+    // Not supported yet
+    return {.mEncoded = 0};
 }
 
 static const int params_unvoiced[] = {
@@ -1447,23 +1321,23 @@ hr_ref_from_canon(uint16_t *hr_ref, const uint8_t *canon)
 [+] PQ: Adding conversion from canon to rawpcm-s16le (for codec pcm)
 [+] PQ: Adding file output (blk_len=320)
 */
-int GsmHrCodec::decode(const void* input, int inputBytes, void* output, int outputCapacity)
+Codec::DecodeResult GsmHrCodec::decode(std::span<const uint8_t> input, std::span<uint8_t> output)
 {
-    ByteBuffer bb(input, inputBytes, ByteBuffer::CopyBehavior::UseExternal);
+    ByteBuffer bb(input, ByteBuffer::CopyBehavior::UseExternal);
     BitReader br(bb);
     uint16_t hr_ref[22];
 
-    hr_ref_from_canon(hr_ref, (const uint8_t*)input + 1);
+    hr_ref_from_canon(hr_ref, input.data() + 1);
     hr_ref[18] = 0;		/* BFI : 1 bit */
     hr_ref[19] = 0;		/* UFI : 1 bit */
     hr_ref[20] = 0;		/* SID : 2 bit */
     hr_ref[21] = 0;		/* TAF : 1 bit */
 
-    reinterpret_cast<GsmHr::Codec*>(mDecoder)->speechDecoder((int16_t*)hr_ref, (int16_t*)output);
-    return 320;
+    reinterpret_cast<GsmHr::Codec*>(mDecoder)->speechDecoder((int16_t*)hr_ref, (int16_t*)output.data());
+    return {.mDecoded = 320};
 }
 
-int GsmHrCodec::plc(int lostFrames, void* output, int outputCapacity)
+size_t GsmHrCodec::plc(int lostFrames, std::span<uint8_t> output)
 {
     return 0;
 }

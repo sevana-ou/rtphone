@@ -54,16 +54,14 @@ public:
     };
 
     AmrNbCodec(const AmrCodecConfig& config);
+    ~AmrNbCodec();
 
-    virtual ~AmrNbCodec();
-    const char* name() override;
-    int pcmLength() override;
-    int rtpLength() override;
-    int frameTime() override;
-    int samplerate() override;
-    int encode(const void* input, int inputBytes, void* output, int outputCapacity) override;
-    int decode(const void* input, int inputBytes, void* output, int outputCapacity) override;
-    int plc(int lostFrames, void* output, int outputCapacity) override;
+    Info info() override;
+
+    EncodeResult encode(std::span<const uint8_t> input, std::span<uint8_t> output) override;
+    DecodeResult decode(std::span<const uint8_t> input, std::span<uint8_t> output) override;
+    size_t plc(int lostFrames, std::span<uint8_t> output) override;
+
     int getSwitchCounter() const;
     int getCngCounter() const;
 };
@@ -113,14 +111,11 @@ public:
     AmrWbCodec(const AmrCodecConfig& config);
     virtual ~AmrWbCodec();
 
-    const char* name() override;
-    int pcmLength() override;
-    int rtpLength() override;
-    int frameTime() override;
-    int samplerate() override;
-    int encode(const void* input, int inputBytes, void* output, int outputCapacity) override;
-    int decode(const void* input, int inputBytes, void* output, int outputCapacity) override;
-    int plc(int lostFrames, void* output, int outputCapacity) override;
+    Info info() override;
+
+    EncodeResult encode(std::span<const uint8_t> input, std::span<uint8_t> output) override;
+    DecodeResult decode(std::span<const uint8_t> input, std::span<uint8_t> output) override;
+    size_t       plc(int lostFrames, std::span<uint8_t> output) override;
     int getSwitchCounter() const;
     int getCngCounter() const;
 };
@@ -147,23 +142,19 @@ public:
         void create(CodecMap& codecs) override;
 
         PCodec create() override;
-
     protected:
         bool mIuUP;
         int mPayloadType;
     };
 
     GsmEfrCodec(bool iuup = false);
+    ~GsmEfrCodec();
 
-    virtual ~GsmEfrCodec();
-    const char* name() override;
-    int pcmLength() override;
-    int rtpLength() override;
-    int frameTime() override;
-    int samplerate() override;
-    int encode(const void* input, int inputBytes, void* output, int outputCapacity) override;
-    int decode(const void* input, int inputBytes, void* output, int outputCapacity) override;
-    int plc(int lostFrames, void* output, int outputCapacity) override;
+    Info info() override;
+
+    EncodeResult encode(std::span<const uint8_t> input, std::span<uint8_t> output) override;
+    DecodeResult decode(std::span<const uint8_t> input, std::span<uint8_t> output) override;
+    size_t       plc(int lostFrames, std::span<uint8_t> output) override;
 };
 
 } // End of MT namespace

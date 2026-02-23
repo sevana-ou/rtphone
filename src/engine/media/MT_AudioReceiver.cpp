@@ -396,12 +396,10 @@ size_t decode_packet(Codec& codec, RTPPacket& p, void* output_buffer, size_t out
 
         for (int i=0; i < frame_count; i++)
         {
-            auto decoded_length = codec.decode(p.GetPayloadData() + i * codec.rtpLength(),
-                                               frame_length,
-                                               output_buffer,
-                                               output_capacity);
+            auto r = codec.decode({p.GetPayloadData() + i * codec.rtpLength(), (size_t)frame_length},
+                                  {(uint8_t*)output_buffer, output_capacity});
 
-            result += decoded_length;
+            result += r.mDecoded;
         }
     }
     else
@@ -572,7 +570,7 @@ AudioReceiver::DecodeResult AudioReceiver::decodeGapTo(Audio::DataWindow& output
             mDecodedLength = 0;
         else
         {
-            mDecodedLength = mCodec->plc(mFrameCount, mDecodedFrame, sizeof mDecodedFrame);
+            mDecodedLength = mCodec->plc(mFrameCount, {(uint8_t*)mDecodedFrame, sizeof mDecodedFrame});
             if (!mDecodedLength)
             {
                 // PLC is not support or failed
@@ -587,7 +585,7 @@ AudioReceiver::DecodeResult AudioReceiver::decodeGapTo(Audio::DataWindow& output
     if (mDecodedLength)
     {
         processDecoded(output, options);
-        return {.mStatus = DecodeResult::Status::Ok,.mChannels = mCodec->channels(), .mSamplerate = mCodec->samplerate()};
+        return {.mStatus = DecodeResult::Status::Ok, .mSamplerate = mCodec->samplerate(), .mChannels = mCodec->channels()};
     }
     else
         return {.mStatus = DecodeResult::Status::Skip};
@@ -683,9 +681,15 @@ AudioReceiver::DecodeResult AudioReceiver::decodePacketTo(Audio::DataWindow& out
                     else
                     {
                         // Decode frame by frame
-                        mDecodedLength = mCodec->decode(rtp.GetPayloadData() + i * mCodec->rtpLength(), frameLength, mDecodedFrame, sizeof mDecodedFrame);
+                        auto r = mCodec->decode({rtp.GetPayloadData() + i * mCodec->rtpLength(), (size_t)frameLength},
+                                                {(uint8_t*)mDecodedFrame, sizeof mDecodedFrame});
+                        mDecodedLength = r.mDecoded;
                         if (mDecodedLength > 0)
                             processDecoded(output, options);
+
+                        // What is important - here we may have packet marked as CNG
+                        if (r.mIsCng)
+                            mCngPacket = packet;
                     }
                 }
                 result.mStatus = mFrameCount > 0 ? DecodeResult::Status::Ok : DecodeResult::Status::Skip;
@@ -705,14 +709,40 @@ AudioReceiver::DecodeResult AudioReceiver::decodePacketTo(Audio::DataWindow& out
 
 AudioReceiver::DecodeResult AudioReceiver::decodeEmptyTo(Audio::DataWindow& output, DecodeOptions options)
 {
+    // There are two cases
+    // First is we have no ready time estimated how much audio should be emitted i.e. audio is decoded right after the next packet arrives.
+    // In this case we just skip the analysis - we should not be called in this situation
+    if (options.mElapsed == 0ms || !mCodec)
+        return {.mStatus = DecodeResult::Status::Skip};
+
     // No packet available at all (and no previous CNG packet) - so return the silence
     if (options.mElapsed != 0ms && mCodec)
     {
         Audio::Format fmt = options.mResampleToMainRate ? Audio::Format(AUDIO_SAMPLERATE, 1) : mCodec->getAudioFormat();
-        // Emit silence if codec information is available - it is to properly handle the gaps
-        auto avail = output.getTimeLength(fmt.rate(), fmt.channels());
-        if (options.mElapsed > avail)
-            mAvailable.addZero(fmt.sizeFromTime(options.mElapsed - avail));
+        if (mCngPacket)
+        {
+            // Try to decode it - replay previous audio decoded or use CNG decoder (if payload type is 13)
+            if (mCngPacket->rtp()->GetPayloadType() == 13)
+            {
+                // Using latest CNG packet to produce comfort noise
+                auto produced = mCngDecoder.produce(fmt.rate(), options.mElapsed.count(), (short*)(output.data() + output.filled()), false);
+                output.setFilled(output.filled() + produced);
+                return {.mStatus = DecodeResult::Status::Ok, .mSamplerate = fmt.rate(), .mChannels = fmt.channels()};
+            }
+            else
+            {
+                // Here we have another packet marked as CNG - for another decoder
+                // Just decode it +1 time
+                return decodePacketTo(output, options, mCngPacket);
+            }
+        }
+        else
+        {
+            // Emit silence if codec information is available - it is to properly handle the gaps
+            auto avail = output.getTimeLength(fmt.rate(), fmt.channels());
+            if (options.mElapsed > avail)
+                output.addZero(fmt.sizeFromTime(options.mElapsed - avail));
+        }
     }
 
     mFailedCount++;
@@ -871,11 +901,10 @@ void AudioReceiver::updateAmrCodecStats(Codec* c)
 int AudioReceiver::getSize() const
 {
     int result = 0;
-    result += sizeof(*this) + mResampler8.getSize() + mResampler16.getSize() + mResampler32.getSize()
-            + mResampler48.getSize();
+    result += sizeof(*this) + mResampler8.getSize() + mResampler16.getSize() + mResampler32.getSize() + mResampler48.getSize();
 
     if (mCodec)
-        result += mCodec->getSize();
+        ; // ToDo: need the way to calculate size of codec instances
 
     return result;
 }

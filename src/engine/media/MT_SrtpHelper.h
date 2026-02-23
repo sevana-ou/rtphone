@@ -20,20 +20,17 @@
 
 enum SrtpSuite
 {
-    SRTP_NONE,
-    SRTP_AES_128_AUTH_80,
-    SRTP_AES_256_AUTH_80,
-    SRTP_AES_192_AUTH_80,
-    SRTP_AES_128_AUTH_32,
-    SRTP_AES_256_AUTH_32,
-    SRTP_AES_192_AUTH_32,
-    SRTP_AES_128_AUTH_NULL,
-    SRTP_AED_AES_256_GCM,
-    SRTP_AED_AES_128_GCM,
+    SRTP_NONE               = 0,
+    SRTP_AES_128_AUTH_80    = 1,
+    SRTP_AES_256_AUTH_80    = 2,
+    SRTP_AES_192_AUTH_80    = 3,
+    SRTP_AES_128_AUTH_32    = 4,
+    SRTP_AES_256_AUTH_32    = 5,
+    SRTP_AES_192_AUTH_32    = 6,
+    SRTP_AES_128_AUTH_NULL  = 7,
+    SRTP_AED_AES_256_GCM    = 8,
+    SRTP_AED_AES_128_GCM    = 9,
     SRTP_LAST = SRTP_AED_AES_128_GCM
-    // ToDo:
-    // a=crypto:1 AEAD_AES_256_GCM_8 inline:tN2A0vRjFBimpQsW2GasuJuPe7hKE26gki30APC8DVuySqCOYTs8lYBPR5I=
-    // a=crypto:3 AEAD_AES_128_GCM_8 inline:Ok7VL8SmBHSbZLw4dK6iQgpliYKGdY9BHLJcRw==
 };
 
 extern SrtpSuite        toSrtpSuite(const std::string_view& s);

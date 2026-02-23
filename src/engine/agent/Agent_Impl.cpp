@@ -687,7 +687,7 @@ void AgentImpl::processUseStreamForSession(JsonCpp::Value& request, JsonCpp::Val
                 answer["status"] = Status_Ok;
             }
             else
-                answer["status"] = Status_AccountNotFound;
+                answer["status"] = Status_NoCommand;
         }
         else
             answer["status"] = Status_NoMediaAction;
@@ -709,11 +709,13 @@ void AgentImpl::onMedia(const void* data, int length, MT::Stream::MediaDirection
 
 PDataProvider AgentImpl::onProviderNeeded(const std::string& name)
 {
+    assert(mTerminal);
+
     EVENT_WITH_NAME("provider_needed");
     v["provider_name"] = name;
     addEvent(v);
 
-    return PDataProvider(new AudioProvider(*this, *mTerminal));
+    return std::make_shared<AudioProvider>(*this, *mTerminal);
 }
 
 // Called on new session offer
