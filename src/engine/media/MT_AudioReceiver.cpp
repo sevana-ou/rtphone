@@ -238,11 +238,11 @@ RtpBuffer::FetchResult RtpBuffer::fetch()
 
                 // Gap between new packet and previous on
                 int gap = (int64_t)seqno - (int64_t)*mLastSeqno - 1;
-                gap = std::min(gap, 127);
+                // gap = std::min(gap, 127);
                 if (gap > 0)
                 {
                     // std::cout << "Increase the packet loss for SSRC " << std::hex << mSsrc << std::endl;
-                    mStat.mPacketLoss++;
+                    mStat.mPacketLoss += gap;
                     auto currentTimestamp = std::chrono::microseconds(uint64_t(packet.rtp()->GetReceiveTime().GetDouble() * 1000000));
 
                     if (mStat.mPacketLossTimeline.empty() || (mStat.mPacketLossTimeline.back().mEndSeqno != seqno))
@@ -251,8 +251,7 @@ RtpBuffer::FetchResult RtpBuffer::fetch()
                                                              .mGap = gap,
                                                              .mTimestamp = currentTimestamp});
 
-                    mLastSeqno = *mLastSeqno + 1; // As we deal with the audio gap - return the silence and increase last seqno
-
+                    mLastSeqno = seqno;
                     result = {FetchResult::Status::Gap};
                 }
                 else
