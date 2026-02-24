@@ -18,14 +18,24 @@ DataWindow::DataWindow()
 DataWindow::~DataWindow()
 {
     if (mData)
+    {
         free(mData);
+        mData = nullptr;
+    }
 }
 
 void DataWindow::setCapacity(int capacity)
 {
     Lock l(mMutex);
     int tail  = capacity - mCapacity;
+    char* buffer = mData;
     mData = (char*)realloc(mData, capacity);
+    if (!mData)
+    {
+        // Realloc failed
+        mData = buffer;
+        throw std::bad_alloc();
+    }
     if (tail > 0)
         memset(mData + mCapacity, 0, tail);
     mCapacity = capacity;

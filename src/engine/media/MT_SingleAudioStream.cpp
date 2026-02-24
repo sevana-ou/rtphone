@@ -13,14 +13,12 @@
 using namespace MT;
 
 SingleAudioStream::SingleAudioStream(const CodecList::Settings& codecSettings, Statistics& stat)
-    :mReceiver(codecSettings, stat), mDtmfReceiver(stat)
-{
-}
+    :mReceiver(codecSettings, stat),
+     mDtmfReceiver(stat)
+{}
 
 SingleAudioStream::~SingleAudioStream()
-{
-
-}
+{}
 
 void SingleAudioStream::process(const std::shared_ptr<jrtplib::RTPPacket>& packet)
 {

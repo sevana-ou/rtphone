@@ -280,7 +280,8 @@ size_t TimerQueue::cancel(uint64_t id) {
 //! Cancels all timers
 // \return
 //  The number of timers cancelled
-size_t TimerQueue::cancelAll() {
+size_t TimerQueue::cancelAll()
+{
     // Setting all "end" to 0 (for immediate execution) is ok,
     // since it maintains the heap integrity
     std::unique_lock<std::mutex> lk(m_mtx);

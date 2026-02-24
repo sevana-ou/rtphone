@@ -341,6 +341,8 @@ set (LIBS_STATIC ${LIBS_STATIC} jrtplib g729_codec gsm_codec opus
 
 if (USE_AMR_CODEC)
     #include (${LIB_PLATFORM}/platform_libs.cmake)
+    set (OPENCORE_AMRNB opencore-amrnb)
+    set (OPENCORE_AMRWB opencore-amrwb)
     message("Media: AMR NB and WB codecs will be included.")
     set (DEFINES ${DEFINES} -DUSE_AMR_CODEC)
     set (LIBS_STATIC ${LIBS_STATIC} ${OPENCORE_AMRNB} ${OPENCORE_AMRWB})
