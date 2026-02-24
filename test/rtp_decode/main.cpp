@@ -29,7 +29,8 @@ static void usage(const char* progname)
     fprintf(stderr,
         "Usage: %s <input.rtp> <output.wav> --codec <name> [--pt <N>] [--rate <N>] [--channels <N>]\n"
         "\n"
-        "Codecs: pcmu pcma g722 g729 opus gsm gsmhr gsmefr amrnb amrwb evs ilbc20 ilbc30 isac16 isac32\n"
+        "Codecs: pcmu pcma g722 g729 opus gsm gsmhr gsmefr\n"
+        "        amrnb amrwb amrnb-bwe amrwb-bwe evs ilbc20 ilbc30 isac16 isac32\n"
         "\n"
         "Options:\n"
         "  --codec <name>    Codec name (required)\n"
@@ -65,8 +66,10 @@ static const CodecDefaults kCodecTable[] = {
     { "g729",   18,  false },
     { "gsm",    3,   false },
     { "opus",   106, false },
-    { "amrnb",  -1,  true  },
-    { "amrwb",  -1,  true  },
+    { "amrnb",     -1,  true  },
+    { "amrwb",     -1,  true  },
+    { "amrnb-bwe", -1,  true  },
+    { "amrwb-bwe", -1,  true  },
     { "gsmhr",  -1,  true  },
     { "gsmefr", 126, false },
     { "evs",    127, false },
@@ -104,6 +107,10 @@ static MT::CodecList::Settings buildSettings(const std::string& codecName, int p
         s.mAmrNbOctetPayloadType.insert(pt);
     } else if (codecName == "amrwb") {
         s.mAmrWbOctetPayloadType.insert(pt);
+    } else if (codecName == "amrnb-bwe") {
+        s.mAmrNbPayloadType.insert(pt);
+    } else if (codecName == "amrwb-bwe") {
+        s.mAmrWbPayloadType.insert(pt);
     } else if (codecName == "evs") {
         MT::CodecList::Settings::EvsSpec ev;
         ev.mPayloadType = pt;
