@@ -681,8 +681,9 @@ AudioReceiver::DecodeResult AudioReceiver::decodePacketTo(Audio::DataWindow& out
                     else
                     {
                         // Decode frame by frame
-                        auto r = mCodec->decode({rtp.GetPayloadData() + i * mCodec->rtpLength(), (size_t)frameLength},
-                                                {(uint8_t*)mDecodedFrame, sizeof mDecodedFrame});
+                        auto codecInput = std::span{rtp.GetPayloadData() + i * mCodec->rtpLength(), (size_t)frameLength};
+                        auto codecOutput = std::span{(uint8_t*)mDecodedFrame, sizeof mDecodedFrame};
+                        auto r = mCodec->decode(codecInput, codecOutput);
                         mDecodedLength = r.mDecoded;
                         if (mDecodedLength > 0)
                             processDecoded(output, options);

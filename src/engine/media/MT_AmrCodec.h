@@ -85,8 +85,8 @@ protected:
 
     int mPreviousPacketLength;
 
-    int decodeIuup(std::span<const uint8_t> input, std::span<uint8_t> output);
-    int decodePlain(std::span<const uint8_t> input, std::span<uint8_t> output);
+    DecodeResult decodeIuup(std::span<const uint8_t> input, std::span<uint8_t> output);
+    DecodeResult decodePlain(std::span<const uint8_t> input, std::span<uint8_t> output);
 
 public:
     class CodecFactory: public Factory

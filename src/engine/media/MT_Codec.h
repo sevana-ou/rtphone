@@ -52,17 +52,19 @@ public:
         int mPcmLength = 0;     // In bytes
         int mFrameTime = 0;     // In milliseconds
         int mRtpLength = 0;     // In bytes
+        float mTimestampUnit = 0.0f;
     };
     // Returns information about this codec instance
     virtual Info info() = 0;
 
     // Helper functions to return information - they are based on info() method
-    int pcmLength()     { return info().mPcmLength;  }
-    int rtpLength()     { return info().mRtpLength;  }
-    int channels()      { return info().mChannels;   }
-    int samplerate()    { return info().mSamplerate; }
-    int frameTime()     { return info().mFrameTime;  }
-    std::string name()  { return info().mName;       }
+    int pcmLength()         { return info().mPcmLength;  }
+    int rtpLength()         { return info().mRtpLength;  }
+    int channels()          { return info().mChannels;   }
+    int samplerate()        { return info().mSamplerate; }
+    int frameTime()         { return info().mFrameTime;  }
+    std::string name()      { return info().mName;       }
+    float timestampUnit()   { return info().mTimestampUnit == 0.0f ? 1.0f / info().mSamplerate : info().mTimestampUnit; }
 
     Audio::Format getAudioFormat() {
         return Audio::Format(this->info().mSamplerate, this->info().mChannels);

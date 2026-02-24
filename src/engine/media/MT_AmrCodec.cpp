@@ -535,16 +535,16 @@ Codec::EncodeResult AmrWbCodec::encode(std::span<const uint8_t> input, std::span
 #define L_FRAME 160
 #define AMR_BITRATE_DTX 15
 
-int AmrWbCodec::decodeIuup(std::span<const uint8_t> input, std::span<uint8_t> output)
+Codec::DecodeResult AmrWbCodec::decodeIuup(std::span<const uint8_t> input, std::span<uint8_t> output)
 {
     IuUP::Frame frame;
     if (!IuUP::parse2(input.data(), input.size(), frame))
-        return 0;
+        return {.mDecoded = 0};
 
     if (!frame.mHeaderCrcOk || !frame.mPayloadCrcOk)
     {
         ICELogInfo(<< "CRC check failed.");
-        return 0;
+        return {.mDecoded = 0};
     }
 
     // Reserve space
@@ -559,15 +559,15 @@ int AmrWbCodec::decodeIuup(std::span<const uint8_t> input, std::span<uint8_t> ou
             frameType = ftIndex;
 
     if (frameType == 0xFF)
-        return 0;
+        return {.mDecoded = 0, .mIsCng = true};
 
     dataToDecode.mutableData()[0] = (frameType << 3) | (1 << 2);
 
     D_IF_decode(mDecoderCtx, (const unsigned char*)dataToDecode.data(), (short*)output.data(), 0);
-    return pcmLength();
+    return {.mDecoded = (size_t)pcmLength()};
 }
 
-int AmrWbCodec::decodePlain(std::span<const uint8_t> input, std::span<uint8_t> output)
+Codec::DecodeResult AmrWbCodec::decodePlain(std::span<const uint8_t> input, std::span<uint8_t> output)
 {
     AmrPayloadInfo info;
     info.mCurrentTimestamp  = mCurrentDecoderTimestamp;
@@ -586,7 +586,7 @@ int AmrWbCodec::decodePlain(std::span<const uint8_t> input, std::span<uint8_t> o
     {
         GAmrWbStatistics.mNonParsed++;
         ICELogDebug(<< "Failed to decode AMR payload");
-        return 0;
+        return {.mDecoded = 0};
     }
     // Save current timestamp
     mCurrentDecoderTimestamp = info.mCurrentTimestamp;
@@ -595,22 +595,22 @@ int AmrWbCodec::decodePlain(std::span<const uint8_t> input, std::span<uint8_t> o
     if (ap.mDiscardPacket)
     {
         GAmrWbStatistics.mDiscarded++;
-        return 0;
+        return {.mDecoded = 0};
     }
 
     // Find the required output capacity
     size_t capacity = 0;
     for (AmrFrame& frame: ap.mFrames)
-        capacity += frame.mMode == 0xFF /* CNG */ ? pcmLength() * 8 : pcmLength();
+        capacity += frame.mMode == 0xFF /* CNG */ ? pcmLength() : pcmLength();
 
     if (output.size() < capacity)
-        return 0;
+        return {.mDecoded = 0};
 
     short* dataOut = (short*)output.data();
     size_t dataOutSizeInBytes = 0;
     for (AmrFrame& frame: ap.mFrames)
     {
-        size_t frameOutputSize = frame.mMode == 0xFF ? pcmLength() * 8 : pcmLength();
+        size_t frameOutputSize = frame.mMode == 0xFF ? pcmLength() : pcmLength();
         memset(dataOut, 0, frameOutputSize);
 
         if (frame.mData)
@@ -624,17 +624,16 @@ int AmrWbCodec::decodePlain(std::span<const uint8_t> input, std::span<uint8_t> o
             dataOutSizeInBytes += frameOutputSize;
         }
     }
-    return dataOutSizeInBytes;
+    return {.mDecoded = dataOutSizeInBytes,
+            .mIsCng = ap.mFrames.size() == 1 ? (ap.mFrames.front().mMode == 0xFF) : false};
 }
 
 Codec::DecodeResult AmrWbCodec::decode(std::span<const uint8_t> input, std::span<uint8_t> output)
 {
     if (mConfig.mIuUP)
-        return {.mDecoded = (size_t)decodeIuup(input, output)};
+        return decodeIuup(input, output);
     else
-        return {.mDecoded = (size_t)decodePlain(input, output)};
-
-    return {.mDecoded = 0};
+        return decodePlain(input, output);
 }
 
 size_t AmrWbCodec::plc(int lostFrames, std::span<uint8_t> output)
