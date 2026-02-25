@@ -369,7 +369,8 @@ else()
 endif()
 
 find_package(OpenSSL)
-target_compile_definitions(resiprocate PUBLIC ${RESIP_DEFINES})
-
 target_link_libraries(resiprocate PUBLIC OpenSSL::SSL)
 target_link_libraries(resiprocate PUBLIC OpenSSL::Crypto)
+
+target_compile_definitions(resiprocate PUBLIC ${RESIP_DEFINES})
+target_compile_options(resiprocate PUBLIC -Wno-deprecated -Wno-deprecated-declarations)

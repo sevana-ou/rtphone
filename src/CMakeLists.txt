@@ -15,6 +15,7 @@ option (USE_MUSL        "Build with MUSL library"               OFF)
 # PIC code by default
 set (CMAKE_POSITION_INDEPENDENT_CODE ON)
 set (RUNTIME_CPU_CAPABILITY_DETECTION ON)
+set (CMAKE_WARN_DEPRECATED OFF)
 
 find_package(OpenSSL REQUIRED)
 set (OPENSSL_SSL OpenSSL::SSL)
@@ -352,10 +353,11 @@ if (USE_EVS_CODEC)
     set (LIBS_STATIC ${LIBS_STATIC} evs_codec)
 endif()
 
-target_compile_definitions(rtphone PUBLIC ${DEFINES})
+target_compile_definitions(rtphone PUBLIC ${DEFINES} )
 
 if (TARGET_LINUX)
     target_link_options(rtphone PUBLIC -Wl,-Bstatic)
+    target_compile_options(rtphone PUBLIC -Wno-deprecated -Wno-deprecated-declarations)
 endif()
 target_link_libraries(rtphone PUBLIC ${LIBS_STATIC})
 
