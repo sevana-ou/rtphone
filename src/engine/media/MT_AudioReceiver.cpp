@@ -201,7 +201,7 @@ RtpBuffer::FetchResult RtpBuffer::fetch()
     // See if there is enough information in buffer
     auto total = findTimelength();
 
-    while (total > mHigh && mPacketList.size() && 0ms != mHigh)
+    while (total > mHigh && mPacketList.size() > 1 && 0ms != mHigh)
     {
         ICELogMedia( << "Dropping RTP packets from jitter buffer");
         total -= mPacketList.front()->timelength();
@@ -337,7 +337,7 @@ Receiver::~Receiver()
 
 //-------------- AudioReceiver ----------------
 AudioReceiver::AudioReceiver(const CodecList::Settings& settings, MT::Statistics &stat)
-    :Receiver(stat), mBuffer(stat), mCodecSettings(settings), mCodecList(settings)
+    :Receiver(stat), mBuffer(stat), mDtmfBuffer(stat), mCodecSettings(settings), mCodecList(settings), mDtmfReceiver(stat)
 {
     // Init resamplers
     mResampler8.start(AUDIO_CHANNELS, 8000, AUDIO_SAMPLERATE);
@@ -350,6 +350,10 @@ AudioReceiver::AudioReceiver(const CodecList::Settings& settings, MT::Statistics
     mCodecList.fillCodecMap(mCodecMap);
 
     mAvailable.setCapacity(AUDIO_SAMPLERATE * sizeof(short));
+
+    mDtmfBuffer.setPrebuffer(0ms);
+    mDtmfBuffer.setLow(0ms);
+    mDtmfBuffer.setHigh(1ms);
 
 #if defined(DUMP_DECODED)
     mDecodedDump = std::make_shared<Audio::WavFileWriter>();
@@ -431,66 +435,72 @@ bool AudioReceiver::add(const std::shared_ptr<jrtplib::RTPPacket>& p, Codec** de
     // Increase codec counter
     mStat.mCodecCount[ptype]++;
 
-    // Check if codec can be handled
-    Codec* codec = nullptr;
-    auto codecIter = mCodecMap.find(ptype);
-    if (codecIter == mCodecMap.end())
+    // Check if we deal with telephone-event
+    if (p->GetPayloadType() == mCodecSettings.mTelephoneEvent)
     {
-        // Well, there is no information about the codec; skip this packet
+        *detectedCodec = nullptr;
+        mDtmfBuffer.add(p, 10ms, 8000);
     }
     else
     {
-        // Check if codec is creating lazily
-        if (!codecIter->second)
+        // Look for codec
+        // Check if codec can be handled
+        Codec* codec = nullptr;
+        auto codecIter = mCodecMap.find(ptype);
+        if (codecIter != mCodecMap.end())
         {
-            codecIter->second = mCodecList.createCodecByPayloadType(ptype);
+            // Check if codec is creating lazily
+            if (!codecIter->second)
+            {
+                codecIter->second = mCodecList.createCodecByPayloadType(ptype);
+            }
+            codec = codecIter->second.get();
+
+            // Return pointer to codec if needed.get()
+            if (detectedCodec)
+                *detectedCodec = codec;
+
+            if (mStat.mCodecName.empty() && codec)
+                mStat.mCodecName = codec->name();
+
+
+            if (!codec)
+                time_length = 10;
+            else
+            if (!codec->rtpLength())
+                time_length = codec->frameTime();
+            else
+                time_length = lround(double(payloadLength) / codec->rtpLength() * codec->frameTime());
+
+            if (codec)
+                samplerate = codec->samplerate();
         }
-        codec = codecIter->second.get();
 
-        // Return pointer to codec if needed.get()
-        if (detectedCodec)
-            *detectedCodec = codec;
-
-        if (mStat.mCodecName.empty() && codec)
-            mStat.mCodecName = codec->name();
-
+        // Process jitter anyway - can we decode payload or not
+        mJitterStats.process(p.get(), samplerate);
+        mStat.mJitter = static_cast<float>(mJitterStats.get());
 
         if (!codec)
-            time_length = 10;
+            return false; // There is no sense to add this packet into jitter buffer - we can't decode this
+
+        // Check if packet is CNG
+        if (payloadLength >= 1 && payloadLength <= 6 && (ptype == 0 || ptype == 8))
+            time_length = mLastPacketTimeLength ? mLastPacketTimeLength : 20;
         else
-        if (!codec->rtpLength())
-            time_length = codec->frameTime();
-        else
-            time_length = lround(double(payloadLength) / codec->rtpLength() * codec->frameTime());
+        // Check if packet is too short from time length side
+        if (time_length < 2)
+        {
+            // It will cause statistics to report about bad RTP packet
+            // I have to replay last packet payload here to avoid report about lost packet
+            mBuffer.add(p, std::chrono::milliseconds(time_length), samplerate);
+            return false;
+        }
 
-        if (codec)
-            samplerate = codec->samplerate();
+        // Queue packet to buffer
+        auto packet = mBuffer.add(p, std::chrono::milliseconds(time_length), samplerate).get();
+        return packet;
     }
-
-    // Process jitter
-    mJitterStats.process(p.get(), samplerate);
-    mStat.mJitter = static_cast<float>(mJitterStats.get());
-
-    if (!codec)
-        return false; // There is no sense to add this packet into jitter buffer - we can't decode this
-
-    // Check if packet is CNG
-    if (payloadLength >= 1 && payloadLength <= 6 && (ptype == 0 || ptype == 8))
-        time_length = mLastPacketTimeLength ? mLastPacketTimeLength : 20;
-    else
-    // Check if packet is too short from time length side
-    if (time_length < 2)
-    {
-        // It will cause statistics to report about bad RTP packet
-        // I have to replay last packet payload here to avoid report about lost packet
-        mBuffer.add(p, std::chrono::milliseconds(time_length), samplerate);
-        return false;
-    }
-
-    // Queue packet to buffer
-    auto packet = mBuffer.add(p, std::chrono::milliseconds(time_length), samplerate).get();
-
-    return packet;
+    return {};
 }
 
 void AudioReceiver::processDecoded(Audio::DataWindow& output, DecodeOptions options)
@@ -764,6 +774,12 @@ AudioReceiver::DecodeResult AudioReceiver::getAudioTo(Audio::DataWindow& output,
 {
     DecodeResult result = {.mStatus = DecodeResult::Status::Skip};
 
+    // Process RFC2833 here; it doesn't result in any audio - only callbacks and statistics
+    auto fr = mDtmfBuffer.fetch();
+    if (fr.mPacket && fr.mStatus == RtpBuffer::FetchResult::Status::RegularPacket)
+        mDtmfReceiver.add(fr.mPacket->rtp());
+
+
     auto produced = 0ms;
     if (mAvailable.filled() && mCodec && options.mElapsed != 0ms)
     {
@@ -968,23 +984,22 @@ DtmfReceiver::~DtmfReceiver()
 
 void DtmfReceiver::add(const std::shared_ptr<RTPPacket>& p)
 {
-    // This receiver always work in context of single RTP stream; so there is no need to put SSRC map and so on
-    if (p->GetPayloadType() != 101)
-        return;
-
     auto ev = DtmfBuilder::parseRfc2833({p->GetPayloadData(), p->GetPayloadLength()});
     if (ev.mTone != mEvent || ev.mEnd != mEventEnded)
     {
-        // New tone is here
-        if (mCallback)
-            mCallback(ev.mTone);
+        if (!(mEvent == ev.mTone && !mEventEnded && ev.mEnd))
+        {
+            // New tone is here
+            if (mCallback)
+                mCallback(ev.mTone);
 
-        // Queue statistics item
-        mStat.mDtmf2833Timeline.emplace_back(Dtmf2833Event{.mTone = ev.mTone,
-                                                           .mTimestamp = RtpHelper::toMicroseconds(p->GetReceiveTime())});
+            // Queue statistics item
+            mStat.mDtmf2833Timeline.emplace_back(Dtmf2833Event{.mTone = ev.mTone,
+                                                               .mTimestamp = RtpHelper::toMicroseconds(p->GetReceiveTime())});
 
-        // Store to avoid triggering on the packet
-        mEvent = ev.mTone;
-        mEventEnded = ev.mEnd;
+            // Store to avoid triggering on the packet
+            mEvent = ev.mTone;
+            mEventEnded = ev.mEnd;
+        }
     }
 }

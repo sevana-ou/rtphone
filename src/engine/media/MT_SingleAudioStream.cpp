@@ -23,7 +23,7 @@ SingleAudioStream::~SingleAudioStream()
 void SingleAudioStream::process(const std::shared_ptr<jrtplib::RTPPacket>& packet)
 {
     ICELogMedia(<< "Processing incoming RTP/RTCP packet");
-    if (packet->GetPayloadType() == 101/*resip::Codec::TelephoneEvent.payloadType()*/)
+    if (packet->GetPayloadType() == mReceiver.getCodecSettings().mTelephoneEvent)
         mDtmfReceiver.add(packet);
     else
         mReceiver.add(packet);

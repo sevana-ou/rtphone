@@ -136,6 +136,23 @@ protected:
     Statistics& mStat;
 };
 
+class DtmfReceiver: public Receiver
+{
+private:
+    char mEvent = 0;
+    bool mEventEnded = false;
+    std::chrono::milliseconds mEventStart = 0ms;
+    std::function<void(char)> mCallback;
+
+public:
+    DtmfReceiver(Statistics& stat);
+    ~DtmfReceiver();
+
+    void add(const std::shared_ptr<RTPPacket>& p);
+    void setCallback(std::function<void(char tone)> callback);
+};
+
+
 class AudioReceiver: public Receiver
 {
 public:
@@ -189,6 +206,9 @@ public:
 
 protected:
     RtpBuffer                           mBuffer;                // Jitter buffer itself
+    RtpBuffer                           mDtmfBuffer;            // These two (mDtmfBuffer / mDtmfReceiver) are for our analyzer stack only; in normal softphone logic DTMF packets goes via SingleAudioStream::mDtmfReceiver
+    DtmfReceiver                        mDtmfReceiver;
+
     CodecMap                            mCodecMap;
     PCodec                              mCodec;
     int                                 mFrameCount = 0;
@@ -247,21 +267,6 @@ protected:
     DecodeResult decodeEmptyTo(Audio::DataWindow& output, DecodeOptions options);
 };
 
-class DtmfReceiver: public Receiver
-{
-private:
-    char mEvent = 0;
-    bool mEventEnded = false;
-    std::chrono::milliseconds mEventStart = 0ms;
-    std::function<void(char)> mCallback;
-
-public:
-    DtmfReceiver(Statistics& stat);
-    ~DtmfReceiver();
-
-    void add(const std::shared_ptr<RTPPacket>& p);
-    void setCallback(std::function<void(char tone)> callback);
-};
 }
 
 #endif

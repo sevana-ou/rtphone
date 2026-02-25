@@ -28,6 +28,9 @@ public:
         bool mWrapIuUP              = false;
         bool mSkipDecode            = false;
 
+        // RFC2833 DTMF
+        int mTelephoneEvent = -1;
+
         // AMR payload types
         std::set<int64_t> mAmrWbPayloadType       = { };
         std::set<int64_t> mAmrNbPayloadType       = { };
