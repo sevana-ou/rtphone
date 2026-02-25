@@ -1,6 +1,6 @@
 #include "MT_EvsCodec.h"
-
-
+#include <set>
+#include <map>
 
 /*-------------------------------------------------------------------*
 * rate2AMRWB_IOmode()
@@ -167,67 +167,58 @@ EVSCodec::~EVSCodec()
     }
 }
 
-int EVSCodec::samplerate()
-{
-    return st_dec->output_Fs;
+Codec::Info EVSCodec::info() {
+    return {
+        .mName = MT_EVS_CODECNAME,
+        .mSamplerate = st_dec->output_Fs,
+        .mChannels = 1,
+        .mPcmLength = st_dec->output_Fs / 1000 * sp.ptime * 2,
+        .mFrameTime = sp.ptime,
+        .mRtpLength = 0
+    };
 }
 
-int EVSCodec::pcmLength()
-{
-    return samplerate() / 50 * 2;
-}
 
-int EVSCodec::frameTime()
-{
-	return sp.ptime;
-}
-
-int EVSCodec::rtpLength()
-{
-    // Variable sized codec - bitrate can be changed during the call
-	return 0;
-}
-
-int EVSCodec::encode(const void* input, int inputBytes, void* output, int outputCapacity)
+Codec::EncodeResult EVSCodec::encode(std::span<const uint8_t> input, std::span<uint8_t> output)
 {
     // Encoding is not supported yet.
-	return 0;
+    return {.mEncoded = 0};
 }
 
-int EVSCodec::decode(const void* input, int input_length, void* output, int outputCapacity)
+Codec::DecodeResult EVSCodec::decode(std::span<const uint8_t> input, std::span<uint8_t> output)
 {
-    if (outputCapacity < pcmLength())
-        return 0;
+    if (output.size_bytes() < pcmLength())
+        return {.mDecoded = 0};
 
     std::string buffer;
 
     // Check if we get payload with CMR
-    auto payload_iter = FixedPayload_EVSPrimary.find((input_length - 2) * 8);
+    auto payload_iter = FixedPayload_EVSPrimary.find((input.size_bytes() - 2) * 8);
     if (payload_iter == FixedPayload_EVSPrimary.end())
     {
         // Check if we get payload with ToC and without CMR
-        payload_iter = FixedPayload_EVSPrimary.find((input_length - 1) * 8);
+        payload_iter = FixedPayload_EVSPrimary.find((input.size_bytes() - 1) * 8);
         if (payload_iter == FixedPayload_EVSPrimary.end())
         {
             // Maybe there is no ToC ?
-            payload_iter = FixedPayload_EVSPrimary.find(input_length * 8);
+            payload_iter = FixedPayload_EVSPrimary.find(input.size_bytes() * 8);
             if (payload_iter == FixedPayload_EVSPrimary.end())
             {
                 // Bad payload size at all
-                return 0;
+                return {.mDecoded = 0};
             }
             /* Add ToC byte.
              * WARNING maybe it will be work incorrect with 56bit payload,
              * see 3GPP TS 26.445 Annex A, A.2.1.3 */
-            char c = evs::rate2EVSmode(FixedPayload_EVSPrimary.find(input_length * 8)->second);
+            char c = evs::rate2EVSmode(FixedPayload_EVSPrimary.find(input.size_bytes() * 8)->second);
             buffer += c;
-            buffer += std::string(reinterpret_cast<const char*>(input), input_length);
+            buffer += std::string(reinterpret_cast<const char*>(input.data()), input.size_bytes());
         }
         else
-            buffer = std::string(reinterpret_cast<const char*>(input), input_length);
+            buffer = std::string(reinterpret_cast<const char*>(input.data()), input.size_bytes());
     }
     else // Skip CMR byte
-        buffer = std::string(reinterpret_cast<const char*>(input) + 1, input_length-1);
+        buffer = std::string(reinterpret_cast<const char*>(input.data()) + 1, input.size_bytes()-1);
 
 
     // Output buffer for 48 KHz
@@ -263,7 +254,7 @@ int EVSCodec::decode(const void* input, int input_length, void* output, int outp
 		}
 
 		/* convert 'float' output data to 'short' */
-        evs::syn_output(data, static_cast<short>(pcmLength() / 2), static_cast<short*>(output) + offset);
+        evs::syn_output(data, static_cast<short>(pcmLength() / 2), reinterpret_cast<short*>(output.data()) + offset);
         offset += pcmLength() / 2;
         if (st_dec->ini_frame < MAX_FRAME_COUNTER)
 		{
@@ -271,12 +262,12 @@ int EVSCodec::decode(const void* input, int input_length, void* output, int outp
 		}
 	}
 
-    return pcmLength();
+    return {.mDecoded = (size_t)pcmLength()};
 }
 
-int EVSCodec::plc(int lostFrames, void* output, int outputCapacity)
+size_t EVSCodec::plc(int lostFrames, std::span<uint8_t> output)
 {
-	return 0;
+    return 0;
 }
 
 void EVSCodec::initDecoder(const StreamParameters& sp)

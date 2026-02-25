@@ -16,6 +16,7 @@ const std::string Status_FailedToOpenFile = "failed to open file";
 const std::string Status_NoActiveProvider = "no active provider";
 const std::string Status_NoMediaAction = "no valid media action";
 const std::string Status_NoCommand = "no valid command";
+const std::string Status_NoAudioManager = "no audio manager";
 
 #define LOG_SUBSYSTEM "Agent"
 
@@ -336,7 +337,7 @@ void AgentImpl::processStartSession(JsonCpp::Value& request, JsonCpp::Value& ans
     {
         // Agent was not started
         ICELogError(<< "No audio manager installed.");
-        answer["status"] = "Audio manager not started. Most probably agent is not started.";
+        answer["status"] = Status_NoAudioManager;
         return;
     }
 
@@ -431,28 +432,35 @@ void AgentImpl::processAcceptSession(JsonCpp::Value& request, JsonCpp::Value& an
     auto sessionIter = mSessionMap.find(request["session_id"].asInt());
     if (sessionIter != mSessionMap.end())
     {
-        // Ensure audio manager is here
-        mAudioManager->start(mUseNativeAudio ? AudioManager::atReceiver : AudioManager::atNull);
+        if (!mAudioManager)
+        {
+            ICELogError(<< "No audio manager installed.");
+            answer["status"] = Status_NoAudioManager;
+        }
+        else
+        {
+            // Ensure audio manager is here
+            mAudioManager->start(mUseNativeAudio ? AudioManager::atReceiver : AudioManager::atNull);
 
-        // Accept session on SIP level
-        PSession session = sessionIter->second;
+            // Accept session on SIP level
+            PSession session = sessionIter->second;
 
-        // Get user headers
-        Session::UserHeaders info;
-        JsonCpp::Value& arg = request["userinfo"];
-        std::vector<std::string> keys = arg.getMemberNames();
-        for (const std::string& k: keys)
-            info[k] = arg[k].asString();
-        session->setUserHeaders(info);
+            // Get user headers
+            Session::UserHeaders info;
+            JsonCpp::Value& arg = request["userinfo"];
+            std::vector<std::string> keys = arg.getMemberNames();
+            for (const std::string& k: keys)
+                info[k] = arg[k].asString();
+            session->setUserHeaders(info);
 
-        // Accept finally
-        session->accept();
+            // Accept finally
+            session->accept();
 
-        answer["status"] = Status_Ok;
+            answer["status"] = Status_Ok;
+        }
     }
     else
         answer["status"] = Status_SessionNotFound;
-
 }
 
 void AgentImpl::processDestroySession(JsonCpp::Value& request, JsonCpp::Value& answer)
@@ -526,6 +534,8 @@ void AgentImpl::processGetMediaStats(JsonCpp::Value& request, JsonCpp::Value& an
             answer["rtt"] = result[SessionInfo_Rtt].asFloat();
         if (result.exists(SessionInfo_BitrateSwitchCounter))
             answer["bitrate_switch_counter"] = result[SessionInfo_BitrateSwitchCounter].asInt();
+        if (result.exists(SessionInfo_CngCounter))
+            answer["cng_counter"] = result[SessionInfo_CngCounter].asInt();
         if (result.exists(SessionInfo_SSRC))
             answer["rtp_ssrc"] = result[SessionInfo_SSRC].asInt();
         if (result.exists(SessionInfo_RemotePeer))
@@ -685,7 +695,7 @@ void AgentImpl::processUseStreamForSession(JsonCpp::Value& request, JsonCpp::Val
                 answer["status"] = Status_Ok;
             }
             else
-                answer["status"] = Status_AccountNotFound;
+                answer["status"] = Status_NoCommand;
         }
         else
             answer["status"] = Status_NoMediaAction;
@@ -707,11 +717,13 @@ void AgentImpl::onMedia(const void* data, int length, MT::Stream::MediaDirection
 
 PDataProvider AgentImpl::onProviderNeeded(const std::string& name)
 {
+    assert(mTerminal);
+
     EVENT_WITH_NAME("provider_needed");
     v["provider_name"] = name;
     addEvent(v);
 
-    return PDataProvider(new AudioProvider(*this, *mTerminal));
+    return std::make_shared<AudioProvider>(*this, *mTerminal);
 }
 
 // Called on new session offer

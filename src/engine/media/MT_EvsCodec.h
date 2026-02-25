@@ -2,15 +2,11 @@
 #define __MT_EVS_CODEC_H
 
 #include "../engine_config.h"
-#include <set>
-#include <map>
-#include <memory>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
 #include <assert.h>
-#include <sstream>
 
 #include "MT_Codec.h"
 
@@ -52,18 +48,14 @@ public:
     EVSCodec(const StreamParameters& sp);
     ~EVSCodec() override;
 
-    const char* name() override { return MT_EVS_CODECNAME; }
-    int samplerate() override;
-    int pcmLength() override;
-    int frameTime() override;
-    int rtpLength() override;
-    int encode(const void* input, int inputBytes, void* output, int outputCapacity) override;
-    int decode(const void* input, int inputBytes, void* output, int outputCapacity) override;
-    int plc(int lostFrames, void* output, int outputCapacity) override;
+    Info info() override;
+
+    EncodeResult encode(std::span<const uint8_t> input, std::span<uint8_t> output) override;
+    DecodeResult decode(std::span<const uint8_t> input, std::span<uint8_t> output) override;
+    size_t       plc(int lostFrames, std::span<uint8_t> output) override;
 
 private:
-    evs::Decoder_State* st_dec;
-    //Encoder_State_fx* st_enc;
+    evs::Decoder_State* st_dec = nullptr;
     StreamParameters sp;
     void initDecoder(const StreamParameters& sp);
 };

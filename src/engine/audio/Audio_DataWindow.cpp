@@ -11,21 +11,31 @@ using namespace Audio;
 DataWindow::DataWindow()
 {
     mFilled = 0;
-    mData = NULL;
+    mData = nullptr;
     mCapacity = 0;
 }
 
 DataWindow::~DataWindow()
 {
     if (mData)
+    {
         free(mData);
+        mData = nullptr;
+    }
 }
 
 void DataWindow::setCapacity(int capacity)
 {
     Lock l(mMutex);
     int tail  = capacity - mCapacity;
+    char* buffer = mData;
     mData = (char*)realloc(mData, capacity);
+    if (!mData)
+    {
+        // Realloc failed
+        mData = buffer;
+        throw std::bad_alloc();
+    }
     if (tail > 0)
         memset(mData + mCapacity, 0, tail);
     mCapacity = capacity;
@@ -164,6 +174,25 @@ void DataWindow::zero(int length)
     assert(length <= mCapacity);
     mFilled = length;
     memset(mData, 0, mFilled);
+}
+
+size_t DataWindow::moveTo(DataWindow& dst, size_t size)
+{
+    Lock l(mMutex);
+
+    size_t avail = std::min(size, (size_t)filled());
+    if (avail != 0)
+    {
+        dst.add(mData, avail);
+        erase(avail);
+    }
+    return avail;
+}
+
+std::chrono::milliseconds DataWindow::getTimeLength(int samplerate, int channels) const
+{
+    Lock l(mMutex);
+    return std::chrono::milliseconds(mFilled / sizeof(short) / channels / (samplerate / 1000));
 }
 
 void DataWindow::makeStereoFromMono(DataWindow& dst, DataWindow& src)

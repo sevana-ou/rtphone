@@ -483,6 +483,7 @@ void Session::getSessionInfo(Session::InfoOptions options, VariantMap& info)
         info[SessionInfo_Rtt] = static_cast<float>(stat.mRttDelay * 1000);
 #if defined(USE_AMR_CODEC)
     info[SessionInfo_BitrateSwitchCounter] = stat.mBitrateSwitchCounter;
+    info[SessionInfo_CngCounter] = stat.mCng;
 #endif
     info[SessionInfo_SSRC] = stat.mSsrc;
     info[SessionInfo_RemotePeer] = stat.mRemotePeer.toStdString();
@@ -882,7 +883,7 @@ void Session::refreshMediaPath()
 
         // Bring new socket to provider and stream
         RtpPair<PDatagramSocket> s4 = SocketHeap::instance().allocSocketPair(AF_INET, this, IS_MULTIPLEX() ),
-                s6 = SocketHeap::instance().allocSocketPair(AF_INET, this, IS_MULTIPLEX());
+                                 s6 = SocketHeap::instance().allocSocketPair(AF_INET6, this, IS_MULTIPLEX());
 
         p->setSocket(s4, s6);
         s.setSocket4(s4);

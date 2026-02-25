@@ -65,6 +65,8 @@ bool CodecList::Settings::contains(int ptype) const
 
     if (mGsmEfrPayloadType == ptype || mGsmFrPayloadType == ptype || mGsmHrPayloadType == ptype)
         return true;
+    if (mTelephoneEvent == ptype)
+        return true;
 
     return false;
 }
@@ -122,6 +124,9 @@ std::string CodecList::Settings::toString() const
     if (mGsmEfrPayloadType != -1)
         oss << "GSM EFR ptype: " << mGsmEfrPayloadType << " ";
 
+    if (mTelephoneEvent != -1)
+        oss << "RFC2833 DTMF ptype: " << mTelephoneEvent;
+
     for (auto& spec: mEvsSpec)
     {
         oss << "EVS ptype: " << spec.mPayloadType << ", bw: " << spec.mBandwidth << ", enc: " << (spec.mEncodingType == EvsSpec::Encoding_MIME ? "mime" : "g192") << " ";
@@ -131,6 +136,7 @@ std::string CodecList::Settings::toString() const
     {
         oss << "OPUS ptype: " << spec.mPayloadType << ", rate: " << spec.mRate << ", channels: " << spec.mChannels << std::endl;
     }
+
 
     return oss.str();
 }
@@ -151,6 +157,7 @@ void CodecList::Settings::clear()
     mGsmEfrPayloadType = -1;
     mGsmFrPayloadType = -1;
     mGsmHrPayloadType = -1;
+    mTelephoneEvent = -1;
 }
 
 bool CodecList::Settings::EvsSpec::isValid() const
@@ -268,15 +275,16 @@ CodecList::Settings CodecList::Settings::parseSdp(const std::list<resip::Codec>&
             }
         } else if (codec_name == "EVS") {
             r.mEvsSpec.push_back({ptype});
-        }
+        } else if (codec_name == "TELEPHONE-EVENT")
+            r.mTelephoneEvent = ptype;
     }
     return r;
 }
 
 bool CodecList::Settings::operator == (const Settings& rhs) const
 {
-    if (std::tie(mWrapIuUP, mSkipDecode, mIsac16KPayloadType, mIsac32KPayloadType, mIlbc20PayloadType, mIlbc30PayloadType, mGsmFrPayloadType, mGsmFrPayloadLength, mGsmEfrPayloadType, mGsmHrPayloadType) !=
-        std::tie(rhs.mWrapIuUP, rhs.mSkipDecode, rhs.mIsac16KPayloadType, rhs.mIsac32KPayloadType, rhs.mIlbc20PayloadType, rhs.mIlbc30PayloadType, rhs.mGsmFrPayloadType, rhs.mGsmFrPayloadLength, rhs.mGsmEfrPayloadType, rhs.mGsmHrPayloadType))
+    if (std::tie(mWrapIuUP, mSkipDecode, mIsac16KPayloadType, mIsac32KPayloadType, mIlbc20PayloadType, mIlbc30PayloadType, mGsmFrPayloadType, mGsmFrPayloadLength, mGsmEfrPayloadType, mGsmHrPayloadType, mTelephoneEvent) !=
+        std::tie(rhs.mWrapIuUP, rhs.mSkipDecode, rhs.mIsac16KPayloadType, rhs.mIsac32KPayloadType, rhs.mIlbc20PayloadType, rhs.mIlbc30PayloadType, rhs.mGsmFrPayloadType, rhs.mGsmFrPayloadLength, rhs.mGsmEfrPayloadType, rhs.mGsmHrPayloadType, rhs.mTelephoneEvent))
         return false;
 
     if (mAmrNbOctetPayloadType != rhs.mAmrNbOctetPayloadType)
@@ -305,6 +313,9 @@ bool CodecList::Settings::operator == (const Settings& rhs) const
     for (size_t i = 0; i < mOpusSpec.size(); i++)
         if (mOpusSpec[i] != rhs.mOpusSpec[i])
             return false;
+
+    if (mTelephoneEvent != rhs.mTelephoneEvent)
+        return false;
 
     return true;
 }

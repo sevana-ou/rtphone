@@ -240,7 +240,7 @@ int64_t Variant::asInt64() const
     if (mType != VTYPE_INT64)
         throw Exception(ERR_BAD_VARIANT_TYPE);
 
-    return mInt;
+    return mInt64;
 }
 
 bool Variant::asBool() const

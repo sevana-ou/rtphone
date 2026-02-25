@@ -74,13 +74,16 @@ Statistics::~Statistics()
 
 void Statistics::calculateBurstr(double* burstr, double* lossr) const
 {
-    int lost = 0;
-    int bursts = 0;
-    for (int i = 0; i < 128; i++)
-    {
-        lost += i * mLoss[i];
-        bursts += mLoss[i];
-    }
+    int lost = 0; // Total packet lost
+    for (const auto& item: mPacketLossTimeline)
+        lost += item.mGap;
+    int bursts = mPacketLossTimeline.size(); // number of events
+
+    // for (const auto& entry: mLoss)
+    // {
+    //     lost += entry.first * entry.second;
+    //     bursts += entry.second;
+    // }
 
     if (lost < 5)
     {
@@ -109,14 +112,14 @@ void Statistics::calculateBurstr(double* burstr, double* lossr) const
 double Statistics::calculateMos(double maximalMos) const
 {
     // calculate lossrate and burst rate
-    double burstr, lossr;
+    double burstr = 0, lossr = 0;
     calculateBurstr(&burstr, &lossr);
 
-    double r;
+    double r = 0.0;
     double bpl = 8.47627; //mos = -4.23836 + 0.29873 * r - 0.00416744 * r * r + 0.0000209855 * r * r * r;
-    double mos;
+    double mos = 0.0;
 
-    if (mReceivedRtp < 100)
+    if (mReceivedRtp < 10)
         return 0.0;
 
     if (lossr == 0.0 || burstr == 0.0)

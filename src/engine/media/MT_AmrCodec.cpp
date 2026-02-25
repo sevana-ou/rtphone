@@ -3,11 +3,8 @@
 
 #include "MT_AmrCodec.h"
 #include "../helper/HL_ByteBuffer.h"
-#include "../helper/HL_Log.h"
 #include "../helper/HL_IuUP.h"
-#include "../helper/HL_Exception.h"
-
-#include <iostream>
+#include "../helper/HL_Log.h"
 
 #define LOG_SUBSYSTEM "AmrCodec"
 using namespace MT;
@@ -31,37 +28,37 @@ const uint16_t amrwb_framelenbits[10] =
 
 struct AmrPayloadInfo
 {
-    const uint8_t*  mPayload;
-    int             mPayloadLength;
-    bool            mOctetAligned;
-    bool            mInterleaving;
-    bool            mWideband;
-    uint64_t        mCurrentTimestamp;
+    const uint8_t*  mPayload = nullptr;
+    int             mPayloadLength = 0;
+    bool            mOctetAligned = false;
+    bool            mInterleaving = false;
+    bool            mWideband = false;
+    uint64_t        mCurrentTimestamp = 0;
 };
 
 
 struct AmrFrame
 {
-    uint8_t               mFrameType;
-    uint8_t               mMode;
-    bool                  mGoodQuality;
-    uint64_t              mTimestamp;
+    uint8_t               mFrameType = 0;
+    uint8_t               mMode = 0;
+    bool                  mGoodQuality = false;
+    uint64_t              mTimestamp = 0;
     std::shared_ptr<ByteBuffer> mData;
-    uint8_t               mSTI;
+    uint8_t               mSTI = 0;
 };
 
 struct AmrPayload
 {
-    uint8_t               mCodeModeRequest;
+    uint8_t               mCodeModeRequest = 0;
     std::vector<AmrFrame> mFrames;
-    bool                  mDiscardPacket;
+    bool                  mDiscardPacket = false;
 };
 
 // ARM RTP payload has next structure
 //   Header
 //   Table of Contents
 //   Frames
-static AmrPayload parseAmrPayload(AmrPayloadInfo& input)
+static AmrPayload parseAmrPayload(AmrPayloadInfo& input, size_t& cngCounter)
 {
     AmrPayload result;
 
@@ -128,6 +125,8 @@ static AmrPayload parseAmrPayload(AmrPayloadInfo& input)
         frame.mTimestamp = input.mCurrentTimestamp;
         result.mFrames.push_back(frame);
         input.mCurrentTimestamp += input.mWideband ? 320 : 160;
+        if (FT == SID_FT)
+            cngCounter++;
     }
     while (F != 0);
 
@@ -140,12 +139,16 @@ static AmrPayload parseAmrPayload(AmrPayloadInfo& input)
         //   avoid the loss of data synchronization in the depacketization
         //   process, which can result in a huge degradation in speech quality.
         bool discard = input.mWideband ? (f.mFrameType >= 10 && f.mFrameType <= 13) : (f.mFrameType >= 9 && f.mFrameType <= 14);
-        // discard |= input.mWideband ? f.mFrameType >= 14 : f.mFrameType >= 15;
         if (discard)
         {
             result.mDiscardPacket = true;
             continue;
         }
+
+        // if (input.mWideband && f.mMode == 0xFF /* CNG */)
+        // {
+        //     int a = 1;
+        // }`
 
         if (input.mWideband && f.mFrameType == 15)
         {
@@ -165,8 +168,8 @@ static AmrPayload parseAmrPayload(AmrPayloadInfo& input)
             continue;
         }
 
-        size_t bitsLength = input.mWideband ? amrwb_framelenbits[f.mFrameType] : amrnb_framelenbits[f.mFrameType];
-        size_t byteLength = input.mWideband ? amrwb_framelen[f.mFrameType] : amrnb_framelen[f.mFrameType];
+        size_t bitsLength = input.mWideband ? amrwb_framelenbits[f.mFrameType]  : amrnb_framelenbits[f.mFrameType];
+        size_t byteLength = input.mWideband ? amrwb_framelen[f.mFrameType]      : amrnb_framelen[f.mFrameType];
 
         if (bitsLength > 0)
         {
@@ -260,8 +263,7 @@ PCodec AmrNbCodec::CodecFactory::create()
 
 
 AmrNbCodec::AmrNbCodec(const AmrCodecConfig& config)
-    :mEncoderCtx(nullptr), mDecoderCtx(nullptr), mConfig(config), mCurrentDecoderTimestamp(0),
-      mSwitchCounter(0), mPreviousPacketLength(0)
+    :mConfig(config)
 {
     mEncoderCtx = Encoder_Interface_init(1);
     mDecoderCtx = Decoder_Interface_init();
@@ -282,44 +284,31 @@ AmrNbCodec::~AmrNbCodec()
     }
 }
 
-const char* AmrNbCodec::name()
+Codec::Info AmrNbCodec::info()
 {
-    return MT_AMRNB_CODECNAME;
+    return {
+        .mName = MT_AMRNB_CODECNAME,
+        .mSamplerate = 8000,
+        .mChannels = 1,
+        .mPcmLength = 20 * 16,
+        .mFrameTime = 20,
+        .mRtpLength = 0
+    };
 }
 
-int AmrNbCodec::pcmLength()
+Codec::EncodeResult AmrNbCodec::encode(std::span<const uint8_t> input, std::span<uint8_t> output)
 {
-    return 20 * 16;
-}
-
-int AmrNbCodec::rtpLength()
-{
-    return 0;
-}
-
-int AmrNbCodec::frameTime()
-{
-    return 20;
-}
-
-int AmrNbCodec::samplerate()
-{
-    return 8000;
-}
-
-int AmrNbCodec::encode(const void* input, int inputBytes, void* output, int outputCapacity)
-{
-    if (inputBytes % pcmLength())
-        return 0;
+    if (input.size_bytes() % pcmLength())
+        return {.mEncoded = 0};
 
     // Declare the data input pointer
-    auto *dataIn = (const short *)input;
+    auto *dataIn = (const short *)input.data();
 
     // Declare the data output pointer
-    auto *dataOut = (unsigned char *)output;
+    auto *dataOut = (unsigned char *)output.data();
 
     // Find how much RTP frames will be generated
-    unsigned int frames = inputBytes / pcmLength();
+    unsigned int frames = input.size_bytes() / pcmLength();
 
     // Generate frames
     for (unsigned int i = 0; i < frames; i++)
@@ -328,28 +317,28 @@ int AmrNbCodec::encode(const void* input, int inputBytes, void* output, int outp
         dataIn += pcmLength() / 2;
     }
 
-    return dataOut - (unsigned char*)output;
+    return {.mEncoded = (size_t)(dataOut - (unsigned char*)output.data())};
 }
 
 #define L_FRAME 160
 #define AMR_BITRATE_DTX 15
-int AmrNbCodec::decode(const void* input, int inputBytes, void* output, int outputCapacity)
+Codec::DecodeResult AmrNbCodec::decode(std::span<const uint8_t> input, std::span<uint8_t> output)
 {
     if (mConfig.mOctetAligned)
-        return 0;
+        return {.mDecoded = 0};
 
     if (mConfig.mIuUP)
     {
         // Try to parse IuUP frame
         IuUP::Frame frame;
-        if (!IuUP::parse2((const uint8_t*)input, inputBytes, frame))
-            return 0;
+        if (!IuUP::parse2((const uint8_t*)input.data(), input.size_bytes(), frame))
+            return {0};
 
         // Check if CRC failed - it is check from IuUP data
         if (!frame.mHeaderCrcOk || !frame.mPayloadCrcOk)
         {
             ICELogInfo(<< "CRC check failed.");
-            return 0;
+            return {0};
         }
 
         // Build NB frame to decode
@@ -366,61 +355,61 @@ int AmrNbCodec::decode(const void* input, int inputBytes, void* output, int outp
 
         // Check if frameType comparing is correct
         if (frameType == 0xFF)
-            return 0;
+            return {0};
 
         dataToDecode.mutableData()[0] = (frameType << 3) | (1 << 2);
 
-        Decoder_Interface_Decode(mDecoderCtx, (const unsigned char*)dataToDecode.data(), (short*)output, 0);
-        return pcmLength();
+        Decoder_Interface_Decode(mDecoderCtx, (const unsigned char*)dataToDecode.data(), (short*)output.data(), 0);
+        return {.mDecoded = (size_t)pcmLength()};
     }
     else
     {
-        if (outputCapacity < pcmLength())
-            return 0;
+        if (output.size_bytes() < pcmLength())
+            return {.mDecoded = 0};
 
-        if (inputBytes == 0)
+        if (input.size_bytes() == 0)
         { // PLC part
             unsigned char buffer[32];
             buffer[0] = (AMR_BITRATE_DTX << 3)|4;
-            Decoder_Interface_Decode(mDecoderCtx, buffer, (short*)output, 0); // Handle missing data
-            return pcmLength();
+            Decoder_Interface_Decode(mDecoderCtx, buffer, (short*)output.data(), 0); // Handle missing data
+            return {.mDecoded = (size_t)pcmLength()};
         }
 
         AmrPayloadInfo info;
         info.mCurrentTimestamp = mCurrentDecoderTimestamp;
         info.mOctetAligned = mConfig.mOctetAligned;
-        info.mPayload = (const uint8_t*)input;
-        info.mPayloadLength = inputBytes;
+        info.mPayload = input.data();
+        info.mPayloadLength = input.size_bytes();
         info.mWideband = false;
         info.mInterleaving = false;
 
         AmrPayload ap;
         try
         {
-            ap = parseAmrPayload(info);
+            ap = parseAmrPayload(info, mCngCounter);
         }
         catch(...)
         {
             ICELogDebug(<< "Failed to decode AMR payload.");
-            return 0;
+            return {.mDecoded = 0};
         }
         // Save current timestamp
         mCurrentDecoderTimestamp = info.mCurrentTimestamp;
 
         // Check if packet is corrupted
         if (ap.mDiscardPacket)
-            return 0;
+            return {.mDecoded = 0};
 
 
         // Check for output buffer capacity
-        if (outputCapacity < (int)ap.mFrames.size() * pcmLength())
-            return 0;
+        if (output.size_bytes() < (int)ap.mFrames.size() * pcmLength())
+            return {.mDecoded = 0};
 
         if (ap.mFrames.empty())
         {
             ICELogError(<< "No AMR frames");
         }
-        short* dataOut = (short*)output;
+        short* dataOut = (short*)output.data();
         for (AmrFrame& frame: ap.mFrames)
         {
             if (frame.mData)
@@ -430,18 +419,18 @@ int AmrNbCodec::decode(const void* input, int inputBytes, void* output, int outp
                 dataOut += pcmLength() / 2;
             }
         }
-        return pcmLength() * ap.mFrames.size();
+        return {.mDecoded = pcmLength() * ap.mFrames.size()};
     }
 
-    return pcmLength();
+    return {.mDecoded = (size_t)pcmLength()};
 }
 
-int AmrNbCodec::plc(int lostFrames, void* output, int outputCapacity)
+size_t AmrNbCodec::plc(int lostFrames, std::span<uint8_t> output)
 {
-    if (outputCapacity < lostFrames * pcmLength())
+    if (output.size_bytes() < lostFrames * pcmLength())
         return 0;
 
-    short* dataOut = (short*)output;
+    short* dataOut = (short*)output.data();
 
     for (int i=0; i < lostFrames; i++)
     {
@@ -457,6 +446,11 @@ int AmrNbCodec::plc(int lostFrames, void* output, int outputCapacity)
 int AmrNbCodec::getSwitchCounter() const
 {
     return mSwitchCounter;
+}
+
+int AmrNbCodec::getCngCounter() const
+{
+    return mCngCounter;
 }
 
 // -------- AMR WB codec
@@ -500,11 +494,9 @@ PCodec AmrWbCodec::CodecFactory::create()
 AmrWbStatistics MT::GAmrWbStatistics;
 
 AmrWbCodec::AmrWbCodec(const AmrCodecConfig& config)
-    :mEncoderCtx(nullptr), mDecoderCtx(nullptr), mConfig(config),
-      mSwitchCounter(0), mPreviousPacketLength(0)
+    :mConfig(config)
 {
     mDecoderCtx = D_IF_init();
-    mCurrentDecoderTimestamp = 0;
 }
 
 AmrWbCodec::~AmrWbCodec()
@@ -522,49 +514,37 @@ AmrWbCodec::~AmrWbCodec()
     }
 }
 
-const char* AmrWbCodec::name()
-{
-    return MT_AMRWB_CODECNAME;
+Codec::Info AmrWbCodec::info() {
+    return {
+        .mName = MT_AMRWB_CODECNAME,
+        .mSamplerate = 16000,
+        .mChannels = 1,
+        .mPcmLength = 20 * 16 * 2,
+        .mFrameTime = 20,
+        .mRtpLength = 0   /* There is complex structure inside AMR packet which may include multilple frames with various length. */
+    };
 }
 
-int AmrWbCodec::pcmLength()
-{
-    return 20 * 16 * 2;
-}
 
-int AmrWbCodec::rtpLength()
+Codec::EncodeResult AmrWbCodec::encode(std::span<const uint8_t> input, std::span<uint8_t> output)
 {
-    return 0; // VBR
-}
-
-int AmrWbCodec::frameTime()
-{
-    return 20;
-}
-
-int AmrWbCodec::samplerate()
-{
-    return 16000;
-}
-
-int AmrWbCodec::encode(const void* input, int inputBytes, void* output, int outputCapacity)
-{
-    throw Exception(ERR_NOT_IMPLEMENTED);
+    // Still no support for encoding - emit silence instead
+    return {.mEncoded = 0};
 }
 
 #define L_FRAME 160
 #define AMR_BITRATE_DTX 15
 
-int AmrWbCodec::decodeIuup(std::span<const uint8_t> input, std::span<uint8_t> output)
+Codec::DecodeResult AmrWbCodec::decodeIuup(std::span<const uint8_t> input, std::span<uint8_t> output)
 {
     IuUP::Frame frame;
     if (!IuUP::parse2(input.data(), input.size(), frame))
-        return 0;
+        return {.mDecoded = 0};
 
     if (!frame.mHeaderCrcOk || !frame.mPayloadCrcOk)
     {
         ICELogInfo(<< "CRC check failed.");
-        return 0;
+        return {.mDecoded = 0};
     }
 
     // Reserve space
@@ -579,34 +559,34 @@ int AmrWbCodec::decodeIuup(std::span<const uint8_t> input, std::span<uint8_t> ou
             frameType = ftIndex;
 
     if (frameType == 0xFF)
-        return 0;
+        return {.mDecoded = 0, .mIsCng = true};
 
     dataToDecode.mutableData()[0] = (frameType << 3) | (1 << 2);
 
     D_IF_decode(mDecoderCtx, (const unsigned char*)dataToDecode.data(), (short*)output.data(), 0);
-    return pcmLength();
+    return {.mDecoded = (size_t)pcmLength()};
 }
 
-int AmrWbCodec::decodePlain(std::span<const uint8_t> input, std::span<uint8_t> output)
+Codec::DecodeResult AmrWbCodec::decodePlain(std::span<const uint8_t> input, std::span<uint8_t> output)
 {
     AmrPayloadInfo info;
-    info.mCurrentTimestamp = mCurrentDecoderTimestamp;
-    info.mOctetAligned = mConfig.mOctetAligned;
-    info.mPayload = input.data();
-    info.mPayloadLength = input.size();
-    info.mWideband = true;
-    info.mInterleaving = false;
+    info.mCurrentTimestamp  = mCurrentDecoderTimestamp;
+    info.mOctetAligned      = mConfig.mOctetAligned;
+    info.mPayload           = input.data();
+    info.mPayloadLength     = input.size();
+    info.mWideband          = true;
+    info.mInterleaving      = false;
 
     AmrPayload ap;
     try
     {
-        ap = parseAmrPayload(info);
+        ap = parseAmrPayload(info, mCngCounter);
     }
     catch(...)
     {
         GAmrWbStatistics.mNonParsed++;
         ICELogDebug(<< "Failed to decode AMR payload");
-        return 0;
+        return {.mDecoded = 0};
     }
     // Save current timestamp
     mCurrentDecoderTimestamp = info.mCurrentTimestamp;
@@ -615,58 +595,67 @@ int AmrWbCodec::decodePlain(std::span<const uint8_t> input, std::span<uint8_t> o
     if (ap.mDiscardPacket)
     {
         GAmrWbStatistics.mDiscarded++;
-        return 0;
+        return {.mDecoded = 0};
     }
 
-    // Check for output buffer capacity
-    if (output.size() < (int)ap.mFrames.size() * pcmLength())
-        return 0;
+    // Find the required output capacity
+    size_t capacity = 0;
+    for (AmrFrame& frame: ap.mFrames)
+        capacity += frame.mMode == 0xFF /* CNG */ ? pcmLength() : pcmLength();
+
+    if (output.size() < capacity)
+        return {.mDecoded = 0};
 
     short* dataOut = (short*)output.data();
     size_t dataOutSizeInBytes = 0;
     for (AmrFrame& frame: ap.mFrames)
     {
-        memset(dataOut, 0, static_cast<size_t>(output.size()));
+        size_t frameOutputSize = frame.mMode == 0xFF ? pcmLength() : pcmLength();
+        memset(dataOut, 0, frameOutputSize);
 
         if (frame.mData)
         {
+            if (frame.mMode == 0xFF)
+            {
+                // int bp = 1;
+            }
             D_IF_decode(mDecoderCtx, (const unsigned char*)frame.mData->data(), (short*)dataOut, 0);
-            dataOut += pcmLength() / 2;
-            dataOutSizeInBytes += pcmLength();
+            dataOut += frameOutputSize / 2;
+            dataOutSizeInBytes += frameOutputSize;
         }
     }
-    return dataOutSizeInBytes;
+    return {.mDecoded = dataOutSizeInBytes,
+            .mIsCng = ap.mFrames.size() == 1 ? (ap.mFrames.front().mMode == 0xFF) : false};
 }
 
-int AmrWbCodec::decode(const void* input, int inputBytes, void* output, int outputCapacity)
+Codec::DecodeResult AmrWbCodec::decode(std::span<const uint8_t> input, std::span<uint8_t> output)
 {
-    auto inputBuffer = std::span<const uint8_t>((uint8_t*)input, (size_t)inputBytes);
-    auto outputBuffer = std::span<uint8_t>((uint8_t*)output, (size_t)outputCapacity);
-
     if (mConfig.mIuUP)
-        return decodeIuup(inputBuffer, outputBuffer);
+        return decodeIuup(input, output);
     else
-        return decodePlain(inputBuffer, outputBuffer);
-
-    return 0;
+        return decodePlain(input, output);
 }
 
-int AmrWbCodec::plc(int lostFrames, void* output, int outputCapacity)
+size_t AmrWbCodec::plc(int lostFrames, std::span<uint8_t> output)
 {
-    /*  if (outputCapacity < lostFrames * pcmLength())
-    return 0;
-
-  short* dataOut = (short*)output;
-
-  for (int i=0; i < lostFrames; i++)
-  {
-    unsigned char buffer[32];
-    buffer[0] = (AMR_BITRATE_DTX << 3)|4;
-    Decoder_Interface_Decode(mDecoderCtx, buffer, dataOut, 0); // Handle missing data
-    dataOut += L_FRAME;
-  }
-  */
+    // ToDo: Check again if PLC works for AMR-WB
+    // For now return the silence
+    memset(output.data(), 0, output.size_bytes());
     return lostFrames * pcmLength();
+    /*
+    if (outputCapacity < lostFrames * pcmLength())
+        return 0;
+
+    short* dataOut = (short*)output;
+
+    for (int i=0; i < lostFrames; i++)
+    {
+        unsigned char buffer[32];
+        buffer[0] = (AMR_BITRATE_DTX << 3)|4;
+        Decoder_Interface_Decode(mDecoderCtx, buffer, dataOut, 0); // Handle missing data
+        dataOut += L_FRAME;
+    }
+    */
 }
 
 int AmrWbCodec::getSwitchCounter() const
@@ -674,14 +663,16 @@ int AmrWbCodec::getSwitchCounter() const
     return mSwitchCounter;
 }
 
+int AmrWbCodec::getCngCounter() const
+{
+    return mCngCounter;
+}
 
 // ------------- GSM EFR -----------------
 
 GsmEfrCodec::GsmEfrFactory::GsmEfrFactory(bool iuup, int ptype)
     :mIuUP(iuup), mPayloadType(ptype)
-{
-
-}
+{}
 
 const char* GsmEfrCodec::GsmEfrFactory::name()
 {
@@ -699,9 +690,7 @@ int GsmEfrCodec::GsmEfrFactory::payloadType()
 }
 
 void GsmEfrCodec::GsmEfrFactory::updateSdp(resip::SdpContents::Session::Medium::CodecContainer& codecs, SdpDirection direction)
-{
-
-}
+{}
 
 int GsmEfrCodec::GsmEfrFactory::processSdp(const resip::SdpContents::Session::Medium::CodecContainer& codecs, SdpDirection direction)
 {
@@ -719,7 +708,7 @@ PCodec GsmEfrCodec::GsmEfrFactory::create()
 }
 
 GsmEfrCodec::GsmEfrCodec(bool iuup)
-    :mEncoderCtx(nullptr), mDecoderCtx(nullptr), mIuUP(iuup)
+    :mIuUP(iuup)
 {
     mEncoderCtx = Encoder_Interface_init(1);
     mDecoderCtx = Decoder_Interface_init();
@@ -740,44 +729,31 @@ GsmEfrCodec::~GsmEfrCodec()
     }
 }
 
-const char* GsmEfrCodec::name()
+Codec::Info GsmEfrCodec::info()
 {
-    return MT_GSMEFR_CODECNAME;
+    return {
+        .mName = MT_GSMEFR_CODECNAME,
+        .mSamplerate = 8000,
+        .mChannels = 1,
+        .mPcmLength = 20 * 16,
+        .mFrameTime = 20,
+        .mRtpLength = 0
+    };
 }
 
-int GsmEfrCodec::pcmLength()
+Codec::EncodeResult GsmEfrCodec::encode(std::span<const uint8_t> input, std::span<uint8_t> output)
 {
-    return 20 * 16;
-}
-
-int GsmEfrCodec::rtpLength()
-{
-    return 0;
-}
-
-int GsmEfrCodec::frameTime()
-{
-    return 20;
-}
-
-int GsmEfrCodec::samplerate()
-{
-    return 8000;
-}
-
-int GsmEfrCodec::encode(const void* input, int inputBytes, void* output, int outputCapacity)
-{
-    if (inputBytes % pcmLength())
-        return 0;
+    if (input.size_bytes() % pcmLength())
+        return {.mEncoded = 0};
 
     // Declare the data input pointer
-    const short *dataIn = (const short *)input;
+    const short *dataIn = (const short *)input.data();
 
     // Declare the data output pointer
-    unsigned char *dataOut = (unsigned char *)output;
+    unsigned char *dataOut = (unsigned char *)output.data();
 
     // Find how much RTP frames will be generated
-    unsigned int frames = inputBytes / pcmLength();
+    unsigned int frames = input.size_bytes() / pcmLength();
 
     // Generate frames
     for (unsigned int i = 0; i < frames; i++)
@@ -786,7 +762,7 @@ int GsmEfrCodec::encode(const void* input, int inputBytes, void* output, int out
         dataIn += pcmLength() / 2;
     }
 
-    return frames * rtpLength();
+    return {.mEncoded = frames * rtpLength()};
 }
 
 #define L_FRAME 160
@@ -843,100 +819,61 @@ const uint16_t gsm690_12_2_bitorder[244] = {
     237, 236,  96, 199,
 };
 
-int GsmEfrCodec::decode(const void* input, int inputBytes, void* output, int outputCapacity)
+Codec::DecodeResult GsmEfrCodec::decode(std::span<const uint8_t> input, std::span<uint8_t> output)
 {
-    /*  if (mIuUP)
-  {
-    // Try to parse IuUP frame
-    IuUP::Frame frame;
-    if (!IuUP::parse2((const uint8_t*)input, inputBytes, frame))
-      return 0;
+    if (output.size_bytes() < pcmLength())
+        return {.mDecoded = 0};
 
-    // Check if CRC failed - it is check from IuUP data
-    if (!frame.mHeaderCrcOk || !frame.mPayloadCrcOk)
-    {
-      ICELogInfo(<< "CRC check failed.");
-      return 0;
+    if (input.size_bytes() == 0)
+    { // PLC part
+        unsigned char buffer[32];
+        buffer[0] = (AMR_BITRATE_DTX << 3)|4;
+        Decoder_Interface_Decode(mDecoderCtx, buffer, (short*)output.data(), 0); // Handle missing data
     }
-
-    // Build NB frame to decode
-    ByteBuffer dataToDecode;
-    dataToDecode.resize(1 + frame.mPayloadSize); // Reserve place
-
-    // Copy AMR data
-    memmove(dataToDecode.mutableData() + 1, frame.mPayload, frame.mPayloadSize);
-
-    uint8_t frameType = 0xFF;
-    for (uint8_t ftIndex = 0; ftIndex <= 9 && frameType == 0xFF; ftIndex++)
-      if (amrnb_framelen[ftIndex] == frame.mPayloadSize)
-        frameType = ftIndex;
-
-    // Check if frameType comparing is correct
-    if (frameType == 0xFF)
-      return 0;
-
-    dataToDecode.mutableData()[0] = (frameType << 3) | (1 << 2);
-
-    Decoder_Interface_Decode(mDecoderCtx, (const unsigned char*)dataToDecode.data(), (short*)output, 0);
-    return pcmLength();
-  }
-  else */
+    else
     {
-        if (outputCapacity < pcmLength())
-            return 0;
+        // Reorder bytes from input to dst
+        uint8_t dst[GSM_EFR_FRAME_LEN];
+        const uint8_t* src = input.data();
+        for (int i=0; i<(GSM_EFR_FRAME_LEN-1); i++)
+            dst[i] = (src[i] << 4) | (src[i+1] >> 4);
+        dst[GSM_EFR_FRAME_LEN-1] = src[GSM_EFR_FRAME_LEN-1] << 4;
 
-        if (inputBytes == 0)
-        { // PLC part
-            unsigned char buffer[32];
-            buffer[0] = (AMR_BITRATE_DTX << 3)|4;
-            Decoder_Interface_Decode(mDecoderCtx, buffer, (short*)output, 0); // Handle missing data
-        }
-        else
+        unsigned char in[GSM_EFR_FRAME_LEN + 1];
+
+        // Reorder bits
+        in[0] = 0x3c; /* AMR mode 7 = GSM-EFR, Quality bit is set */
+        in[GSM_EFR_FRAME_LEN] = 0x0;
+
+        for (int i=0; i<244; i++)
         {
-            // Reorder bytes from input to dst
-            uint8_t dst[GSM_EFR_FRAME_LEN];
-            const uint8_t* src = (const uint8_t*)input;
-            for (int i=0; i<(GSM_EFR_FRAME_LEN-1); i++)
-                dst[i] = (src[i] << 4) | (src[i+1] >> 4);
-            dst[GSM_EFR_FRAME_LEN-1] = src[GSM_EFR_FRAME_LEN-1] << 4;
+            int si = gsm690_12_2_bitorder[i];
+            int di = i;
+            msb_put_bit(in + 1, di, msb_get_bit(dst, si));
+        }
 
-            unsigned char in[GSM_EFR_FRAME_LEN + 1];
+        // Decode
+        memset(output.data(), 0, pcmLength());
+        Decoder_Interface_Decode(mDecoderCtx, in, (short*)output.data(), 0);
 
-            // Reorder bits
-            in[0] = 0x3c; /* AMR mode 7 = GSM-EFR, Quality bit is set */
-            in[GSM_EFR_FRAME_LEN] = 0x0;
-
-            for (int i=0; i<244; i++)
-            {
-                int si = gsm690_12_2_bitorder[i];
-                int di = i;
-                msb_put_bit(in + 1, di, msb_get_bit(dst, si));
-            }
-
-            // Decode
-            memset(output, 0, pcmLength());
-            Decoder_Interface_Decode(mDecoderCtx, in, (short*)output, 0);
-
-
-            uint8_t* pcm = (uint8_t*)output;
-            for (int i=0; i<160; i++)
-            {
-                uint16_t w = ((uint16_t*)output)[i];
-                pcm[(i<<1)  ] =  w       & 0xff;
-                pcm[(i<<1)+1] = (w >> 8) & 0xff;
-            }
+        uint8_t* pcm = (uint8_t*)output.data();
+        for (int i=0; i<160; i++)
+        {
+            uint16_t w = ((uint16_t*)output.data())[i];
+            pcm[(i<<1)  ] =  w       & 0xff;
+            pcm[(i<<1)+1] = (w >> 8) & 0xff;
         }
     }
 
-    return pcmLength();
+    return {.mDecoded = (size_t)pcmLength()};
 }
 
-int GsmEfrCodec::plc(int lostFrames, void* output, int outputCapacity)
+size_t GsmEfrCodec::plc(int lostFrames, std::span<uint8_t> output)
 {
-    if (outputCapacity < lostFrames * pcmLength())
+    if (output.size_bytes() < lostFrames * pcmLength())
         return 0;
 
-    short* dataOut = (short*)output;
+    short* dataOut = (short*)output.data();
 
     for (int i=0; i < lostFrames; i++)
     {

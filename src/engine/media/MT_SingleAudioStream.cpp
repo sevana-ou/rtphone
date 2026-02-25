@@ -13,19 +13,17 @@
 using namespace MT;
 
 SingleAudioStream::SingleAudioStream(const CodecList::Settings& codecSettings, Statistics& stat)
-    :mReceiver(codecSettings, stat), mDtmfReceiver(stat)
-{
-}
+    :mReceiver(codecSettings, stat),
+     mDtmfReceiver(stat)
+{}
 
 SingleAudioStream::~SingleAudioStream()
-{
-
-}
+{}
 
 void SingleAudioStream::process(const std::shared_ptr<jrtplib::RTPPacket>& packet)
 {
     ICELogMedia(<< "Processing incoming RTP/RTCP packet");
-    if (packet->GetPayloadType() == 101/*resip::Codec::TelephoneEvent.payloadType()*/)
+    if (packet->GetPayloadType() == mReceiver.getCodecSettings().mTelephoneEvent)
         mDtmfReceiver.add(packet);
     else
         mReceiver.add(packet);
@@ -33,9 +31,10 @@ void SingleAudioStream::process(const std::shared_ptr<jrtplib::RTPPacket>& packe
 
 void SingleAudioStream::copyPcmTo(Audio::DataWindow& output, int needed)
 {
+    // Packet by packet
     while (output.filled() < needed)
     {
-        if (mReceiver.getAudio(output, {}) != AudioReceiver::DecodeResult_Ok)
+        if (mReceiver.getAudioTo(output, {}).mStatus != AudioReceiver::DecodeResult::Status::Ok)
             break;
     }
 

@@ -26,13 +26,13 @@ struct AmrCodecConfig
 class AmrNbCodec : public Codec
 {
 protected:
-    void* mEncoderCtx;
-    void* mDecoderCtx;
+    void* mEncoderCtx = nullptr;
+    void* mDecoderCtx = nullptr;
     AmrCodecConfig mConfig;
-    unsigned mCurrentDecoderTimestamp;
-    int mSwitchCounter;
-    int mPreviousPacketLength;
-
+    unsigned mCurrentDecoderTimestamp = 0;
+    int mPreviousPacketLength = 0;
+    size_t mCngCounter = 0;
+    size_t mSwitchCounter = 0;
 public:
     class CodecFactory: public Factory
     {
@@ -54,17 +54,16 @@ public:
     };
 
     AmrNbCodec(const AmrCodecConfig& config);
+    ~AmrNbCodec();
 
-    virtual ~AmrNbCodec();
-    const char* name() override;
-    int pcmLength() override;
-    int rtpLength() override;
-    int frameTime() override;
-    int samplerate() override;
-    int encode(const void* input, int inputBytes, void* output, int outputCapacity) override;
-    int decode(const void* input, int inputBytes, void* output, int outputCapacity) override;
-    int plc(int lostFrames, void* output, int outputCapacity) override;
+    Info info() override;
+
+    EncodeResult encode(std::span<const uint8_t> input, std::span<uint8_t> output) override;
+    DecodeResult decode(std::span<const uint8_t> input, std::span<uint8_t> output) override;
+    size_t plc(int lostFrames, std::span<uint8_t> output) override;
+
     int getSwitchCounter() const;
+    int getCngCounter() const;
 };
 
 struct AmrWbStatistics
@@ -77,15 +76,17 @@ extern AmrWbStatistics GAmrWbStatistics;
 class AmrWbCodec : public Codec
 {
 protected:
-    void* mEncoderCtx;
-    void* mDecoderCtx;
+    void* mEncoderCtx = nullptr;
+    void* mDecoderCtx = nullptr;
     AmrCodecConfig mConfig;
-    uint64_t mCurrentDecoderTimestamp;
-    int mSwitchCounter;
+    uint64_t mCurrentDecoderTimestamp = 0;
+    size_t mSwitchCounter = 0;
+    size_t mCngCounter = 0;
+
     int mPreviousPacketLength;
 
-    int decodeIuup(std::span<const uint8_t> input, std::span<uint8_t> output);
-    int decodePlain(std::span<const uint8_t> input, std::span<uint8_t> output);
+    DecodeResult decodeIuup(std::span<const uint8_t> input, std::span<uint8_t> output);
+    DecodeResult decodePlain(std::span<const uint8_t> input, std::span<uint8_t> output);
 
 public:
     class CodecFactory: public Factory
@@ -110,23 +111,21 @@ public:
     AmrWbCodec(const AmrCodecConfig& config);
     virtual ~AmrWbCodec();
 
-    const char* name() override;
-    int pcmLength() override;
-    int rtpLength() override;
-    int frameTime() override;
-    int samplerate() override;
-    int encode(const void* input, int inputBytes, void* output, int outputCapacity) override;
-    int decode(const void* input, int inputBytes, void* output, int outputCapacity) override;
-    int plc(int lostFrames, void* output, int outputCapacity) override;
+    Info info() override;
+
+    EncodeResult encode(std::span<const uint8_t> input, std::span<uint8_t> output) override;
+    DecodeResult decode(std::span<const uint8_t> input, std::span<uint8_t> output) override;
+    size_t       plc(int lostFrames, std::span<uint8_t> output) override;
     int getSwitchCounter() const;
+    int getCngCounter() const;
 };
 
 class GsmEfrCodec : public Codec
 {
 protected:
-    void* mEncoderCtx;
-    void* mDecoderCtx;
-    bool mIuUP;
+    void* mEncoderCtx = nullptr;
+    void* mDecoderCtx = nullptr;
+    bool mIuUP = false;
 
 public:
     class GsmEfrFactory: public Factory
@@ -143,23 +142,19 @@ public:
         void create(CodecMap& codecs) override;
 
         PCodec create() override;
-
     protected:
         bool mIuUP;
         int mPayloadType;
     };
 
     GsmEfrCodec(bool iuup = false);
+    ~GsmEfrCodec();
 
-    virtual ~GsmEfrCodec();
-    const char* name() override;
-    int pcmLength() override;
-    int rtpLength() override;
-    int frameTime() override;
-    int samplerate() override;
-    int encode(const void* input, int inputBytes, void* output, int outputCapacity) override;
-    int decode(const void* input, int inputBytes, void* output, int outputCapacity) override;
-    int plc(int lostFrames, void* output, int outputCapacity) override;
+    Info info() override;
+
+    EncodeResult encode(std::span<const uint8_t> input, std::span<uint8_t> output) override;
+    DecodeResult decode(std::span<const uint8_t> input, std::span<uint8_t> output) override;
+    size_t       plc(int lostFrames, std::span<uint8_t> output) override;
 };
 
 } // End of MT namespace

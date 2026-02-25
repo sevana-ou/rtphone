@@ -1,4 +1,4 @@
-/* Copyright(C) 2007-2017 VoIP objects (voipobjects.com)
+/* Copyright(C) 2007-2026 VoIP objects (voipobjects.com)
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -9,6 +9,7 @@
 
 #include "../engine_config.h"
 #include "HL_NetworkSocket.h"
+#include "HL_Log.h"
 
 #if defined(TARGET_OSX) || defined(TARGET_LINUX)
 # include <fcntl.h>
@@ -19,11 +20,11 @@
 #endif
 #include <assert.h>
 
+#define LOG_SUBSYSTEM "network"
+
 DatagramSocket::DatagramSocket()
     :mFamily(AF_INET), mHandle(INVALID_SOCKET), mLocalPort(0)
-{
-
-}
+{}
 
 DatagramSocket::~DatagramSocket()
 {
@@ -159,6 +160,12 @@ void DatagramAgreggator::addSocket(PDatagramSocket socket)
 {
     if (socket->mHandle == INVALID_SOCKET)
         return;
+
+    if (mSocketVector.size() >= 62)
+    {
+        ICELogError(<< "fd_set overflow; too much sockets");
+        return;
+    }
 
     FD_SET(socket->mHandle, &mReadSet);
     if (socket->mHandle > mMaxHandle)

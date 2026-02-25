@@ -212,15 +212,13 @@ void SrtpSession::close()
 
 SrtpKeySalt& SrtpSession::outgoingKey(SrtpSuite suite)
 {
-    Lock l(mGuard);
     assert(suite > SRTP_NONE && suite <= SRTP_LAST);
-    return mOutgoingKey[int(suite)-1];
+    Lock l(mGuard);
+    return mOutgoingKey[int(suite)-1];  // The automated review sometimes give the hints about the possible underflow array index access
 }
 
 bool SrtpSession::protectRtp(void* buffer, int* length)
 {
-    // addSsrc(RtpHelper::findSsrc(buffer, *length), sdOutgoing);
-
     Lock l(mGuard);
     if (mOutboundSession)
     {

@@ -210,18 +210,17 @@ void AudioStream::addData(const void* buffer, int bytes)
         if (mSendingDump)
             mSendingDump->write((const char*)mCapturedAudio.data() + codec->pcmLength() * i, codec->pcmLength());
 
-        int produced;
-        produced = codec->encode((const char*)mCapturedAudio.data() + codec->pcmLength()*i,
-                                 codec->pcmLength(), mFrameBuffer, MT_MAXAUDIOFRAME);
+        auto r = codec->encode({(const uint8_t*)mCapturedAudio.data() + codec->pcmLength()*i, (size_t)codec->pcmLength()},
+                                 {(uint8_t*)mFrameBuffer, MT_MAXAUDIOFRAME});
         
         // Counter of processed input bytes of raw pcm data from microphone
         processed += codec->pcmLength();
         encodedTime += codec->frameTime();
         mEncodedTime += codec->frameTime();
 
-        if (produced)
+        if (r.mEncoded)
         {
-            mEncodedAudio.appendBuffer(mFrameBuffer, produced);
+            mEncodedAudio.appendBuffer(mFrameBuffer, r.mEncoded);
             if (packetTime <= encodedTime)
             {
                 // Time to send packet
