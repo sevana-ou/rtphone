@@ -4,16 +4,15 @@
 #include <chrono>
 #include <map>
 #include <optional>
-#include <array>
 
-#include "audio/Audio_DataWindow.h"
-#include "helper/HL_Optional.hpp"
 #include "helper/HL_Statistics.h"
 #include "helper/HL_Types.h"
+#include "helper/HL_InternetAddress.h"
 
 #include "jrtplib/src/rtptimeutilities.h"
 #include "jrtplib/src/rtppacket.h"
 
+using namespace std::chrono_literals;
 
 namespace MT
 {
@@ -56,47 +55,55 @@ struct PacketLossEvent
     uint32_t    mStartSeqno = 0,
                 mEndSeqno = 0;
     int         mGap = 0;
+    std::chrono::microseconds mTimestampStart = 0us,
+                              mTimestampEnd = 0us;
+};
+
+struct Dtmf2833Event
+{
+    char mTone;
     std::chrono::microseconds mTimestamp;
 };
 
 class Statistics
 {
 public:
-    size_t                      mReceived = 0,        // Received traffic in bytes
-                                mSent = 0,            // Sent traffic in bytes
-                                mReceivedRtp = 0,     // Number of received rtp packets
-                                mSentRtp = 0,         // Number of sent rtp packets
-                                mReceivedRtcp = 0,    // Number of received rtcp packets
-                                mSentRtcp = 0,        // Number of sent rtcp packets
-                                mDuplicatedRtp = 0,   // Number of received duplicated rtp packets
-                                mOldRtp = 0,          // Number of late rtp packets
-                                mPacketLoss = 0,      // Number of lost packets
-                                mPacketDropped = 0,   // Number of dropped packets (due to time unsync when playing)б
-                                mIllegalRtp = 0;      // Number of rtp packets with bad payload type
+    size_t                          mReceived = 0,        // Received traffic in bytes
+                                    mSent = 0,            // Sent traffic in bytes
+                                    mReceivedRtp = 0,     // Number of received rtp packets
+                                    mSentRtp = 0,         // Number of sent rtp packets
+                                    mReceivedRtcp = 0,    // Number of received rtcp packets
+                                    mSentRtcp = 0,        // Number of sent rtcp packets
+                                    mDuplicatedRtp = 0,   // Number of received duplicated rtp packets
+                                    mOldRtp = 0,          // Number of late rtp packets
+                                    mPacketLoss = 0,      // Number of lost packets
+                                    mPacketDropped = 0,   // Number of dropped packets (due to time unsync when playing)б
+                                    mIllegalRtp = 0;      // Number of rtp packets with bad payload type
 
-    TestResult<float>           mDecodingInterval,      // Average interval on call to packet decode
-                                mDecodeRequested,       // Average amount of requested audio frames to play
-                                mPacketInterval;        // Average interval between packet adding to jitter buffer
+    TestResult<float>               mDecodingInterval,      // Average interval on call to packet decode
+                                    mDecodeRequested,       // Average amount of requested audio frames to play
+                                    mPacketInterval;        // Average interval between packet adding to jitter buffer
 
-    std::array<float, 128>      mLoss = {0};            // Every item is number of loss of corresping length
-    size_t                      mAudioTime = 0;         // Decoded/found time in milliseconds
-    size_t                      mDecodedSize = 0;       // Number of decoded bytes
-    uint16_t                    mSsrc = 0;              // Last known SSRC ID in a RTP stream
-    ice::NetworkAddress         mRemotePeer;            // Last known remote RTP address
+    std::map<int,int>               mLoss;            // Every item is number of loss of corresping length
+    size_t                          mAudioTime = 0;         // Decoded/found time in milliseconds
+    size_t                          mDecodedSize = 0;       // Number of decoded bytes
+    uint16_t                        mSsrc = 0;              // Last known SSRC ID in a RTP stream
+    ice::NetworkAddress             mRemotePeer;            // Last known remote RTP address
 
     // AMR codec bitrate switch counter
-    int                         mBitrateSwitchCounter = 0;
-    int                         mCng = 0;
-    std::string                 mCodecName;
-    float                       mJitter = 0.0f;         // Jitter
-    TestResult<float>           mRttDelay;              // RTT delay
+    int                             mBitrateSwitchCounter = 0;
+    int                             mCng = 0;
+    std::string                     mCodecName;
+    float                           mJitter = 0.0f;         // Jitter
+    TestResult<float>               mRttDelay;              // RTT delay
 
     // Timestamp when first RTP packet has arrived
-    std::optional<timepoint_t>  mFirstRtpTime;
+    std::optional<timepoint_t>      mFirstRtpTime;
 
-    std::map<int, int>          mCodecCount;            // Stats on used codecs
+    std::map<int, int>              mCodecCount;            // Stats on used codecs
 
-    std::vector<PacketLossEvent> mPacketLossTimeline;   // Packet loss timeline
+    std::vector<PacketLossEvent>    mPacketLossTimeline;   // Packet loss timeline
+    std::vector<Dtmf2833Event>      mDtmf2833Timeline;
 
     // It is to calculate network MOS
     void calculateBurstr(double* burstr, double* loss) const;

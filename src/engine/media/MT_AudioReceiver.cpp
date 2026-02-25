@@ -11,6 +11,7 @@
 #include "MT_AudioReceiver.h"
 #include "MT_AudioCodec.h"
 #include "MT_CngHelper.h"
+#include "MT_Dtmf.h"
 #include "../helper/HL_Log.h"
 #include "../helper/HL_Time.h"
 #include "../audio/Audio_Interface.h"
@@ -207,7 +208,8 @@ RtpBuffer::FetchResult RtpBuffer::fetch()
 
         // Save it as last packet however - to not confuse loss packet counter
         mFetchedPacket = mPacketList.front();
-        mLastSeqno = mPacketList.front()->rtp()->GetExtendedSequenceNumber();
+        mLastSeqno = mFetchedPacket->rtp()->GetExtendedSequenceNumber();
+        mLastReceiveTime = mFetchedPacket->rtp()->GetReceiveTime();
 
         // Erase from packet list
         mPacketList.erase(mPacketList.begin());
@@ -238,20 +240,27 @@ RtpBuffer::FetchResult RtpBuffer::fetch()
 
                 // Gap between new packet and previous on
                 int gap = (int64_t)seqno - (int64_t)*mLastSeqno - 1;
-                // gap = std::min(gap, 127);
                 if (gap > 0)
                 {
                     // std::cout << "Increase the packet loss for SSRC " << std::hex << mSsrc << std::endl;
                     mStat.mPacketLoss += gap;
-                    auto currentTimestamp = std::chrono::microseconds(uint64_t(packet.rtp()->GetReceiveTime().GetDouble() * 1000000));
 
+                    // Report is the onetime; there is no many sequential 1-packet gap reports
                     if (mStat.mPacketLossTimeline.empty() || (mStat.mPacketLossTimeline.back().mEndSeqno != seqno))
-                        mStat.mPacketLossTimeline.push_back({.mStartSeqno = *mLastSeqno,
-                                                             .mEndSeqno = seqno,
-                                                             .mGap = gap,
-                                                             .mTimestamp = currentTimestamp});
+                    {
+                        auto gapStart = RtpHelper::toMicroseconds(*mLastReceiveTime);
+                        auto gapEnd = RtpHelper::toMicroseconds(packet.rtp()->GetReceiveTime());
+                        mStat.mPacketLossTimeline.emplace_back(PacketLossEvent{.mStartSeqno = *mLastSeqno,
+                                                                               .mEndSeqno = seqno,
+                                                                               .mGap = gap,
+                                                                               .mTimestampStart = gapStart,
+                                                                               .mTimestampEnd = gapEnd});
+                    }
 
+                    // ToDo: here we should decide smth - 2-packet gap shoud report Status::Gap two times at least; but current implementation gives only one.
+                    // It is not big problem - as gap is detected when we have smth to return usually
                     mLastSeqno = seqno;
+                    mLastReceiveTime = packet.rtp()->GetReceiveTime();
                     result = {FetchResult::Status::Gap};
                 }
                 else
@@ -261,6 +270,7 @@ RtpBuffer::FetchResult RtpBuffer::fetch()
                     // Save last returned normal packet
                     mFetchedPacket = result.mPacket;
                     mLastSeqno = result.mPacket->rtp()->GetExtendedSequenceNumber();
+                    mLastReceiveTime = result.mPacket->rtp()->GetReceiveTime();
 
                     // Remove returned packet from the list
                     mPacketList.erase(mPacketList.begin());
@@ -278,6 +288,7 @@ RtpBuffer::FetchResult RtpBuffer::fetch()
                 // Remember returned packet
                 mFetchedPacket = result.mPacket;
                 mLastSeqno = result.mPacket->rtp()->GetExtendedSequenceNumber();
+                mLastReceiveTime = result.mPacket->rtp()->GetReceiveTime();
 
                 // Remove returned packet from buffer list
                 mPacketList.erase(mPacketList.begin());
@@ -955,5 +966,25 @@ DtmfReceiver::DtmfReceiver(Statistics& stat)
 DtmfReceiver::~DtmfReceiver()
 {}
 
-void DtmfReceiver::add(std::shared_ptr<RTPPacket> /*p*/)
-{}
+void DtmfReceiver::add(const std::shared_ptr<RTPPacket>& p)
+{
+    // This receiver always work in context of single RTP stream; so there is no need to put SSRC map and so on
+    if (p->GetPayloadType() != 101)
+        return;
+
+    auto ev = DtmfBuilder::parseRfc2833({p->GetPayloadData(), p->GetPayloadLength()});
+    if (ev.mTone != mEvent || ev.mEnd != mEventEnded)
+    {
+        // New tone is here
+        if (mCallback)
+            mCallback(ev.mTone);
+
+        // Queue statistics item
+        mStat.mDtmf2833Timeline.emplace_back(Dtmf2833Event{.mTone = ev.mTone,
+                                                           .mTimestamp = RtpHelper::toMicroseconds(p->GetReceiveTime())});
+
+        // Store to avoid triggering on the packet
+        mEvent = ev.mTone;
+        mEventEnded = ev.mEnd;
+    }
+}

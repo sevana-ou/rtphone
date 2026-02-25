@@ -43,6 +43,8 @@ public:
     static unsigned findSsrc(const void* buffer, size_t length);
     static void     setSsrc(void* buffer, size_t length, uint32_t ssrc);
     static int      findPayloadLength(const void* buffer, size_t length);
+
+    static std::chrono::microseconds toMicroseconds(const jrtplib::RTPTime& t);
 };
 
 /**

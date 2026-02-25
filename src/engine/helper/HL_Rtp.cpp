@@ -173,6 +173,11 @@ int RtpHelper::findPayloadLength(const void* buffer, size_t length)
     return static_cast<int>(payloadLen);
 }
 
+std::chrono::microseconds RtpHelper::toMicroseconds(const jrtplib::RTPTime& t)
+{
+    return std::chrono::microseconds(uint64_t(t.GetDouble() * 1000000));
+}
+
 // --- RtpDump implementation ---
 
 std::shared_ptr<jrtplib::RTPPacket> RtpDump::parseRtpData(const uint8_t* data, size_t len)

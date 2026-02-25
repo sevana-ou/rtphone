@@ -16,37 +16,67 @@
 
 using namespace MT;
 
-void DtmfBuilder::buildRfc2833(int tone, int duration, int volume, bool endOfEvent, void* output)
+void DtmfBuilder::buildRfc2833(const Rfc2833Event& ev, void* output)
 {
-    assert(duration);
+    assert(ev.mDuration != 0);
     assert(output);
-    assert(tone);
+    assert(ev.mTone != 0);
 
     unsigned char toneValue = 0;
-    if (tone >= '0' && tone <='9')
-        toneValue = tone - '0';
+    if (ev.mTone >= '0' && ev.mTone <='9')
+        toneValue = ev.mTone - '0';
     else
-        if (tone >= 'A' && tone <='D' )
-            toneValue = tone - 'A' + 12;
-        else
-            if (tone == '*')
-                toneValue = 10;
-            else
-                if (tone == '#')
-                    toneValue = 11;
+    if (ev.mTone >= 'A' && ev.mTone <='D' )
+        toneValue = ev.mTone - 'A' + 12;
+    else
+    if (ev.mTone == '*')
+        toneValue = 10;
+    else
+    if (ev.mTone == '#')
+        toneValue = 11;
 
     char* packet = (char*)output;
 
     packet[0] = toneValue;
-    packet[1] = 1 | (volume << 2);
-    if (endOfEvent)
+    packet[1] = 1 | (ev.mVolume << 2);
+    if (ev.mEnd)
         packet[1] |= 128;
     else
         packet[1] &= 127;
 
-    unsigned short durationValue = htons(duration);
+    unsigned short durationValue = htons(ev.mDuration);
     memcpy(packet + 2, &durationValue, 2);
 }
+
+
+DtmfBuilder::Rfc2833Event DtmfBuilder::parseRfc2833(std::span<uint8_t> payload)
+{
+    Rfc2833Event r;
+    if (payload.size_bytes() < 4)
+        return r;
+
+    uint8_t b0 = payload[0];
+    uint8_t b1 = payload[1];
+
+    if (b0 >=0 && b0 <= 9)
+        r.mTone = '0' + b0;
+    else
+    if (b0 >= 12 && b0 <= 17)
+        r.mTone = 'A' + b0;
+    else
+    if (b0 == 10)
+        r.mTone = '*';
+    else
+    if (b0 == 11)
+        r.mTone = '#';
+
+    r.mEnd = (b1 & 128);
+    r.mVolume = (b1 & 127) >> 2;
+    r.mDuration = ntohs(*(uint16_t*)payload.data()+2);
+
+    return r;
+}
+
 
 #pragma region Inband DTMF support
 #include <math.h>
@@ -302,24 +332,24 @@ bool DtmfContext::getRfc2833(int milliseconds, ByteBuffer& output, ByteBuffer& s
     {
         // Emit rfc2833 packet
         output.resize(4);
-        DtmfBuilder::buildRfc2833(d.mTone, milliseconds, d.mVolume, false, output.mutableData());
+        DtmfBuilder::buildRfc2833({.mTone = (char)d.mTone, .mDuration = milliseconds, .mVolume = d.mVolume, .mEnd = false}, output.mutableData());
         d.mDuration -= milliseconds;
         if(d.mDuration <= 0)
             d.mStopped = true;
     }
     else
-        if (!d.mStopped)
-        {
-            output.resize(4);
-            DtmfBuilder::buildRfc2833(d.mTone, milliseconds, d.mVolume, false, output.mutableData());
-        }
-        else
-            output.clear();
+    if (!d.mStopped)
+    {
+        output.resize(4);
+        DtmfBuilder::buildRfc2833({.mTone = (char)d.mTone, .mDuration = milliseconds, .mVolume = d.mVolume, .mEnd = false}, output.mutableData());
+    }
+    else
+        output.clear();
 
     if (d.mStopped)
     {
         stopPacket.resize(4);
-        DtmfBuilder::buildRfc2833(d.mTone, milliseconds, d.mVolume, true, stopPacket.mutableData());
+        DtmfBuilder::buildRfc2833({.mTone = (char)d.mTone, .mDuration = milliseconds, .mVolume = d.mVolume, .mEnd = true}, stopPacket.mutableData());
     }
     else
         stopPacket.clear();
@@ -375,7 +405,7 @@ void  zap_dtmf_detect_init(dtmf_detect_state_t *s);
 int   zap_dtmf_detect(dtmf_detect_state_t *s, int16_t amp[], int samples, int isradio);
 int   zap_dtmf_get(dtmf_detect_state_t *s, char *buf, int max);
 
-DTMFDetector::DTMFDetector()
+InbandDtmfDetector::InbandDtmfDetector()
     :mState(NULL)
 {
     mState = malloc(sizeof(dtmf_detect_state_t));
@@ -384,13 +414,13 @@ DTMFDetector::DTMFDetector()
     zap_dtmf_detect_init((dtmf_detect_state_t*)mState);
 }
 
-DTMFDetector::~DTMFDetector()
+InbandDtmfDetector::~InbandDtmfDetector()
 {
     if (mState)
         free(mState);
 }
 
-std::string DTMFDetector::streamPut(unsigned char* samples, unsigned int size)
+std::string InbandDtmfDetector::streamPut(unsigned char* samples, unsigned int size)
 {
     char buf[16]; buf[0] = 0;
     if (zap_dtmf_detect((dtmf_detect_state_t*)mState, (int16_t*)samples, size/2, 0))
@@ -398,7 +428,7 @@ std::string DTMFDetector::streamPut(unsigned char* samples, unsigned int size)
     return buf;
 }
 
-void DTMFDetector::resetState()
+void InbandDtmfDetector::resetState()
 {
     zap_dtmf_detect_init((dtmf_detect_state_t*)mState);
 }

@@ -120,6 +120,7 @@ protected:
     jrtplib::RTPSourceStats mRtpStats;
     std::shared_ptr<Packet> mFetchedPacket;
     std::optional<uint32_t> mLastSeqno;
+    std::optional<jrtplib::RTPTime> mLastReceiveTime;
 
     // To calculate average interval between packet add. It is close to jitter but more useful in debugging.
     float mLastAddTime = 0.0f;
@@ -248,11 +249,18 @@ protected:
 
 class DtmfReceiver: public Receiver
 {
+private:
+    char mEvent = 0;
+    bool mEventEnded = false;
+    std::chrono::milliseconds mEventStart = 0ms;
+    std::function<void(char)> mCallback;
+
 public:
     DtmfReceiver(Statistics& stat);
     ~DtmfReceiver();
 
-    void add(std::shared_ptr<RTPPacket> p);
+    void add(const std::shared_ptr<RTPPacket>& p);
+    void setCallback(std::function<void(char tone)> callback);
 };
 }
 
