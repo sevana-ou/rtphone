@@ -55,8 +55,11 @@ if (CMAKE_SYSTEM MATCHES "Darwin*")
     set (LIBS_STATIC ${LIBS_STATIC} dl)
 endif()
 
-# 
+
 if (CMAKE_SYSTEM MATCHES "Android")
+    # Disable opencore AMR codecs - there is no ready libraries in vcpkg right now
+    set (USE_AMR_CODEC   OFF)
+
     message("Adding the Oboe library")
     set (OBOE_DIR libs/oboe)
     add_subdirectory (${OBOE_DIR} ./oboe)
