@@ -363,7 +363,7 @@ target_include_directories(resiprocate PUBLIC
 
 set (RESIP_DEFINES -DUSE_SSL -DUSE_IPV6 -DUSE_ARES)
 if (TARGET_WIN)
-    set (RESIP_DEFINES ${RESIP_DEFINES} -DARES_LEGACY_DEFINES)
+    set (RESIP_DEFINES ${RESIP_DEFINES} -DARES_LEGACY_DEFINES -DNOMINMAX)
 else()
     set (RESIP_DEFINES ${RESIP_DEFINES} -DHAVE_ARPA_NAMESER_H)
 endif()
@@ -373,4 +373,7 @@ target_link_libraries(resiprocate PUBLIC OpenSSL::SSL)
 target_link_libraries(resiprocate PUBLIC OpenSSL::Crypto)
 
 target_compile_definitions(resiprocate PUBLIC ${RESIP_DEFINES})
-target_compile_options(resiprocate PUBLIC -Wno-deprecated -Wno-deprecated-declarations)
+
+if (TARGET_LINUX OR TARGET_OSX OR TARGET_ANDROID OR TARGET_IOS)
+    target_compile_options(resiprocate PUBLIC -Wno-deprecated -Wno-deprecated-declarations)
+endif()

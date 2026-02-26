@@ -1,6 +1,7 @@
 #include "HL_Process.h"
 #include <thread>
 #include <memory>
+#include <algorithm>
 
 #ifdef TARGET_WIN
 # define popen _popen
@@ -9,7 +10,6 @@
 
 #if defined(TARGET_WIN)
 #include <Windows.h>
-#include <iostream>
 #include "helper/HL_String.h"
 
 int OsProcess::execSystem(const std::string& cmd)
@@ -68,7 +68,7 @@ std::string OsProcess::execCommand(const std::string& cmd)
             if (!dwAvail) // no data available, return
                 break;
 
-            if (!::ReadFile(hPipeRead, buf, min(sizeof(buf) - 1, dwAvail), &dwRead, NULL) || !dwRead)
+            if (!::ReadFile(hPipeRead, buf, std::min(sizeof(buf) - 1, (size_t)dwAvail), &dwRead, NULL) || !dwRead)
                 // error, the child process might ended
                 break;
 
@@ -148,7 +148,7 @@ std::shared_ptr<std::thread> OsProcess::asyncExecCommand(const std::string& cmdl
                     break;
 
                 int filled = strlen(buf);
-                if (!::ReadFile(hPipeRead, buf + filled, min(sizeof(buf) - 1 - filled, dwAvail), &dwRead, nullptr) || !dwRead)
+                if (!::ReadFile(hPipeRead, buf + filled, std::min(sizeof(buf) - 1 - filled, (size_t)dwAvail), &dwRead, nullptr) || !dwRead)
                     // error, the child process might ended
                     break;
 

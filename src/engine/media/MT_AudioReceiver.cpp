@@ -1,11 +1,7 @@
-/* Copyright(C) 2007-2021 VoIPobjects (voipobjects.com)
+/* Copyright(C) 2007-2026 VoIPobjects (voipobjects.com)
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
-
-#if defined(TARGET_WIN) && !defined(NOMINMAX)
-#  define NOMINMAX
-#endif
 
 #include "../engine_config.h"
 #include "MT_AudioReceiver.h"

@@ -37,7 +37,7 @@ set (CMAKE_FIND_LIBRARY_SUFFIXES .a .so .dylib)
 
 # Windows-specific definitions
 if (CMAKE_SYSTEM MATCHES "Windows*")
-    set (DEFINES ${DEFINES} -DTARGET_WIN -D_SILENCE_STDEXT_HASH_DEPRECATION_WARNINGS -D_UNICODE -D_CRT_SECURE_NO_WARNINGS)
+    set (DEFINES ${DEFINES} -DTARGET_WIN -D_SILENCE_STDEXT_HASH_DEPRECATION_WARNINGS -D_UNICODE -D_CRT_SECURE_NO_WARNINGS -DNOMINMAX)
     set (TARGET_WIN ON)
 endif()
 
@@ -340,9 +340,14 @@ set (LIBS_STATIC ${LIBS_STATIC} jrtplib g729_codec gsm_codec opus
 
 if (USE_AMR_CODEC)
     #include (${LIB_PLATFORM}/platform_libs.cmake)
-    set (OPENCORE_AMRNB opencore-amrnb)
-    set (OPENCORE_AMRWB opencore-amrwb)
-    message("Media: AMR NB and WB codecs will be included.")
+    if (TARGET_WIN)
+        set (OPENCORE_AMRNB ${CMAKE_CURRENT_LIST_DIR}/libs/opencore-amr/opencore-amrnb.lib)
+        set (OPENCORE_AMRWB ${CMAKE_CURRENT_LIST_DIR}/libs/opencore-amr/opencore-amrwb.lib)
+    else()
+        set (OPENCORE_AMRNB opencore-amrnb)
+        set (OPENCORE_AMRWB opencore-amrwb)
+    endif()
+    message("Media: AMR NB and WB codecs will be included: {OPENCORE_AMRNB} / {OPENCORE_AMRWB}")
     set (DEFINES ${DEFINES} -DUSE_AMR_CODEC)
     set (LIBS_STATIC ${LIBS_STATIC} ${OPENCORE_AMRNB} ${OPENCORE_AMRWB})
 endif()
