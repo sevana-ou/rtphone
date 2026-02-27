@@ -445,6 +445,12 @@ Logger::operator<<(const uint64_t data)
     return *this;
 }
 
+Logger&
+Logger::operator<<(const size_t data)
+{
+    *mStream << data;
+    return *this;
+}
 
 Logger& 
 Logger::operator << (const std::string& data)
