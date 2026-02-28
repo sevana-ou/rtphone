@@ -372,9 +372,9 @@ void UserAgent::stop()
 
     // Dump statistics here
     ICELogInfo(<< "Remaining "
-               << Session::InstanceCounter << " session(s), "
-               << ResipSession::InstanceCounter << " resip DialogSet(s), "
-               << resip::ClientRegistration::InstanceCounter << " ClientRegistration(s)");
+               << Session::InstanceCounter.load() << " session(s), "
+               << ResipSession::InstanceCounter.load() << " resip DialogSet(s), "
+               << resip::ClientRegistration::InstanceCounter.load() << " ClientRegistration(s)");
 
     mDum->shutdown(this);
     onDumCanBeDeleted();

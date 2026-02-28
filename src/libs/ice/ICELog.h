@@ -129,9 +129,14 @@ public:
     Logger& operator << (const int64_t data);
     Logger& operator << (const unsigned int data);
     Logger& operator << (const uint64_t data);
-    Logger& operator << (const size_t data);
     Logger& operator << (const std::filesystem::path& p);
     Logger& operator << (const std::chrono::milliseconds t);
+    template<typename T>
+    Logger& operator << (const T data)
+    {
+        *mStream << data;
+        return *this;
+    }
 
 protected:
     LogGuard            mGuard;
