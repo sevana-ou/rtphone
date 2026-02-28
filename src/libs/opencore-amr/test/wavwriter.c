@@ -101,7 +101,7 @@ void wav_write_close(void* obj) {
 	free(ww);
 }
 
-void wav_write_data(void* obj,  char* data, int length) {
+void wav_write_data(void* obj, const unsigned char* data, int length) {
 	struct wav_writer* ww = (struct wav_writer*) obj;
 	if (ww->wav == NULL)
 		return;

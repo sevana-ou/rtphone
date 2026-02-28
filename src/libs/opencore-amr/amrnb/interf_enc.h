@@ -39,20 +39,9 @@ enum Mode {
 };
 #endif
 
-struct encoder_state {
-	void* encCtx;
-	void* pidSyncCtx;
-};
-
 void* Encoder_Interface_init(int dtx);
-
-//WORK
-//void Encoder_Interface_init(void* state,int dtx);
-
 void Encoder_Interface_exit(void* state);
-int Encoder_Interface_Encode(void* state, enum Mode mode, 
-							 const short* speech, 
-							 unsigned char* out, int forceSpeech);
+int Encoder_Interface_Encode(void* state, enum Mode mode, const short* speech, unsigned char* out, int forceSpeech);
 
 #ifdef __cplusplus
 }

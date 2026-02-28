@@ -31,10 +31,6 @@ extern "C" {
 #define oscl_memmove memmove
 #define oscl_memcpy memcpy
 
-#define OSCL_ARRAY_DELETE(ptr) delete [] ptr
-
-#define OSCL_ARRAY_NEW(T, count) new T[count]
-
 #ifdef __cplusplus
 }
 #endif

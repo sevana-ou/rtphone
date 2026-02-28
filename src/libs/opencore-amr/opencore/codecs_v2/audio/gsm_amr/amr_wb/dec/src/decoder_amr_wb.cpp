@@ -41,7 +41,6 @@ terms listed above has been obtained from the copyright holder.
 
 // Use default DLL entry point
 #include "oscl_dll.h"
-#include "oscl_error.h"
 #include "oscl_error_codes.h"
 #include "oscl_exception.h"
 #include "oscl_mem.h"

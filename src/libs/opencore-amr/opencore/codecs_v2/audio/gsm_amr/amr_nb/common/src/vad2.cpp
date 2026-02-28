@@ -49,21 +49,16 @@ terms listed above has been obtained from the copyright holder.
 #include "abs_s.h"
 #include "norm_s.h"
 #include "shl.h"
+#include "l_add.h"
 #include "shr_r.h"
 #include "add.h"
-//#include "mult.h"
+#include "mult.h"
 #include "l_shr.h"
-//#include "mpy_32_16.h"
-
-
-#include "basic_op.h"
-
-//#include "l_add.h"
-//#include "l_mac.h"
+#include "mpy_32_16.h"
+#include "l_mac.h"
 #include "l_extract.h"
-//#include "l_sub.h"
-//#include "l_mult.h"
-
+#include "l_sub.h"
+#include "l_mult.h"
 #include "round.h"
 #include "shr.h"
 #include "l_shl.h"

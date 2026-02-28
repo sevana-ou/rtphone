@@ -34,13 +34,12 @@ terms listed above has been obtained from the copyright holder.
 #include "gsmamr_encoder_wrapper.h"
 #endif
 
-//lhc fix;no this file
 #ifndef OSCL_DLL_H_INCLUDED
 #include "oscl_dll.h"
 #endif
 
 // Define entry point for this DLL
-OSCL_DLL_ENTRY_POINT_DEFAULT();
+OSCL_DLL_ENTRY_POINT_DEFAULT()
 
 //----------------------------------------------------------------------------
 // CONSTANTS
@@ -66,11 +65,13 @@ OSCL_DLL_ENTRY_POINT_DEFAULT();
 
 // length of uncompressed audio frame in bytes
 // Formula: (num_samples_per_frame * bits_per_sample) / num_bits_per_byte
-#define PV_GSM_AMR_20_MSEC_SIZE  ((KGAMR_NUM_SAMPLES_PER_FRAME * KDFLT_GAMR_BITS_PER_SAMPLE)/8)
+#define PV_GSM_AMR_20_MSEC_SIZE       \
+        ((KGAMR_NUM_SAMPLES_PER_FRAME * KDFLT_GAMR_BITS_PER_SAMPLE) / 8)
 
 
 ///////////////////////////////////////////////////////////////////////////////
-OSCL_EXPORT_REF CPvGsmAmrEncoder::CPvGsmAmrEncoder()
+OSCL_EXPORT_REF
+CPvGsmAmrEncoder::CPvGsmAmrEncoder()
 {
     // initialize member data to default values
     iEncState = NULL;

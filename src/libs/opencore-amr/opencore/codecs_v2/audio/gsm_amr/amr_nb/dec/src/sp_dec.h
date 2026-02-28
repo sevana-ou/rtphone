@@ -79,11 +79,8 @@ typedef struct
 extern "C"
 {
 #endif
-
-	//error
-  //Word16 GSMInitDecode(void *state_data, Word8 *id);
-
-   Word16 GSMInitDecode(void **state_data, Word8 *id);
+    Word16 GSMInitDecode(void **state_data,
+    Word8 *id);
     /* initialize one instance of the speech decoder
        Stores pointer to filter status struct in *st. This pointer has to
        be passed to Speech_Decode_Frame in each call.

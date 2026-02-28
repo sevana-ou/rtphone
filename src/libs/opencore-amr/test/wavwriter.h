@@ -26,7 +26,7 @@ extern "C" {
 void* wav_write_open(const char *filename, int sample_rate, int bits_per_sample, int channels);
 void wav_write_close(void* obj);
 
-void wav_write_data(void* obj,   char* data, int length);
+void wav_write_data(void* obj, const unsigned char* data, int length);
 
 #ifdef __cplusplus
 }

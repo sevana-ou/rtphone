@@ -15,19 +15,13 @@
  * and limitations under the License.
  * -------------------------------------------------------------------
  */
-//use: xx  -r 12200 -d     ../test-8k-1ch.amr  ../encode-8k-1ch-MR122-dtx.wav
-//use: xx  -r 12200      ../test-8k-1ch.amr  ../encode-8k-1ch.wav
 
 #include <stdio.h>
 #include <stdint.h>
 #include <interf_enc.h>
-//#include <unistd.h>
+#include <unistd.h>
 #include <stdlib.h>
-
- 
 #include "wavreader.h"
-
-#define DISABLE_AMRNB_DECODER
 
 void usage(const char* name) {
 	fprintf(stderr, "%s [-r bitrate] [-d] in.wav out.amr\n", name);
@@ -51,7 +45,6 @@ enum Mode findMode(const char* str) {
 	int closest = -1;
 	int closestdiff = 0;
 	unsigned int i;
-
 	for (i = 0; i < sizeof(modes)/sizeof(modes[0]); i++) {
 		if (modes[i].rate == rate)
 			return modes[i].mode;
@@ -65,48 +58,21 @@ enum Mode findMode(const char* str) {
 }
 
 int main(int argc, char *argv[]) {
-
-	//enum Mode optarg = MR122;
 	enum Mode mode = MR122;
-
-	char *setMode = "12200"; 
-
 	int ch, dtx = 0;
-	 int optind=3;
-
 	const char *infile, *outfile;
-
 	FILE *out;
-	void *wav;
-	//	*amr;
-
- 
-
-
-	int format=1;
-	int sampleRate=8000;
-	int channels= 1;
-	int bitsPerSample=16;
-
+	void *wav, *amr;
+	int format, sampleRate, channels, bitsPerSample;
 	int inputSize;
-
 	uint8_t* inputBuf;
-
-	//struct encoder_state* amr = (struct encoder_state*) malloc(sizeof(struct encoder_state));
-	void* amr;
-
-	fprintf(stderr, "AMR-NB Encode .wav file to .amr\n");
-
 	while ((ch = getopt(argc, argv, "r:d")) != -1) {
 		switch (ch) {
 		case 'r':
-			//mode = findMode(optarg);
-			mode = findMode(argv[2]);
-			 
+			mode = findMode(optarg);
 			break;
 		case 'd':
 			dtx = 1;
-			optind=4;
 			break;
 		case '?':
 		default:
@@ -114,17 +80,14 @@ int main(int argc, char *argv[]) {
 			return 1;
 		}
 	}
-
 	if (argc - optind < 2) {
 		usage(argv[0]);
 		return 1;
 	}
- 
 	infile = argv[optind];
-	outfile = argv[optind+1];
+	outfile = argv[optind + 1];
 
 	wav = wav_read_open(infile);
-
 	if (!wav) {
 		fprintf(stderr, "Unable to open wav file %s\n", infile);
 		return 1;
@@ -145,74 +108,38 @@ int main(int argc, char *argv[]) {
 		fprintf(stderr, "Warning, only compressing one audio channel\n");
 	if (sampleRate != 8000)
 		fprintf(stderr, "Warning, AMR-NB uses 8000 Hz sample rate (WAV file has %d Hz)\n", sampleRate);
-	
 	inputSize = channels*2*160;
 	inputBuf = (uint8_t*) malloc(inputSize);
 
 	amr = Encoder_Interface_init(dtx);
-  
-	//work
-	// Encoder_Interface_init(amr,dtx);
- 
-
-	//amr default
 	out = fopen(outfile, "wb");
 	if (!out) {
 		perror(outfile);
 		return 1;
 	}
- 
 
 	fwrite("#!AMR\n", 1, 6, out);
-
 	while (1) {
 		short buf[160];
 		uint8_t outbuf[500];
 		int read, i, n;
-
-
 		read = wav_read_data(wav, inputBuf, inputSize);
-
 		read /= channels;
 		read /= 2;
-
 		if (read < 160)
 			break;
 		for (i = 0; i < 160; i++) {
 			const uint8_t* in = &inputBuf[2*channels*i];
 			buf[i] = in[0] | (in[1] << 8);
 		}
-
 		n = Encoder_Interface_Encode(amr, mode, buf, outbuf, 0);
-
-		//lhc mp4 write		 
-
-
-		//default
-		 fwrite(outbuf, 1, n, out);
-
-
-	}//end while
-
-
+		fwrite(outbuf, 1, n, out);
+	}
 	free(inputBuf);
-
-
-	//lhc mp4 5/5 WriteMP4File CloseMP4File 
-     //lhc mp4 5/5 end 
-
-
-	  fclose(out);
-
-
+	fclose(out);
 	Encoder_Interface_exit(amr);
-
-
-	//close input file
 	wav_read_close(wav);
 
-	fprintf(stderr, "Finished Encode\n");
-	//getchar();
 	return 0;
 }
 

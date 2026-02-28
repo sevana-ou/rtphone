@@ -124,7 +124,7 @@ typedef unsigned int    UInt;
 
 
 #ifndef INT_MAX
-//#define INT_MAX  INT32_MAX      /*  for 32 bit  */
+#define INT_MAX  INT32_MAX      /*  for 32 bit  */
 #endif
 
 /*----------------------------------------------------------------------------

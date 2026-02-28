@@ -85,7 +85,6 @@ extern "C"
     ; Function Prototype declaration
     ----------------------------------------------------------------------------*/
     OSCL_IMPORT_REF Word16 add_16(Word16 var1, Word16 var2, Flag *pOverflow);
-    OSCL_IMPORT_REF Word16 add(Word16 var1, Word16 var2, Flag *pOverflow);
 
     /*----------------------------------------------------------------------------
     ; END

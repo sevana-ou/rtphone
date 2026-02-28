@@ -331,7 +331,8 @@ Word16 AMRDecode(
      * that structure type to this function so the structure make up can't
      * be viewed from higher level functions than this.
      */
-    Speech_Decode_FrameState *decoder_state= (Speech_Decode_FrameState *) state_data;
+    Speech_Decode_FrameState *decoder_state
+    = (Speech_Decode_FrameState *) state_data;
 
     /* Determine type of de-formatting */
     /* WMF or IF2 frames */

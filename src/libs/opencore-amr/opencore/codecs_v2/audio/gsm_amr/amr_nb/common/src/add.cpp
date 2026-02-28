@@ -141,7 +141,6 @@ terms listed above has been obtained from the copyright holder.
 /*----------------------------------------------------------------------------
 ; FUNCTION CODE
 ----------------------------------------------------------------------------*/
-//lhc fix add_16 to add
 OSCL_EXPORT_REF Word16 add_16(Word16 var1, Word16 var2, Flag *pOverflow)
 {
     /*----------------------------------------------------------------------------
@@ -169,30 +168,4 @@ OSCL_EXPORT_REF Word16 add_16(Word16 var1, Word16 var2, Flag *pOverflow)
 
     return ((Word16) sum);
 }
-OSCL_EXPORT_REF Word16 add(Word16 var1, Word16 var2, Flag *pOverflow)
-{
-    /*----------------------------------------------------------------------------
-    ; Define all local variables
-    ----------------------------------------------------------------------------*/
-    Word32 sum;
-    sum = (Word32) var1 + var2;
 
-    /* Saturate result (if necessary). */
-    /* Replaced function call with in-line code             */
-    /* to conserve MIPS, i.e., var_out = saturate (sum)  */
-
-    if (sum > 0X00007fffL)
-    {
-        *pOverflow = 1;
-        sum = MAX_16;
-    }
-    else if (sum < (Word32) - 32768)
-    {
-        *pOverflow = 1;
-        sum = MIN_16;
-    }
-
-    /* Return the sum as a 16 bit value by type casting Word32 to Word16 */
-
-    return ((Word16) sum);
-}

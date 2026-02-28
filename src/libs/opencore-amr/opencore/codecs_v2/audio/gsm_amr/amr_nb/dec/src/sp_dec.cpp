@@ -365,42 +365,6 @@ int Speech_Decode_Frame_init (Speech_Decode_FrameState **state,
 ------------------------------------------------------------------------------
 */
 
-/* fixed error
-Word16 GSMInitDecode(void *state_data,
-                     Word8 * id)
-{
-    Speech_Decode_FrameState* s=(Speech_Decode_FrameState*)state_data;
-    OSCL_UNUSED_ARG(id);
-
-    if (state_data == NULL)
-    {
-         
-        return (-1);
-    }
-   // *state_data = NULL;
-
-   
-
-    if (Decoder_amr_init(&s->decoder_amrState)
-            || Post_Process_reset(&s->postHP_state))
-    {
-        Speech_Decode_FrameState *tmp = s;
-        
-        void** tempVoid = (void**) tmp;
-        GSMDecodeFrameExit(tempVoid);
-        return (-1);
-    }
-
-
-    Speech_Decode_Frame_reset(s);
-   // *state_data = (void *)s;
-
-    return (0);
-}
-*/
-
-//default
-
 Word16 GSMInitDecode(void **state_data,
                      Word8 * id)
 {
@@ -409,16 +373,18 @@ Word16 GSMInitDecode(void **state_data,
 
     if (state_data == NULL)
     {
-         
+        /*  fprintf(stderr, "Speech_Decode_Frame_init:
+                             invalid parameter\n");  */
         return (-1);
     }
     *state_data = NULL;
 
-    // allocate memory 
+    /* allocate memory */
     if ((s = (Speech_Decode_FrameState *)
              oscl_malloc(sizeof(Speech_Decode_FrameState))) == NULL)
     {
-       
+        /*  fprintf(stderr, "Speech_Decode_Frame_init: can not malloc state "
+            "structure\n");  */
         return (-1);
     }
 
@@ -426,7 +392,10 @@ Word16 GSMInitDecode(void **state_data,
             || Post_Process_reset(&s->postHP_state))
     {
         Speech_Decode_FrameState *tmp = s;
-      
+        /*
+         *  dereferencing type-punned pointer avoid
+         *  breaking strict-aliasing rules
+         */
         void** tempVoid = (void**) tmp;
         GSMDecodeFrameExit(tempVoid);
         return (-1);
@@ -603,7 +572,6 @@ void Speech_Decode_Frame_exit (Speech_Decode_FrameState **state)
 ------------------------------------------------------------------------------
 */
 
-
 void GSMDecodeFrameExit(void **state_data)
 {
 
@@ -616,7 +584,7 @@ void GSMDecodeFrameExit(void **state_data)
     }
 
     /* deallocate memory */
-   // oscl_free(*state);
+    oscl_free(*state);
     *state = NULL;
 
     return;

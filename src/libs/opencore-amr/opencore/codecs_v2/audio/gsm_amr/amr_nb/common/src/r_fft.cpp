@@ -44,14 +44,11 @@ terms listed above has been obtained from the copyright holder.
 #include "add.h"
 #include "shr.h"
 #include "shl.h"
-
-//#include "l_mult.h"
-//#include "l_mac.h"
-//#include "l_msu.h"
-
+#include "l_mult.h"
+#include "l_mac.h"
+#include "l_msu.h"
 #include "round.h"
 #include "l_negate.h"
-//lhc 
 #include "l_deposit_h.h"
 #include "l_shr.h"
 

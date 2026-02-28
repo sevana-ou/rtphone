@@ -44,9 +44,8 @@ terms listed above has been obtained from the copyright holder.
 #include "typedef.h"
 #include "cnst.h"
 #include "l_extract.h"
-//#include "mpy_32_16.h"
+#include "mpy_32_16.h"
 
-#include "basic_op_c_equivalent.h"
 #include "vad2.h"
 #include "mode.h"
 

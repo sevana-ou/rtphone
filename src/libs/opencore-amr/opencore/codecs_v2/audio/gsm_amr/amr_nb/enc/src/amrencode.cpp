@@ -662,8 +662,7 @@ Word16 AMREncode(
     Word16 num_enc_bytes = -1;
     Word16 i;
     enum TXFrameType tx_frame_type;
-    //enum Mode usedMode = MR475;
-    enum Mode usedMode = MR122;
+    enum Mode usedMode = MR475;
 
     /* Encode WMF or IF2 frames */
     if ((output_format == AMR_TX_WMF) | (output_format == AMR_TX_IF2)

@@ -71,10 +71,6 @@ terms listed above has been obtained from the copyright holder.
 #include    "shr.h"
 #include    "l_negate.h"
 #include    "l_extract.h"
-#include    "extract_l.h"
-#include    "extract_h.h"
-#include    "l_deposit_h.h"
-
 /*--------------------------------------------------------------------------*/
 #ifdef __cplusplus
 extern "C"
