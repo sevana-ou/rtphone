@@ -20,7 +20,7 @@
 #include "HL_Sync.h"
 #include "HL_Exception.h"
 
-#define LOG_SUBSYSTEM "[SocketHeap]"
+#define LOG_SUBSYSTEM "network"
 
 #ifndef WIN32
 #define WSAGetLastError(X) errno

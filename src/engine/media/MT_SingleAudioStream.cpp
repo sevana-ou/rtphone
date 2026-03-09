@@ -8,7 +8,7 @@
 //#include "resip/stack/SdpContents.hxx"
 #include "../engine/helper/HL_Log.h"
 
-#define LOG_SUBSYSTEM "SingleAudioStream"
+#define LOG_SUBSYSTEM "media"
 
 using namespace MT;
 

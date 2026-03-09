@@ -14,7 +14,7 @@
 
 using namespace ice;
 
-#define LOG_SUBSYSTEM "ICE"
+#define LOG_SUBSYSTEM "ice"
 // ------------------ ClientAllocate -----------------
 
 ClientAllocate::ClientAllocate(unsigned int lifetime)

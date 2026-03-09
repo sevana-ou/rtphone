@@ -6,7 +6,7 @@
 #include "../helper/HL_IuUP.h"
 #include "../helper/HL_Log.h"
 
-#define LOG_SUBSYSTEM "AmrCodec"
+#define LOG_SUBSYSTEM "media"
 using namespace MT;
 
 

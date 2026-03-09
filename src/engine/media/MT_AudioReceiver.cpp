@@ -21,9 +21,7 @@
 
 #include <algorithm>
 
-#define LOG_SUBSYSTEM "AudioReceiver"
-
-//#define DUMP_DECODED
+#define LOG_SUBSYSTEM "media"
 
 using namespace MT;
 
@@ -564,7 +562,7 @@ void AudioReceiver::produceCNG(std::chrono::milliseconds length, Audio::DataWind
 
 AudioReceiver::DecodeResult AudioReceiver::decodeGapTo(Audio::DataWindow& output, DecodeOptions options)
 {
-    ICELogDebug(<< "Gap detected.");
+    ICELogMedia(<< "Gap detected.");
 
     mDecodedLength = mResampledLength = 0;
     if (mCngPacket && mCodec)

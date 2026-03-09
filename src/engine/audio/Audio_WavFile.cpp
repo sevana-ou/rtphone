@@ -32,7 +32,7 @@ WaveFormatEx;
 
 #define WAVE_FORMAT_PCM 1
 
-#define LOG_SUBSYSTEM "WavFileReader"
+#define LOG_SUBSYSTEM "audio"
 
 #define LOCK std::unique_lock<std::recursive_mutex> lock(mFileMtx);
 

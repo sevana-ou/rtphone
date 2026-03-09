@@ -38,7 +38,7 @@
 #include "ICEError.h"
 using namespace ice;
 
-#define LOG_SUBSYSTEM "ICE"
+#define LOG_SUBSYSTEM "ice"
 
 #if defined(TARGET_WIN) && !defined(WINDOWS_RT)
 class IPHlpApi

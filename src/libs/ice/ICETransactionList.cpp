@@ -9,7 +9,7 @@
 
 using namespace ice;
 
-#define LOG_SUBSYSTEM "ICE"
+#define LOG_SUBSYSTEM "ice"
 
 TransactionList::TransactionList()
 :mRegularIndex(0), mPrioritizedIndex(0)

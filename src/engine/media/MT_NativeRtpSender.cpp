@@ -7,7 +7,7 @@
 #include "ICELog.h"
 #include <assert.h>
 
-#define LOG_SUBSYSTEM "MT"
+#define LOG_SUBSYSTEM "media"
 using namespace MT;
 
 NativeRtpSender::NativeRtpSender(Statistics& stat)

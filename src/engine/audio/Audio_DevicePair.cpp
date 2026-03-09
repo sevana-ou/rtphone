@@ -7,7 +7,7 @@
 #include <algorithm>
 #include <assert.h>
 
-#define LOG_SUBSYSTEM "Audio"
+#define LOG_SUBSYSTEM "audio"
 
 using namespace Audio;
 

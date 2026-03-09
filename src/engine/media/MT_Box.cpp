@@ -12,7 +12,7 @@
 #include "../helper/HL_StreamState.h"
 #include "../helper/HL_Log.h"
 
-#define LOG_SUBSYSTEM "MT::Box"
+#define LOG_SUBSYSTEM "media"
 
 using namespace MT;
 

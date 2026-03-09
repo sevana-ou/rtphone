@@ -7,7 +7,7 @@
 
 #include "../helper/HL_Log.h"
 
-#define LOG_SUBSYSTEM "Player"
+#define LOG_SUBSYSTEM "audio"
 
 using namespace Audio;
 // -------------- Player -----------

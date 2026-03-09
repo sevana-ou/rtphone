@@ -14,7 +14,7 @@
 #include "../helper/HL_Log.h"
 #include "../helper/HL_String.h"
 
-#define LOG_SUBSYSTEM "AudioProvider"
+#define LOG_SUBSYSTEM "engine"
 
 AudioProvider::AudioProvider(UserAgent& agent, MT::Terminal& terminal)
     :mUserAgent(agent), mTerminal(terminal), mState(0),

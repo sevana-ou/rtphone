@@ -10,7 +10,7 @@
 #include <resip/stack/Pidf.hxx>
 #include <resip/stack/PlainContents.hxx>
 
-#define LOG_SUBSYSTEM "Account"
+#define LOG_SUBSYSTEM "engine"
 
 #define CONFIG(X) mConfig->at(X)
 #define CONFIG_EXISTS(X) mConfig->exists(X)

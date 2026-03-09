@@ -13,7 +13,7 @@
 
 using namespace Audio;
 
-#define LOG_SUBSYSTEM "CoreAudio"
+#define LOG_SUBSYSTEM "audio"
 
 enum
 {

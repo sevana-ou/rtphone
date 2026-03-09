@@ -12,7 +12,7 @@
 # include "../engine/audio/Audio_Android.h"
 #endif
 
-#define LOG_SUBSYSTEM "AudioManager"
+#define LOG_SUBSYSTEM "audio"
 
 
 AudioManager::AudioManager()

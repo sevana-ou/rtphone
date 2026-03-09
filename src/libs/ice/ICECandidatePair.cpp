@@ -11,7 +11,7 @@
 #include <stdio.h>
 
 using namespace ice;
-#define LOG_SUBSYSTEM "ICE"
+#define LOG_SUBSYSTEM "ice"
 CandidatePair::CandidatePair()
 :mPriority(0), mState(CandidatePair::Frozen), mControlledIndex(0), mControllingIndex(1),
 mNomination(Nomination_None), mRole(Regular), mTransaction(NULL)

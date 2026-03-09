@@ -8,7 +8,7 @@
 
 #include <assert.h>
 
-#define LOG_SUBSYSTEM "ICE"
+#define LOG_SUBSYSTEM "ice"
 
 using namespace ice;
 

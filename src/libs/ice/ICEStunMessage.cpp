@@ -24,7 +24,7 @@
 
 #define STUN_HEADER_SIZE 20
 #define HMAC_DIGEST_SIZE 20
-#define LOG_SUBSYSTEM "ICE"
+#define LOG_SUBSYSTEM "ice"
 
 using namespace ice;
 

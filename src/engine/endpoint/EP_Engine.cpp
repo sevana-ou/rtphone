@@ -37,7 +37,7 @@
 # include "resip/stack/ssl/WinSecurity.hxx"
 #endif
 
-#define LOG_SUBSYSTEM "[Engine]"
+#define LOG_SUBSYSTEM "engine"
 #define LOCK Lock l(mGuard)
 #define CAST2RESIPSESSION(x) (x.isValid() ? (x->getAppDialogSet().isValid() ? dynamic_cast<ResipSession*>(x->getAppDialogSet().get()) : NULL) : NULL)
 

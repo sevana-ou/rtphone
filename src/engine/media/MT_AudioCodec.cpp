@@ -25,7 +25,7 @@
 #include <string.h>
 #include <algorithm>
 
-#define LOG_SUBSYSTEM "Codec"
+#define LOG_SUBSYSTEM "media"
 
 #ifdef TARGET_LINUX
 # define stricmp strcasecmp

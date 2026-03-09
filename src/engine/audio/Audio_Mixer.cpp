@@ -12,7 +12,7 @@
 
 #include "Audio_Mixer.h"
 
-#define LOG_SUBSYSTEM "Mixer"
+#define LOG_SUBSYSTEM "audio"
 using namespace Audio;
 
 Mixer::Stream::Stream()

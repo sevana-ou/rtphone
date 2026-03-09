@@ -11,7 +11,7 @@
 #include "../helper/HL_Sync.h"
 #include "../helper/HL_String.h"
 
-#define LOG_SUBSYSTEM "[Engine]"
+#define LOG_SUBSYSTEM "engine"
 
 typedef resip::SdpContents::Session::Medium Medium;
 typedef resip::SdpContents::Session::MediumContainer MediumContainer;

@@ -18,7 +18,7 @@ const std::string Status_NoMediaAction = "no valid media action";
 const std::string Status_NoCommand = "no valid command";
 const std::string Status_NoAudioManager = "no audio manager";
 
-#define LOG_SUBSYSTEM "Agent"
+#define LOG_SUBSYSTEM "agent"
 
 AgentImpl::AgentImpl()
     :mShutdown(false), mEventListChangeCondVar()

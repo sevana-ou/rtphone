@@ -13,7 +13,7 @@
 #include <sstream>
 
 using namespace ice;
-#define LOG_SUBSYSTEM "ICE"
+#define LOG_SUBSYSTEM "ice"
 
 const char* CheckList::stateToString(int state)
 {

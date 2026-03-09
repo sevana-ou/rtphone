@@ -25,7 +25,7 @@
 #include <cstdio>
 #include <chrono>
 
-#define LOG_SUBSYSTEM "RtpDump"
+#define LOG_SUBSYSTEM "network"
 
 static constexpr size_t MAX_RTP_PACKET_SIZE = 65535;
 static const char RTPDUMP_SHEBANG[] = "#!rtpplay1.0";

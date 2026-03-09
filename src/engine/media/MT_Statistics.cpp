@@ -2,7 +2,7 @@
 #include <iostream>
 
 #include "MT_Statistics.h"
-#define LOG_SUBSYSTEM "Statistics"
+#define LOG_SUBSYSTEM "media"
 
 using namespace MT;
 

@@ -16,7 +16,7 @@
 #include "jrtplib/src/rtptransmitter.h"
 #include "jrtplib/src/rtpsessionparams.h"
 
-#define LOG_SUBSYSTEM "AudioStream"
+#define LOG_SUBSYSTEM "media"
 
 //#define DUMP_SENDING_AUDIO
 

@@ -22,7 +22,7 @@
 #define DRV_QUERYFUNCTIONINSTANCEID  (DRV_RESERVED + 17)
 #define DRV_QUERYFUNCTIONINSTANCEIDSIZE (DRV_RESERVED + 18)
 
-#define LOG_SUBSYSTEM "DirectSound"
+#define LOG_SUBSYSTEM "audio"
 
 using namespace Audio;
 

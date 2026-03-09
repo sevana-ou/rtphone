@@ -10,7 +10,7 @@
 
 using namespace ice;
 
-#define LOG_SUBSYSTEM "ICE"
+#define LOG_SUBSYSTEM "ice"
 
 AuthTransaction::AuthTransaction()
 :Transaction(), mActive(false), mComposed(false), mConformsToKeepaliveSchedule(true),

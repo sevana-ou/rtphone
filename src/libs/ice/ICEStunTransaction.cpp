@@ -17,7 +17,7 @@
 #include <assert.h>
 
 using namespace ice;
-#define LOG_SUBSYSTEM "ICE"
+#define LOG_SUBSYSTEM "ice"
 
 const char* Transaction::stateToString(State state)
 {

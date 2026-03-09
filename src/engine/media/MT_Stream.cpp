@@ -8,7 +8,7 @@
 #include "../helper/HL_Log.h"
 #include <math.h>
 
-#define LOG_SUBSYSTEM "[Media]"
+#define LOG_SUBSYSTEM "media"
 
 using namespace MT;
 
