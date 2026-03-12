@@ -349,8 +349,6 @@ void Logger::beginLine(LogLevel level, const char* filename, int linenumber, con
 void
 Logger::endLine()
 {
-    *mStream << std::endl;
-    *mStream << std::flush;
     mStream->flush();
 
     std::ostringstream result;
@@ -382,7 +380,7 @@ Logger::endLine()
     }
     if (mFile)
     {
-        fprintf(mFile, "%s", result.str().c_str());
+        fprintf(mFile, "%s\n", result.str().c_str());
         fflush(mFile);
     }
     if (mDelegate)
