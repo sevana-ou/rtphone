@@ -62,7 +62,7 @@ if (CMAKE_SYSTEM MATCHES "Android")
 
     message("Adding the Oboe library")
     set (OBOE_DIR libs/oboe)
-    add_subdirectory (${OBOE_DIR} ./oboe)
+    add_subdirectory (${OBOE_DIR} build_oboe)
     include_directories (${OBOE_DIR}/include)
     set (DEFINES ${DEFINES} -DTARGET_ANDROID -DHAVE_NETINET_IN_H)
     set (TARGET_ANDROID ON)
