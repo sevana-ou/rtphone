@@ -388,9 +388,6 @@ target_include_directories(rtphone
         ${L}/libs/json
     )
 
-# For MSVC static builds
-# set_property(TARGET rtphone PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
-
 find_package(OpenSSL REQUIRED)
 target_link_libraries(rtphone PUBLIC OpenSSL::SSL)
 target_link_libraries(rtphone PUBLIC OpenSSL::Crypto)
