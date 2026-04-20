@@ -165,7 +165,7 @@ public:
 
     // Returns false when packet is rejected as illegal. codec parameter will show codec which will be used for decoding.
     // Lifetime of pointer to codec is limited by lifetime of AudioReceiver (it is container).
-    bool add(const std::shared_ptr<jrtplib::RTPPacket>& p, Codec** codec = nullptr);
+    Codec* add(const std::shared_ptr<jrtplib::RTPPacket>& p);
 
     struct DecodeOptions
     {
@@ -198,11 +198,18 @@ public:
     // Returns size of AudioReceiver's instance in bytes (including size of all data + codecs + etc.)
     int getSize() const;
 
-    // Returns timelength for given packet
-    int timelengthFor(jrtplib::RTPPacket& p);
+    struct MediaInfo
+    {
+        std::chrono::milliseconds mTimeLength = 0ms;
+        int mSamplerate = 0;
+    };
+    MediaInfo infoFor(jrtplib::RTPPacket& p);
 
-    // Return samplerate for given packet
-    int samplerateFor(jrtplib::RTPPacket& p);
+    // // Returns timelength for given packet
+    // int timelengthFor(jrtplib::RTPPacket& p);
+
+    // // Return samplerate for given packet
+    // int samplerateFor(jrtplib::RTPPacket& p);
 
 protected:
     RtpBuffer                           mBuffer;                // Jitter buffer itself

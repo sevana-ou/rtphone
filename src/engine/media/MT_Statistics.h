@@ -84,8 +84,8 @@ public:
                                     mDecodeRequested,       // Average amount of requested audio frames to play
                                     mPacketInterval;        // Average interval between packet adding to jitter buffer
 
-    std::map<int,int>               mLoss;            // Every item is number of loss of corresping length
-    size_t                          mAudioTime = 0;         // Decoded/found time in milliseconds
+    std::map<int,int>               mLoss;                  // Every item is number of loss of corresping length
+    std::chrono::milliseconds       mAudioTime = 0ms;       // Decoded/found time in milliseconds
     size_t                          mDecodedSize = 0;       // Number of decoded bytes
     uint16_t                        mSsrc = 0;              // Last known SSRC ID in a RTP stream
     ice::NetworkAddress             mRemotePeer;            // Last known remote RTP address

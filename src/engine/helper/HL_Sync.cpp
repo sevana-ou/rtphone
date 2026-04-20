@@ -72,20 +72,20 @@ static uint64_t TimestampStartPoint = duration_cast<milliseconds>(steady_clock::
 static time_t TimestampBase = time(nullptr);
 
 // Returns number of milliseconds starting from 01 Jan 1970 GMT
-uint64_t chronox::getTimestamp()
+std::chrono::milliseconds chronox::getTimestamp()
 {
     time_point<steady_clock> t = steady_clock::now();
     uint64_t ms = duration_cast< milliseconds >(t.time_since_epoch()).count();
-    return ms - TimestampStartPoint + TimestampBase * 1000;
+    return std::chrono::milliseconds(ms - TimestampStartPoint + TimestampBase * 1000);
 }
 
-uint64_t chronox::getUptime()
+std::chrono::milliseconds chronox::getUptime()
 {
     time_point<steady_clock> t = steady_clock::now();
 
     uint64_t ms = duration_cast< milliseconds >(t.time_since_epoch()).count();
 
-    return ms - TimestampStartPoint;
+    return std::chrono::milliseconds(ms - TimestampStartPoint);
 }
 
 uint32_t chronox::getDelta(uint32_t later, uint32_t earlier)
@@ -132,7 +132,7 @@ chronox::ExecutionTime::ExecutionTime()
     mStart = chronox::getTimestamp();
 }
 
-uint64_t chronox::ExecutionTime::getSpentTime() const
+std::chrono::milliseconds chronox::ExecutionTime::getSpentTime() const
 {
     return chronox::getTimestamp() - mStart;
 }

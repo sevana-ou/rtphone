@@ -416,8 +416,10 @@ size_t decode_packet(Codec& codec, RTPPacket& p, void* output_buffer, size_t out
     return result;
 }
 
-bool AudioReceiver::add(const std::shared_ptr<jrtplib::RTPPacket>& p, Codec** detectedCodec)
+Codec* AudioReceiver::add(const std::shared_ptr<jrtplib::RTPPacket>& p)
 {
+    Codec* codec = nullptr;
+
     // Estimate time length
     int time_length = 0,
         samplerate = 8000,
@@ -432,14 +434,13 @@ bool AudioReceiver::add(const std::shared_ptr<jrtplib::RTPPacket>& p, Codec** de
     // Check if we deal with telephone-event
     if (p->GetPayloadType() == mCodecSettings.mTelephoneEvent)
     {
-        *detectedCodec = nullptr;
+        codec = nullptr;
         mDtmfBuffer.add(p, 10ms, 8000);
     }
     else
     {
         // Look for codec
         // Check if codec can be handled
-        Codec* codec = nullptr;
         auto codecIter = mCodecMap.find(ptype);
         if (codecIter != mCodecMap.end())
         {
@@ -451,9 +452,6 @@ bool AudioReceiver::add(const std::shared_ptr<jrtplib::RTPPacket>& p, Codec** de
             codec = codecIter->second.get();
 
             // Return pointer to codec if needed.get()
-            if (detectedCodec)
-                *detectedCodec = codec;
-
             if (mStat.mCodecName.empty() && codec)
                 mStat.mCodecName = codec->name();
 
@@ -475,26 +473,25 @@ bool AudioReceiver::add(const std::shared_ptr<jrtplib::RTPPacket>& p, Codec** de
         mStat.mJitter = static_cast<float>(mJitterStats.get());
 
         if (!codec)
-            return false; // There is no sense to add this packet into jitter buffer - we can't decode this
+            return nullptr;
 
         // Check if packet is CNG
         if (payloadLength >= 1 && payloadLength <= 6 && (ptype == 0 || ptype == 8))
             time_length = mLastPacketTimeLength ? mLastPacketTimeLength : 20;
         else
-        // Check if packet is too short from time length side
+        // Check if packet is too short from time length side - smth strange with found codec...
         if (time_length < 2)
         {
             // It will cause statistics to report about bad RTP packet
             // I have to replay last packet payload here to avoid report about lost packet
             mBuffer.add(p, std::chrono::milliseconds(time_length), samplerate);
-            return false;
+            return nullptr;
         }
 
         // Queue packet to buffer
-        auto packet = mBuffer.add(p, std::chrono::milliseconds(time_length), samplerate).get();
-        return packet;
+        mBuffer.add(p, std::chrono::milliseconds(time_length), samplerate).get();
     }
-    return {};
+    return codec;
 }
 
 void AudioReceiver::processDecoded(Audio::DataWindow& output, DecodeOptions options)
@@ -930,43 +927,66 @@ int AudioReceiver::getSize() const
     return result;
 }
 
-int AudioReceiver::timelengthFor(jrtplib::RTPPacket& p)
+AudioReceiver::MediaInfo AudioReceiver::infoFor(jrtplib::RTPPacket& p)
 {
     CodecMap::iterator codecIter = mCodecMap.find(p.GetPayloadType());
     if (codecIter == mCodecMap.end())
-        return 0;
-
+        return {};
     PCodec codec = codecIter->second;
-    if (codec)
-    {
-        int frame_count = 0;
-        if (codec->rtpLength() != 0)
-        {
-            frame_count = static_cast<int>(p.GetPayloadLength() / codec->rtpLength());
-            if (p.GetPayloadType() == 9/*G729A silence*/ && p.GetPayloadLength() % codec->rtpLength())
-                frame_count++;
-        }
-        else
-            frame_count = 1;
+    if (!codec)
+        return {};
 
-        return frame_count * codec->frameTime();
+    int frame_count = 0;
+    if (codec->rtpLength() != 0)
+    {
+        frame_count = static_cast<int>(p.GetPayloadLength() / codec->rtpLength());
+        if (p.GetPayloadType() == 9/*G729A silence*/ && p.GetPayloadLength() % codec->rtpLength())
+            frame_count++;
     }
     else
-        return 0;
+        frame_count = 1;
+
+
+    return {std::chrono::milliseconds(frame_count * codec->frameTime()), codec->samplerate()};
 }
 
-int AudioReceiver::samplerateFor(jrtplib::RTPPacket& p)
-{
-    CodecMap::iterator codecIter = mCodecMap.find(p.GetPayloadType());
-    if (codecIter != mCodecMap.end())
-    {
-        PCodec codec = codecIter->second;
-        if (codec)
-            return codec->samplerate();
-    }
+// int AudioReceiver::timelengthFor(jrtplib::RTPPacket& p)
+// {
+//     CodecMap::iterator codecIter = mCodecMap.find(p.GetPayloadType());
+//     if (codecIter == mCodecMap.end())
+//         return 0;
 
-    return 8000;
-}
+//     PCodec codec = codecIter->second;
+//     if (codec)
+//     {
+//         int frame_count = 0;
+//         if (codec->rtpLength() != 0)
+//         {
+//             frame_count = static_cast<int>(p.GetPayloadLength() / codec->rtpLength());
+//             if (p.GetPayloadType() == 9/*G729A silence*/ && p.GetPayloadLength() % codec->rtpLength())
+//                 frame_count++;
+//         }
+//         else
+//             frame_count = 1;
+
+//         return frame_count * codec->frameTime();
+//     }
+//     else
+//         return 0;
+// }
+
+// int AudioReceiver::samplerateFor(jrtplib::RTPPacket& p)
+// {
+//     CodecMap::iterator codecIter = mCodecMap.find(p.GetPayloadType());
+//     if (codecIter != mCodecMap.end())
+//     {
+//         PCodec codec = codecIter->second;
+//         if (codec)
+//             return codec->samplerate();
+//     }
+
+//     return 8000;
+// }
 
 // ----------------------- DtmfReceiver -------------------
 DtmfReceiver::DtmfReceiver(Statistics& stat)

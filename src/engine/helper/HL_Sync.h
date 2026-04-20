@@ -54,10 +54,10 @@ class chronox
 {
 public:
     // Returns current timestamp in milliseconds
-    static uint64_t getTimestamp();
+    static std::chrono::milliseconds getTimestamp();
 
     // Returns uptime (of calling process) in milliseconds
-    static uint64_t getUptime();
+    static std::chrono::milliseconds getUptime();
 
     // Finds time delta between 'later' and 'earlier' time points.
     // Handles cases when clock is wrapped.
@@ -75,9 +75,9 @@ public:
     {
     public:
         ExecutionTime();
-        uint64_t getSpentTime() const;
+        std::chrono::milliseconds getSpentTime() const;
     protected:
-        uint64_t mStart;
+        std::chrono::milliseconds mStart;
     };
 };
 
