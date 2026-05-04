@@ -375,9 +375,24 @@ void AudioStream::dataArrived(PDatagramSocket s, const void* buffer, int length,
             // Process incoming data packet
             rtpStream->process(packet);
 
+            // RTT sanity filter: jrtplib's INF_GetRoundtripTime() does the
+            // RFC 3550 §6.4.1 math but omits clock-skew / outlier guards;
+            // without these, a skewed or buggy peer can poison mRttDelay
+            // (and therefore the Id term in MOS).
             double rtt = mRtpSession.GetCurrentSourceInfo()->INF_GetRoundtripTime().GetDouble();
-            if (rtt > 0)
+            if (rtt > 0 && rtt < 30.0)  // reject "RTT not making any sense" (>30s)
+            {
+                // Once an average is established, cap a new sample at 3x mean
+                // so a single outlier can't skew the running RTT.
+                constexpr double kRttNormalizeFactor = 3.0;
+                const double meanRtt = mStat.mRttDelay.average();
+                if (mStat.mRttDelay.is_initialized() && meanRtt > 0.0 &&
+                    rtt > meanRtt * kRttNormalizeFactor)
+                {
+                    rtt = meanRtt * kRttNormalizeFactor;
+                }
                 mStat.mRttDelay.process(rtt);
+            }
         }
         hasData = mRtpSession.GotoNextSourceWithData();
     }

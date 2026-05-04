@@ -39,6 +39,14 @@ protected:
     // Last timestamp from packet in units
     uint32_t                mReceiveTimestamp = 0;
 
+    // Last extended sequence number, used to apply RFC 3550 §A.8 rule
+    // ("update jitter only when packets are truly adjacent in sequence").
+    std::optional<uint32_t> mLastExtSeqno;
+
+    // Number of in-sequence packets seen so far. Used to skip the first few
+    // packets while transit-time settles after call setup.
+    uint32_t                mPacketsProcessed = 0;
+
     // It is classic jitter value in units
     std::optional<float>    mLastJitter;
 
