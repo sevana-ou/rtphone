@@ -53,6 +53,11 @@ public:
     void start(int usageId);
     void stop(int usageId);
 
+    // Inject a custom input device. Must be called before start(): when set,
+    // start() skips construction of the default platform microphone. Pass an
+    // empty pointer to clear the override.
+    void setAudioInput(Audio::PInputDevice input);
+
     enum AudioTarget
     {
         atNull,

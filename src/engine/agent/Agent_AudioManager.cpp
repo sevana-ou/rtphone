@@ -167,6 +167,12 @@ void AudioManager::stop(int usageId)
     }
 }
 
+void AudioManager::setAudioInput(Audio::PInputDevice input)
+{
+    LOCK_MANAGER;
+    mAudioInput = std::move(input);
+}
+
 void AudioManager::startPlayFile(int usageId, const std::string& path, AudioTarget target, LoopMode lm, int timelimit)
 {
     // Check if file exists
