@@ -37,7 +37,7 @@ public:
     AudioManager();
     virtual ~AudioManager();
 
-    static AudioManager& instance();
+    // static AudioManager& instance();
 
     // Enforces to close audio devices. Used to shutdown AudioManager on exit from application
     void close();
@@ -57,6 +57,7 @@ public:
     // start() skips construction of the default platform microphone. Pass an
     // empty pointer to clear the override.
     void setAudioInput(Audio::PInputDevice input);
+    void setAudioOutput(Audio::POutputDevice output);
 
     enum AudioTarget
     {

@@ -7,7 +7,7 @@
 
 #include "helper/HL_Statistics.h"
 #include "helper/HL_Types.h"
-#include "helper/HL_InternetAddress.h"
+#include "ice/ICEAddress.h"
 
 #include "jrtplib/src/rtptimeutilities.h"
 #include "jrtplib/src/rtppacket.h"
@@ -73,6 +73,19 @@ struct Dtmf2833Event
     std::chrono::microseconds mTimestamp;
 };
 
+// Per-remote-address packet/byte counters. Split out so an aggregate
+// Statistics can break its totals down by destination/source — useful
+// for diagnosing ICE candidate switches or symmetric-RTP issues.
+struct DestinationStats
+{
+    size_t mSentRtp     = 0;
+    size_t mSentRtcp    = 0;
+    size_t mSentBytes   = 0;
+    size_t mReceivedRtp   = 0;
+    size_t mReceivedRtcp  = 0;
+    size_t mReceivedBytes = 0;
+};
+
 class Statistics
 {
 public:
@@ -87,6 +100,10 @@ public:
                                     mPacketLoss = 0,      // Number of lost packets
                                     mPacketDropped = 0,   // Number of dropped packets (due to time unsync when playing)б
                                     mIllegalRtp = 0;      // Number of rtp packets with bad payload type
+
+    // Per-remote-address breakdown of the totals above. Keyed by the remote
+    // RTP/RTCP socket address (NAT-mapped, after ICE selection).
+    std::map<ice::NetworkAddress, DestinationStats> mPerDestination;
 
     TestResult<float>               mDecodingInterval,      // Average interval on call to packet decode
                                     mDecodeRequested,       // Average amount of requested audio frames to play
@@ -115,7 +132,7 @@ public:
 
     // It is to calculate network MOS
     void calculateBurstr(double* burstr, double* loss) const;
-    double calculateMos(double maximalMos) const;
+    double calculateMos() const;
 
     Statistics();
     ~Statistics();

@@ -3,10 +3,11 @@
 #include "helper/HL_String.h"
 #include "helper/HL_StreamState.h"
 #include "helper/HL_VariantMap.h"
-#include "helper/HL_CsvReader.h"
-#include "helper/HL_Base64.h"
+// #include "helper/HL_CsvReader.h"
+// #include "helper/HL_Base64.h"
 #include "media/MT_CodecList.h"
-#include <fstream>
+#include "audio/Audio_Null.h"
+// #include <fstream>
 
 
 const std::string Status_Ok = "ok";
@@ -37,19 +38,19 @@ AgentImpl::~AgentImpl()
 // Get access to internal audio manager. Value can be nullptr.
 const std::shared_ptr<AudioManager>& AgentImpl::audioManager() const
 {
-  return mAudioManager;
+    return mAudioManager;
 }
 
 void AgentImpl::setAudioMonitoring(Audio::DataConnection* monitoring)
 {
-  mAudioMonitoring = monitoring;
-  if (mAudioManager)
-    mAudioManager->setAudioMonitoring(monitoring);
+    mAudioMonitoring = monitoring;
+    if (mAudioManager)
+        mAudioManager->setAudioMonitoring(monitoring);
 }
 
 Audio::DataConnection* AgentImpl::monitoring() const
 {
-  return mAudioMonitoring;
+    return mAudioMonitoring;
 }
 
 void AgentImpl::run()
@@ -84,73 +85,73 @@ std::string AgentImpl::command(const std::string& command)
         if (cmd == "config")
             processConfig(d, answer);
         else
-        if (cmd == "start")
-            processStart(d, answer);
-        else
-        if (cmd == "stop")
-            processStop(d, answer);
-        else
-        if (cmd == "account_create")
-            processCreateAccount(d, answer);
-        else
-        if (cmd == "account_start")
-            processStartAccount(d, answer);
-        else
-        if (cmd == "account_setuserinfo")
-            processSetUserInfoToAccount(d, answer);
-        else
-        if (cmd == "session_create") {
-            // For Bugsnag test
-            // int* v = nullptr;
-            // *v = 0;
-            processCreateSession(d, answer);
-        }
-        else
-        if (cmd == "session_start")
-            processStartSession(d, answer);
-        else
-        if (cmd == "session_stop")
-            processStopSession(d, answer);
-        else
-        if (cmd == "session_accept")
-            processAcceptSession(d, answer);
-        else
-        if (cmd == "session_destroy")
-            processDestroySession(d, answer);
-        else
-        if (cmd == "session_use_stream")
-            processUseStreamForSession(d, answer);
-        else
-        if (cmd == "wait_for_event")
-            processWaitForEvent(d, answer);
-        else
-        if (cmd == "session_get_media_stats")
-            processGetMediaStats(d, answer);
-        else
-        if (cmd == "agent_network_changed")
-            processNetworkChanged(d, answer);
-        else
-        if (cmd == "agent_add_root_cert")
-            processAddRootCert(d, answer);
-        else
-        if (cmd == "detach_log")
-        {
-            GLogger.closeFile();
-            answer["status"] = Status_Ok;
-        }
-        else
-        if (cmd == "attach_log")
-        {
-            GLogger.openFile();
-            answer["status"] = Status_Ok;
-        }
-        else
-        if (cmd == "log_message")
-            processLogMessage(d, answer);
-        else
-        {
-            answer["status"] = Status_NoCommand;
-        }
+            if (cmd == "start")
+                processStart(d, answer);
+            else
+                if (cmd == "stop")
+                    processStop(d, answer);
+                else
+                    if (cmd == "account_create")
+                        processCreateAccount(d, answer);
+                    else
+                        if (cmd == "account_start")
+                            processStartAccount(d, answer);
+                        else
+                            if (cmd == "account_setuserinfo")
+                                processSetUserInfoToAccount(d, answer);
+                            else
+                                if (cmd == "session_create") {
+                                    // For Bugsnag test
+                                    // int* v = nullptr;
+                                    // *v = 0;
+                                    processCreateSession(d, answer);
+                                }
+                                else
+                                    if (cmd == "session_start")
+                                        processStartSession(d, answer);
+                                    else
+                                        if (cmd == "session_stop")
+                                            processStopSession(d, answer);
+                                        else
+                                            if (cmd == "session_accept")
+                                                processAcceptSession(d, answer);
+                                            else
+                                                if (cmd == "session_destroy")
+                                                    processDestroySession(d, answer);
+                                                else
+                                                    if (cmd == "session_use_stream")
+                                                        processUseStreamForSession(d, answer);
+                                                    else
+                                                        if (cmd == "wait_for_event")
+                                                            processWaitForEvent(d, answer);
+                                                        else
+                                                            if (cmd == "session_get_media_stats")
+                                                                processGetMediaStats(d, answer);
+                                                            else
+                                                                if (cmd == "agent_network_changed")
+                                                                    processNetworkChanged(d, answer);
+                                                                else
+                                                                    if (cmd == "agent_add_root_cert")
+                                                                        processAddRootCert(d, answer);
+                                                                    else
+                                                                        if (cmd == "detach_log")
+                                                                        {
+                                                                            GLogger.closeFile();
+                                                                            answer["status"] = Status_Ok;
+                                                                        }
+                                                                        else
+                                                                            if (cmd == "attach_log")
+                                                                            {
+                                                                                GLogger.openFile();
+                                                                                answer["status"] = Status_Ok;
+                                                                            }
+                                                                            else
+                                                                                if (cmd == "log_message")
+                                                                                    processLogMessage(d, answer);
+                                                                                else
+                                                                                {
+                                                                                    answer["status"] = Status_NoCommand;
+                                                                                }
     }
     catch(std::exception& e)
     {
@@ -226,19 +227,13 @@ void AgentImpl::processStart(JsonCpp::Value& request, JsonCpp::Value &answer)
     for (int i=0; i<cl.count(); i++)
         priorityConfig->at(i) = i;
 
-    // Disable dynamic payload codec types - commented for now
-    // if (cl.codecAt(i).payloadType() < 96)
-    //    priorityConfig->at(i) = i;
-    // else
-    //    priorityConfig->at(i) = -1;
-
     config()[CONFIG_CODEC_PRIORITY] = priorityConfig;
 
     // Enable audio
     mAudioManager = std::make_shared<AudioManager>();
     mAudioManager->setTerminal(mTerminal.get());
     if (mAudioMonitoring)
-      mAudioManager->setAudioMonitoring(mAudioMonitoring);
+        mAudioManager->setAudioMonitoring(mAudioMonitoring);
 
     // Do not start audio manager here. Start right before call.
 
@@ -341,6 +336,11 @@ void AgentImpl::processStartSession(JsonCpp::Value& request, JsonCpp::Value& ans
         return;
     }
 
+    if (request["use_null_mic"].asBool())
+        mAudioManager->setAudioInput(std::make_shared<Audio::NullInputDevice>());
+    if (request["use_null_spk"].asBool())
+        mAudioManager->setAudioOutput(std::make_shared<Audio::NullOutputDevice>());
+
     mAudioManager->start(mUseNativeAudio ? AudioManager::atReceiver : AudioManager::atNull);
 
     auto sessionIter = mSessionMap.find(request["session_id"].asInt());
@@ -351,7 +351,7 @@ void AgentImpl::processStartSession(JsonCpp::Value& request, JsonCpp::Value& ans
         PDataProvider audioProvider = std::make_shared<AudioProvider>(*this, *mTerminal);
         audioProvider->setState(audioProvider->state() | static_cast<int>(StreamState::Grabbing) | static_cast<int>(StreamState::Playing));
 
-/*#if defined(USE_AQUA_LIBRARY)
+        /*#if defined(USE_AQUA_LIBRARY)
         std::string path_faults = request["path_faults"].asString();
 
         sevana::aqua::config config = {
@@ -440,6 +440,10 @@ void AgentImpl::processAcceptSession(JsonCpp::Value& request, JsonCpp::Value& an
         else
         {
             // Ensure audio manager is here
+            if (request["use_null_mic"].asBool())
+                mAudioManager->setAudioInput(std::make_shared<Audio::NullInputDevice>());
+            if (request["use_null_spk"].asBool())
+                mAudioManager->setAudioOutput(std::make_shared<Audio::NullOutputDevice>());
             mAudioManager->start(mUseNativeAudio ? AudioManager::atReceiver : AudioManager::atNull);
 
             // Accept session on SIP level
@@ -471,9 +475,9 @@ void AgentImpl::processDestroySession(JsonCpp::Value& request, JsonCpp::Value& a
     auto sessionIter = mSessionMap.find(sessionId);
     if (sessionIter != mSessionMap.end())
         mSessionMap.erase(sessionIter);
-//#if defined(USE_AQUA_LIBRARY)
-//    closeAqua(sessionId);
-//#endif
+    //#if defined(USE_AQUA_LIBRARY)
+    //    closeAqua(sessionId);
+    //#endif
     answer["status"] = Status_Ok;
 }
 
@@ -637,7 +641,7 @@ void AgentImpl::processUseStreamForSession(JsonCpp::Value& request, JsonCpp::Val
 
         // Parse command
         std::string actionText = request["media_action"].asString(),
-                directionText = request["media_direction"].asString();
+            directionText = request["media_direction"].asString();
 
         MT::Stream::MediaDirection direction = directionText == "incoming" ? MT::Stream::MediaDirection::Incoming
                                                                            : MT::Stream::MediaDirection::Outgoing;
@@ -668,34 +672,34 @@ void AgentImpl::processUseStreamForSession(JsonCpp::Value& request, JsonCpp::Val
                 }
             }
             else
-            if (actionText == "write")
-            {
-                if (path.empty())
+                if (actionText == "write")
                 {
-                    // Turn off recording from the stream
-                    prov->writeFile(Audio::PWavFileWriter(), direction);
-                    answer["status"] = Status_Ok;
-                }
-                else
-                {
-                    Audio::PWavFileWriter writer = std::make_shared<Audio::WavFileWriter>();
-                    if (!writer->open(strx::makeTstring(path), AUDIO_SAMPLERATE, AUDIO_CHANNELS))
-                        answer["status"] = Status_FailedToOpenFile;
-                    else
+                    if (path.empty())
                     {
-                        prov->writeFile(writer, direction);
+                        // Turn off recording from the stream
+                        prov->writeFile(Audio::PWavFileWriter(), direction);
                         answer["status"] = Status_Ok;
                     }
+                    else
+                    {
+                        Audio::PWavFileWriter writer = std::make_shared<Audio::WavFileWriter>();
+                        if (!writer->open(strx::makeTstring(path), AUDIO_SAMPLERATE, AUDIO_CHANNELS))
+                            answer["status"] = Status_FailedToOpenFile;
+                        else
+                        {
+                            prov->writeFile(writer, direction);
+                            answer["status"] = Status_Ok;
+                        }
+                    }
                 }
-            }
-            else
-            if (actionText == "mirror")
-            {
-                prov->setupMirror(request["enable"].asBool());
-                answer["status"] = Status_Ok;
-            }
-            else
-                answer["status"] = Status_NoCommand;
+                else
+                    if (actionText == "mirror")
+                    {
+                        prov->setupMirror(request["enable"].asBool());
+                        answer["status"] = Status_Ok;
+                    }
+                    else
+                        answer["status"] = Status_NoCommand;
         }
         else
             answer["status"] = Status_NoMediaAction;

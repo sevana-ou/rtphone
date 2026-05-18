@@ -5,129 +5,135 @@
 #define LOG_SUBSYSTEM "audio"
 
 using namespace Audio;
+using namespace std::chrono_literals;
 
-NullTimer::NullTimer(int interval, Delegate *delegate, const char* name)
-  :mShutdown(false), mDelegate(delegate), mInterval(interval), mThreadName(name)
+NullTimer::NullTimer(std::chrono::milliseconds interval, Delegate *delegate, const char* name)
+    :mShutdown(false), mDelegate(delegate), mInterval(interval), mThreadName(name)
 {
-  start();
+    start();
 }
 
 NullTimer::~NullTimer()
 {
-  stop();
+    stop();
 }
 
 void NullTimer::start()
 {
-  mShutdown = false;
-  mWorkerThread = std::thread(&NullTimer::run, this);
+    mShutdown = false;
+    mWorkerThread = std::thread(&NullTimer::run, this);
 }
 
 void NullTimer::stop()
 {
-  mShutdown = true;
-  if (mWorkerThread.joinable())
-    mWorkerThread.join();
+    mShutdown = true;
+    if (mWorkerThread.joinable())
+        mWorkerThread.join();
 }
 
 void NullTimer::run()
 {
-  mTail = 0;
-  while (!mShutdown)
-  {
-    // Get current timestamp
-    std::chrono::system_clock::time_point timestamp = std::chrono::system_clock::now();
-
-    while (mTail >= mInterval * 1000)
+    mTail = 0us;
+    while (!mShutdown)
     {
-      if (mDelegate)
-        mDelegate->onTimerSignal(*this);
-      mTail -= mInterval * 1000;
+        // Get current timestamp
+        std::chrono::system_clock::time_point timestamp = std::chrono::system_clock::now();
+
+        while (mTail >= mInterval)
+        {
+            if (mDelegate)
+                mDelegate->onTimerSignal(*this);
+            mTail -= mInterval;
+        }
+
+        // Sleep for mInterval - mTail milliseconds
+        std::this_thread::sleep_for(mInterval - mTail);
+
+        mTail = mTail + std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::system_clock::now() - timestamp);
     }
-
-    // Sleep for mInterval - mTail milliseconds
-    std::this_thread::sleep_for(std::chrono::microseconds(mInterval * 1000 - mTail));
-
-    mTail += (int)std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::system_clock::now() - timestamp).count();
-  }
 }
 
 // --------------------- NullInputDevice -------------------------
 NullInputDevice::NullInputDevice()
-  :mBuffer(nullptr)
+    :mBuffer(nullptr)
 {
 }
 
 NullInputDevice::~NullInputDevice()
 {
-  internalClose();
+    internalClose();
 }
 
 bool NullInputDevice::open()
 {
-  mBuffer = malloc(AUDIO_MIC_BUFFER_SIZE);
-  memset(mBuffer, 0, AUDIO_MIC_BUFFER_SIZE);
-  mTimeCounter = 0; mDataCounter = 0;
-  // Creation of timer starts it also. So first onTimerSignal can come even before open() returns.
-  mTimer = std::make_shared<NullTimer>(AUDIO_MIC_BUFFER_LENGTH, this, "NullMicrophoneThread");
-  return true;
+    ICELogInfo(<< "Starting NullInputDevice for " << AUDIO_MIC_BUFFER_LENGTH << "ms buffers");
+    mBuffer = malloc(AUDIO_MIC_BUFFER_SIZE);
+    memset(mBuffer, 0, AUDIO_MIC_BUFFER_SIZE);
+    mTimeCounter = 0; mDataCounter = 0;
+
+    // Creation of timer starts it also. So first onTimerSignal can come even before open() returns.
+    mTimer = std::make_shared<NullTimer>(std::chrono::milliseconds(AUDIO_MIC_BUFFER_LENGTH), this, "null_mic");
+    return true;
 }
 
 void NullInputDevice::internalClose()
 {
-  mTimer.reset();
-  if (mBuffer)
-  {
-    free(mBuffer);
-    mBuffer = nullptr;
-  }
-  ICELogInfo(<<"Pseudocaptured " << mTimeCounter << " milliseconds , " << mDataCounter << " bytes.");
+    ICELogInfo(<< "Stopping NullInputDevice");
+    mTimer.reset();
+    if (mBuffer)
+    {
+        free(mBuffer);
+        mBuffer = nullptr;
+    }
+    ICELogInfo( << "Pseudocaptured " << mTimeCounter << " milliseconds , " << mDataCounter << " bytes.");
 }
 
 void NullInputDevice::close()
 {
     internalClose();
 }
+
 Format NullInputDevice::getFormat()
 {
-  assert (Format().sizeFromTime(AUDIO_MIC_BUFFER_LENGTH) == AUDIO_MIC_BUFFER_SIZE);
-  return Format();
+    assert (Format().sizeFromTime(AUDIO_MIC_BUFFER_LENGTH) == AUDIO_MIC_BUFFER_SIZE);
+
+    return {}; // Return library-define default format
 }
 
 void NullInputDevice::onTimerSignal(NullTimer& timer)
 {
-  mTimeCounter += AUDIO_MIC_BUFFER_LENGTH;
-  mDataCounter += AUDIO_MIC_BUFFER_SIZE;
-  if (mConnection)
-    mConnection->onMicData(getFormat(), mBuffer, AUDIO_MIC_BUFFER_SIZE);
+    mTimeCounter += AUDIO_MIC_BUFFER_LENGTH;
+    mDataCounter += AUDIO_MIC_BUFFER_SIZE;
+    if (mConnection)
+        mConnection->onMicData(getFormat(), mBuffer, AUDIO_MIC_BUFFER_SIZE);
 }
 
 // --------------------- NullOutputDevice --------------------------
 NullOutputDevice::NullOutputDevice()
-  :mBuffer(nullptr)
+    :mBuffer(nullptr)
 {
 }
 
 NullOutputDevice::~NullOutputDevice()
 {
-  internalClose();
+    internalClose();
 }
 
 
 bool NullOutputDevice::open()
 {
-  mTimeCounter = 0; mDataCounter = 0;
-  mBuffer = malloc(AUDIO_SPK_BUFFER_SIZE);
-  // Creation of timer starts it also. So first onSpkData() can come before open() returns even.
-  mTimer = std::make_shared<NullTimer>(AUDIO_SPK_BUFFER_LENGTH, this, "NullSpeakerThread");
-  return true;
+    mTimeCounter = 0; mDataCounter = 0;
+    mBuffer = malloc(AUDIO_SPK_BUFFER_SIZE);
+    // Creation of timer starts it also. So first onSpkData() can come before open() returns even.
+    mTimer = std::make_shared<NullTimer>(std::chrono::milliseconds(AUDIO_SPK_BUFFER_LENGTH), this, "null_spk");
+    return true;
 }
 
 void NullOutputDevice::internalClose()
 {
-  mTimer.reset();
-  free(mBuffer); mBuffer = nullptr;
-  ICELogInfo(<< "Pseudoplayed " << mTimeCounter << " milliseconds, " << mDataCounter << " bytes.");
+    mTimer.reset();
+    free(mBuffer); mBuffer = nullptr;
+    ICELogInfo(<< "Pseudoplayed " << mTimeCounter << " milliseconds, " << mDataCounter << " bytes.");
 }
 
 void NullOutputDevice::close()
@@ -137,16 +143,16 @@ void NullOutputDevice::close()
 
 Format NullOutputDevice::getFormat()
 {
-  assert (Format().sizeFromTime(AUDIO_SPK_BUFFER_LENGTH) == AUDIO_SPK_BUFFER_SIZE);
-  return Format();
+    assert (Format().sizeFromTime(AUDIO_SPK_BUFFER_LENGTH) == AUDIO_SPK_BUFFER_SIZE);
+    return Format();
 }
 
 void NullOutputDevice::onTimerSignal(NullTimer &timer)
 {
-  mTimeCounter += AUDIO_SPK_BUFFER_LENGTH;
-  mDataCounter += AUDIO_SPK_BUFFER_SIZE;
-  if (mConnection)
-    mConnection->onSpkData(getFormat(), mBuffer, AUDIO_SPK_BUFFER_SIZE);
+    mTimeCounter += AUDIO_SPK_BUFFER_LENGTH;
+    mDataCounter += AUDIO_SPK_BUFFER_SIZE;
+    if (mConnection)
+        mConnection->onSpkData(getFormat(), mBuffer, AUDIO_SPK_BUFFER_SIZE);
 }
 
 // ---------------------- NullEnumerator --------------------------
@@ -164,25 +170,25 @@ void NullEnumerator::close()
 
 int NullEnumerator::count()
 {
-  return 1;
+    return 1;
 }
 
 std::tstring NullEnumerator::nameAt(int index)
 {
 #if defined(TARGET_WIN)
-  return L"null";
+    return L"null";
 #else
-  return "null";
+    return "null";
 #endif
 }
 
 int NullEnumerator::idAt(int index)
 {
-  return 0;
+    return 0;
 }
 
 int NullEnumerator::indexOfDefaultDevice()
 {
-  return 0;
+    return 0;
 }
 

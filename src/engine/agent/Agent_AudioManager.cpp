@@ -26,16 +26,6 @@ AudioManager::~AudioManager()
     // stop();
 }
 
-AudioManager& AudioManager::instance()
-{
-    static std::shared_ptr<AudioManager> GAudioManager;
-
-    if (!GAudioManager)
-        GAudioManager = std::make_shared<AudioManager>();
-
-    return *GAudioManager;
-}
-
 void AudioManager::setTerminal(MT::Terminal* terminal)
 {
     mTerminal = terminal;
@@ -67,6 +57,7 @@ void AudioManager::start(int usageId)
     if (mUsage.obtain(usageId) > 1)
         return;
 
+    // Maybe it is time to initialize global audio support
     if (Audio::OsEngine::instance())
         Audio::OsEngine::instance()->open();
 
@@ -89,14 +80,15 @@ void AudioManager::start(int usageId)
             enumerator->open(Audio::myMicrophone);
             int inputIndex = enumerator->indexOfDefaultDevice();
 
-            // Construct and set to terminal's audio pair input device
+            // Construct default platform input device
             if (usageId != atNull)
                 mAudioInput = Audio::PInputDevice(Audio::InputDevice::make(enumerator->idAt(inputIndex)));
             else
                 mAudioInput = Audio::PInputDevice(new Audio::NullInputDevice());
-
-            mTerminal->audio()->setInput(mAudioInput);
         }
+        // Bind input to the terminal's device pair regardless of whether it was
+        // just constructed or externally injected via setAudioInput().
+        mTerminal->audio()->setInput(mAudioInput);
 
         if (!mAudioOutput)
         {
@@ -104,7 +96,7 @@ void AudioManager::start(int usageId)
             enumerator->open(Audio::mySpeaker);
             int outputIndex = enumerator->indexOfDefaultDevice();
 
-            // Construct and set terminal's audio pair output device
+            // Construct default platform output device
             if (usageId != atNull)
             {
                 if (outputIndex >= enumerator->count())
@@ -115,9 +107,8 @@ void AudioManager::start(int usageId)
             }
             else
                 mAudioOutput = Audio::POutputDevice(new Audio::NullOutputDevice());
-
-            mTerminal->audio()->setOutput(mAudioOutput);
         }
+        mTerminal->audio()->setOutput(mAudioOutput);
     }
 
     // Open audio
@@ -173,6 +164,12 @@ void AudioManager::setAudioInput(Audio::PInputDevice input)
     mAudioInput = std::move(input);
 }
 
+void AudioManager::setAudioOutput(Audio::POutputDevice output)
+{
+    LOCK_MANAGER;
+    mAudioOutput = std::move(output);
+}
+
 void AudioManager::startPlayFile(int usageId, const std::string& path, AudioTarget target, LoopMode lm, int timelimit)
 {
     // Check if file exists
@@ -208,6 +205,6 @@ void AudioManager::process()
     mPlayer.releasePlayed();
     std::vector<int> ids;
     mTerminal->audio()->player().retrieveUsageIds(ids);
-    for (unsigned i=0; i<ids.size(); i++)
-        stop(ids[i]);
+    for (int id : ids)
+        stop(id);
 }

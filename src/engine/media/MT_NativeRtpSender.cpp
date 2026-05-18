@@ -47,6 +47,9 @@ bool NativeRtpSender::SendRTP(const void *data, size_t len)
     mSocket.mRtp->sendDatagram(mTarget.mRtp, mSendBuffer, sendLength);
     mStat.mSentRtp++;
     mStat.mSent += len;
+    auto& perDst = mStat.mPerDestination[mTarget.mRtp];
+    perDst.mSentRtp++;
+    perDst.mSentBytes += len;
 
     return true;
 }
@@ -73,6 +76,9 @@ bool NativeRtpSender::SendRTCP(const void *data, size_t len)
     mSocket.mRtcp->sendDatagram(mTarget.mRtcp, mSendBuffer, sendLength);
     mStat.mSentRtcp++;
     mStat.mSent += len;
+    auto& perDst = mStat.mPerDestination[mTarget.mRtcp];
+    perDst.mSentRtcp++;
+    perDst.mSentBytes += len;
 
     return true;
 }

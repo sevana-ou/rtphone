@@ -344,14 +344,20 @@ void AudioStream::dataArrived(PDatagramSocket s, const void* buffer, int length,
     }
 
     mStat.mReceived += length;
+    auto& perDst = mStat.mPerDestination[source];
+    perDst.mReceivedBytes += length;
     if (RtpHelper::isRtp(mReceiveBuffer, receiveLength))
     {
         if (!mStat.mFirstRtpTime)
             mStat.mFirstRtpTime = std::chrono::steady_clock::now();
         mStat.mReceivedRtp++;
+        perDst.mReceivedRtp++;
     }
     else
+    {
         mStat.mReceivedRtcp++;
+        perDst.mReceivedRtcp++;
+    }
 
     mRtpSession.Poll(); // maybe it is extra with external transmitter
     bool hasData = mRtpSession.GotoFirstSourceWithData();

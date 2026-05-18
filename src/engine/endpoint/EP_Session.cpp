@@ -453,7 +453,7 @@ void Session::getSessionInfo(Session::InfoOptions options, VariantMap& info)
 
         media = &stream;
         MT::Statistics s = stream.provider()->getStatistics();
-        info[SessionInfo_NetworkMos] = static_cast<float>(s.calculateMos(4.14));
+        info[SessionInfo_NetworkMos] = static_cast<float>(s.calculateMos());
         info[SessionInfo_AudioCodec] = s.mCodecName;
 
         stat += s;

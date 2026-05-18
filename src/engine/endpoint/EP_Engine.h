@@ -108,7 +108,7 @@ enum
     CONFIG_ACCOUNT,             // VariantMap with account configuration
     CONFIG_EXTERNALIP,          // Use external/public IP in outgoing requests
     CONFIG_OWN_DNS,             // Use predefined DNS servers
-    CONFIG_REGID                // reg-id value from RFC5626
+    CONFIG_REGID                // reg-id value from RFC5626,
 };
 
 // Conntype parameter for OnSessionEstablished event

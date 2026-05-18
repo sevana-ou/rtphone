@@ -2,6 +2,7 @@
 #include <cctype>
 #include <cstring>
 #include <iostream>
+#include <sstream>
 
 #include "MT_Statistics.h"
 #define LOG_SUBSYSTEM "media"
@@ -203,7 +204,7 @@ void Statistics::calculateBurstr(double* burstr, double* lossr) const
         *lossr = 0;
 }
 
-double Statistics::calculateMos(double maximalMos) const
+double Statistics::calculateMos() const
 {
     // Network MOS via the simplified ITU-T G.107 E-Model:
     //
@@ -211,7 +212,7 @@ double Statistics::calculateMos(double maximalMos) const
     //   Id       = 0.024*d + 0.11*max(0, d - 177.3)
     //   Ie_eff   = Ie + (95 - Ie) * Ppl / (Ppl + Bpl)         (BurstR=1)
     //   R        = 93.2 - Id - Ie_eff                          (clamped to [0,100])
-    //   MOS      = 1 + 0.035*R + 7e-6*R*(R-60)*(100-R)        (clamped to [1, maximalMos])
+    //   MOS      = 1 + 0.035*R + 7e-6*R*(R-60)*(100-R)        (clamped >= 1)
     //
     // Ie/Bpl are looked up from a per-codec table; safe defaults are used
     // when the codec is unknown.
@@ -253,8 +254,7 @@ double Statistics::calculateMos(double maximalMos) const
     else
         mos = 1.0 + 0.035 * R + 7e-6 * R * (R - 60.0) * (100.0 - R);
 
-    if (mos < 1.0)        mos = 1.0;
-    if (mos > maximalMos) mos = maximalMos;
+    if (mos < 1.0) mos = 1.0;
     return mos;
 }
 
@@ -306,6 +306,17 @@ Statistics& Statistics::operator += (const Statistics& src)
     mRemotePeer             = src.mRemotePeer;
     mSsrc                   = src.mSsrc;
 
+    for (const auto& [addr, counts]: src.mPerDestination)
+    {
+        auto& dst = mPerDestination[addr];
+        dst.mSentRtp       += counts.mSentRtp;
+        dst.mSentRtcp      += counts.mSentRtcp;
+        dst.mSentBytes     += counts.mSentBytes;
+        dst.mReceivedRtp   += counts.mReceivedRtp;
+        dst.mReceivedRtcp  += counts.mReceivedRtcp;
+        dst.mReceivedBytes += counts.mReceivedBytes;
+    }
+
     return *this;
 }
 
@@ -330,6 +341,19 @@ Statistics& Statistics::operator -= (const Statistics& src)
             mCodecCount[codecStat.first] -= codecStat.second;
     }
 
+    for (const auto& [addr, counts]: src.mPerDestination)
+    {
+        auto it = mPerDestination.find(addr);
+        if (it == mPerDestination.end())
+            continue;
+        it->second.mSentRtp       -= counts.mSentRtp;
+        it->second.mSentRtcp      -= counts.mSentRtcp;
+        it->second.mSentBytes     -= counts.mSentBytes;
+        it->second.mReceivedRtp   -= counts.mReceivedRtp;
+        it->second.mReceivedRtcp  -= counts.mReceivedRtcp;
+        it->second.mReceivedBytes -= counts.mReceivedBytes;
+    }
+
     return *this;
 }
 
@@ -344,6 +368,17 @@ std::string Statistics::toString() const
         << ", decoding interval: "  << mDecodingInterval.average()
         << ", decode requested: "   << mDecodeRequested.average()
         << ", packet interval: "    << mPacketInterval.average();
+
+    for (const auto& [addr, counts]: mPerDestination)
+    {
+        oss << "; peer " << addr.toBriefStdString()
+            << " sent rtp="  << counts.mSentRtp
+            << "/rtcp="      << counts.mSentRtcp
+            << "/bytes="     << counts.mSentBytes
+            << ", received rtp=" << counts.mReceivedRtp
+            << "/rtcp="          << counts.mReceivedRtcp
+            << "/bytes="         << counts.mReceivedBytes;
+    }
 
     return oss.str();
 }

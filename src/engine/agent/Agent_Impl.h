@@ -18,111 +18,111 @@
 class AgentImpl: public UserAgent, public MT::Stream::MediaObserver
 {
 protected:
-  std::recursive_mutex mAgentMutex;
-  std::mutex mEventListMutex;
-  std::condition_variable mEventListChangeCondVar;
-  std::vector<JsonCpp::Value> mEventList;
-  bool mUseNativeAudio = false;
+    std::recursive_mutex mAgentMutex;
+    std::mutex mEventListMutex;
+    std::condition_variable mEventListChangeCondVar;
+    std::vector<JsonCpp::Value> mEventList;
+    bool mUseNativeAudio = false;
 
-  typedef std::map<int, PAccount> AccountMap;
-  AccountMap mAccountMap;
+    typedef std::map<int, PAccount> AccountMap;
+    AccountMap mAccountMap;
 
-  typedef std::map<int, PSession> SessionMap;
-  SessionMap mSessionMap;
+    typedef std::map<int, PSession> SessionMap;
+    SessionMap mSessionMap;
 
 
-  std::shared_ptr<std::thread> mThread;
-  volatile bool mShutdown;
-  std::shared_ptr<MT::Terminal> mTerminal;
-  std::shared_ptr<AudioManager> mAudioManager;
-  Audio::DataConnection* mAudioMonitoring = nullptr;
+    std::shared_ptr<std::thread> mThread;
+    volatile bool mShutdown;
+    std::shared_ptr<MT::Terminal> mTerminal;
+    std::shared_ptr<AudioManager> mAudioManager;
+    Audio::DataConnection* mAudioMonitoring = nullptr;
 
-  void run();
-  void addEvent(const JsonCpp::Value& v);
-  void processConfig(JsonCpp::Value& request, JsonCpp::Value& answer);
-  void processStart(JsonCpp::Value& request, JsonCpp::Value& answer);
-  void processStop(JsonCpp::Value& request, JsonCpp::Value& answer);
-  void processCreateAccount(JsonCpp::Value& request, JsonCpp::Value& answer);
-  void processStartAccount(JsonCpp::Value& request, JsonCpp::Value& answer);
-  void processSetUserInfoToAccount(JsonCpp::Value& request, JsonCpp::Value& answer);
-  void processCreateSession(JsonCpp::Value& request, JsonCpp::Value& answer);
-  void processStartSession(JsonCpp::Value& request, JsonCpp::Value& answer);
-  void processStopSession(JsonCpp::Value& request, JsonCpp::Value& answer);
-  void processAcceptSession(JsonCpp::Value& request, JsonCpp::Value& answer);
-  void processDestroySession(JsonCpp::Value& request, JsonCpp::Value& answer);
-  void processWaitForEvent(JsonCpp::Value& request, JsonCpp::Value& answer);
-  void processGetMediaStats(JsonCpp::Value& request, JsonCpp::Value& answer);
-  void processUseStreamForSession(JsonCpp::Value& request, JsonCpp::Value& answer);
-  void processNetworkChanged(JsonCpp::Value& request, JsonCpp::Value& answer);
-  void processAddRootCert(JsonCpp::Value& request, JsonCpp::Value& answer);
-  void processLogMessage(JsonCpp::Value& request, JsonCpp::Value& answer);
-  void stopAgentAndThread();
+    void run();
+    void addEvent(const JsonCpp::Value& v);
+    void processConfig(JsonCpp::Value& request, JsonCpp::Value& answer);
+    void processStart(JsonCpp::Value& request, JsonCpp::Value& answer);
+    void processStop(JsonCpp::Value& request, JsonCpp::Value& answer);
+    void processCreateAccount(JsonCpp::Value& request, JsonCpp::Value& answer);
+    void processStartAccount(JsonCpp::Value& request, JsonCpp::Value& answer);
+    void processSetUserInfoToAccount(JsonCpp::Value& request, JsonCpp::Value& answer);
+    void processCreateSession(JsonCpp::Value& request, JsonCpp::Value& answer);
+    void processStartSession(JsonCpp::Value& request, JsonCpp::Value& answer);
+    void processStopSession(JsonCpp::Value& request, JsonCpp::Value& answer);
+    void processAcceptSession(JsonCpp::Value& request, JsonCpp::Value& answer);
+    void processDestroySession(JsonCpp::Value& request, JsonCpp::Value& answer);
+    void processWaitForEvent(JsonCpp::Value& request, JsonCpp::Value& answer);
+    void processGetMediaStats(JsonCpp::Value& request, JsonCpp::Value& answer);
+    void processUseStreamForSession(JsonCpp::Value& request, JsonCpp::Value& answer);
+    void processNetworkChanged(JsonCpp::Value& request, JsonCpp::Value& answer);
+    void processAddRootCert(JsonCpp::Value& request, JsonCpp::Value& answer);
+    void processLogMessage(JsonCpp::Value& request, JsonCpp::Value& answer);
+    void stopAgentAndThread();
 
 public:
-  AgentImpl();
-  ~AgentImpl();
+    AgentImpl();
+    ~AgentImpl();
 
-  std::string command(const std::string& command);
-  bool waitForData(int milliseconds);
-  std::string read();
+    std::string command(const std::string& command);
+    bool waitForData(int milliseconds);
+    std::string read();
 
-  // Get access to internal audio manager. Value can be nullptr.
-  const std::shared_ptr<AudioManager>& audioManager() const;
+    // Get access to internal audio manager. Value can be nullptr.
+    const std::shared_ptr<AudioManager>& audioManager() const;
 
-  void setAudioMonitoring(Audio::DataConnection* monitoring);
-  Audio::DataConnection* monitoring() const;
+    void setAudioMonitoring(Audio::DataConnection* monitoring);
+    Audio::DataConnection* monitoring() const;
 
-  // UserAgent overrides
-  // Called on new incoming session; providers shoukld
-  PDataProvider onProviderNeeded(const std::string& name) override;
+    // UserAgent overrides
+    // Called on new incoming session; providers shoukld
+    PDataProvider onProviderNeeded(const std::string& name) override;
 
-  // Called on new session offer
-  void onNewSession(PSession s) override;
+    // Called on new session offer
+    void onNewSession(PSession s) override;
 
-  // Called when session is terminated
-  void onSessionTerminated(PSession s, int responsecode, int reason) override;
+    // Called when session is terminated
+    void onSessionTerminated(PSession s, int responsecode, int reason) override;
 
-  // Called when session is established ok i.e. after all ICE signalling is finished
-  // Conntype is type of establish event - EV_SIP or EV_ICE
-  void onSessionEstablished(PSession s, int conntype, const RtpPair<InternetAddress>& p) override;
+    // Called when session is established ok i.e. after all ICE signalling is finished
+    // Conntype is type of establish event - EV_SIP or EV_ICE
+    void onSessionEstablished(PSession s, int conntype, const RtpPair<InternetAddress>& p) override;
 
-  void onSessionProvisional(PSession s, int code) override;
+    void onSessionProvisional(PSession s, int code) override;
 
-  // Called when user agent started
-  void onStart(int errorcode) override;
+    // Called when user agent started
+    void onStart(int errorcode) override;
 
-  // Called when user agent stopped
-  void onStop() override;
+    // Called when user agent stopped
+    void onStop() override;
 
-  // Called when account registered
-  void onAccountStart(PAccount account) override;
+    // Called when account registered
+    void onAccountStart(PAccount account) override;
 
-  // Called when account removed or failed (non zero error code)
-  void onAccountStop(PAccount account, int error) override;
+    // Called when account removed or failed (non zero error code)
+    void onAccountStop(PAccount account, int error) override;
 
-  // Called when connectivity checks failed.
-  void onConnectivityFailed(PSession s) override;
+    // Called when connectivity checks failed.
+    void onConnectivityFailed(PSession s) override;
 
-  // Called when new candidate is gathered
-  void onCandidateGathered(PSession s, const char* address) override;
+    // Called when new candidate is gathered
+    void onCandidateGathered(PSession s, const char* address) override;
 
-  // Called when network change detected
-  void onNetworkChange(PSession s) override;
+    // Called when network change detected
+    void onNetworkChange(PSession s) override;
 
-  // Called when all candidates are gathered
-  void onGathered(PSession s) override;
+    // Called when all candidates are gathered
+    void onGathered(PSession s) override;
 
-  // Called when new connectivity check is finished
-  void onCheckFinished(PSession s, const char* description) override;
+    // Called when new connectivity check is finished
+    void onCheckFinished(PSession s, const char* description) override;
 
-  // Called when log message must be recorded
-  void onLog(const char* msg) override;
+    // Called when log message must be recorded
+    void onLog(const char* msg) override;
 
-  // Called when problem with SIP connection(s) detected
-  void onSipConnectionFailed() override;
+    // Called when problem with SIP connection(s) detected
+    void onSipConnectionFailed() override;
 
-  // Called on incoming & outgoing audio for voice sessions
-  void onMedia(const void* data, int length, MT::Stream::MediaDirection direction, void* context, void* userTag) override;
+    // Called on incoming & outgoing audio for voice sessions
+    void onMedia(const void* data, int length, MT::Stream::MediaDirection direction, void* context, void* userTag) override;
 };
 
 #endif
