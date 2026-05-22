@@ -549,6 +549,12 @@ size_t OpusCodec::plc(int lostPackets, std::span<uint8_t> output)
     return ((uint8_t*)data_output - output.data());
 }
 
+size_t OpusCodec::getNumberOfSamples(std::span<const uint8_t> payload)
+{
+    int r = opus_packet_get_nb_samples(payload.data(), payload.size(), mSamplerate);
+    return r >= 0 ? r : 0;
+}
+
 // -------------- ILBC -------------------
 #define ILBC_CODEC_NAME "ILBC"
 

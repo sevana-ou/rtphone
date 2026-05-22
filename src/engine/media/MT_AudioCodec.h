@@ -64,8 +64,11 @@ class OpusCodec: public Codec
 protected:
     OpusEncoder        *mEncoderCtx = nullptr;
     OpusDecoder        *mDecoderCtx = nullptr;
-    int mPTime = 0, mSamplerate = 0, mChannels = 0;
+    int mPTime = 0,
+        mSamplerate = 0,
+        mChannels = 0;
     int mDecoderChannels = 0;
+
 public:
     struct Params
     {
@@ -110,6 +113,8 @@ public:
     EncodeResult    encode(std::span<const uint8_t> input, std::span<uint8_t> output) override;
     DecodeResult    decode(std::span<const uint8_t> input, std::span<uint8_t> output) override;
     size_t          plc(int lostFrames, std::span<uint8_t> output) override;
+
+    size_t          getNumberOfSamples(std::span<const uint8_t> payload);
 };
 
 

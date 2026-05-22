@@ -936,18 +936,31 @@ AudioReceiver::MediaInfo AudioReceiver::infoFor(jrtplib::RTPPacket& p)
     if (!codec)
         return {};
 
-    int frame_count = 0;
+    std::chrono::milliseconds packetTime = 0ms;
+
     if (codec->rtpLength() != 0)
     {
-        frame_count = static_cast<int>(p.GetPayloadLength() / codec->rtpLength());
+        int frameCount = static_cast<int>(p.GetPayloadLength() / codec->rtpLength());
         if (p.GetPayloadType() == 9/*G729A silence*/ && p.GetPayloadLength() % codec->rtpLength())
-            frame_count++;
+            frameCount++;
+
+        packetTime = std::chrono::milliseconds(frameCount * codec->frameTime());
     }
     else
-        frame_count = 1;
+    if (typeid(*codec) == typeid(OpusCodec))
+    {
+        OpusCodec* oc = dynamic_cast<OpusCodec*>(codec.get());
+        assert(oc);
+        size_t samplesCount = oc->getNumberOfSamples({p.GetPayloadData(), p.GetPayloadLength()});
+        int sampleratePerMs = codec->samplerate() / 1000;
+        packetTime = std::chrono::milliseconds(samplesCount / sampleratePerMs);
+    }
+    else
+    {
+        packetTime = std::chrono::milliseconds(codec->frameTime());
+    }
 
-
-    return {std::chrono::milliseconds(frame_count * codec->frameTime()), codec->samplerate()};
+    return {packetTime, codec->samplerate()};
 }
 
 // int AudioReceiver::timelengthFor(jrtplib::RTPPacket& p)
