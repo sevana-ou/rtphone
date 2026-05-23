@@ -200,9 +200,33 @@ RtpBuffer::FetchResult RtpBuffer::fetch()
         ICELogMedia( << "Dropping RTP packets from jitter buffer");
         total -= mPacketList.front()->timelength();
 
+        // Before advancing mLastSeqno over the dropped packet, record a loss event for any
+        // sequence-number gap on the wire between the previous packet we saw and this one.
+        // Without this, drops silently mask real packet loss that happened between them.
+        auto droppingPacket = mPacketList.front();
+        uint32_t droppingSeq = droppingPacket->rtp()->GetExtendedSequenceNumber();
+        if (mLastSeqno)
+        {
+            int gap = (int64_t)droppingSeq - (int64_t)*mLastSeqno - 1;
+            if (gap > 0)
+            {
+                mStat.mPacketLoss += gap;
+                if (mStat.mPacketLossTimeline.empty() || (mStat.mPacketLossTimeline.back().mEndSeqno != droppingSeq))
+                {
+                    auto gapStart = RtpHelper::toMicroseconds(*mLastReceiveTime);
+                    auto gapEnd = RtpHelper::toMicroseconds(droppingPacket->rtp()->GetReceiveTime());
+                    mStat.mPacketLossTimeline.emplace_back(PacketLossEvent{.mStartSeqno = *mLastSeqno,
+                                                                           .mEndSeqno = droppingSeq,
+                                                                           .mGap = gap,
+                                                                           .mTimestampStart = gapStart,
+                                                                           .mTimestampEnd = gapEnd});
+                }
+            }
+        }
+
         // Save it as last packet however - to not confuse loss packet counter
-        mFetchedPacket = mPacketList.front();
-        mLastSeqno = mFetchedPacket->rtp()->GetExtendedSequenceNumber();
+        mFetchedPacket = droppingPacket;
+        mLastSeqno = droppingSeq;
         mLastReceiveTime = mFetchedPacket->rtp()->GetReceiveTime();
 
         // Erase from packet list
