@@ -342,8 +342,6 @@ void Logger::beginLine(LogLevel level, const char* filename, int linenumber, con
     mFilename = filenamestart;
     mLine = linenumber;
     mSubsystem = subsystem;
-
-    // mStream << std::setw(8) << ICETimeHelper::timestamp() << " | " << std::setw(8) << ThreadInfo::currentThread() << " | " << std::setw(30) << filenamestart << " | " << std::setw(4) << linenumber << " | " << std::setw(12) << subsystem << " | ";
 }
 
 void
