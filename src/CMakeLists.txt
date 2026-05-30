@@ -360,13 +360,21 @@ endif()
 target_compile_definitions(rtphone PUBLIC ${DEFINES} )
 
 if (TARGET_LINUX)
-    target_link_options(rtphone PUBLIC -Wl,-Bstatic)
+    # PRIVATE, not PUBLIC: rtphone is a STATIC library, so these link options are
+    # never used to build rtphone itself and must not propagate to consumers.
+    # As PUBLIC they leaked into every consumer's LINK_FLAGS as an adjacent
+    # "-Wl,-Bstatic -Wl,-Bdynamic" pair (the wrapped libraries land in a separate
+    # LINK_LIBRARIES section, so nothing is actually wrapped). The trailing
+    # -Bdynamic forced the linker back into dynamic-search mode, which broke
+    # fully-static consumers (e.g. vq-core built with SERVER_STATIC_LINKING=ON:
+    # "attempted static link of dynamic object libz.so").
+    target_link_options(rtphone PRIVATE -Wl,-Bstatic)
     target_compile_options(rtphone PUBLIC -Wno-deprecated -Wno-deprecated-declarations)
 endif()
 target_link_libraries(rtphone PUBLIC ${LIBS_STATIC})
 
 if (TARGET_LINUX)
-    target_link_options(rtphone PUBLIC -Wl,-Bdynamic)
+    target_link_options(rtphone PRIVATE -Wl,-Bdynamic)
 endif()
 
 target_include_directories(rtphone
