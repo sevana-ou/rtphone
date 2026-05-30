@@ -137,7 +137,6 @@ std::string CodecList::Settings::toString() const
         oss << "OPUS ptype: " << spec.mPayloadType << ", rate: " << spec.mRate << ", channels: " << spec.mChannels << std::endl;
     }
 
-
     return oss.str();
 }
 

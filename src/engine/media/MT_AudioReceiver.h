@@ -122,6 +122,7 @@ protected:
     std::optional<uint32_t> mLastSeqno;
     std::optional<jrtplib::RTPTime> mLastReceiveTime;
 
+
     // To calculate average interval between packet add. It is close to jitter but more useful in debugging.
     float mLastAddTime = 0.0f;
 };
@@ -169,10 +170,22 @@ public:
 
     struct DecodeOptions
     {
+        bool mRealtimeProcessing = false;               // Target PCAP parsing by default
         bool mResampleToMainRate = true;                // Resample all decoded audio to AUDIO_SAMPLERATE
         bool mFillGapByCNG = false;                     // Use CNG information if available
         bool mSkipDecode = false;                       // Don't do decode, just dry run - fetch packets, remove them from the jitter buffer
         std::chrono::milliseconds mElapsed = 0ms;       // How much milliseconds should be decoded; zero value means "decode just next packet from the buffer"
+        DecodeOptions decreaseElapsedBy(std::chrono::milliseconds delta)
+        {
+            return
+            {
+                .mRealtimeProcessing = mRealtimeProcessing,
+                .mResampleToMainRate = mResampleToMainRate,
+                .mFillGapByCNG = mFillGapByCNG,
+                .mSkipDecode = mSkipDecode,
+                .mElapsed = std::max(mElapsed - delta, 0ms)
+            };
+        }
     };
 
     struct DecodeResult
@@ -192,8 +205,8 @@ public:
     DecodeResult getAudioTo(Audio::DataWindow& output, DecodeOptions options);
 
     // Looks for codec by payload type
-    Codec* findCodec(int payloadType);
-    RtpBuffer&  getRtpBuffer() { return mBuffer; }
+    Codec*      findCodec(int payloadType);
+    RtpBuffer&  getRtpBuffer() { return mRtpBuffer; }
 
     // Returns size of AudioReceiver's instance in bytes (including size of all data + codecs + etc.)
     int getSize() const;
@@ -205,14 +218,12 @@ public:
     };
     MediaInfo infoFor(jrtplib::RTPPacket& p);
 
-    // // Returns timelength for given packet
-    // int timelengthFor(jrtplib::RTPPacket& p);
+    void processDtmf();
 
-    // // Return samplerate for given packet
-    // int samplerateFor(jrtplib::RTPPacket& p);
+    void updateDecodingTimeStatistics();
 
 protected:
-    RtpBuffer                           mBuffer;                // Jitter buffer itself
+    RtpBuffer                           mRtpBuffer;             // RTP jitter buffer itself; here are audio packets
     RtpBuffer                           mDtmfBuffer;            // These two (mDtmfBuffer / mDtmfReceiver) are for our analyzer stack only; in normal softphone logic DTMF packets goes via SingleAudioStream::mDtmfReceiver
     DtmfReceiver                        mDtmfReceiver;
 
@@ -258,6 +269,9 @@ protected:
     float mIntervalSum = 0.0f;
     int mIntervalCount = 0;
 
+    std::chrono::milliseconds mRequestedAudio = 0ms;
+    std::chrono::milliseconds mProducedAudio = 0ms;
+
     // Zero rate will make audio mono but resampling will be skipped
     void makeMonoAndResample(int rate, int channels);
 
@@ -272,6 +286,12 @@ protected:
     DecodeResult decodeGapTo(Audio::DataWindow& output, DecodeOptions options);
     DecodeResult decodePacketTo(Audio::DataWindow& output, DecodeOptions options, const std::shared_ptr<RtpBuffer::Packet>& p);
     DecodeResult decodeEmptyTo(Audio::DataWindow& output, DecodeOptions options);
+
+    std::optional<std::chrono::steady_clock::time_point> mLastDecodeTimestamp;
+    std::chrono::microseconds mIntervalBetweenDecode = 0us;
+    size_t mDecodeCount = 0;
+    void updateDecodeIntervalStatistics();
+
 };
 
 }
