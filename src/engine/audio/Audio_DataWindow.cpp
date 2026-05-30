@@ -9,11 +9,7 @@
 using namespace Audio;
 
 DataWindow::DataWindow()
-{
-    mFilled = 0;
-    mData = nullptr;
-    mCapacity = 0;
-}
+{}
 
 DataWindow::~DataWindow()
 {
@@ -24,24 +20,30 @@ DataWindow::~DataWindow()
     }
 }
 
-void DataWindow::setCapacity(int capacity)
+void DataWindow::setCapacity(size_t capacity)
 {
     Lock l(mMutex);
-    int tail  = capacity - mCapacity;
-    char* buffer = mData;
-    mData = (char*)realloc(mData, capacity);
-    if (!mData)
+
+    if (capacity >= mCapacity)
     {
-        // Realloc failed
-        mData = buffer;
-        throw std::bad_alloc();
+        size_t tail  = capacity - mCapacity;
+        char* buffer = mData;
+        mData = (char*)realloc(mData, capacity);
+        if (!mData)
+        {
+            // Realloc failed
+            mData = buffer;
+            throw std::bad_alloc();
+        }
+        if (tail > 0)
+            memset(mData + mCapacity, 0, tail);
+        mCapacity = capacity;
     }
-    if (tail > 0)
-        memset(mData + mCapacity, 0, tail);
-    mCapacity = capacity;
+    else
+        throw std::bad_alloc();
 }
 
-void DataWindow::addZero(int length)
+void DataWindow::addZero(size_t length)
 {
     Lock l(mMutex);
 
@@ -60,7 +62,7 @@ void DataWindow::addZero(int length)
 }
 
 
-void DataWindow::add(const void* data, int length)
+void DataWindow::add(const void* data, size_t length)
 {
     Lock l(mMutex);
 
@@ -94,7 +96,7 @@ void DataWindow::add(short sample)
     add(&sample, sizeof sample);
 }
 
-void DataWindow::erase(int length)
+void DataWindow::erase(size_t length)
 {
     Lock l(mMutex);
     if (length > mFilled)
@@ -120,21 +122,21 @@ void DataWindow::clear()
     mFilled = 0;
 }
 
-short DataWindow::shortAt(int index) const
+short DataWindow::shortAt(size_t index) const
 {
     Lock l(mMutex);
     assert(index < mFilled / 2);
     return ((short*)mData)[index];
 }
 
-void DataWindow::setShortAt(short value, int index)
+void DataWindow::setShortAt(short value, size_t index)
 {
     Lock l(mMutex);
     assert(index < mFilled / 2);
     ((short*)mData)[index] = value;
 }
 
-int DataWindow::read(void* buffer, int length)
+size_t DataWindow::read(void* buffer, size_t length)
 {
     Lock l(mMutex);
     if (length > mFilled)
@@ -150,25 +152,27 @@ int DataWindow::read(void* buffer, int length)
     return length;
 }
 
-int DataWindow::filled() const
+size_t DataWindow::filled() const
 {
     Lock l(mMutex);
     return mFilled;
 }
 
-void DataWindow::setFilled(int filled)
+void DataWindow::setFilled(size_t filled)
 {
     Lock l(mMutex);
+    if (filled > mCapacity)
+        throw std::bad_alloc();
     mFilled = filled;
 }
 
-int DataWindow::capacity() const
+size_t DataWindow::capacity() const
 {
     Lock l(mMutex);
     return mCapacity;
 }
 
-void DataWindow::zero(int length)
+void DataWindow::zero(size_t length)
 {
     Lock l(mMutex);
     assert(length <= mCapacity);
@@ -189,10 +193,10 @@ size_t DataWindow::moveTo(DataWindow& dst, size_t size)
     return avail;
 }
 
-std::chrono::milliseconds DataWindow::getTimeLength(int samplerate, int channels) const
+std::chrono::milliseconds DataWindow::getTimeLength(const Audio::Format& fmt) const
 {
     Lock l(mMutex);
-    return std::chrono::milliseconds(mFilled / sizeof(short) / channels / (samplerate / 1000));
+    return std::chrono::milliseconds(mFilled / sizeof(short) / fmt.channels() / (fmt.rate()/ 1000));
 }
 
 void DataWindow::makeStereoFromMono(DataWindow& dst, DataWindow& src)

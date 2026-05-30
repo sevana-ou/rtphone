@@ -8,6 +8,7 @@
 
 #include "../helper/HL_ByteBuffer.h"
 #include "../helper/HL_Sync.h"
+#include "Audio_Interface.h"
 
 namespace Audio
 {
@@ -17,34 +18,34 @@ public:
     DataWindow();
     ~DataWindow();
 
-    void        setCapacity(int capacity);
-    int         capacity() const;
+    void        setCapacity(size_t capacity);
+    size_t      capacity() const;
 
-    void        addZero(int length);
-    void        add(const void* data, int length);
+    void        addZero(size_t length);
+    void        add(const void* data, size_t length);
     void        add(short sample);
-    int         read(void* buffer, int length);
-    void        erase(int length = -1);
+    size_t      read(void* buffer, size_t length);
+    void        erase(size_t length);
     const char* data() const;
     char*       mutableData();
-    int         filled() const;
-    void        setFilled(int filled);
+    size_t      filled() const;
+    void        setFilled(size_t filled);
     void        clear();
 
-    short       shortAt(int index) const;
-    void        setShortAt(short value, int index);
-    void        zero(int length);
-    size_t      moveTo(DataWindow& dst, size_t size);
+    short       shortAt(size_t index) const;
+    void        setShortAt(short value, size_t index);
+    void        zero(size_t length);
+    size_t      moveTo(DataWindow& dst, size_t size /* in bytes*/ );
 
-    std::chrono::milliseconds getTimeLength(int samplerate, int channels) const;
+    std::chrono::milliseconds getTimeLength(const Format& fmt) const;
 
     static void makeStereoFromMono(DataWindow& dst, DataWindow& src);
 
 protected:
     mutable Mutex mMutex;
-    char* mData;
-    int mFilled;
-    int mCapacity;
+    char*   mData = nullptr;
+    size_t  mFilled = 0;
+    size_t  mCapacity = 0;
 };
 }
 #endif
