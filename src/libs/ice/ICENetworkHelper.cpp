@@ -163,7 +163,7 @@ void NetworkHelper::reload(int networkType)
   fillUwpInterfaceList(AF_INET6, networkType, mIPList);
 #else
   // https://github.com/golang/go/issues/40569
-  struct ifaddrs* il = NULL;
+  struct ifaddrs* il = nullptr;
   if (getifaddrs(&il))
     throw Exception(GETIFADDRS_FAILED, errno);
   if (il)
@@ -171,6 +171,15 @@ void NetworkHelper::reload(int networkType)
     struct ifaddrs* current = il;
     while (current)
     {
+      // getifaddrs() may return entries with a null ifa_addr (interfaces with
+      // no assigned address, point-to-point/tunnel interfaces, link-layer
+      // entries, ...). Dereferencing it would crash, so skip such entries.
+      if (current->ifa_addr == nullptr)
+      {
+        current = current->ifa_next;
+        continue;
+      }
+
       //char ipbuffer[64];
       NetworkAddress addr;
       addr.setPort(1000); // Set fake address to keep NetworkAddress initialized

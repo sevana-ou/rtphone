@@ -34,7 +34,21 @@ void SingleAudioStream::copyPcmTo(Audio::DataWindow& output, int needed)
     // Packet by packet
     while (output.filled() < needed)
     {
-        if (mReceiver.getAudioTo(output, {}).mStatus != AudioReceiver::DecodeResult::Status::Ok)
+        // Number of bytes to fill on this step
+        auto requested = needed - output.filled();
+
+        auto options = AudioReceiver::DecodeOptions{
+            .mRealtimeProcessing = true,
+            .mResampleToMainRate = true,
+            .mSkipDecode = false,
+            .mElapsed  = std::chrono::milliseconds(requested / (AUDIO_SAMPLERATE / 1000))
+        };
+
+        // Try to get the data from receiver / decoder
+        if (options.mElapsed != 0ms) {
+            if (mReceiver.getAudioTo(output, options).mStatus != AudioReceiver::DecodeResult::Status::Ok)
+                break;
+        } else
             break;
     }
 
