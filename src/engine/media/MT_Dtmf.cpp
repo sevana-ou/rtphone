@@ -37,12 +37,11 @@ void DtmfBuilder::buildRfc2833(const Rfc2833Event& ev, void* output)
 
     char* packet = (char*)output;
 
+    // RFC 4733: byte 1 is E(1) R(1) volume(6)
     packet[0] = toneValue;
-    packet[1] = 1 | (ev.mVolume << 2);
+    packet[1] = ev.mVolume & 0x3F;
     if (ev.mEnd)
-        packet[1] |= 128;
-    else
-        packet[1] &= 127;
+        packet[1] |= 0x80;
 
     unsigned short durationValue = htons(ev.mDuration);
     memcpy(packet + 2, &durationValue, 2);
@@ -58,11 +57,11 @@ DtmfBuilder::Rfc2833Event DtmfBuilder::parseRfc2833(std::span<uint8_t> payload)
     uint8_t b0 = payload[0];
     uint8_t b1 = payload[1];
 
-    if (b0 >=0 && b0 <= 9)
+    if (b0 <= 9)
         r.mTone = '0' + b0;
     else
-    if (b0 >= 12 && b0 <= 17)
-        r.mTone = 'A' + b0;
+    if (b0 >= 12 && b0 <= 15)
+        r.mTone = 'A' + b0 - 12;
     else
     if (b0 == 10)
         r.mTone = '*';
@@ -70,9 +69,10 @@ DtmfBuilder::Rfc2833Event DtmfBuilder::parseRfc2833(std::span<uint8_t> payload)
     if (b0 == 11)
         r.mTone = '#';
 
-    r.mEnd = (b1 & 128);
-    r.mVolume = (b1 & 127) >> 2;
-    r.mDuration = ntohs(*(uint16_t*)payload.data()+2);
+    // RFC 4733: byte 1 is E(1) R(1) volume(6); duration is bytes 2-3, network order
+    r.mEnd = (b1 & 0x80) != 0;
+    r.mVolume = b1 & 0x3F;
+    r.mDuration = (uint16_t(payload[2]) << 8) | payload[3];
 
     return r;
 }
@@ -202,7 +202,7 @@ void PDTMFEncoder_AddTone(double f1, double f2, unsigned ms1, unsigned ms2, unsi
         int ival = ifix(val);
         if (ival < -32768)
             ival = -32768;
-        else if (val > 32767)
+        else if (ival > 32767)
             ival = 32767;
 
         result[dataPtr++] = ival / 2;
@@ -280,8 +280,9 @@ void DtmfContext::stopTone()
         switch (mType)
         {
         case Dtmf_Rfc2833:
+            // Mark stopped but keep the entry: getRfc2833() emits the end
+            // packet(s) for a stopped tone and erases it afterwards.
             mQueue.front().mStopped = true;
-            mQueue.erase(mQueue.begin());
             break;
 
         case Dtmf_Inband:
@@ -769,7 +770,7 @@ int zap_dtmf_detect (dtmf_detect_state_t *s,
             s->fax_tone.v2 = s->fax_tone.v3;
             s->fax_tone.v3 = s->fax_tone.fac*s->fax_tone.v2 - v1 + famp;
 
-            v1 = s->fax_tone.v2;
+            v1 = s->fax_tone2nd.v2;
             s->fax_tone2nd.v2 = s->fax_tone2nd.v3;
             s->fax_tone2nd.v3 = s->fax_tone2nd.fac*s->fax_tone2nd.v2 - v1 + famp;
         }
@@ -865,7 +866,7 @@ printf("Fax energy/Second Harmonic: %f/%f\n", fax_energy, fax_energy_2nd);
                 s->detected_digits++;
                 if (s->current_digits < MAX_DTMF_DIGITS)
                 {
-                    s->digits[s->current_digits++] = hit;
+                    s->digits[s->current_digits++] = 'f';
                     s->digits[s->current_digits] = '\0';
                 }
                 else

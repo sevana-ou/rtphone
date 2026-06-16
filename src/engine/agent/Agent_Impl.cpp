@@ -181,9 +181,6 @@ void AgentImpl::processConfig(JsonCpp::Value &d, JsonCpp::Value &answer)
     config()[CONFIG_IPV4] = d["ipv4"].asBool();
     config()[CONFIG_IPV6] = d["ipv6"].asBool();
 
-    if (transport == "tls")
-        config()[CONFIG_SIPS] = true;
-
     // Log file
     std::string logfile = d["logfile"].asString();
     ice::Logger& logger = ice::GLogger;
@@ -195,7 +192,7 @@ void AgentImpl::processConfig(JsonCpp::Value &d, JsonCpp::Value &answer)
 
     mUseNativeAudio = d["nativeaudio"].asBool();
     config()[CONFIG_OWN_DNS] = d["dns_servers"].asString();
-    config()[CONFIG_SIPS] = d["secure"].asBool();
+    config()[CONFIG_SIPS] = d["secure"].asBool() || transport == "tls";
     config()[CONFIG_STUNSERVER_IP] = d["stun_server"].asString();
 
     answer["status"] = Status_Ok;
@@ -483,18 +480,18 @@ void AgentImpl::processDestroySession(JsonCpp::Value& request, JsonCpp::Value& a
 
 void AgentImpl::processWaitForEvent(JsonCpp::Value &request, JsonCpp::Value &answer)
 {
-    std::unique_lock<std::recursive_mutex> l(mAgentMutex);
-
-    //int x = 0;
-    //int y = 1/x;
+    // Deliberately does NOT take mAgentMutex: events are produced by the worker
+    // thread inside process(), which needs mAgentMutex. Holding it here would
+    // stall all SIP/media processing for the whole timeout and guarantee that
+    // the awaited event can never arrive during the wait.
 
     int timeout = 0;
     if (request.isMember("timeout"))
         timeout = request["timeout"].asInt();
 
     std::unique_lock<std::mutex> eventLock(mEventListMutex);
-    if (mEventList.empty())
-        mEventListChangeCondVar.wait_for(eventLock, chrono::milliseconds(timeout));
+    mEventListChangeCondVar.wait_for(eventLock, chrono::milliseconds(timeout),
+                                     [this]() { return !mEventList.empty(); });
 
     if (!mEventList.empty())
     {
@@ -521,7 +518,7 @@ void AgentImpl::processGetMediaStats(JsonCpp::Value& request, JsonCpp::Value& an
             answer["codec"] = result[SessionInfo_AudioCodec].asStdString();
         if (result.exists(SessionInfo_NetworkMos))
             answer["network_mos"] = result[SessionInfo_NetworkMos].asFloat();
-        if (result.exists(SessionInfo_PacketLoss))
+        if (result.exists(SessionInfo_LostRtp))
             answer["rtp_lost"] = result[SessionInfo_LostRtp].asInt();
         if (result.exists(SessionInfo_DroppedRtp))
             answer["rtp_dropped"] = result[SessionInfo_DroppedRtp].asInt();
@@ -749,7 +746,8 @@ void AgentImpl::onSessionTerminated(PSession s, int responsecode, int reason)
   if (mOutgoingAudioDump)
     mOutgoingAudioDump->close();
   */
-    mAudioManager->stop(mUseNativeAudio ? AudioManager::atReceiver : AudioManager::atNull);
+    if (mAudioManager)
+        mAudioManager->stop(mUseNativeAudio ? AudioManager::atReceiver : AudioManager::atNull);
     // Gather statistics before
     EVENT_WITH_NAME("session_terminated");
     v["session_id"] = s->id();

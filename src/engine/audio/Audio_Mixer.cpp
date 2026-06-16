@@ -94,6 +94,7 @@ Mixer::~Mixer()
 
 void Mixer::unregisterChannel(void* channel)
 {
+  Lock l(mMutex);
   for (int i=0; i<AUDIO_MIX_CHANNEL_COUNT; i++)
   {
     Stream& c = mChannelList[i];
@@ -108,6 +109,7 @@ void Mixer::unregisterChannel(void* channel)
 
 void Mixer::clear(void* context, unsigned ssrc)
 {
+  Lock l(mMutex);
   for (int i=0; i<AUDIO_MIX_CHANNEL_COUNT; i++)
   {
     Stream& c = mChannelList[i];
@@ -141,12 +143,13 @@ Mixer::Stream* Mixer::allocateChannel(void* context, unsigned ssrc)
   return NULL;
 }
 
-void Mixer::addPcm(void* context, unsigned ssrc, 
-                         const void* inputData, int inputLength, 
+void Mixer::addPcm(void* context, unsigned ssrc,
+                         const void* inputData, int inputLength,
                          int inputRate, bool fadeOut)
 {
   assert(inputRate == 8000 || inputRate == 16000 || inputRate == 32000);
 
+  Lock l(mMutex);
   int i;
 
   // Locate a channel
@@ -172,6 +175,7 @@ void Mixer::addPcm(void* context, unsigned ssrc, Audio::DataWindow& w, int rate,
 {
   assert(rate == 8000 || rate == 16000 || rate == 32000 || rate == 48000);
 
+  Lock l(mMutex);
   int i;
 
   // Locate a channel
@@ -196,6 +200,8 @@ void Mixer::addPcm(void* context, unsigned ssrc, Audio::DataWindow& w, int rate,
 
 void Mixer::mix()
 {
+  Lock l(mMutex);
+
   // Current sample
   int sample = 0;
 
@@ -310,9 +316,11 @@ void Mixer::mix()
 
 int Mixer::getPcm(void* outputData, int outputLength)
 {
+  Lock l(mMutex);
+
   if (mOutput.filled() < outputLength)
     mix();
-      
+
     //ICELogSpecial(<<"Mixer has " << mOutput.filled() << " available bytes");
   memset(outputData, 0, outputLength);
   return mOutput.read(outputData, outputLength);
@@ -320,14 +328,26 @@ int Mixer::getPcm(void* outputData, int outputLength)
 
 int Mixer::mixAndGetPcm(Audio::DataWindow& output)
 {
+  Lock l(mMutex);
+
   // Mix
   mix();
 
-  // Set output space
-  output.setCapacity(mOutput.filled());
+  size_t avail = mOutput.filled();
+  if (!avail)
+  {
+    output.setFilled(0);
+    return 0;
+  }
 
-  // Read mixed data to output
-  return mOutput.read(output.mutableData(), output.capacity());
+  // Make sure output has enough space (setCapacity only ever grows the window)
+  if (output.capacity() < avail)
+    output.setCapacity(avail);
+
+  // Read mixed data to output and publish the real byte count
+  size_t got = mOutput.read(output.mutableData(), avail);
+  output.setFilled(got);
+  return static_cast<int>(got);
 }
 
 int Mixer::available()

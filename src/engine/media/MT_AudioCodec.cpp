@@ -24,6 +24,7 @@
 #include <memory.h>
 #include <string.h>
 #include <algorithm>
+#include <vector>
 
 #define LOG_SUBSYSTEM "media"
 
@@ -434,9 +435,10 @@ Codec::Info OpusCodec::info() {
 
 Codec::EncodeResult OpusCodec::encode(std::span<const uint8_t> input, std::span<uint8_t> output)
 {
-    // Send number of samples for input and number of bytes for output
+    // opus_encode() takes the frame size in samples per channel and the output
+    // capacity in bytes.
     int written = opus_encode(mEncoderCtx, (const opus_int16*)input.data(), input.size_bytes() / (sizeof(short) * channels()),
-                              output.data(), output.size_bytes() / (sizeof(short) * channels()));
+                              output.data(), output.size_bytes());
     if (written < 0)
         return {.mEncoded = 0};
     else
@@ -445,10 +447,13 @@ Codec::EncodeResult OpusCodec::encode(std::span<const uint8_t> input, std::span<
 
 Codec::DecodeResult OpusCodec::decode(std::span<const uint8_t> input, std::span<uint8_t> output)
 {
-    int result = 0;
+    if (input.empty())
+        return {0};
 
     // Examine the number of channels available in incoming packet
     int nr_of_channels = opus_packet_get_nb_channels(input.data());
+    if (nr_of_channels != 1 && nr_of_channels != 2)
+        return {0};
 
     // Recreate decoder if needed
     if (mDecoderChannels != nr_of_channels)
@@ -473,80 +478,97 @@ Codec::DecodeResult OpusCodec::decode(std::span<const uint8_t> input, std::span<
     if (nr_of_frames <= 0)
         return {0};
 
-    // We support stereo and mono here.
-    int buffer_capacity = nr_of_frames * sizeof(opus_int16) * nr_of_channels;
-    opus_int16 *buffer_decode = (opus_int16 *)alloca(buffer_capacity);
+    // Output must match channels() - that is what info() promises downstream.
+    size_t needed = (size_t)nr_of_frames * sizeof(opus_int16) * channels();
+    if (needed > output.size_bytes())
+        return {0};
+
+    if (nr_of_channels == channels())
+    {
+        int decoded = opus_decode(mDecoderCtx, input.data(), input.size_bytes(),
+                                  (opus_int16*)output.data(), nr_of_frames, 0);
+        if (decoded < 0)
+        {
+            ICELogCritical(<< "opus_decode() returned " << decoded);
+            return {0};
+        }
+        return {.mDecoded = (size_t)decoded * sizeof(opus_int16) * nr_of_channels};
+    }
+
+    // Channel count differs from the negotiated one - decode to a temporary
+    // buffer and convert.
+    std::vector<opus_int16> temp((size_t)nr_of_frames * nr_of_channels);
     int decoded = opus_decode(mDecoderCtx, input.data(), input.size_bytes(),
-                              buffer_decode, nr_of_frames, 0);
+                              temp.data(), nr_of_frames, 0);
     if (decoded < 0)
     {
         ICELogCritical(<< "opus_decode() returned " << decoded);
         return {0};
     }
 
-    opus_int16 *buffer_stereo = nullptr;
-    int buffer_stereo_capacity = buffer_capacity * 2;
-
-    switch (nr_of_channels) {
-        case 1:
-            // Convert to stereo before
-            buffer_stereo = (opus_int16 *) alloca(buffer_stereo_capacity);
-            for (int i = 0; i < nr_of_frames; i++) {
-                buffer_stereo[i * 2 + 1] = buffer_decode[i];
-                buffer_stereo[i * 2] = buffer_decode[i];
-            }
-            assert(buffer_stereo_capacity <= output.size_bytes());
-            memcpy(output.data(), buffer_stereo, buffer_stereo_capacity);
-            result = buffer_stereo_capacity;
-            break;
-
-        case 2:
-            assert(buffer_capacity <= output.size_bytes());
-            memcpy(output.data(), buffer_decode, buffer_capacity);
-            result = buffer_capacity;
-            break;
-
-        default:
-            assert(0);
+    opus_int16* out = (opus_int16*)output.data();
+    if (channels() == 2 && nr_of_channels == 1)
+    {
+        for (int i = 0; i < decoded; i++)
+            out[i * 2] = out[i * 2 + 1] = temp[i];
+        return {.mDecoded = (size_t)decoded * sizeof(opus_int16) * 2};
     }
-
-    return {.mDecoded = (size_t)result};
+    else // mono negotiated, stereo packet
+    {
+        for (int i = 0; i < decoded; i++)
+            out[i] = (opus_int16)((int(temp[i * 2]) + temp[i * 2 + 1]) / 2);
+        return {.mDecoded = (size_t)decoded * sizeof(opus_int16)};
+    }
 }
 
 size_t OpusCodec::plc(int lostPackets, std::span<uint8_t> output)
 {
-    // Find how much frames do we need to produce and prefill it with silence
-    int frames_per_packet = (int)pcmLength() / (sizeof(opus_int16) * channels());
-    memset(output.data(), 0, output.size_bytes());
+    if (lostPackets <= 0 || output.empty())
+        return 0;
 
-    // Use this pointer as output
-    opus_int16* data_output = reinterpret_cast<opus_int16*>(output.data());
+    // Total bytes we are asked to conceal, clamped to the output capacity.
+    size_t packet_bytes = (size_t)pcmLength();
+    size_t total = std::min(output.size_bytes(), packet_bytes * (size_t)lostPackets);
+    memset(output.data(), 0, total);
 
-    int nr_of_decoded_frames = 0;
+    // No decoder yet (PLC before the first decoded packet) - leave silence.
+    if (!mDecoderCtx || (mDecoderChannels != 1 && mDecoderChannels != 2))
+        return total;
 
-    // Buffer for single lost frame
-    opus_int16* buffer_plc = (opus_int16*)alloca(frames_per_packet * mDecoderChannels * sizeof(opus_int16));
-    for (int i=0; i<lostPackets; i++)
+    int samples_per_packet = (int)(packet_bytes / (sizeof(opus_int16) * channels()));
+    if (samples_per_packet <= 0)
+        return total;
+
+    opus_int16* out = reinterpret_cast<opus_int16*>(output.data());
+    std::vector<opus_int16> temp((size_t)samples_per_packet * mDecoderChannels);
+
+    for (int packet = 0; packet < lostPackets; packet++)
     {
-        nr_of_decoded_frames = opus_decode(mDecoderCtx, nullptr, 0, buffer_plc, frames_per_packet, 0);
-        assert(nr_of_decoded_frames == frames_per_packet);
-        switch (mDecoderChannels)
-        {
-            case 1:
-                // Convert mono to stereo
-                for (int i=0; i < nr_of_decoded_frames; i++)
-                    data_output[i * 2] = data_output[i * 2 + 1] = buffer_plc[i];
-                data_output += frames_per_packet * mChannels;
-                break;
+        size_t offset_bytes = (size_t)packet * packet_bytes;
+        if (offset_bytes + packet_bytes > total)
+            break;
 
-            case 2:
-                // Just copy data
-                memcpy(data_output, buffer_plc, frames_per_packet * sizeof(opus_int16) * mDecoderChannels);
-                data_output += frames_per_packet * mChannels;
-                break;
+        int decoded = opus_decode(mDecoderCtx, nullptr, 0, temp.data(), samples_per_packet, 0);
+        if (decoded <= 0)
+            break; // keep the pre-filled silence
+
+        opus_int16* dst = out + offset_bytes / sizeof(opus_int16);
+        if (mDecoderChannels == channels())
+        {
+            memcpy(dst, temp.data(), (size_t)decoded * sizeof(opus_int16) * mDecoderChannels);
+        }
+        else if (channels() == 2 && mDecoderChannels == 1)
+        {
+            for (int i = 0; i < decoded; i++)
+                dst[i * 2] = dst[i * 2 + 1] = temp[i];
+        }
+        else // mono negotiated, stereo decoder
+        {
+            for (int i = 0; i < decoded; i++)
+                dst[i] = (opus_int16)((int(temp[i * 2]) + temp[i * 2 + 1]) / 2);
         }
     }
-    return ((uint8_t*)data_output - output.data());
+    return total;
 }
 
 size_t OpusCodec::getNumberOfSamples(std::span<const uint8_t> payload)
@@ -1021,14 +1043,29 @@ Codec::EncodeResult GsmCodec::encode(std::span<const uint8_t> input, std::span<u
 
 Codec::DecodeResult GsmCodec::decode(std::span<const uint8_t> input, std::span<uint8_t> output)
 {
-    if (input.size_bytes() % rtpLength() != 0)
+    const size_t frameSize = (size_t)rtpLength();
+    if (!frameSize || input.size_bytes() % frameSize != 0)
         return {.mDecoded = 0};
 
-    int i=0;
-    for (i = 0; i < input.size_bytes() / rtpLength(); i++)
-        gsm_decode(mGSM, (gsm_byte *)input.data() + 33 * i, (gsm_signal *)output.data() + 160 * i);
+    // Bytes_65 carries a WAV49 frame pair (33 + 32 bytes) and produces 320 samples
+    const size_t pcmPerFrame = (mCodecType == Type::Bytes_65) ? 640 : 320;
+    size_t frames = input.size_bytes() / frameSize;
 
-    return {.mDecoded = (size_t)i * 320};
+    size_t i;
+    for (i = 0; i < frames; i++)
+    {
+        if ((i + 1) * pcmPerFrame > output.size_bytes())
+            break;
+
+        const gsm_byte* in = (const gsm_byte*)input.data() + frameSize * i;
+        gsm_signal* out = (gsm_signal*)output.data() + (pcmPerFrame / 2) * i;
+
+        gsm_decode(mGSM, (gsm_byte*)in, out);
+        if (mCodecType == Type::Bytes_65)
+            gsm_decode(mGSM, (gsm_byte*)(in + 33), out + 160);
+    }
+
+    return {.mDecoded = i * pcmPerFrame};
 }
 
 size_t GsmCodec::plc(int lostFrames, std::span<uint8_t> output)
@@ -1327,8 +1364,11 @@ hr_ref_from_canon(uint16_t *hr_ref, const uint8_t *canon)
 */
 Codec::DecodeResult GsmHrCodec::decode(std::span<const uint8_t> input, std::span<uint8_t> output)
 {
-    ByteBuffer bb(input, ByteBuffer::CopyBehavior::UseExternal);
-    BitReader br(bb);
+    // hr_ref_from_canon() reads 112 bits (14 bytes) starting at offset 1,
+    // and the decoder produces 160 samples (320 bytes).
+    if (input.size_bytes() < 15 || output.size_bytes() < 320)
+        return {.mDecoded = 0};
+
     uint16_t hr_ref[22];
 
     hr_ref_from_canon(hr_ref, input.data() + 1);

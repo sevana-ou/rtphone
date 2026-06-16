@@ -135,7 +135,7 @@ namespace MT
 
     // Get noise level
     unsigned char noiseLevel = *dataIn;
-    float linear = float(1.0 / noiseLevel ? noiseLevel : 1);
+    float linear = 1.0f / float(noiseLevel ? noiseLevel : 1);
 
     // Generate white noise for 16KHz sample rate
     LPFilter lpf; HPFilter hpf;

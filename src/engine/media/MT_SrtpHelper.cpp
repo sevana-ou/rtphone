@@ -48,6 +48,24 @@ extern std::string_view toString(SrtpSuite suite)
     return {};
 }
 
+extern int srtpSuiteStrength(SrtpSuite suite)
+{
+    switch (suite)
+    {
+    case SRTP_NONE:                 return 0;
+    case SRTP_AES_128_AUTH_NULL:    return 1; // no authentication - weakest
+    case SRTP_AES_128_AUTH_32:      return 2;
+    case SRTP_AES_192_AUTH_32:      return 3;
+    case SRTP_AES_256_AUTH_32:      return 4;
+    case SRTP_AES_128_AUTH_80:      return 5;
+    case SRTP_AES_192_AUTH_80:      return 6;
+    case SRTP_AES_256_AUTH_80:      return 7;
+    case SRTP_AED_AES_128_GCM:      return 8;
+    case SRTP_AED_AES_256_GCM:      return 9;
+    }
+    return 0;
+}
+
 typedef void (*set_srtp_policy_function) (srtp_crypto_policy_t*);
 
 set_srtp_policy_function findPolicyFunction(SrtpSuite suite)
@@ -95,6 +113,7 @@ SrtpSession::SrtpSession()
 
     // Generate outgoing keys for all ciphers
     auto putKey = [this](SrtpSuite suite, size_t length){
+        assert(suite > SRTP_NONE && suite <= SRTP_LAST);
         auto key = std::make_shared<ByteBuffer>();
         key->resize(length);
         RAND_bytes(key->mutableData(), key->size());
@@ -103,9 +122,9 @@ SrtpSession::SrtpSession()
     putKey(SRTP_AES_128_AUTH_80, 30); putKey(SRTP_AES_128_AUTH_32, 30);
     putKey(SRTP_AES_192_AUTH_80, 38); putKey(SRTP_AES_192_AUTH_32, 38);
     putKey(SRTP_AES_256_AUTH_80, 46); putKey(SRTP_AES_256_AUTH_32, 46);
+    putKey(SRTP_AES_128_AUTH_NULL, 30); // NULL auth still encrypts - it needs a key+salt
     putKey(SRTP_AED_AES_128_GCM, 28);
     putKey(SRTP_AED_AES_256_GCM, 44);
-
 }
 
 SrtpSession::~SrtpSession()
@@ -214,7 +233,9 @@ SrtpKeySalt& SrtpSession::outgoingKey(SrtpSuite suite)
 {
     assert(suite > SRTP_NONE && suite <= SRTP_LAST);
     Lock l(mGuard);
-    return mOutgoingKey[int(suite)-1];  // The automated review sometimes give the hints about the possible underflow array index access
+    // Must use the same indexing as the constructor and open(): the SDP
+    // crypto attribute has to advertise the key the session encrypts with.
+    return mOutgoingKey[int(suite)];
 }
 
 bool SrtpSession::protectRtp(void* buffer, int* length)

@@ -20,7 +20,8 @@
 void SyncHelper::delay(unsigned int microseconds)
 {
 #ifdef TARGET_WIN
-    ::Sleep(microseconds/1000);
+    // Round up so sub-millisecond delays do not become Sleep(0)
+    ::Sleep((microseconds + 999) / 1000);
 #endif
 #if defined(TARGET_OSX) || defined(TARGET_LINUX)
     timespec requested, remaining;
@@ -93,8 +94,9 @@ uint32_t chronox::getDelta(uint32_t later, uint32_t earlier)
     if (later > earlier)
         return later - earlier;
 
+    // Counter wrapped: unsigned subtraction yields the correct modulo-2^32 delta
     if (later < earlier && later < 0x7FFFFFFF && earlier >= 0x7FFFFFFF)
-        return 0xFFFFFFFF - earlier + later;
+        return later - earlier;
 
     return 0;
 }
@@ -115,8 +117,8 @@ uint64_t chronox::toTimestamp(const timeval& ts)
 
 int64_t chronox::getDelta(const timespec& a, const timespec& b)
 {
-    uint64_t ms_a = (uint64_t)a.tv_sec * 1000 + a.tv_nsec / 10000000;
-    uint64_t ms_b = (uint64_t)b.tv_sec * 1000 + b.tv_nsec / 10000000;
+    int64_t ms_a = (int64_t)a.tv_sec * 1000 + a.tv_nsec / 1000000;
+    int64_t ms_b = (int64_t)b.tv_sec * 1000 + b.tv_nsec / 1000000;
     return ms_a - ms_b;
 }
 
@@ -162,13 +164,11 @@ void BufferQueue::push(const void* data, int bytes)
 BufferQueue::PBlock BufferQueue::pull(int milliseconds)
 {
     std::unique_lock<std::mutex> l(mMutex);
-    std::cv_status status = mBlockList.empty() ? std::cv_status::timeout : std::cv_status::no_timeout;
-
-    if (mBlockList.empty())
-        status = mSignal.wait_for(l, std::chrono::milliseconds(milliseconds));
+    mSignal.wait_for(l, std::chrono::milliseconds(milliseconds),
+                     [this]() { return !mBlockList.empty(); });
 
     PBlock r;
-    if (status == std::cv_status::no_timeout && !mBlockList.empty())
+    if (!mBlockList.empty())
     {
         r = mBlockList.front();
         mBlockList.pop_front();

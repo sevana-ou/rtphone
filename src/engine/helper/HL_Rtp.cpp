@@ -93,7 +93,8 @@ bool RtpHelper::isRtp(const void* buffer, size_t length)
 
 bool RtpHelper::isRtpOrRtcp(const void* buffer, size_t length)
 {
-    if (length < 12)
+    // A minimal RTCP packet (e.g. an empty receiver report) is 8 bytes
+    if (length < 8)
         return false;
     const RtcpHeader* h = reinterpret_cast<const RtcpHeader*>(buffer);
     return h->version == 2;
@@ -390,7 +391,8 @@ void RtpDump::add(const void* buffer, size_t len, uint32_t offsetMs)
     if (!buffer || len == 0)
         return;
 
-    if (len > MAX_RTP_PACKET_SIZE)
+    // The record length field is 16-bit and covers payload + 8 byte header
+    if (len > MAX_RTP_PACKET_SIZE - 8)
         throw std::runtime_error("Packet too large: " + std::to_string(len));
 
     RtpData entry;

@@ -60,17 +60,11 @@ std::string WavFileReader::readChunk()
     uint32_t size = 0;
     readBuffer(&size, 4);
 
-    if (result == "fact")
-    {
-        uint32_t dataLength = 0;
-        readBuffer(&dataLength, sizeof dataLength);
-        mDataLength = dataLength;
-    }
-    else
-    if (result != "data")
-        mInput->seekg(size, std::ios_base::beg);
-    else
+    if (result == "data")
         mDataLength = size;
+    else
+        // Skip the chunk body; RIFF chunks are word-aligned, so odd sizes carry a pad byte
+        mInput->seekg(std::streamoff(size + (size & 1)), std::ios_base::cur);
 
     return result;
 }
@@ -151,7 +145,9 @@ bool WavFileReader::open(const std::filesystem::path& p)
         mBits = 0;
         readBuffer(&mBits, sizeof(mBits));
 
-        if (mBits !=8 && mBits != 16)
+        // Only 16-bit PCM is supported: the read path feeds the data
+        // directly into a 16-bit resampler.
+        if (mBits != 16)
             THROW_READERROR;
 
         // Look for the chunk 'data'
@@ -222,7 +218,8 @@ size_t WavFileReader::read(short* buffer, size_t samples)
         auto filePosition = mInput->tellg();
 
         // Check how much data we can read
-        size_t fileAvailable = mDataLength + mDataOffset - filePosition;
+        std::streamoff dataEnd = std::streamoff(mDataLength) + mDataOffset;
+        size_t fileAvailable = filePosition < dataEnd ? size_t(dataEnd - filePosition) : 0;
         requiredBytes = fileAvailable < requiredBytes ? fileAvailable : requiredBytes;
     }
 
@@ -254,8 +251,9 @@ size_t WavFileReader::readRaw(short* buffer, size_t samples)
         auto filePosition = mInput->tellg();
 
         // Check how much data we can read
-        size_t fileAvailable = mDataLength + mDataOffset - filePosition;
-        requiredBytes = (int)fileAvailable < requiredBytes ? (int)fileAvailable : requiredBytes;
+        std::streamoff dataEnd = std::streamoff(mDataLength) + mDataOffset;
+        size_t fileAvailable = filePosition < dataEnd ? size_t(dataEnd - filePosition) : 0;
+        requiredBytes = fileAvailable < requiredBytes ? fileAvailable : requiredBytes;
     }
 
     size_t readBytes = tryReadBuffer(buffer, requiredBytes);
@@ -332,10 +330,11 @@ bool WavFileWriter::open(const std::filesystem::path& p, int samplerate, int cha
     mChannels = channels;
 
     mOutput = std::make_unique<std::ofstream>(p, std::ios::binary | std::ios::trunc);
-    if (!mOutput)
+    if (!mOutput->is_open())
     {
         int errorcode = errno;
         ICELogError(<< "Failed to create .wav file: filename = " << p << " , error = " << errorcode);
+        mOutput.reset();
         return false;
     }
 
@@ -420,7 +419,7 @@ size_t WavFileWriter::write(const void* buffer, size_t bytes)
 bool WavFileWriter::isOpened() const
 {
     LOCK;
-    return mOutput.get();
+    return mOutput && mOutput->is_open();
 }
 
 std::filesystem::path WavFileWriter::path() const

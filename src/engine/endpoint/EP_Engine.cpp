@@ -470,8 +470,10 @@ void UserAgent::process()
                         // Send generated packet via provider's method to allow custom scheme of encryption
                         ICELogDebug(<<"Sending ICE packet to " << buffer->remoteAddress().toStdString() << " with " << buffer->comment());
 
-                        PDatagramSocket s = iceComponentId == ICE_RTP_ID ? stream.socket4().mRtp : stream.socket4().mRtcp;
-                        stream.provider()->sendData(s, buffer->remoteAddress(), buffer->data(), buffer->size());
+                        RtpPair<PDatagramSocket>& pair = buffer->remoteAddress().family() == AF_INET6 ? stream.socket6() : stream.socket4();
+                        PDatagramSocket s = iceComponentId == ICE_RTP_ID ? pair.mRtp : pair.mRtcp;
+                        if (s)
+                            stream.provider()->sendData(s, buffer->remoteAddress(), buffer->data(), buffer->size());
                         break;
                     }
                 } // end of provider iterating
@@ -805,7 +807,10 @@ void UserAgent::onEarlyMedia(resip::ClientInviteSessionHandle h, const resip::Si
 /// called when dialog enters the Early state - typically after getting 18x
 void UserAgent::onProvisional(resip::ClientInviteSessionHandle h, const resip::SipMessage& msg)
 {
-    PSession s = getUserSession(CAST2RESIPSESSION(h)->mSessionId);
+    ResipSession* rs = CAST2RESIPSESSION(h);
+    if (!rs)
+        return;
+    PSession s = getUserSession(rs->mSessionId);
     if (!s)
         return;
 
@@ -821,7 +826,10 @@ void UserAgent::onProvisional(resip::ClientInviteSessionHandle h, const resip::S
 /// called when a dialog initiated as a UAC enters the connected state
 void UserAgent::onConnected(resip::ClientInviteSessionHandle h, const resip::SipMessage& msg)
 {
-    PSession s = getUserSession(CAST2RESIPSESSION(h)->mSessionId);
+    ResipSession* rs = CAST2RESIPSESSION(h);
+    if (!rs)
+        return;
+    PSession s = getUserSession(rs->mSessionId);
     if (!s)
         return;
 
@@ -874,7 +882,10 @@ void UserAgent::onConnected(resip::InviteSessionHandle h, const resip::SipMessag
 
 void UserAgent::onTerminated(resip::InviteSessionHandle h, resip::InviteSessionHandler::TerminatedReason reason, const resip::SipMessage* related)
 {
-    PSession s = getUserSession(CAST2RESIPSESSION(h)->mSessionId);
+    ResipSession* rs = CAST2RESIPSESSION(h);
+    if (!rs)
+        return;
+    PSession s = getUserSession(rs->mSessionId);
     if (!s)
         return;
 
@@ -920,6 +931,8 @@ void UserAgent::onAnswer(resip::InviteSessionHandle h, const resip::SipMessage& 
     if (!resipSession)
         return;
     Session* s = resipSession->session();
+    if (!s)
+        return;
 
     bool iceAvailable = true;
 
@@ -1069,7 +1082,8 @@ void UserAgent::onAnswer(resip::InviteSessionHandle h, const resip::SipMessage& 
 /// Called when an SDP offer is received - must send an answer soon after this
 void UserAgent::onOffer(resip::InviteSessionHandle h, const resip::SipMessage& msg, const resip::SdpContents& sdp)
 {
-    PSession s = getUserSession(CAST2RESIPSESSION(h)->mSessionId);
+    ResipSession* rs = CAST2RESIPSESSION(h);
+    PSession s = rs ? getUserSession(rs->mSessionId) : PSession();
     if (!s)
     {
         h->reject(488);
@@ -1091,7 +1105,8 @@ void UserAgent::onOffer(resip::InviteSessionHandle h, const resip::SipMessage& m
 
     uint64_t version = sdp.session().origin().getVersion();
     std::string remoteIp = sdp.session().connection().getAddress().c_str();
-    int code;
+    // Default to 200: a retransmitted offer (same origin version) keeps the session.
+    int code = 200;
     if ((uint64_t)-1 == s->mRemoteOriginVersion)
     {
         code = s->processSdp(version, iceAvailable, icePwd, iceUfrag, remoteIp, sdp.session().media());
@@ -1299,6 +1314,8 @@ void UserAgent::onPresenceUpdate(PClientObserver observer, const std::string& pe
 void UserAgent::onNewSubscription(resip::ServerSubscriptionHandle h, const resip::SipMessage& sub)
 {
     ResipSession* s = CAST2RESIPSESSION(h);
+    if (!s)
+        return;
 
     // Get the event package name
     const char* event = sub.header(resip::h_Event).value().c_str();

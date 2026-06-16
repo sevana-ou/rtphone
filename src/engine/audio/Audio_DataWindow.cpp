@@ -24,23 +24,22 @@ void DataWindow::setCapacity(size_t capacity)
 {
     Lock l(mMutex);
 
-    if (capacity >= mCapacity)
+    // The window only ever grows; a smaller request keeps the current buffer.
+    if (capacity <= mCapacity)
+        return;
+
+    size_t tail  = capacity - mCapacity;
+    char* buffer = mData;
+    mData = (char*)realloc(mData, capacity);
+    if (!mData)
     {
-        size_t tail  = capacity - mCapacity;
-        char* buffer = mData;
-        mData = (char*)realloc(mData, capacity);
-        if (!mData)
-        {
-            // Realloc failed
-            mData = buffer;
-            throw std::bad_alloc();
-        }
-        if (tail > 0)
-            memset(mData + mCapacity, 0, tail);
-        mCapacity = capacity;
-    }
-    else
+        // Realloc failed
+        mData = buffer;
         throw std::bad_alloc();
+    }
+    if (tail > 0)
+        memset(mData + mCapacity, 0, tail);
+    mCapacity = capacity;
 }
 
 void DataWindow::addZero(size_t length)

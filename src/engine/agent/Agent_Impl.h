@@ -13,6 +13,7 @@
 #include "Agent_AudioManager.h"
 #include <mutex>
 #include <condition_variable>
+#include <atomic>
 
 
 class AgentImpl: public UserAgent, public MT::Stream::MediaObserver
@@ -32,7 +33,7 @@ protected:
 
 
     std::shared_ptr<std::thread> mThread;
-    volatile bool mShutdown;
+    std::atomic<bool> mShutdown;
     std::shared_ptr<MT::Terminal> mTerminal;
     std::shared_ptr<AudioManager> mAudioManager;
     Audio::DataConnection* mAudioMonitoring = nullptr;

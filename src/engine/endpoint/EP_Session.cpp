@@ -346,6 +346,10 @@ void Session::stop()
             // Free socket
             SocketHeap::instance().freeSocketPair( dataStream.socket4() );
             SocketHeap::instance().freeSocketPair( dataStream.socket6() );
+
+            // Drop the references so the destructor's cleanup does not free them again
+            dataStream.setSocket4(RtpPair<PDatagramSocket>());
+            dataStream.setSocket6(RtpPair<PDatagramSocket>());
         }
     }
 
@@ -475,7 +479,7 @@ void Session::getSessionInfo(Session::InfoOptions options, VariantMap& info)
     if (stat.mReceivedRtp)
         info[SessionInfo_PacketLoss] = static_cast<int>((stat.mPacketLoss * 1000) / stat.mReceivedRtp);
 
-    if (media)
+    if (media && mIceStack)
         info[SessionInfo_AudioPeer] = mIceStack->remoteAddress(media->iceInfo().mStreamId, media->iceInfo().mComponentId.mRtp).toStdString();
 
     info[SessionInfo_Jitter] = stat.mJitter;
@@ -485,7 +489,8 @@ void Session::getSessionInfo(Session::InfoOptions options, VariantMap& info)
     info[SessionInfo_BitrateSwitchCounter] = stat.mBitrateSwitchCounter;
     info[SessionInfo_CngCounter] = stat.mCng;
 #endif
-    info[SessionInfo_SSRC] = stat.mSsrc;
+    // Variant stores VTYPE_INT here; keep the 32 bits (consumers read it back with asInt()).
+    info[SessionInfo_SSRC] = static_cast<int>(stat.mSsrc);
     info[SessionInfo_RemotePeer] = stat.mRemotePeer.toStdString();
 }
 
@@ -741,9 +746,12 @@ PDataProvider Session::findProviderByPort(int family, unsigned short port)
     {
         Stream& s = mStreamList[i];
 
-        if ((s.socket4().mRtp->localport() == port || s.socket4().mRtcp->localport() == port) && family == AF_INET)
+        // Sockets may not be allocated yet (stream created from SDP, sockets follow later)
+        if (family == AF_INET && s.socket4().mRtp && s.socket4().mRtcp &&
+            (s.socket4().mRtp->localport() == port || s.socket4().mRtcp->localport() == port))
             return s.provider();
-        if ((s.socket6().mRtp->localport() == port || s.socket6().mRtcp->localport() == port) && family == AF_INET6)
+        if (family == AF_INET6 && s.socket6().mRtp && s.socket6().mRtcp &&
+            (s.socket6().mRtp->localport() == port || s.socket6().mRtcp->localport() == port))
             return s.provider();
     }
 

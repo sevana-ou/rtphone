@@ -59,8 +59,6 @@ std::vector<short>& RtpBuffer::Packet::pcm()
 RtpBuffer::RtpBuffer(Statistics& stat)
     :mStat(stat)
 {
-    if (mStat.mPacketLoss)
-        std::cout << "Warning: packet loss is not zero" << std::endl;
 }
 
 RtpBuffer::~RtpBuffer()
@@ -126,14 +124,14 @@ std::shared_ptr<RtpBuffer::Packet> RtpBuffer::add(const std::shared_ptr<jrtplib:
         mStat.mPacketInterval.process(t - mLastAddTime);
         mLastAddTime = t;
     }
-    mStat.mSsrc = static_cast<uint16_t>(packet->GetSSRC());
+    mStat.mSsrc = packet->GetSSRC();
 
     // Update jitter
     ICELogMedia(<< "Adding new packet seqno " << packet->GetSequenceNumber() << " into jitter buffer");
     mAddCounter++;
 
     // Look for maximum&minimal sequence number; check for dublicates
-    unsigned maxno = 0xFFFFFFFF, minno = 0;
+    unsigned maxno = 0, minno = 0xFFFFFFFF;
 
     // New sequence number
     unsigned newSeqno = packet->GetExtendedSequenceNumber();
@@ -412,40 +410,6 @@ void AudioReceiver::setCodecSettings(const CodecList::Settings& codecSettings)
 CodecList::Settings& AudioReceiver::getCodecSettings()
 {
     return mCodecSettings;
-}
-
-size_t decode_packet(Codec& codec, RTPPacket& p, void* output_buffer, size_t output_capacity)
-{
-    // How much data was produced
-    size_t result = 0;
-
-    // Handle here regular RTP packets
-    // Check if payload length is ok
-    int tail = codec.rtpLength() ? p.GetPayloadLength() % codec.rtpLength() : 0;
-
-    if (!tail)
-    {
-        // Find number of frames
-        int frame_count = codec.rtpLength() ? p.GetPayloadLength() / codec.rtpLength() : 1;
-        int frame_length = codec.rtpLength() ? codec.rtpLength() : (int)p.GetPayloadLength();
-
-        // Save last packet time length
-        // mLastPacketTimeLength = mFrameCount * mCodec->frameTime();
-
-        // Decode
-
-        for (int i=0; i < frame_count; i++)
-        {
-            auto r = codec.decode({p.GetPayloadData() + i * codec.rtpLength(), (size_t)frame_length},
-                                  {(uint8_t*)output_buffer, output_capacity});
-
-            result += r.mDecoded;
-        }
-    }
-    else
-        ICELogMedia(<< "RTP packet with tail.");
-
-    return result;
 }
 
 Codec* AudioReceiver::add(const std::shared_ptr<jrtplib::RTPPacket>& p)
@@ -775,8 +739,15 @@ AudioReceiver::DecodeResult AudioReceiver::decodeEmptyTo(Audio::DataWindow& outp
             // Try to decode it - replay previous audio decoded or use CNG decoder (if payload type is 13)
             if (mCngPacket->rtp()->GetPayloadType() == 13)
             {
-                // Using latest CNG packet to produce comfort noise
-                auto produced = mCngDecoder.produce(fmt.rate(), options.mElapsed.count(), (short*)(output.data() + output.filled()), false);
+                // Using latest CNG packet to produce comfort noise.
+                // Clamp the produced amount to the remaining capacity of the output window -
+                // the CNG decoder writes straight into its buffer.
+                size_t bytesPerMs = (size_t)fmt.rate() / 1000 * sizeof(short) * fmt.channels();
+                size_t room = output.capacity() - output.filled();
+                int ms = bytesPerMs ? (int)std::min<int64_t>(options.mElapsed.count(), (int64_t)(room / bytesPerMs)) : 0;
+                if (ms <= 0)
+                    return {.mStatus = DecodeResult::Status::Skip};
+                auto produced = mCngDecoder.produce(fmt.rate(), ms, (short*)(output.mutableData() + output.filled()), false);
                 output.setFilled(output.filled() + produced);
                 return {.mStatus = DecodeResult::Status::Ok, .mSamplerate = fmt.rate(), .mChannels = fmt.channels()};
             }
@@ -1037,21 +1008,25 @@ DtmfReceiver::~DtmfReceiver()
 void DtmfReceiver::add(const std::shared_ptr<RTPPacket>& p)
 {
     auto ev = DtmfBuilder::parseRfc2833({p->GetPayloadData(), p->GetPayloadLength()});
-    if (ev.mTone != mEvent || ev.mEnd != mEventEnded)
+    if (!ev.mTone)
+        return; // Malformed or unknown event payload
+
+    // A new digit begins when the tone changes, or when the same tone starts
+    // again after the previous occurrence ended. Retransmitted start/end
+    // packets keep both fields unchanged and are ignored. The end packet of
+    // the current tone only updates state - the digit was already reported.
+    bool newEvent = (ev.mTone != mEvent) || (mEventEnded && !ev.mEnd);
+
+    if (newEvent)
     {
-        if (!(mEvent == ev.mTone && !mEventEnded && ev.mEnd))
-        {
-            // New tone is here
-            if (mCallback)
-                mCallback(ev.mTone);
+        if (mCallback)
+            mCallback(ev.mTone);
 
-            // Queue statistics item
-            mStat.mDtmf2833Timeline.emplace_back(Dtmf2833Event{.mTone = ev.mTone,
-                                                               .mTimestamp = RtpHelper::toMicroseconds(p->GetReceiveTime())});
-
-            // Store to avoid triggering on the packet
-            mEvent = ev.mTone;
-            mEventEnded = ev.mEnd;
-        }
+        // Queue statistics item
+        mStat.mDtmf2833Timeline.emplace_back(Dtmf2833Event{.mTone = ev.mTone,
+                                                           .mTimestamp = RtpHelper::toMicroseconds(p->GetReceiveTime())});
     }
+
+    mEvent = ev.mTone;
+    mEventEnded = ev.mEnd;
 }

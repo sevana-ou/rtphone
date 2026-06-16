@@ -112,7 +112,7 @@ public:
     std::map<int,int>               mLoss;                  // Every item is number of loss of corresping length
     std::chrono::milliseconds       mAudioTime = 0ms;       // Decoded/found time in milliseconds
     size_t                          mDecodedSize = 0;       // Number of decoded bytes
-    uint16_t                        mSsrc = 0;              // Last known SSRC ID in a RTP stream
+    uint32_t                        mSsrc = 0;              // Last known SSRC ID in a RTP stream
     ice::NetworkAddress             mRemotePeer;            // Last known remote RTP address
 
     // AMR codec bitrate switch counter

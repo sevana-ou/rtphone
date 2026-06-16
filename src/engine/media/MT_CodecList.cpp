@@ -233,7 +233,7 @@ static int findOctetMode(const char* line)
     p += strlen(param_name);
     char int_buf[8] = {0};
     size_t int_buf_offset = 0;
-    while (*p && isdigit(*p) && int_buf_offset < sizeof(int_buf))
+    while (*p && isdigit(*p) && int_buf_offset < sizeof(int_buf) - 1)
         int_buf[int_buf_offset++] = *p++;
     return atoi(int_buf);
 }

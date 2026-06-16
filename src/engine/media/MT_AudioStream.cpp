@@ -238,6 +238,9 @@ void AudioStream::addData(const void* buffer, int bytes)
 
 void AudioStream::copyDataTo(Audio::Mixer& mixer, int needed)
 {
+    // mStreamMap is also mutated from the network thread (dataArrived)
+    Lock l(mMutex);
+
     // Local audio mixer - used to send audio to media observer
     Audio::Mixer localMixer;
     Audio::DataWindow forObserver;
@@ -282,22 +285,27 @@ void AudioStream::copyDataTo(Audio::Mixer& mixer, int needed)
 
     if (mMediaObserver)
     {
-        localMixer.mixAndGetPcm(forObserver);
-        mMediaObserver->onMedia(forObserver.data(), forObserver.capacity(), MT::Stream::MediaDirection::Incoming, this, mMediaObserverTag);
+        int mixedBytes = localMixer.mixAndGetPcm(forObserver);
+        if (mixedBytes > 0)
+            mMediaObserver->onMedia(forObserver.data(), mixedBytes, MT::Stream::MediaDirection::Incoming, this, mMediaObserverTag);
     }
 }
 
 void AudioStream::dataArrived(PDatagramSocket s, const void* buffer, int length, InternetAddress& source)
 {
+    // Protects mStreamMap (also iterated by copyDataTo on the audio thread)
+    // and the receive/decrypt buffers.
+    Lock l(mMutex);
+
     jrtplib::RTPIPv6Address addr6;
     jrtplib::RTPIPv4Address addr4;
     jrtplib::RTPExternalTransmissionInfo* info = dynamic_cast<jrtplib::RTPExternalTransmissionInfo*>(mRtpSession.GetTransmissionInfo());
     assert(info);
 
     // Drop RTP packets if stream is not receiving now; let RTCP go
-    if (!(state() & (int)StreamState::Receiving) && RtpHelper::isRtpOrRtcp(buffer, length))
+    if (!(state() & (int)StreamState::Receiving) && RtpHelper::isRtp(buffer, length))
     {
-        ICELogMedia(<< "Stream is not allowed to receive RTP stream. Ignore the RT(C)P packet");
+        ICELogMedia(<< "Stream is not allowed to receive RTP stream. Ignore the RTP packet");
         return;
     }
 

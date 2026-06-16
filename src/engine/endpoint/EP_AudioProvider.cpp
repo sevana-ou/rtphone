@@ -93,11 +93,13 @@ void AudioProvider::updateSdpOffer(resip::SdpContents::Session::Medium& sdp, Sdp
         // Check if SRTP suite is found already or not
         if (mSrtpSuite == SRTP_NONE)
         {
+            // RFC 4568 requires a unique tag per crypto attribute; use the suite id.
             for (int suite = SRTP_AES_128_AUTH_80; suite <= SRTP_LAST; suite++)
-                sdp.addAttribute("crypto", resip::Data(createCryptoAttribute((SrtpSuite)suite)));
+                sdp.addAttribute("crypto", resip::Data(createCryptoAttribute((SrtpSuite)suite, suite)));
         }
         else
-            sdp.addAttribute("crypto", resip::Data(createCryptoAttribute(mSrtpSuite)));
+            // Answer/re-offer: echo the tag of the negotiated attribute.
+            sdp.addAttribute("crypto", resip::Data(createCryptoAttribute(mSrtpSuite, mSrtpTag)));
     }
 
     // Use CodecListPriority mCodecPriority adapter to work with codec priorities
@@ -246,11 +248,13 @@ bool AudioProvider::processSdpOffer(const resip::SdpContents::Session::Medium& m
         {
             const resip::Data& attr = *attrIter;
             ByteBuffer tempkey;
-            SrtpSuite suite = processCryptoAttribute(attr, tempkey);
-            if (suite > ss)
+            int tag = 1;
+            SrtpSuite suite = processCryptoAttribute(attr, tempkey, &tag);
+            if (srtpSuiteStrength(suite) > srtpSuiteStrength(ss))
             {
                 ss = suite;
                 mSrtpSuite = suite;
+                mSrtpTag = tag;
                 key = tempkey;
             }
         }
@@ -295,26 +299,30 @@ MT::PStream AudioProvider::activeStream()
     return mActiveStream;
 }
 
-std::string AudioProvider::createCryptoAttribute(SrtpSuite suite)
+std::string AudioProvider::createCryptoAttribute(SrtpSuite suite, int tag)
 {
     if (!mActiveStream)
         return "";
 
     // Print key to base64 string
     PByteBuffer keyBuffer = mActiveStream->srtp().outgoingKey(suite).first;
+    if (!keyBuffer)
+        return "";
     resip::Data d(keyBuffer->data(), keyBuffer->size());
     resip::Data keyText = d.base64encode();
 
-    return std::format("{} {} inline:{}", 1, toString(suite), keyText.c_str());
+    return std::format("{} {} inline:{}", tag, toString(suite), keyText.c_str());
 }
 
-SrtpSuite AudioProvider::processCryptoAttribute(const resip::Data& value, ByteBuffer& key)
+SrtpSuite AudioProvider::processCryptoAttribute(const resip::Data& value, ByteBuffer& key, int* tag)
 {
     int srtpTag = 0;
     char suite[64], keyChunk[256];
     int components = sscanf(value.c_str(), "%d %63s inline: %255s", &srtpTag, suite, keyChunk);
     if (components != 3)
         return SRTP_NONE;
+    if (tag)
+        *tag = srtpTag;
 
     const char* delimiter = strchr(keyChunk, '|');
     resip::Data keyText;

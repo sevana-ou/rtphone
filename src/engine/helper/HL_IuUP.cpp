@@ -5,6 +5,10 @@ bool IuUP::TwoBytePseudoheader = false;
 
 bool IuUP::parse(const uint8_t *packet, int size, IuUP::Frame &result)
 {
+    // Data-with-CRC frames carry a 4 byte header
+    if (size < 4)
+        return false;
+
     // Wrap incoming packet in byte buffer
     BitReader reader(packet, size);
 
@@ -45,11 +49,18 @@ bool IuUP::parse2(const uint8_t* packet, int size, Frame& result)
         size -= 2;
     }
 
+    // Frame header is 3 bytes (no CRC) or 4 bytes (with CRC)
+    if (size < 3)
+        return false;
+
     BitReader reader(packet, size);
     result.mPduType = (PduType)reader.readBits(4);
 
     // Ignore control commands for now
     if (result.mPduType != PduType::DataNoCrc && result.mPduType != PduType::DataWithCrc)
+        return false;
+
+    if (result.mPduType == PduType::DataWithCrc && size < 4)
         return false;
 
     result.mFrameNumber = reader.readBits(4);

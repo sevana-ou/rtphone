@@ -74,7 +74,7 @@ public:
   void setupMirror(bool enable);
 
   void configureMediaObserver(MT::Stream::MediaObserver* observer, void* userTag);
-  static SrtpSuite processCryptoAttribute(const resip::Data& value, ByteBuffer& key);
+  static SrtpSuite processCryptoAttribute(const resip::Data& value, ByteBuffer& key, int* tag = nullptr);
 
 protected:
   // SDP's stream name
@@ -93,6 +93,7 @@ protected:
 
   unsigned mState;
   SrtpSuite mSrtpSuite;
+  int mSrtpTag = 1;                       // RFC 4568 tag of the negotiated crypto attribute
   struct RemoteCodec
   {
     RemoteCodec(MT::Codec::Factory* factory, int payloadType)
@@ -109,7 +110,7 @@ protected:
   MT::Stream::MediaObserver* mMediaObserver = nullptr;
   void* mMediaObserverTag = nullptr;
 
-  std::string createCryptoAttribute(SrtpSuite suite);
+  std::string createCryptoAttribute(SrtpSuite suite, int tag);
   void findRfc2833(const resip::SdpContents::Session::Medium::CodecContainer& codecs);
 
   // Implements setState() logic. This allows to be called from constructor (it is not virtual function)

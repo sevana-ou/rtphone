@@ -97,7 +97,20 @@ RtpPair<PDatagramSocket> SocketHeap::allocSocketPair(int family, SocketSink *sin
                 rtcp = allocSocket(family, sink, rtp->localport() + 1);
         }
         catch(...)
-        {}
+        {
+            // Release a partially allocated pair before retrying - otherwise
+            // the RTP socket from this attempt leaks into the socket map.
+            if (rtp)
+            {
+                freeSocket(rtp);
+                rtp.reset();
+            }
+            if (rtcp)
+            {
+                freeSocket(rtcp);
+                rtcp.reset();
+            }
+        }
     }
 
     if (!rtp || !rtcp)
@@ -139,6 +152,9 @@ PDatagramSocket SocketHeap::allocSocket(int family, SocketSink* sink, int port)
     sockaddr_in6 addr6;
     int result = 0;
     int testport;
+    // A fixed port cannot be retried (it would loop forever if the port is
+    // owned by another process); random ports get a bounded number of attempts.
+    int attemptsLeft = port ? 1 : 100;
     do
     {
         testport = port ? port : rand() % ((mFinish - mStart) / 2) * 2 + mStart;
@@ -164,7 +180,7 @@ PDatagramSocket SocketHeap::allocSocket(int family, SocketSink* sink, int port)
             break;
         }
 
-    } while (result == WSAEADDRINUSE);
+    } while (result == WSAEADDRINUSE && --attemptsLeft > 0);
 
     if (result)
     {

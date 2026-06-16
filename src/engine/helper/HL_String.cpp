@@ -48,9 +48,12 @@ std::string strx::appendPath(const std::string& s1, const std::string& s2)
 std::string strx::makeUtf8(const std::tstring &arg)
 {
 #if defined(TARGET_WIN)
-    size_t required = WideCharToMultiByte(CP_UTF8, 0, arg.c_str(), -1, NULL, 0, NULL, NULL);
-    char *result = (char*)_alloca(required + 1);
-    WideCharToMultiByte(CP_UTF8, 0, arg.c_str(), -1, result, required+1, NULL, NULL);
+    int required = WideCharToMultiByte(CP_UTF8, 0, arg.c_str(), -1, NULL, 0, NULL, NULL);
+    if (required <= 0)
+        return std::string();
+    std::string result(static_cast<size_t>(required), '\0');
+    WideCharToMultiByte(CP_UTF8, 0, arg.c_str(), -1, &result[0], required, NULL, NULL);
+    result.resize(strlen(result.c_str())); // strip the trailing NUL written by the API
     return result;
 #else
     return arg;
@@ -65,9 +68,12 @@ std::string strx::toUtf8(const std::tstring &arg)
 std::tstring strx::makeTstring(const std::string& arg)
 {
 #if defined(TARGET_WIN)
-    size_t count = MultiByteToWideChar(CP_UTF8, 0, arg.c_str(), -1, NULL, 0);
-    wchar_t* result = (wchar_t*)_alloca(count * 2);
-    MultiByteToWideChar(CP_UTF8, 0, arg.c_str(), -1, result, count);
+    int count = MultiByteToWideChar(CP_UTF8, 0, arg.c_str(), -1, NULL, 0);
+    if (count <= 0)
+        return std::tstring();
+    std::wstring result(static_cast<size_t>(count), L'\0');
+    MultiByteToWideChar(CP_UTF8, 0, arg.c_str(), -1, &result[0], count);
+    result.resize(wcslen(result.c_str())); // strip the trailing NUL written by the API
     return result;
 #else
     return arg;
@@ -93,11 +99,7 @@ int strx::toInt(const char *s, int defaultValue, bool* isOk)
 uint64_t strx::toUint64(const char* s, uint64_t def, bool *isOk)
 {
     uint64_t result = def;
-#if defined(TARGET_WIN)
-    if (sscanf(s, "%I64d", &result) != 1)
-#else
-    if (sscanf(s, "%llu", &result) != 1)
-#endif
+    if (sscanf(s, "%" SCNu64, &result) != 1)
     {
         if (isOk)
             *isOk = false;
@@ -143,7 +145,6 @@ std::string strx::toHex(const uint8_t* input, size_t inputLength)
         *r++ = hexmap[hi];
         *r++ = hexmap[low];
     }
-    *r = 0;
 
     return result;
 }
@@ -171,11 +172,9 @@ std::string strx::doubleToString(double value, int precision)
 
 const char* strx::findSubstring(const char* buffer, const char* substring, size_t bufferLength)
 {
-#if defined(TARGET_WIN)
-    return (const char*)strstr(buffer, substring);
-#else
+    // The buffer is not necessarily NUL-terminated, so a bounded search is
+    // required on every platform (a memmem replacement for MSVC is provided below).
     return (const char*)memmem(buffer, bufferLength, substring, strlen(substring));
-#endif
 }
 
 
@@ -332,7 +331,7 @@ std::string strx::fromHex2String(const std::string& s)
     std::string result; result.resize(s.size() / 2);
     const char* t = s.c_str();
     for (size_t i = 0; i < result.size(); i++)
-        result[i] = hex2code(t[i*2]);
+        result[i] = static_cast<char>((hex2code(t[i*2]) << 4) | hex2code(t[i*2+1]));
 
     return result;
 }
@@ -367,15 +366,19 @@ std::string strx::decodeUri(const std::string& s)
 
     char ch;
 
-    int i, ii;
+    int i, ii = 0;
     for (i=0; i<(int)s.length(); i++)
     {
-        if (s[i] == 37)
+        if (s[i] == '%' && i + 2 < (int)s.length())
         {
-            sscanf(s.substr(i+1,2).c_str(), "%x", &ii);
-            ch = static_cast<char>(ii);
-            ret += ch;
-            i += 2;
+            if (sscanf(s.substr(i+1,2).c_str(), "%x", &ii) == 1)
+            {
+                ch = static_cast<char>(ii);
+                ret += ch;
+                i += 2;
+            }
+            else
+                ret += s[i];
         }
         else
             ret += s[i];
@@ -385,14 +388,16 @@ std::string strx::decodeUri(const std::string& s)
 
 bool strx::startsWith(const std::string& s, const std::string& prefix)
 {
-    std::string::size_type p = s.find(prefix);
-    return p == 0;
+    if (prefix.size() > s.size())
+        return false;
+    return s.compare(0, prefix.size(), prefix) == 0;
 }
 
 bool strx::endsWith(const std::string& s, const std::string& suffix)
 {
-    std::string::size_type p = s.rfind(suffix);
-    return (p == s.size() - suffix.size());
+    if (suffix.size() > s.size())
+        return false;
+    return s.compare(s.size() - suffix.size(), suffix.size(), suffix) == 0;
 }
 
 int strx::stringToDuration(const std::string& s)

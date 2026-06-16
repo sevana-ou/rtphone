@@ -36,6 +36,10 @@ enum SrtpSuite
 extern SrtpSuite        toSrtpSuite(const std::string_view& s);
 extern std::string_view toString(SrtpSuite suite);
 
+// Relative cryptographic strength used to pick a suite from an SDP offer.
+// Bigger is stronger. The raw enum values do NOT follow strength order.
+extern int              srtpSuiteStrength(SrtpSuite suite);
+
 typedef std::pair<PByteBuffer, PByteBuffer> SrtpKeySalt;
 typedef std::pair<unsigned, srtp_policy_t> SrtpStream;
 
@@ -68,8 +72,10 @@ protected:
     srtp_t          mInboundSession,
     mOutboundSession;
 
+    // Outgoing keys are indexed by the SrtpSuite enum value directly;
+    // index 0 (SRTP_NONE) is unused.
     SrtpKeySalt     mIncomingKey,
-                    mOutgoingKey[SRTP_LAST];
+                    mOutgoingKey[SRTP_LAST + 1];
     srtp_policy_t   mInboundPolicy;
     srtp_policy_t   mOutboundPolicy;
     SrtpSuite       mSuite;
