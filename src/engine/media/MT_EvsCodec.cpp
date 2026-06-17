@@ -152,6 +152,27 @@ EVSCodec::EVSCodec(const StreamParameters &sp)
 {
 	EVSCodec::sp = sp;
 
+    // Metadata only - the heavy decoder state is created lazily (ensureDecoder()).
+    mOutputFs = outputFsFromBw(sp.bw);
+}
+
+int EVSCodec::outputFsFromBw(int bw)
+{
+    switch (bw)
+    {
+    case NB:  return 8000;
+    case WB:  return 16000;
+    case SWB: return 32000;
+    case FB:  return 48000;
+    }
+    return 0;
+}
+
+void EVSCodec::ensureDecoder()
+{
+    if (st_dec)
+        return;
+
     if ((st_dec = reinterpret_cast<evs::Decoder_State*>(malloc(sizeof(evs::Decoder_State)))) == nullptr)
         throw std::bad_alloc();
 
@@ -170,9 +191,9 @@ EVSCodec::~EVSCodec()
 Codec::Info EVSCodec::info() {
     return {
         .mName = MT_EVS_CODECNAME,
-        .mSamplerate = st_dec->output_Fs,
+        .mSamplerate = mOutputFs,
         .mChannels = 1,
-        .mPcmLength = st_dec->output_Fs / 1000 * sp.ptime * 2,
+        .mPcmLength = mOutputFs / 1000 * sp.ptime * 2,
         .mFrameTime = sp.ptime,
         .mRtpLength = 0
     };
@@ -187,6 +208,8 @@ Codec::EncodeResult EVSCodec::encode(std::span<const uint8_t> input, std::span<u
 
 Codec::DecodeResult EVSCodec::decode(std::span<const uint8_t> input, std::span<uint8_t> output)
 {
+    ensureDecoder();
+
     if (output.size_bytes() < pcmLength())
         return {.mDecoded = 0};
 

@@ -57,7 +57,21 @@ public:
 private:
     evs::Decoder_State* st_dec = nullptr;
     StreamParameters sp;
+
+    // Output sample rate, derived from the negotiated bandwidth (sp.bw) at
+    // construction. Cached so info()/samplerate()/pcmLength() work for network-MOS
+    // metadata without allocating the (large) EVS decoder state - see ensureDecoder.
+    int mOutputFs = 0;
+
     void initDecoder(const StreamParameters& sp);
+
+    // Allocate + initialize the EVS decoder state lazily on first decode().
+    // Network-MOS-only streams resolve metadata but never decode, so they never
+    // pay for the EVS decoder (Decoder_State + CLDFB/FD-CNG sub-allocations).
+    void ensureDecoder();
+
+    // Maps an EVS bandwidth (NB/WB/SWB/FB) to its output sample rate in Hz.
+    static int outputFsFromBw(int bw);
 };
 
 } // End of namespace

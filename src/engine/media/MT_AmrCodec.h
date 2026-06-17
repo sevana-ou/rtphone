@@ -33,6 +33,13 @@ protected:
     int mPreviousPacketLength = 0;
     size_t mCngCounter = 0;
     size_t mSwitchCounter = 0;
+
+    // opencore-amr encoder/decoder state is allocated lazily on first encode/decode.
+    // Network-MOS-only streams resolve codec metadata (name/samplerate/frame timing)
+    // but never decode, so they must not pay for a context they never use - at scale
+    // this is ~a decoder state (several KB) saved per network-only stream.
+    void ensureEncoder();
+    void ensureDecoder();
 public:
     class CodecFactory: public Factory
     {
@@ -84,6 +91,10 @@ protected:
     size_t mCngCounter = 0;
 
     int mPreviousPacketLength;
+
+    // Decoder state is allocated lazily on first decode/plc (see AmrNbCodec) so
+    // network-MOS-only streams never instantiate the AMR-WB decoder.
+    void ensureDecoder();
 
     DecodeResult decodeIuup(std::span<const uint8_t> input, std::span<uint8_t> output);
     DecodeResult decodePlain(std::span<const uint8_t> input, std::span<uint8_t> output);

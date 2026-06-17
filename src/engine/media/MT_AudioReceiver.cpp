@@ -184,16 +184,18 @@ std::shared_ptr<RtpBuffer::Packet> RtpBuffer::add(const std::shared_ptr<jrtplib:
     return std::shared_ptr<Packet>();
 }
 
-RtpBuffer::FetchResult RtpBuffer::fetch()
+void RtpBuffer::trimToHighWater(size_t maxPackets)
 {
     Lock l(mGuard);
 
-    FetchResult result;
-
-    // See if there is enough information in buffer
     auto total = findTimelength();
 
-    while (total > mHigh && mPacketList.size() > 1 && 0ms != mHigh)
+    // Drop the oldest packet while either bound is exceeded: the time-based
+    // high-water mark (mHigh, when set) or, if maxPackets != 0, the packet-count
+    // cap. Always keep at least one packet so loss/gap accounting has a reference.
+    while (mPacketList.size() > 1 &&
+           ((0ms != mHigh && total > mHigh) ||
+            (maxPackets != 0 && mPacketList.size() > maxPackets)))
     {
         ICELogMedia( << "Dropping RTP packets from jitter buffer");
         total -= mPacketList.front()->timelength();
@@ -233,6 +235,19 @@ RtpBuffer::FetchResult RtpBuffer::fetch()
         // Increase number in statistics
         mStat.mPacketDropped++;
     }
+}
+
+RtpBuffer::FetchResult RtpBuffer::fetch()
+{
+    Lock l(mGuard);
+
+    FetchResult result;
+
+    // Bound the buffer to the high-water mark before fetching.
+    trimToHighWater();
+
+    // See how much audio is buffered now.
+    auto total = findTimelength();
 
     if (total < mLow || total == 0ms)
     {
@@ -494,13 +509,13 @@ void AudioReceiver::processDecoded(Audio::DataWindow& output, DecodeOptions opti
 {
     // Write to audio dump if requested
     if (mDecodedDump && mDecodedLength)
-        mDecodedDump->write(mDecodedFrame, mDecodedLength);
+        mDecodedDump->write(mDecodedFrame.data(), mDecodedLength);
 
     // Resample to target rate
     makeMonoAndResample(options.mResampleToMainRate ? mCodec->samplerate() : 0, mCodec->channels());
 
     // Send to output
-    output.add(mResampledFrame, mResampledLength);
+    output.add(mResampledFrame.data(), mResampledLength);
 }
 
 void AudioReceiver::produceSilence(std::chrono::milliseconds length, Audio::DataWindow& output, DecodeOptions options)
@@ -517,13 +532,13 @@ void AudioReceiver::produceSilence(std::chrono::milliseconds length, Audio::Data
     size_t tail_size = tail * sizeof(int16_t) * mCodec->samplerate() / 1000 * mCodec->channels();
     for (size_t i = 0; i < chunks; i++)
     {
-        memset(mDecodedFrame, 0, chunk_size);
+        memset(mDecodedFrame.data(), 0, chunk_size);
         mDecodedLength = chunk_size;
         processDecoded(output, options);
     }
     if (tail)
     {
-        memset(mDecodedFrame, 0, tail_size);
+        memset(mDecodedFrame.data(), 0, tail_size);
         mDecodedLength = tail_size;
         processDecoded(output, options);
     }
@@ -537,7 +552,7 @@ void AudioReceiver::produceCNG(std::chrono::milliseconds length, Audio::DataWind
         if (options.mSkipDecode)
             mDecodedLength = 0;
         else
-            mDecodedLength = mCngDecoder.produce(mCodec->samplerate(), 100, mDecodedFrame, false);
+            mDecodedLength = mCngDecoder.produce(mCodec->samplerate(), 100, mDecodedFrame.data(), false);
 
         if (mDecodedLength)
             processDecoded(output, options);
@@ -550,7 +565,7 @@ void AudioReceiver::produceCNG(std::chrono::milliseconds length, Audio::DataWind
         if (options.mSkipDecode)
             mDecodedLength = 0;
         else
-            mDecodedLength = mCngDecoder.produce(mCodec->samplerate(), tail, reinterpret_cast<short*>(mDecodedFrame), false);
+            mDecodedLength = mCngDecoder.produce(mCodec->samplerate(), tail, reinterpret_cast<short*>(mDecodedFrame.data()), false);
 
         if (mDecodedLength)
             processDecoded(output, options);
@@ -568,7 +583,7 @@ AudioReceiver::DecodeResult AudioReceiver::decodeGapTo(Audio::DataWindow& output
         {
             // Synthesize comfort noise. It will be done on AUDIO_SAMPLERATE rate directly to mResampledFrame buffer.
             // Do not forget to send this noise to analysis
-            mDecodedLength = mCngDecoder.produce(mCodec->samplerate(), mLastPacketTimeLength, reinterpret_cast<short*>(mDecodedFrame), false);
+            mDecodedLength = mCngDecoder.produce(mCodec->samplerate(), mLastPacketTimeLength, reinterpret_cast<short*>(mDecodedFrame.data()), false);
         }
         else
             decodePacketTo(output, options, mCngPacket);
@@ -581,14 +596,14 @@ AudioReceiver::DecodeResult AudioReceiver::decodeGapTo(Audio::DataWindow& output
             mDecodedLength = 0;
         else
         {
-            mDecodedLength = mCodec->plc(mFrameCount, {(uint8_t*)mDecodedFrame, sizeof mDecodedFrame});
+            mDecodedLength = mCodec->plc(mFrameCount, {(uint8_t*)mDecodedFrame.data(), mDecodedFrame.size() * sizeof(int16_t)});
             if (!mDecodedLength)
             {
                 // PLC is not support or failed
                 // So substitute the silence
                 size_t nr_of_samples = mCodec->frameTime() * mCodec->samplerate() / 1000 * sizeof(short);
                 mDecodedLength = nr_of_samples * sizeof(short);
-                memset(mDecodedFrame, 0, mDecodedLength);
+                memset(mDecodedFrame.data(), 0, mDecodedLength);
             }
         }
     }
@@ -660,7 +675,7 @@ AudioReceiver::DecodeResult AudioReceiver::decodePacketTo(Audio::DataWindow& out
                 mCngDecoder.decode3389(rtp.GetPayloadData(), rtp.GetPayloadLength());
 
                 // Emit CNG mLastPacketLength milliseconds
-                mDecodedLength = mCngDecoder.produce(mCodec->samplerate(), mLastPacketTimeLength, (short*)mDecodedFrame, true);
+                mDecodedLength = mCngDecoder.produce(mCodec->samplerate(), mLastPacketTimeLength, (short*)mDecodedFrame.data(), true);
                 if (mDecodedLength)
                     processDecoded(output, options);
             }
@@ -696,7 +711,7 @@ AudioReceiver::DecodeResult AudioReceiver::decodePacketTo(Audio::DataWindow& out
                     {
                         // Decode frame by frame
                         auto codecInput = std::span{rtp.GetPayloadData() + i * mCodec->rtpLength(), (size_t)frameLength};
-                        auto codecOutput = std::span{(uint8_t*)mDecodedFrame, sizeof mDecodedFrame};
+                        auto codecOutput = std::span{(uint8_t*)mDecodedFrame.data(), mDecodedFrame.size() * sizeof(int16_t)};
                         auto r = mCodec->decode(codecInput, codecOutput);
                         mDecodedLength = r.mDecoded;
                         if (mDecodedLength > 0)
@@ -798,6 +813,10 @@ AudioReceiver::DecodeResult AudioReceiver::getAudioTo(Audio::DataWindow& output,
     // ICELogDebug(<< "getAudioTo() for " << options.mElapsed);
     assert (options.mElapsed != 0ms);
 
+    // First decode on this receiver: allocate the scratch buffers. Network-MOS-only
+    // streams never reach this point, so they never pay for them.
+    ensureDecodeBuffers();
+
     // Increase counter of requested audio
     mRequestedAudio += options.mElapsed;
 
@@ -876,6 +895,19 @@ AudioReceiver::DecodeResult AudioReceiver::getAudioTo(Audio::DataWindow& output,
     return result;
 }
 
+void AudioReceiver::ensureDecodeBuffers()
+{
+    // Allocate the decode/convert/resample scratch buffers to full capacity on the
+    // first decode. mDecodedFrame being empty means none are allocated yet; they
+    // are always allocated together, so checking one is enough.
+    if (mDecodedFrame.empty())
+    {
+        mDecodedFrame.resize(MT_MAX_DECODEBUFFER);
+        mConvertedFrame.resize(MT_MAX_DECODEBUFFER * 2);
+        mResampledFrame.resize(MT_MAX_DECODEBUFFER);
+    }
+}
+
 void AudioReceiver::makeMonoAndResample(int rate, int channels)
 {
     // Make mono from stereo - engine works with mono only for now
@@ -883,12 +915,12 @@ void AudioReceiver::makeMonoAndResample(int rate, int channels)
     if (channels != AUDIO_CHANNELS)
     {
         if (channels == 1)
-            mConvertedLength = Audio::ChannelConverter::monoToStereo(mDecodedFrame, mDecodedLength, mConvertedFrame, mDecodedLength * 2);
+            mConvertedLength = Audio::ChannelConverter::monoToStereo(mDecodedFrame.data(), mDecodedLength, mConvertedFrame.data(), mDecodedLength * 2);
         else
-            mDecodedLength = Audio::ChannelConverter::stereoToMono(mDecodedFrame, mDecodedLength, mDecodedFrame, mDecodedLength / 2);
+            mDecodedLength = Audio::ChannelConverter::stereoToMono(mDecodedFrame.data(), mDecodedLength, mDecodedFrame.data(), mDecodedLength / 2);
     }
 
-    void* frames = mConvertedLength ? mConvertedFrame : mDecodedFrame;
+    void* frames = mConvertedLength ? (void*)mConvertedFrame.data() : (void*)mDecodedFrame.data();
     unsigned length = mConvertedLength ? mConvertedLength : mDecodedLength;
 
     Audio::Resampler* r = nullptr;
@@ -899,13 +931,13 @@ void AudioReceiver::makeMonoAndResample(int rate, int channels)
     case 32000:    r = &mResampler32; break;
     case 48000:    r = &mResampler48; break;
     default:
-        memcpy(mResampledFrame, frames, length);
+        memcpy(mResampledFrame.data(), frames, length);
         mResampledLength = length;
         return;
     }
 
     size_t processedInput = 0;
-    mResampledLength = r->processBuffer(frames, length, processedInput, mResampledFrame, r->getDestLength(length));
+    mResampledLength = r->processBuffer(frames, length, processedInput, mResampledFrame.data(), r->getDestLength(length));
     // processedInput result value is ignored - it is always equal to length as internal sample rate is 8/16/32/48K
 }
 

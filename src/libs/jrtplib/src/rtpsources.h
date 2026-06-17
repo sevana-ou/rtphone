@@ -44,7 +44,19 @@
 #include "rtptypes.h"
 #include "rtpmemoryobject.h"
 
-#define RTPSOURCES_HASHSIZE							8317
+// Number of buckets in the per-RTPSession SSRC->source hash table. This is an
+// inline array of pointers in every RTPSources instance (sizeof == hashsize *
+// sizeof(void*)), so it is paid by every RTPSession object regardless of how many
+// sources it actually tracks. The original jrtplib default (8317) targets RTP
+// mixers/conferences that demultiplex thousands of distinct SSRCs on one session;
+// it costs ~65 KB per session. Sevana's per-stream capture sessions carry ~1 SSRC,
+// so a far smaller table is ample - collisions are resolved by linked lists, so a
+// small size only affects lookup cost (negligible at our source counts), never
+// correctness. Overridable at build time for products that genuinely need many
+// sources per session.
+#ifndef RTPSOURCES_HASHSIZE
+#define RTPSOURCES_HASHSIZE							251
+#endif
 
 namespace jrtplib
 {

@@ -265,8 +265,20 @@ PCodec AmrNbCodec::CodecFactory::create()
 AmrNbCodec::AmrNbCodec(const AmrCodecConfig& config)
     :mConfig(config)
 {
-    mEncoderCtx = Encoder_Interface_init(1);
-    mDecoderCtx = Decoder_Interface_init();
+    // Contexts are created lazily (see ensureEncoder/ensureDecoder) - a codec
+    // resolved only for network-MOS metadata never allocates them.
+}
+
+void AmrNbCodec::ensureEncoder()
+{
+    if (!mEncoderCtx)
+        mEncoderCtx = Encoder_Interface_init(1);
+}
+
+void AmrNbCodec::ensureDecoder()
+{
+    if (!mDecoderCtx)
+        mDecoderCtx = Decoder_Interface_init();
 }
 
 AmrNbCodec::~AmrNbCodec()
@@ -298,6 +310,8 @@ Codec::Info AmrNbCodec::info()
 
 Codec::EncodeResult AmrNbCodec::encode(std::span<const uint8_t> input, std::span<uint8_t> output)
 {
+    ensureEncoder();
+
     if (input.size_bytes() % pcmLength())
         return {.mEncoded = 0};
 
@@ -324,6 +338,8 @@ Codec::EncodeResult AmrNbCodec::encode(std::span<const uint8_t> input, std::span
 #define AMR_BITRATE_DTX 15
 Codec::DecodeResult AmrNbCodec::decode(std::span<const uint8_t> input, std::span<uint8_t> output)
 {
+    ensureDecoder();
+
     if (mConfig.mOctetAligned)
         return {.mDecoded = 0};
 
@@ -427,6 +443,8 @@ Codec::DecodeResult AmrNbCodec::decode(std::span<const uint8_t> input, std::span
 
 size_t AmrNbCodec::plc(int lostFrames, std::span<uint8_t> output)
 {
+    ensureDecoder();
+
     if (output.size_bytes() < lostFrames * pcmLength())
         return 0;
 
@@ -496,7 +514,14 @@ AmrWbStatistics MT::GAmrWbStatistics;
 AmrWbCodec::AmrWbCodec(const AmrCodecConfig& config)
     :mConfig(config)
 {
-    mDecoderCtx = D_IF_init();
+    // Decoder context is created lazily (see ensureDecoder) - a codec resolved
+    // only for network-MOS metadata never allocates the AMR-WB decoder state.
+}
+
+void AmrWbCodec::ensureDecoder()
+{
+    if (!mDecoderCtx)
+        mDecoderCtx = D_IF_init();
 }
 
 AmrWbCodec::~AmrWbCodec()
@@ -630,6 +655,8 @@ Codec::DecodeResult AmrWbCodec::decodePlain(std::span<const uint8_t> input, std:
 
 Codec::DecodeResult AmrWbCodec::decode(std::span<const uint8_t> input, std::span<uint8_t> output)
 {
+    ensureDecoder();
+
     if (mConfig.mIuUP)
         return decodeIuup(input, output);
     else

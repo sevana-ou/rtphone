@@ -20,6 +20,8 @@
 
 #include <optional>
 #include <chrono>
+#include <vector>
+#include <cstdint>
 using namespace std::chrono_literals;
 
 namespace MT
@@ -103,7 +105,19 @@ public:
     typedef std::shared_ptr<ResultList> PResultList;
 
     FetchResult fetch();
-    
+
+    // Drop oldest packets so buffered audio stays within the high-water mark,
+    // recording packet-loss events for any sequence gaps crossed (the same
+    // accounting fetch() performs). Used to bound memory on streams that never
+    // call fetch() - i.e. network-MOS-only streams with audio decode disabled,
+    // which would otherwise retain every packet for the whole call.
+    //
+    // maxPackets, when non-zero, additionally caps the buffer to that many packets
+    // regardless of buffered time. The decode path (fetch()) leaves it 0 so jitter
+    // tolerance stays governed by the time-based high-water mark; the network-only
+    // path passes a small cap since those packets are never decoded.
+    void trimToHighWater(size_t maxPackets = 0);
+
 protected:
     unsigned    mSsrc = 0;
     std::chrono::milliseconds   mHigh = std::chrono::milliseconds(RTP_BUFFER_HIGH),
@@ -240,16 +254,22 @@ protected:
     // Already decoded data that can be retrieved without actual decoding - it may happen because of getAudioTo() may be limited by time interval
     Audio::DataWindow mAvailable;
 
-    // Temporary buffer to hold decoded data (it is better than allocate data on stack)
-    int16_t mDecodedFrame[MT_MAX_DECODEBUFFER];
+    // Decode/convert/resample scratch buffers. These were inline arrays
+    // (MT_MAX_DECODEBUFFER * {1,2,1} * int16_t = 256 KB total) carried by every
+    // AudioReceiver, hence by every StreamDecoder - including network-MOS-only
+    // streams that never decode. They are now allocated lazily on the first
+    // getAudioTo() call via ensureDecodeBuffers(); non-decoding streams keep them
+    // empty. Once allocated they are sized to full capacity and reused, so decode
+    // behaviour is unchanged.
+    std::vector<int16_t> mDecodedFrame;     // sized to MT_MAX_DECODEBUFFER
     size_t mDecodedLength = 0;
 
     // Buffer to hold data converted to stereo/mono; there is multiplier 2 as it can be stereo audio
-    int16_t mConvertedFrame[MT_MAX_DECODEBUFFER * 2];
+    std::vector<int16_t> mConvertedFrame;   // sized to MT_MAX_DECODEBUFFER * 2
     size_t mConvertedLength = 0;
 
     // Buffer to hold data resampled to AUDIO_SAMPLERATE
-    int16_t mResampledFrame[MT_MAX_DECODEBUFFER];
+    std::vector<int16_t> mResampledFrame;   // sized to MT_MAX_DECODEBUFFER
     size_t mResampledLength = 0;
 
     // Last packet time length
@@ -271,6 +291,12 @@ protected:
 
     std::chrono::milliseconds mRequestedAudio = 0ms;
     std::chrono::milliseconds mProducedAudio = 0ms;
+
+    // Lazily allocate the decode/convert/resample scratch buffers (mDecodedFrame,
+    // mConvertedFrame, mResampledFrame) to full capacity on the first decode. A
+    // no-op once allocated. Called at the top of getAudioTo(); network-MOS-only
+    // streams never reach it, so they never pay the 256 KB.
+    void ensureDecodeBuffers();
 
     // Zero rate will make audio mono but resampling will be skipped
     void makeMonoAndResample(int rate, int channels);
