@@ -368,19 +368,9 @@ Receiver::~Receiver()
 AudioReceiver::AudioReceiver(const CodecList::Settings& settings, MT::Statistics &stat)
     :Receiver(stat), mRtpBuffer(stat), mDtmfBuffer(stat), mCodecSettings(settings), mCodecList(settings), mDtmfReceiver(stat)
 {
-    // Init resamplers
-    mResampler8.start(AUDIO_CHANNELS, 8000, AUDIO_SAMPLERATE);
-    mResampler16.start(AUDIO_CHANNELS, 16000, AUDIO_SAMPLERATE);
-    mResampler32.start(AUDIO_CHANNELS, 32000, AUDIO_SAMPLERATE);
-    mResampler48.start(AUDIO_CHANNELS, 48000, AUDIO_SAMPLERATE);
-
     // Init codecs
     mCodecList.setSettings(settings);
     mCodecList.fillCodecMap(mCodecMap);
-
-    // 10 seconds is the maximum length of decoded audio in single step
-    // It is important - DTX may produce silence up to few seconds easily
-    mAvailable.setCapacity(AUDIO_SAMPLERATE * 10 * sizeof(short));
 
     mDtmfBuffer.setPrebuffer(0ms);
     mDtmfBuffer.setLow(0ms);
@@ -388,6 +378,12 @@ AudioReceiver::AudioReceiver(const CodecList::Settings& settings, MT::Statistics
 
     // Avoid collecting too much data
     mRtpBuffer.setHigh(240ms);
+
+    // Resamplers are lazy inside; there is no actual memory allocation
+    mResampler8.start(AUDIO_CHANNELS, 8000, AUDIO_SAMPLERATE);
+    mResampler16.start(AUDIO_CHANNELS, 16000, AUDIO_SAMPLERATE);
+    mResampler32.start(AUDIO_CHANNELS, 32000, AUDIO_SAMPLERATE);
+    mResampler48.start(AUDIO_CHANNELS, 48000, AUDIO_SAMPLERATE);
 
 #if defined(DUMP_DECODED)
     mDecodedDump = std::make_shared<Audio::WavFileWriter>();
@@ -905,6 +901,13 @@ void AudioReceiver::ensureDecodeBuffers()
         mDecodedFrame.resize(MT_MAX_DECODEBUFFER);
         mConvertedFrame.resize(MT_MAX_DECODEBUFFER * 2);
         mResampledFrame.resize(MT_MAX_DECODEBUFFER);
+    }
+
+    if (!mAvailable.capacity())
+    {
+        // 10 seconds is the maximum length of decoded audio in single step
+        // It is important - DTX may produce silence up to few seconds easily
+        mAvailable.setCapacity(AUDIO_SAMPLERATE * 10 * sizeof(short));
     }
 }
 

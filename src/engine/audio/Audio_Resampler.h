@@ -24,23 +24,25 @@ namespace Audio
 
         void start(int channels, int sourceRate, int destRate);
         void stop();
+        bool isOpened() const;
+
         size_t processBuffer(const void* source, size_t sourceLength, size_t& sourceProcessed,
                              void* dest, size_t destCapacity);
-        int sourceRate();
-        int destRate();
-        size_t getDestLength(size_t sourceLen);
-        size_t getSourceLength(size_t destLen);
+        int sourceRate() const;
+        int destRate() const;
+        size_t getDestLength(size_t sourceLen) const;
+        size_t getSourceLength(size_t destLen) const;
 
         // Returns instance + speex encoder size in bytes
         size_t getSize() const;
 
     protected:
-        void* mContext;
-        int   mErrorCode;
-        int   mSourceRate,
-        mDestRate,
-        mChannels;
-        short mLastSample;
+        void* mContext = nullptr;
+        int   mErrorCode = 0;
+        int   mSourceRate = 0,
+              mDestRate = 0,
+              mChannels = 0;
+        short mLastSample = 0;
     };
 
     typedef SpeexResampler Resampler;

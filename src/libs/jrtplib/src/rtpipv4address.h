@@ -56,37 +56,37 @@ class RTPMemoryManager;
 class JRTPLIB_IMPORTEXPORT RTPIPv4Address : public RTPAddress
 {
 public:
-	/** Creates an instance with IP address \c ip and port number \c port (both are interpreted in host byte order). */
-  RTPIPv4Address(uint32_t ip = 0, uint16_t port = 0);
-	
-	/** Creates an instance with IP address \c ip and port number \c port (\c port is interpreted in host byte order). */
-  RTPIPv4Address(const uint8_t ip[4],uint16_t port = 0);
-  ~RTPIPv4Address();
+    /** Creates an instance with IP address \c ip and port number \c port (both are interpreted in host byte order). */
+    RTPIPv4Address(uint32_t ip = 0, uint16_t port = 0);
 
-	/** Sets the IP address for this instance to \c ip which is assumed to be in host byte order. */
-	void SetIP(uint32_t ip)																			{ RTPIPv4Address::ip = ip; }
+    /** Creates an instance with IP address \c ip and port number \c port (\c port is interpreted in host byte order). */
+    RTPIPv4Address(const uint8_t ip[4],uint16_t port = 0);
+    ~RTPIPv4Address();
 
-	/** Sets the IP address of this instance to \c ip. */
-	void SetIP(const uint8_t ip[4])																	{ RTPIPv4Address::ip = (uint32_t)ip[3]; RTPIPv4Address::ip |= (((uint32_t)ip[2])<<8); RTPIPv4Address::ip |= (((uint32_t)ip[1])<<16); RTPIPv4Address::ip |= (((uint32_t)ip[0])<<24); }
+    /** Sets the IP address for this instance to \c ip which is assumed to be in host byte order. */
+    void SetIP(uint32_t ip)																			{ RTPIPv4Address::ip = ip; }
 
-	/** Sets the port number for this instance to \c port which is interpreted in host byte order. */
-	void SetPort(uint16_t port)																		{ RTPIPv4Address::port = port; }
+    /** Sets the IP address of this instance to \c ip. */
+    void SetIP(const uint8_t ip[4])																	{ RTPIPv4Address::ip = (uint32_t)ip[3]; RTPIPv4Address::ip |= (((uint32_t)ip[2])<<8); RTPIPv4Address::ip |= (((uint32_t)ip[1])<<16); RTPIPv4Address::ip |= (((uint32_t)ip[0])<<24); }
 
-	/** Returns the IP address contained in this instance in host byte order. */
-	uint32_t GetIP() const																			{ return ip; }
+    /** Sets the port number for this instance to \c port which is interpreted in host byte order. */
+    void SetPort(uint16_t port)																		{ RTPIPv4Address::port = port; }
 
-	/** Returns the port number of this instance in host byte order. */
-	uint16_t GetPort() const																		{ return port; }
+    /** Returns the IP address contained in this instance in host byte order. */
+    uint32_t GetIP() const																			{ return ip; }
 
-	RTPAddress *CreateCopy(RTPMemoryManager *mgr) const;
-	bool IsSameAddress(const RTPAddress *addr) const;
-	bool IsFromSameHost(const RTPAddress *addr) const;
+    /** Returns the port number of this instance in host byte order. */
+    uint16_t GetPort() const																		{ return port; }
+
+    RTPAddress *CreateCopy(RTPMemoryManager *mgr) const;
+    bool IsSameAddress(const RTPAddress *addr) const;
+    bool IsFromSameHost(const RTPAddress *addr) const;
 #ifdef RTPDEBUG
-	std::string GetAddressString() const;
+    std::string GetAddressString() const;
 #endif // RTPDEBUG
 private:
-	uint32_t ip;
-	uint16_t port;
+    uint32_t ip;
+    uint16_t port;
 };
 
 } // end namespace

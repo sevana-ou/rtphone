@@ -7,6 +7,7 @@
 
 #include "rutil/Data.hxx"
 #include <iosfwd>
+#include <atomic>
 #include "rutil/resipfaststreams.hxx"
 
 namespace resip
@@ -21,7 +22,11 @@ class Message
 {
    public:
       Message();
-      virtual ~Message() {}
+      virtual ~Message() { --sInstanceCount; }
+
+      /// Live instance count of all Message-derived objects (leak indicator).
+      static std::atomic<long> sInstanceCount;
+      static long getInstanceCount() { return sInstanceCount.load(std::memory_order_relaxed); }
 
       /// facet for brief output to streams
       class Brief

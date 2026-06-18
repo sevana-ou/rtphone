@@ -9,8 +9,12 @@
 using namespace resip;
 
 
-Message::Message() : mTu(0) 
-{}
+std::atomic<long> Message::sInstanceCount{0};
+
+Message::Message() : mTu(0)
+{
+   ++sInstanceCount;
+}
 
 Message::Brief
 Message::brief() const

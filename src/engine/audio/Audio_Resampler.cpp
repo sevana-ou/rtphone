@@ -18,9 +18,7 @@ namespace Audio
 
 
 SpeexResampler::SpeexResampler()
-    :mContext(NULL), mErrorCode(0), mSourceRate(0), mDestRate(0), mLastSample(0), mChannels(0)
-{
-}
+{}
 
 void SpeexResampler::start(int channels, int sourceRate, int destRate)
 {
@@ -49,6 +47,11 @@ void SpeexResampler::stop()
         speex_resampler_destroy((SpeexResamplerState*)mContext);
         mContext = NULL;
     }
+}
+
+bool SpeexResampler::isOpened() const
+{
+    return mContext != nullptr;
 }
 
 SpeexResampler::~SpeexResampler()
@@ -113,22 +116,22 @@ size_t SpeexResampler::processBuffer(const void* src, size_t sourceLength, size_
     return outLen * sizeof(short) * mChannels;
 }
 
-int SpeexResampler::sourceRate()
+int SpeexResampler::sourceRate() const
 {
     return mSourceRate;
 }
 
-int SpeexResampler::destRate()
+int SpeexResampler::destRate() const
 {
     return mDestRate;
 }
 
-size_t SpeexResampler::getDestLength(size_t sourceLen)
+size_t SpeexResampler::getDestLength(size_t sourceLen) const
 {
     return size_t(sourceLen * (float(mDestRate) / mSourceRate) + 0.5f);
 }
 
-size_t SpeexResampler::getSourceLength(size_t destLen)
+size_t SpeexResampler::getSourceLength(size_t destLen) const
 {
     // Here we want to get 'destLen' number of samples
     return size_t(destLen * (float(mSourceRate) / mDestRate) + 0.5f);

@@ -6,7 +6,8 @@
 #include <list>
 #include <vector>
 #include <utility>
-#include <memory> 
+#include <memory>
+#include <atomic>
 
 #include "resip/stack/Contents.hxx"
 #include "resip/stack/Headers.hxx"
@@ -154,6 +155,10 @@ class SipMessage : public TransactionMessage
 {
    public:
       RESIP_HeapCount(SipMessage);
+
+      /// Live instance count of SipMessage objects (leak indicator).
+      static std::atomic<long> sInstanceCount;
+      static long getInstanceCount() { return sInstanceCount.load(std::memory_order_relaxed); }
 #ifndef __SUNPRO_CC
       typedef std::list< std::pair<Data, HeaderFieldValueList*>, StlPoolAllocator<std::pair<Data, HeaderFieldValueList*>, PoolBase > > UnknownHeaders;
 #else

@@ -28,6 +28,8 @@ using namespace std;
 
 bool SipMessage::checkContentLength=true;
 
+std::atomic<long> SipMessage::sInstanceCount{0};
+
 SipMessage::SipMessage(const Tuple *receivedTransportTuple)
    : mIsDecorated(false),
      mIsBadAck200(false),     
@@ -51,6 +53,7 @@ SipMessage::SipMessage(const Tuple *receivedTransportTuple)
    // !bwc! TODO make this tunable
    mHeaders.reserve(16);
    clear();
+   ++sInstanceCount;
 }
 
 SipMessage::SipMessage(const SipMessage& from)
@@ -63,6 +66,7 @@ SipMessage::SipMessage(const SipMessage& from)
      mCreatedTime(Timer::getTimeMicroSec())
 {
    init(from);
+   ++sInstanceCount;
 }
 
 Message*
@@ -98,6 +102,7 @@ SipMessage::~SipMessage()
    }
 #endif
    freeMem();
+   --sInstanceCount;
 }
 
 void
