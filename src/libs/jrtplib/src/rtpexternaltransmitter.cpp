@@ -772,6 +772,16 @@ void RTPExternalTransmitter::AbortWaitInternal()
 #endif // WIN32
 }
 
+// Convert a polymorphic RTPAddress into the RTPIPAddress variant that RTPRawPacket
+// now stores by value. Only IPv4 / IPv6 are representable; the external transmitter
+// is only ever fed IP addresses in this codebase.
+static RTPIPAddress ToRTPIPAddress(const RTPAddress *addr)
+{
+	if (addr->GetAddressType() == RTPAddress::IPv6Address)
+		return RTPIPAddress{ *static_cast<const RTPIPv6Address *>(addr) };
+	return RTPIPAddress{ *static_cast<const RTPIPv4Address *>(addr) };
+}
+
 void RTPExternalTransmitter::InjectRTP(const void *data, size_t len, const RTPAddress &a)
 {
 	if (!init)
@@ -801,13 +811,16 @@ void RTPExternalTransmitter::InjectRTP(const void *data, size_t len, const RTPAd
 	RTPTime curtime = RTPTime::CurrentTime();
 	RTPRawPacket *pack;
 
-	pack = RTPNew(GetMemoryManager(),RTPMEM_TYPE_CLASS_RTPRAWPACKET) RTPRawPacket(datacopy,len,addr,curtime,true,GetMemoryManager());
+	// RTPRawPacket now stores the address by value (RTPIPAddress variant), so it no
+	// longer takes ownership of addr; release it on every path.
+	pack = RTPNew(GetMemoryManager(),RTPMEM_TYPE_CLASS_RTPRAWPACKET) RTPRawPacket(datacopy,len,ToRTPIPAddress(addr),curtime,true,GetMemoryManager());
 	if (pack == 0)
 	{
 		RTPDelete(addr,GetMemoryManager());
 		RTPDeleteByteArray(localhostname,GetMemoryManager());
 		return;
 	}
+	RTPDelete(addr,GetMemoryManager());
 	rawpacketlist.push_back(pack);
 	AbortWaitInternal();
 
@@ -843,13 +856,16 @@ void RTPExternalTransmitter::InjectRTCP(const void *data, size_t len, const RTPA
 	RTPTime curtime = RTPTime::CurrentTime();
 	RTPRawPacket *pack;
 
-	pack = RTPNew(GetMemoryManager(),RTPMEM_TYPE_CLASS_RTPRAWPACKET) RTPRawPacket(datacopy,len,addr,curtime,false,GetMemoryManager());
+	// RTPRawPacket now stores the address by value (RTPIPAddress variant), so it no
+	// longer takes ownership of addr; release it on every path.
+	pack = RTPNew(GetMemoryManager(),RTPMEM_TYPE_CLASS_RTPRAWPACKET) RTPRawPacket(datacopy,len,ToRTPIPAddress(addr),curtime,false,GetMemoryManager());
 	if (pack == 0)
 	{
 		RTPDelete(addr,GetMemoryManager());
 		RTPDeleteByteArray(localhostname,GetMemoryManager());
 		return;
 	}
+	RTPDelete(addr,GetMemoryManager());
 	rawpacketlist.push_back(pack);
 	AbortWaitInternal();
 
@@ -893,13 +909,16 @@ void RTPExternalTransmitter::InjectRTPorRTCP(const void *data, size_t len, const
 	RTPTime curtime = RTPTime::CurrentTime();
 	RTPRawPacket *pack;
 
-	pack = RTPNew(GetMemoryManager(),RTPMEM_TYPE_CLASS_RTPRAWPACKET) RTPRawPacket(datacopy,len,addr,curtime,rtp,GetMemoryManager());
+	// RTPRawPacket now stores the address by value (RTPIPAddress variant), so it no
+	// longer takes ownership of addr; release it on every path.
+	pack = RTPNew(GetMemoryManager(),RTPMEM_TYPE_CLASS_RTPRAWPACKET) RTPRawPacket(datacopy,len,ToRTPIPAddress(addr),curtime,rtp,GetMemoryManager());
 	if (pack == 0)
 	{
 		RTPDelete(addr,GetMemoryManager());
 		RTPDeleteByteArray(localhostname,GetMemoryManager());
 		return;
 	}
+	RTPDelete(addr,GetMemoryManager());
 	rawpacketlist.push_back(pack);
 	AbortWaitInternal();
 

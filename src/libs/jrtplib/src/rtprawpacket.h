@@ -41,11 +41,16 @@
 #include "rtpconfig.h"
 #include "rtptimeutilities.h"
 #include "rtpaddress.h"
+#include "rtpipv4address.h"
+#include "rtpipv6address.h"
 #include "rtptypes.h"
 #include "rtpmemoryobject.h"
+#include <variant>
+#include <utility>
 
 namespace jrtplib
 {
+typedef std::variant<RTPIPv4Address, RTPIPv6Address> RTPIPAddress;
 
 /** This class is used by the transmission component to store the incoming RTP and RTCP data in. */
 class JRTPLIB_IMPORTEXPORT RTPRawPacket : public RTPMemoryObject
@@ -58,7 +63,7 @@ public:
 	 *  The flag which indicates whether this data is RTP or RTCP data is set to \c rtp. A memory
 	 *  manager can be installed as well.
 	 */
-    RTPRawPacket(uint8_t *data, size_t datalen, RTPAddress *address, const RTPTime &recvtime, bool rtp, RTPMemoryManager *mgr = 0);
+    RTPRawPacket(uint8_t *data, size_t datalen, RTPIPAddress address, const RTPTime &recvtime, bool rtp, RTPMemoryManager *mgr = 0);
 	~RTPRawPacket();
 	
 	/** Returns the pointer to the data which is contained in this packet. */
@@ -71,7 +76,14 @@ public:
 	RTPTime GetReceiveTime() const											{ return receivetime; }
 
 	/** Returns the address stored in this packet. */
-	const RTPAddress *GetSenderAddress() const								{ return senderaddress; }
+    const RTPAddress* GetSenderAddress() const					            {
+        switch (senderaddress.index()) {
+        case 0: return std::get_if<RTPIPv4Address>(&senderaddress);
+        case 1: return std::get_if<RTPIPv6Address>(&senderaddress);
+        default:
+            return nullptr;
+        }
+    }
 
 	/** Returns \c true if this data is RTP data, \c false if it is RTCP data. */
 	bool IsRTP() const														{ return isrtp; }
@@ -88,25 +100,21 @@ private:
 	uint8_t *packetdata;
 	size_t packetdatalength;
 	RTPTime receivetime;
-	RTPAddress *senderaddress;
+    RTPIPAddress senderaddress;
 	bool isrtp;
 };
 
-inline RTPRawPacket::RTPRawPacket(uint8_t *data, size_t datalen, RTPAddress *address, const RTPTime &recvtime, bool rtp, RTPMemoryManager *mgr):RTPMemoryObject(mgr),receivetime(recvtime)
+inline RTPRawPacket::RTPRawPacket(uint8_t *data, size_t datalen, RTPIPAddress address, const RTPTime &recvtime, bool rtp, RTPMemoryManager *mgr):RTPMemoryObject(mgr),receivetime(recvtime),senderaddress(std::move(address))
 {
 	packetdata = data;
 	packetdatalength = datalen;
-	senderaddress = address;
 	isrtp = rtp;
-    receivetime = recvtime;
 }
 
 inline RTPRawPacket::~RTPRawPacket()
 {
     if (packetdata)
             RTPDeleteByteArray(packetdata,GetMemoryManager());
-	if (senderaddress)
-            RTPDelete(senderaddress,GetMemoryManager());
 }
 
 } // end namespace

@@ -28,6 +28,14 @@ public:
         bool mWrapIuUP              = false;
         bool mSkipDecode            = false;
 
+        // When set, fillCodecMap() registers the payload-type keys but leaves the codec
+        // objects null; each codec is created on first use (add()/findCodec()/infoFor()).
+        // A passive monitor (vq-core) creates one AudioReceiver per media stream and most
+        // streams use only 1-2 payload types, so eagerly creating every registered codec
+        // (G722 enc+dec, G729, Opus, AMR, EVS, ...) per stream is pure waste. Default false
+        // keeps the eager behaviour for all other consumers (softphone, etc.).
+        bool mLazyCodecMap          = false;
+
         // RFC2833 DTMF
         int mTelephoneEvent = -1;
 

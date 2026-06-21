@@ -10,6 +10,7 @@
 #include "MT_Dtmf.h"
 #include "../helper/HL_Log.h"
 #include "../helper/HL_Time.h"
+#include "../helper/HL_PoolAllocator.h"
 #include "../audio/Audio_Interface.h"
 #include "../audio/Audio_Resampler.h"
 #include <cmath>
@@ -158,8 +159,9 @@ std::shared_ptr<RtpBuffer::Packet> RtpBuffer::add(const std::shared_ptr<jrtplib:
 
     if (newSeqno > minno || (available < mHigh))
     {
-        // Insert into queue
-        auto p = std::make_shared<Packet>(packet, timelength, rate);
+        // Insert into queue. Pool the per-packet Packet node (object + shared_ptr control block)
+        // via allocate_shared; this churns at the RTP packet rate even on network-MOS-only streams.
+        auto p = std::allocate_shared<Packet>(hl::PoolAllocator<Packet>{}, packet, timelength, rate);
         mPacketList.push_back(p);
 
         // Sort again
@@ -411,11 +413,36 @@ void AudioReceiver::setCodecSettings(const CodecList::Settings& codecSettings)
     if (mCodecSettings == codecSettings)
         return;
 
+    // Preserve the lazy-codec-map policy across SDP-driven updates: codecSettings comes from
+    // parseSdp()/per-call negotiation and defaults mLazyCodecMap to false, but the policy is
+    // set by the owner (vq-core) and must not be lost mid-stream.
+    const bool lazy = mCodecSettings.mLazyCodecMap;
     mCodecSettings = codecSettings;
+    mCodecSettings.mLazyCodecMap = lazy;
     mCodecList.setSettings(mCodecSettings); // This builds factory list with proper payload types according to payload types in settings
 
     // Rebuild codec map from factory list
     mCodecList.fillCodecMap(mCodecMap);
+}
+
+Codec* AudioReceiver::ensureCodec(int payloadType)
+{
+    auto codecIter = mCodecMap.find(payloadType);
+    if (codecIter == mCodecMap.end())
+        return nullptr;
+
+    // mLazyCodecMap leaves the value null until first use - create it now.
+    if (!codecIter->second)
+        codecIter->second = mCodecList.createCodecByPayloadType(payloadType);
+
+    return codecIter->second.get();
+}
+
+CngDecoder& AudioReceiver::cng()
+{
+    if (!mCngDecoder)
+        mCngDecoder = std::make_unique<CngDecoder>();
+    return *mCngDecoder;
 }
 
 CodecList::Settings& AudioReceiver::getCodecSettings()
@@ -548,7 +575,7 @@ void AudioReceiver::produceCNG(std::chrono::milliseconds length, Audio::DataWind
         if (options.mSkipDecode)
             mDecodedLength = 0;
         else
-            mDecodedLength = mCngDecoder.produce(mCodec->samplerate(), 100, mDecodedFrame.data(), false);
+            mDecodedLength = cng().produce(mCodec->samplerate(), 100, mDecodedFrame.data(), false);
 
         if (mDecodedLength)
             processDecoded(output, options);
@@ -561,7 +588,7 @@ void AudioReceiver::produceCNG(std::chrono::milliseconds length, Audio::DataWind
         if (options.mSkipDecode)
             mDecodedLength = 0;
         else
-            mDecodedLength = mCngDecoder.produce(mCodec->samplerate(), tail, reinterpret_cast<short*>(mDecodedFrame.data()), false);
+            mDecodedLength = cng().produce(mCodec->samplerate(), tail, reinterpret_cast<short*>(mDecodedFrame.data()), false);
 
         if (mDecodedLength)
             processDecoded(output, options);
@@ -579,7 +606,7 @@ AudioReceiver::DecodeResult AudioReceiver::decodeGapTo(Audio::DataWindow& output
         {
             // Synthesize comfort noise. It will be done on AUDIO_SAMPLERATE rate directly to mResampledFrame buffer.
             // Do not forget to send this noise to analysis
-            mDecodedLength = mCngDecoder.produce(mCodec->samplerate(), mLastPacketTimeLength, reinterpret_cast<short*>(mDecodedFrame.data()), false);
+            mDecodedLength = cng().produce(mCodec->samplerate(), mLastPacketTimeLength, reinterpret_cast<short*>(mDecodedFrame.data()), false);
         }
         else
             decodePacketTo(output, options, mCngPacket);
@@ -668,10 +695,10 @@ AudioReceiver::DecodeResult AudioReceiver::decodePacketTo(Audio::DataWindow& out
             {
                 ICELogDebug(<< "Decoding CNG");
                 mCngPacket = packet;
-                mCngDecoder.decode3389(rtp.GetPayloadData(), rtp.GetPayloadLength());
+                cng().decode3389(rtp.GetPayloadData(), rtp.GetPayloadLength());
 
                 // Emit CNG mLastPacketLength milliseconds
-                mDecodedLength = mCngDecoder.produce(mCodec->samplerate(), mLastPacketTimeLength, (short*)mDecodedFrame.data(), true);
+                mDecodedLength = cng().produce(mCodec->samplerate(), mLastPacketTimeLength, (short*)mDecodedFrame.data(), true);
                 if (mDecodedLength)
                     processDecoded(output, options);
             }
@@ -758,7 +785,7 @@ AudioReceiver::DecodeResult AudioReceiver::decodeEmptyTo(Audio::DataWindow& outp
                 int ms = bytesPerMs ? (int)std::min<int64_t>(options.mElapsed.count(), (int64_t)(room / bytesPerMs)) : 0;
                 if (ms <= 0)
                     return {.mStatus = DecodeResult::Status::Skip};
-                auto produced = mCngDecoder.produce(fmt.rate(), ms, (short*)(output.mutableData() + output.filled()), false);
+                auto produced = cng().produce(fmt.rate(), ms, (short*)(output.mutableData() + output.filled()), false);
                 output.setFilled(output.filled() + produced);
                 return {.mStatus = DecodeResult::Status::Ok, .mSamplerate = fmt.rate(), .mChannels = fmt.channels()};
             }
@@ -946,11 +973,7 @@ void AudioReceiver::makeMonoAndResample(int rate, int channels)
 
 Codec* AudioReceiver::findCodec(int payloadType)
 {
-    MT::CodecMap::const_iterator codecIter = mCodecMap.find(payloadType);
-    if (codecIter == mCodecMap.end())
-        return nullptr;
-
-    return codecIter->second.get();
+    return ensureCodec(payloadType);
 }
 
 
@@ -987,10 +1010,7 @@ int AudioReceiver::getSize() const
 
 AudioReceiver::MediaInfo AudioReceiver::infoFor(jrtplib::RTPPacket& p)
 {
-    CodecMap::iterator codecIter = mCodecMap.find(p.GetPayloadType());
-    if (codecIter == mCodecMap.end())
-        return {};
-    PCodec codec = codecIter->second;
+    Codec* codec = ensureCodec(p.GetPayloadType());
     if (!codec)
         return {};
 
@@ -1007,7 +1027,7 @@ AudioReceiver::MediaInfo AudioReceiver::infoFor(jrtplib::RTPPacket& p)
     else
     if (typeid(*codec) == typeid(OpusCodec))
     {
-        OpusCodec* oc = dynamic_cast<OpusCodec*>(codec.get());
+        OpusCodec* oc = dynamic_cast<OpusCodec*>(codec);
         assert(oc);
         size_t samplesCount = oc->getNumberOfSamples({p.GetPayloadData(), p.GetPayloadLength()});
         int sampleratePerMs = codec->samplerate() / 1000;

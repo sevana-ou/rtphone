@@ -237,6 +237,13 @@ public:
     void updateDecodingTimeStatistics();
 
 protected:
+    // Resolve (and lazily create) the codec for a payload type. Returns null when no
+    // factory handles it. Used by add()/findCodec()/infoFor() so mLazyCodecMap works.
+    Codec* ensureCodec(int payloadType);
+
+    // Lazily create the comfort-noise decoder on first use.
+    CngDecoder& cng();
+
     RtpBuffer                           mRtpBuffer;             // RTP jitter buffer itself; here are audio packets
     RtpBuffer                           mDtmfBuffer;            // These two (mDtmfBuffer / mDtmfReceiver) are for our analyzer stack only; in normal softphone logic DTMF packets goes via SingleAudioStream::mDtmfReceiver
     DtmfReceiver                        mDtmfReceiver;
@@ -248,7 +255,9 @@ protected:
     CodecList                           mCodecList;
     JitterStatistics                    mJitterStats;
     std::shared_ptr<RtpBuffer::Packet>  mCngPacket;
-    CngDecoder                          mCngDecoder;
+    // Lazily created on first CNG use (getAudioTo); its ctor calls WebRtcCng_CreateDec,
+    // which is wasted for the many streams that never decode comfort noise. Access via cng().
+    std::unique_ptr<CngDecoder>         mCngDecoder;
     size_t                              mDTXSamplesToEmit = 0;   // How much silence (or CNG) should be emited before next RTP packet gets into the action
 
     // Already decoded data that can be retrieved without actual decoding - it may happen because of getAudioTo() may be limited by time interval

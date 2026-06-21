@@ -86,9 +86,9 @@ public:
 #endif // RTPDEBUG
 	
 	virtual ~RTPAddress()						{ }
+    // only allow subclasses to be created
+    RTPAddress(const AddressType t) : addresstype(t) 		{ }
 protected:
-	// only allow subclasses to be created
-	RTPAddress(const AddressType t) : addresstype(t) 		{ }
 private:
 	const AddressType addresstype;
 };

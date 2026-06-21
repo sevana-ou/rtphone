@@ -188,11 +188,11 @@ std::shared_ptr<jrtplib::RTPPacket> RtpDump::parseRtpData(const uint8_t* data, s
 
     try {
         // Both are heap-allocated; RTPRawPacket takes ownership and deletes them
-        auto* addr = new jrtplib::RTPIPv4Address(uint32_t(0), uint16_t(0));
+        jrtplib::RTPIPAddress senderAddress = {jrtplib::RTPIPv4Address(uint32_t(0), uint16_t(0))};
         uint8_t* dataCopy = new uint8_t[len];
         std::memcpy(dataCopy, data, len);
 
-        jrtplib::RTPRawPacket raw(dataCopy, len, addr, jrtplib::RTPTime(0), true);
+        jrtplib::RTPRawPacket raw(dataCopy, len, senderAddress, jrtplib::RTPTime(0), true);
         auto packet = std::make_shared<jrtplib::RTPPacket>(raw);
 
         if (packet->GetCreationError() != 0)

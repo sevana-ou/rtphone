@@ -97,6 +97,7 @@ public:
 #ifdef RTPDEBUG
 	std::string GetAddressString() const;
 #endif // RTPDEBUG
+
 private:
 	in6_addr ip;
 	uint16_t port;

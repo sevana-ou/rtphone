@@ -278,7 +278,7 @@ int RTPSources::ProcessRawPacket(RTPRawPacket *rawpack,RTPTransmitter *rtptrans[
 			}
 			else // not our own packet
 			{
-				status = ProcessRTCPCompoundPacket(&rtcpcomppack,rawpack->GetReceiveTime(),rawpack->GetSenderAddress());
+                status = ProcessRTCPCompoundPacket(&rtcpcomppack, rawpack->GetReceiveTime(), rawpack->GetSenderAddress());
 				if (status < 0)
 					return status;
 			}

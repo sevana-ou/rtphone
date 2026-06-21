@@ -1316,14 +1316,17 @@ int RTPUDPv4Transmitter::PollSocket(bool rtp)
 				}
 				memcpy(datacopy,packetbuffer,recvlen);
 				
-				pack = RTPNew(GetMemoryManager(),RTPMEM_TYPE_CLASS_RTPRAWPACKET) RTPRawPacket(datacopy,recvlen,addr,curtime,rtp,GetMemoryManager());
+				// RTPRawPacket now stores the address by value (RTPIPAddress variant),
+				// so it no longer takes ownership of addr; release it on every path.
+				pack = RTPNew(GetMemoryManager(),RTPMEM_TYPE_CLASS_RTPRAWPACKET) RTPRawPacket(datacopy,recvlen,*addr,curtime,rtp,GetMemoryManager());
 				if (pack == 0)
 				{
 					RTPDelete(addr,GetMemoryManager());
 					RTPDeleteByteArray(datacopy,GetMemoryManager());
 					return ERR_RTP_OUTOFMEM;
 				}
-				rawpacketlist.push_back(pack);	
+				RTPDelete(addr,GetMemoryManager());
+				rawpacketlist.push_back(pack);
 			}
 		}
 		len = 0;

@@ -410,8 +410,10 @@ void CodecList::fillCodecMap(CodecMap& cm)
     cm.clear();
     for (auto& factory: mFactoryList)
     {
-        // Create codec here. Although they are not needed right now - they can be needed to find codec's info.
-        PCodec c = factory->create();
+        // Register the payload-type key. With mLazyCodecMap the codec object is left null
+        // and created on first use (see AudioReceiver::add/findCodec/infoFor); otherwise it
+        // is created eagerly so codec info is available without a packet.
+        PCodec c = mSettings.mLazyCodecMap ? PCodec{} : factory->create();
         cm.insert({factory->payloadType(), c});
     }
 }

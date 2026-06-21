@@ -50,9 +50,9 @@ public:
         int samplerate() override;
         int payloadType() override;
 
-        void updateSdp(resip::SdpContents::Session::Medium::CodecContainer& codecs, SdpDirection direction) override;
-        int processSdp(const resip::SdpContents::Session::Medium::CodecContainer& codecs, SdpDirection direction) override;
-        void create(CodecMap& codecs) override;
+        void    updateSdp(resip::SdpContents::Session::Medium::CodecContainer& codecs, SdpDirection direction) override;
+        int     processSdp(const resip::SdpContents::Session::Medium::CodecContainer& codecs, SdpDirection direction) override;
+        void    create(CodecMap& codecs) override;
 
         PCodec create() override;
 
