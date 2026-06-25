@@ -17,18 +17,25 @@ Uuid::Uuid()
 Uuid Uuid::generateOne()
 {
     Uuid result;
-// #if defined(TARGET_LINUX)
-//     auto id = uuids::uuid_system_generator{}();
-// #else
-    std::random_device rd;
-    auto seed_data = std::array<int, std::mt19937::state_size> {};
-    std::generate(std::begin(seed_data), std::end(seed_data), std::ref(rd));
-    std::seed_seq seq(std::begin(seed_data), std::end(seed_data));
-    std::mt19937 generator(seq);
-    uuids::uuid_random_generator gen{generator};
 
+    // A fully-seeded Mersenne Twister, built ONCE per thread. The previous code
+    // re-seeded a fresh mt19937 from std::random_device on every call: filling
+    // mt19937::state_size (624) words via std::random_device means ~624 RDSEED
+    // instructions per UUID. Since a UUID is minted for every new stream and streams
+    // churn constantly under load, that dominated decode-thread CPU. Seeding once per
+    // thread keeps the identical seed quality but turns each UUID into a cheap engine
+    // advance. thread_local => each thread owns its engine, so no sharing / no locks.
+    static thread_local std::mt19937 generator = []
+    {
+        std::random_device rd;
+        auto seed_data = std::array<int, std::mt19937::state_size> {};
+        std::generate(std::begin(seed_data), std::end(seed_data), std::ref(rd));
+        std::seed_seq seq(std::begin(seed_data), std::end(seed_data));
+        return std::mt19937(seq);
+    }();
+
+    uuids::uuid_random_generator gen{generator};
     auto id = gen();
-// #endif
     memcpy(result.mUuid, id.as_bytes().data(), id.as_bytes().size_bytes());
     return result;
 }
