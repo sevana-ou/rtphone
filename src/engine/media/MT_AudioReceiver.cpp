@@ -31,7 +31,7 @@ RtpBuffer::Packet::Packet(const std::shared_ptr<RTPPacket>& packet, std::chrono:
     :mRtp(packet), mTimelength(timelength), mSamplerate(samplerate)
 {}
 
-std::shared_ptr<RTPPacket> RtpBuffer::Packet::rtp() const
+const std::shared_ptr<RTPPacket>& RtpBuffer::Packet::rtp() const
 {
     return mRtp;
 }

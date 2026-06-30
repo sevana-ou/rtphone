@@ -35,7 +35,7 @@ public:
     {
     public:
         Packet(const std::shared_ptr<RTPPacket>& packet, std::chrono::milliseconds timelen, int samplerate);
-        std::shared_ptr<RTPPacket> rtp() const;
+        const std::shared_ptr<RTPPacket>& rtp() const;
 
         std::chrono::milliseconds timelength() const;
         int samplerate() const;
