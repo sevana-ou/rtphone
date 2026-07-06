@@ -172,12 +172,17 @@ namespace ice
   class BufferWriter
   {
   protected:
-    uint8_t* mData;
-    size_t mIndex;
+    ByteBuffer* mBuffer;  // Non-null => growable: writes resize this buffer to fit
+    uint8_t* mData;       // Cached write pointer (refreshed on growth in growable mode)
+    size_t mBase;         // Start offset within mBuffer (growable mode)
+    size_t mIndex;        // Bytes written since mBase
+    size_t mCapacity;     // Usable capacity from mData (raw/bounded mode)
 
   public:
-    BufferWriter(void* output);
-    BufferWriter(ByteBuffer& buffer);
+    // Bounded writer over caller-owned memory. Writes past 'capacity' are refused.
+    BufferWriter(void* output, size_t capacity);
+    // Growable writer: the backing buffer is resized as needed so writes never overflow.
+    BufferWriter(ByteBuffer& buffer, size_t startOffset = 0);
 
     void          writeUInt(uint32_t value);
     void          writeUShort(uint16_t value);

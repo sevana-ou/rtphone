@@ -497,12 +497,12 @@ size_t BufferReader::count() const
 }
 
 // -------------- BufferWriter ----------------------
-BufferWriter::BufferWriter(ByteBuffer &buffer)
-    :mData(buffer.mutableData()), mIndex(0)
+BufferWriter::BufferWriter(ByteBuffer &buffer, size_t startOffset)
+    :mBuffer(&buffer), mData(buffer.mutableData() + startOffset), mBase(startOffset), mIndex(0), mCapacity(0)
 {}
 
-BufferWriter::BufferWriter(void *output)
-    :mData(reinterpret_cast<uint8_t*>(output)), mIndex(0)
+BufferWriter::BufferWriter(void *output, size_t capacity)
+    :mBuffer(nullptr), mData(reinterpret_cast<uint8_t*>(output)), mBase(0), mIndex(0), mCapacity(capacity)
 {}
 
 
@@ -545,6 +545,30 @@ void BufferWriter::writeIp(const NetworkAddress& ip)
 
 void BufferWriter::writeBuffer(const void* dataPtr, size_t dataSize)
 {
+    if (dataSize == 0)
+        return;
+
+    if (mBuffer)
+    {
+        // Growable mode: ensure the backing buffer is large enough, then refresh
+        // the cached pointer in case resize() reallocated the storage.
+        size_t needed = mBase + mIndex + dataSize;
+        if (needed > mBuffer->size())
+            mBuffer->resize(needed);
+        mData = mBuffer->mutableData() + mBase;
+    }
+    else
+    {
+        // Bounded mode: never write past the caller-supplied capacity.
+        if (mIndex + dataSize > mCapacity)
+        {
+            assert(0 && "BufferWriter capacity exceeded");
+            dataSize = mIndex < mCapacity ? mCapacity - mIndex : 0;
+            if (dataSize == 0)
+                return;
+        }
+    }
+
     memmove(mData + mIndex, dataPtr, dataSize);
     mIndex += dataSize;
 }

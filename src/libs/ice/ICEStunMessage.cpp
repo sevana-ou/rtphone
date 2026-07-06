@@ -216,8 +216,10 @@ void StunMessage::buildPacket(ByteBuffer& buffer, const std::string& password)
   for (size_t i=0; i<4; i++)
     bitstream.writeBit(bit(msgtype, 3-i));
   
-  // Enqueue 2 bytes of length - now it is zero
-  BufferWriter stream(buffer.mutableData() + bitstream.count() / 8);
+  // Enqueue 2 bytes of length - now it is zero.
+  // Growable writer starting right after the bits already emitted; it resizes
+  // 'buffer' as attributes are appended so an oversized message cannot overflow.
+  BufferWriter stream(buffer, bitstream.count() / 8);
   stream.writeUShort(0);
 
   // Enqueue magic cookie value
