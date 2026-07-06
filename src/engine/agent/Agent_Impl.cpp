@@ -189,6 +189,7 @@ void AgentImpl::processConfig(JsonCpp::Value &d, JsonCpp::Value &answer)
 
     config()[CONFIG_MULTIPLEXING] = true;
     config()[CONFIG_DISPLAYNAME] = "Voip quality tester";
+    config()[CONFIG_USERAGENT] = d["useragent"].asString();
 
     mUseNativeAudio = d["nativeaudio"].asBool();
     config()[CONFIG_OWN_DNS] = d["dns_servers"].asString();
