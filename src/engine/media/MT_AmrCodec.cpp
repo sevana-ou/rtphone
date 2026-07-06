@@ -94,8 +94,20 @@ static AmrPayload parseAmrPayload(AmrPayloadInfo& input, size_t& cngCounter)
     // Table of contents
     uint8_t F, FT, Q;
 
+    // Bits consumed by a single ToC entry: F(1) + FT(4) + Q(1), plus 2 padding
+    // bits in octet-aligned mode.
+    const size_t tocEntryBits = input.mOctetAligned ? 8 : 6;
+
     do
     {
+        // Stop when the payload no longer holds a full ToC entry. BitReader
+        // saturates at end-of-stream (re-reads the last bit) instead of
+        // signalling EOF, so trusting the F continuation bit alone would loop
+        // forever - and append AmrFrames unbounded - on a truncated or crafted
+        // payload whose final bit is 1.
+        if (bit_reader.position() + tocEntryBits > bit_reader.count())
+            break;
+
         // Read TOC. It is still relates to RTP part of AMR frames packing; not the AMR frame itself.
         //    F (1 bit): If set to 1, indicates that this frame is followed by
         // another speech frame in this payload; if set to 0, indicates that
