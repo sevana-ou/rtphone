@@ -37,11 +37,14 @@ void SingleAudioStream::copyPcmTo(Audio::DataWindow& output, int needed)
         // Number of bytes to fill on this step
         auto requested = needed - output.filled();
 
+        // requested is in bytes: 16-bit samples at AUDIO_SAMPLERATE/AUDIO_CHANNELS
+        constexpr int bytesPerMs = AUDIO_SAMPLERATE / 1000 * sizeof(int16_t) * AUDIO_CHANNELS;
+
         auto options = AudioReceiver::DecodeOptions{
             .mRealtimeProcessing = true,
             .mResampleToMainRate = true,
             .mSkipDecode = false,
-            .mElapsed  = std::chrono::milliseconds(requested / (AUDIO_SAMPLERATE / 1000))
+            .mElapsed  = std::chrono::milliseconds(requested / bytesPerMs)
         };
 
         // Try to get the data from receiver / decoder

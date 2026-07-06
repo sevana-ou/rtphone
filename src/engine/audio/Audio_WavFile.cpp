@@ -150,6 +150,14 @@ bool WavFileReader::open(const std::filesystem::path& p)
         if (mBits != 16)
             THROW_READERROR;
 
+        // The read path is mono-only: it divides byte counts by AUDIO_CHANNELS
+        // and starts the resampler with AUDIO_CHANNELS. Reject anything else -
+        // a multi-channel file would make read() copy more source bytes than the
+        // caller's (mono-sized) output buffer can hold. Also reject a zero rate,
+        // which would divide by zero in readRaw() / poison the resampler ratio.
+        if (mChannels != AUDIO_CHANNELS || mSamplerate == 0)
+            THROW_READERROR;
+
         // Look for the chunk 'data'
         mInput->seekg(fmtStart + std::streampos(fmtSize));
 

@@ -66,10 +66,13 @@ size_t SpeexResampler::processBuffer(const void* src, size_t sourceLength, size_
 
     if (mDestRate == mSourceRate)
     {
+        // Pass-through, but never write past the caller's buffer: clamp to its
+        // capacity instead of trusting sourceLength (which is caller/file driven).
         assert(destCapacity >= sourceLength);
-        memcpy(dest, src, sourceLength);
-        sourceProcessed = sourceLength;
-        return sourceLength;
+        size_t copied = std::min(sourceLength, destCapacity);
+        memcpy(dest, src, copied);
+        sourceProcessed = copied;
+        return copied;
     }
 
     if (!mContext)
