@@ -27,8 +27,10 @@
 #define AUDIO_MIX_CHANNEL_COUNT 16
 #define AUDIO_DEVICEPAIR_INPUTBUFFER 16384
 
-// Avoid too high resampler quality - it can take many CPU and cause gaps in playing
-#define AUDIO_RESAMPLER_QUALITY 1
+// Resampler quality on the Speex 0..10 scale. Quality 1 upsampling (e.g. G.711 8k -> 48k)
+// adds audible aliasing and hurts PVQA/AQuA scores; 7 is a good fidelity/CPU balance for a
+// single mono stream on modern ARM64. Raise toward 10 for max fidelity if CPU allows.
+#define AUDIO_RESAMPLER_QUALITY 7
 #define AEC_FRAME_TIME 10
 #define AEC_TAIL_TIME 160
 

@@ -381,6 +381,12 @@ AudioReceiver::AudioReceiver(const CodecList::Settings& settings, MT::Statistics
     // Avoid collecting too much data
     mRtpBuffer.setHigh(240ms);
 
+    // Keep a non-zero low-water cushion. With low-water at 0 the buffer drains all the way to
+    // empty before reacting, so ordinary clock drift / jitter periodically starves the decoder
+    // and forces silence/PLC insertion (heard as periodic artifacts, uncounted by rtp_lost /
+    // rtp_dropped). Holding ~60ms lets a late packet arrive before the buffer underruns.
+    mRtpBuffer.setLow(60ms);
+
     // Resamplers are lazy inside; there is no actual memory allocation
     mResampler8.start(AUDIO_CHANNELS, 8000, AUDIO_SAMPLERATE);
     mResampler16.start(AUDIO_CHANNELS, 16000, AUDIO_SAMPLERATE);
