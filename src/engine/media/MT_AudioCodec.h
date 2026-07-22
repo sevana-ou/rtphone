@@ -113,6 +113,7 @@ public:
     EncodeResult    encode(std::span<const uint8_t> input, std::span<uint8_t> output) override;
     DecodeResult    decode(std::span<const uint8_t> input, std::span<uint8_t> output) override;
     size_t          plc(int lostFrames, std::span<uint8_t> output) override;
+    size_t          fec(std::span<const uint8_t> nextPacket, std::span<uint8_t> output) override;
 
     size_t          getNumberOfSamples(std::span<const uint8_t> payload);
 };

@@ -106,6 +106,17 @@ public:
 
     FetchResult fetch();
 
+    // Return the oldest buffered packet without removing it, or nullptr when empty.
+    // After fetch() reports a Gap the post-gap packet stays at the front, so this
+    // lets the decoder peek at it (e.g. to pull Opus in-band FEC) before it is
+    // fetched and decoded normally on the next call.
+    std::shared_ptr<Packet> peekFront() const;
+
+    // Thread-safe snapshot of the currently buffered audio duration. Same value as
+    // findTimelength() but taken under the buffer lock, safe to call from the audio
+    // thread while the network thread adds packets (used by the diagnostic heartbeat).
+    std::chrono::milliseconds bufferedTime() const;
+
     // Drop oldest packets so buffered audio stays within the high-water mark,
     // recording packet-loss events for any sequence gaps crossed (the same
     // accounting fetch() performs). Used to bound memory on streams that never
@@ -326,6 +337,16 @@ protected:
     std::chrono::microseconds mIntervalBetweenDecode = 0us;
     size_t mDecodeCount = 0;
     void updateDecodeIntervalStatistics();
+
+    // --- Step 0 diagnostics: periodic receive-path heartbeat ---
+    // Emits jitter-buffer fill level, starvation (underrun) count, gap/loss/drop
+    // deltas every ~5 s so we can tell which impairment mechanism dominates a call.
+    float  mStatLogLast = 0.0f;      // now_ms() of last heartbeat; 0 = not started
+    size_t mUnderrunCount = 0;       // silence insertions on an empty/starved buffer since last log
+    size_t mGapCount = 0;            // gap (loss) concealment events since last log
+    size_t mStatLossLast = 0;        // mStat.mPacketLoss at last heartbeat
+    size_t mStatDropLast = 0;        // mStat.mPacketDropped at last heartbeat
+    void logReceiveHeartbeat();
 
 };
 

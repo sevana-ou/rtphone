@@ -88,6 +88,13 @@ public:
     // Returns size of produced data (PCM signed short) in bytes
     virtual size_t plc(int lostFrames, std::span<uint8_t> output) = 0;
 
+    // In-band forward error correction. Reconstructs the single frame lost
+    // immediately before nextPacket, using the redundant (LBRR) copy that
+    // nextPacket may carry. Returns the number of PCM bytes written to output,
+    // or 0 when the codec has no in-band FEC or no redundant data was present
+    // (in which case the caller should fall back to plc()). Default: unsupported.
+    virtual size_t fec(std::span<const uint8_t> nextPacket, std::span<uint8_t> output) { return 0; }
+
 };
 }
 #endif

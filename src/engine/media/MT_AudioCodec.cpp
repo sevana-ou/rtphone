@@ -571,6 +571,41 @@ size_t OpusCodec::plc(int lostPackets, std::span<uint8_t> output)
     return total;
 }
 
+size_t OpusCodec::fec(std::span<const uint8_t> nextPacket, std::span<uint8_t> output)
+{
+    // Reconstruct the frame lost right before nextPacket from its LBRR data.
+    // Needs an initialized decoder; the very first gap of a call (no packet
+    // decoded yet) has none, so we bail and let the caller do silence/PLC.
+    if (nextPacket.empty() || !mDecoderCtx || output.empty())
+        return 0;
+
+    // opus_decode(..., decode_fec=1) emits its audio at the decoder's channel
+    // count. Only the matched-channel case is handled here; on a mismatch we
+    // return 0 so decodeGapTo() falls back to plc() (which does convert).
+    if (mDecoderChannels != channels())
+        return 0;
+
+    // The recovered frame is assumed to have the negotiated ptime - the same
+    // assumption plc() makes. frame_size is samples-per-channel.
+    int samples_per_channel = mPTime * mSamplerate / 1000;
+    if (samples_per_channel <= 0)
+        return 0;
+
+    size_t needed = (size_t)samples_per_channel * sizeof(opus_int16) * channels();
+    if (needed > output.size_bytes())
+        return 0;
+
+    // decode_fec = 1: pull the redundant copy of the previous frame. If nextPacket
+    // carries no LBRR for it, Opus falls back to its own concealment internally,
+    // so the result is never worse than plc().
+    int decoded = opus_decode(mDecoderCtx, nextPacket.data(), nextPacket.size_bytes(),
+                              (opus_int16*)output.data(), samples_per_channel, 1);
+    if (decoded <= 0)
+        return 0;
+
+    return (size_t)decoded * sizeof(opus_int16) * channels();
+}
+
 size_t OpusCodec::getNumberOfSamples(std::span<const uint8_t> payload)
 {
     int r = opus_packet_get_nb_samples(payload.data(), payload.size(), mSamplerate);

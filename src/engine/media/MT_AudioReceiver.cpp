@@ -348,6 +348,21 @@ std::chrono::milliseconds RtpBuffer::findTimelength()
     return r;
 }
 
+std::shared_ptr<RtpBuffer::Packet> RtpBuffer::peekFront() const
+{
+    Lock l(mGuard);
+    return mPacketList.empty() ? std::shared_ptr<Packet>() : mPacketList.front();
+}
+
+std::chrono::milliseconds RtpBuffer::bufferedTime() const
+{
+    Lock l(mGuard);
+    std::chrono::milliseconds r = 0ms;
+    for (const auto& p: mPacketList)
+        r += p->timelength();
+    return r;
+}
+
 int RtpBuffer::getNumberOfReturnedPackets() const
 {
     return mReturnedCounter;
@@ -378,14 +393,23 @@ AudioReceiver::AudioReceiver(const CodecList::Settings& settings, MT::Statistics
     mDtmfBuffer.setLow(0ms);
     mDtmfBuffer.setHigh(1ms);
 
-    // Avoid collecting too much data
-    mRtpBuffer.setHigh(240ms);
+    // Jitter-buffer target delay. Diagnostics on bursty networks showed the buffer level
+    // swinging ~140ms peak-to-trough and hitting BOTH rails within one call - starving
+    // (underrun -> silence) and overflowing (trim -> drop) - with real packet loss near 1%.
+    // Widened the window to give burst jitter more room: prebuffer/low-water raised so a
+    // late clump arrives before starvation, and the high-water raised so the extra depth
+    // is not immediately trimmed back off.
+    mRtpBuffer.setHigh(360ms);
 
-    // Keep a non-zero low-water cushion. With low-water at 0 the buffer drains all the way to
-    // empty before reacting, so ordinary clock drift / jitter periodically starves the decoder
-    // and forces silence/PLC insertion (heard as periodic artifacts, uncounted by rtp_lost /
-    // rtp_dropped). Holding ~60ms lets a late packet arrive before the buffer underruns.
-    mRtpBuffer.setLow(60ms);
+    // Prebuffer: initial fill before the first packet is released (also the depth we aim to
+    // hold). Was the RTP_BUFFER_PREBUFFER default (100ms); set explicitly alongside low-water.
+    mRtpBuffer.setPrebuffer(120ms);
+
+    // Low-water cushion. With low-water at 0 the buffer drains to empty before reacting, so
+    // ordinary clock drift / jitter periodically starves the decoder and forces silence/PLC
+    // insertion (heard as periodic artifacts, uncounted by rtp_lost / rtp_dropped). Holding
+    // ~120ms lets a late packet clump arrive before the buffer underruns.
+    mRtpBuffer.setLow(120ms);
 
     // Resamplers are lazy inside; there is no actual memory allocation
     mResampler8.start(AUDIO_CHANNELS, 8000, AUDIO_SAMPLERATE);
@@ -620,20 +644,59 @@ AudioReceiver::DecodeResult AudioReceiver::decodeGapTo(Audio::DataWindow& output
     else
     if (mCodec && mFrameCount && !mCodecSettings.mSkipDecode)
     {
-        // Do PLC to mDecodedFrame/mDecodedLength
+        // Conceal the gap into mDecodedFrame/mDecodedLength.
         if (options.mSkipDecode)
             mDecodedLength = 0;
         else
         {
-            mDecodedLength = mCodec->plc(mFrameCount, {(uint8_t*)mDecodedFrame.data(), mDecodedFrame.size() * sizeof(int16_t)});
+            std::span<uint8_t> concealBuffer{(uint8_t*)mDecodedFrame.data(), mDecodedFrame.size() * sizeof(int16_t)};
+            mDecodedLength = 0;
+
+            // In-band FEC first: the packet sitting past the gap (still at the front
+            // of the jitter buffer - fetch() leaves it there on a Gap) may carry a
+            // redundant copy of the frame we just lost. Recover it exactly instead of
+            // synthesising it. Only attempt this when that packet decodes with the
+            // very same codec instance we have been using.
+            if (auto next = mRtpBuffer.peekFront(); next && next->rtp())
+            {
+                auto codecIter = mCodecMap.find(next->rtp()->GetPayloadType());
+                if (codecIter != mCodecMap.end() && codecIter->second == mCodec)
+                {
+                    mDecodedLength = mCodec->fec({next->rtp()->GetPayloadData(), (size_t)next->rtp()->GetPayloadLength()},
+                                                 concealBuffer);
+                }
+            }
+
+            // No FEC available (unsupported codec, no redundant data, or no next
+            // packet yet): fall back to the codec's own concealment.
+            if (!mDecodedLength)
+                mDecodedLength = mCodec->plc(mFrameCount, concealBuffer);
+
             if (!mDecodedLength)
             {
-                // PLC is not support or failed
-                // So substitute the silence
-                size_t nr_of_samples = mCodec->frameTime() * mCodec->samplerate() / 1000 * sizeof(short);
-                mDecodedLength = nr_of_samples * sizeof(short);
+                // PLC unsupported or failed - substitute one frame of silence.
+                size_t frameBytes = (size_t)mCodec->frameTime() * mCodec->samplerate() / 1000
+                                    * sizeof(short) * std::max(1, mCodec->channels());
+                frameBytes = std::min(frameBytes, concealBuffer.size_bytes());
+                mDecodedLength = frameBytes;
                 memset(mDecodedFrame.data(), 0, mDecodedLength);
             }
+        }
+
+        // Fix double-concealment: fetch() advanced mLastSeqno across the gap but not
+        // mLastPacketTimestamp, so without this the next real packet's timestamp-gap
+        // check in decodePacketTo() would pad the same span again with silence (gap
+        // concealed twice - once here as FEC/PLC, once there as silence). Advance the
+        // expected-timestamp cursor past the last real packet and record the audio we
+        // just produced as the new "last unit", so decodePacketTo() fills only whatever
+        // gap remains beyond it.
+        if (mDecodedLength && mLastPacketTimestamp && mCodec)
+        {
+            int sr = mCodec->samplerate();
+            int chans = std::max(1, mCodec->channels());
+            *mLastPacketTimestamp += (uint32_t)(mLastPacketTimeLength * (sr / 1000));
+            int concealedSamples = (int)(mDecodedLength / (sizeof(short) * chans));
+            mLastPacketTimeLength = concealedSamples * 1000 / sr;
         }
     }
 
@@ -807,7 +870,14 @@ AudioReceiver::DecodeResult AudioReceiver::decodeEmptyTo(Audio::DataWindow& outp
             // Emit silence if codec information is available - it is to properly handle the gaps
             auto avail = output.getTimeLength(fmt);
             if (options.mElapsed > avail)
+            {
+                // Genuine decoder starvation: the buffer drained below low-water with no
+                // packet (and no CNG) to play, so we fill the timeline with silence. Count
+                // it for the heartbeat - this is the signature of jitter/clock-drift
+                // underruns that carry no packet-loss.
                 output.addZero(fmt.sizeFromTime(options.mElapsed - avail));
+                mUnderrunCount++;
+            }
         }
     }
 
@@ -823,6 +893,42 @@ void MT::AudioReceiver::processDtmf()
         if (fr.mPacket && fr.mStatus == RtpBuffer::FetchResult::Status::RegularPacket)
             mDtmfReceiver.add(fr.mPacket->rtp());
     }
+}
+
+void MT::AudioReceiver::logReceiveHeartbeat()
+{
+    float t = now_ms();
+    if (mStatLogLast == 0.0f)
+    {
+        // First call - just latch the baselines, nothing to report yet.
+        mStatLogLast = t;
+        mStatLossLast = mStat.mPacketLoss;
+        mStatDropLast = mStat.mPacketDropped;
+        return;
+    }
+
+    if (t - mStatLogLast < 5000.0f)
+        return;
+
+    // Deltas over the elapsed window. Loss = missing sequence numbers seen on fetch;
+    // dropped = packets discarded by the high-water trim (late/overflow), which is
+    // NOT network loss; underruns = decoder starvation (buffer under low-water) that
+    // forced silence. These three separate the candidate impairment causes.
+    size_t lossDelta = mStat.mPacketLoss - mStatLossLast;
+    size_t dropDelta = mStat.mPacketDropped - mStatDropLast;
+
+    ICELogInfo(<< "[rx-heartbeat] buffered=" << mRtpBuffer.bufferedTime().count() << "ms"
+               << " packets=" << mRtpBuffer.getCount()
+               << " underruns/5s=" << mUnderrunCount
+               << " gaps/5s=" << mGapCount
+               << " loss/5s=" << lossDelta
+               << " dropped/5s=" << dropDelta);
+
+    mStatLogLast = t;
+    mUnderrunCount = 0;
+    mGapCount = 0;
+    mStatLossLast = mStat.mPacketLoss;
+    mStatDropLast = mStat.mPacketDropped;
 }
 
 void MT::AudioReceiver::updateDecodingTimeStatistics()
@@ -887,7 +993,7 @@ AudioReceiver::DecodeResult AudioReceiver::getAudioTo(Audio::DataWindow& output,
         // Decode to mAvailable buffer
         switch (fr.mStatus)
         {
-        case RtpBuffer::FetchResult::Status::Gap:           result = decodeGapTo(mAvailable, options.decreaseElapsedBy(produced));                                                      break;
+        case RtpBuffer::FetchResult::Status::Gap:           mGapCount++; result = decodeGapTo(mAvailable, options.decreaseElapsedBy(produced));                                         break;
         case RtpBuffer::FetchResult::Status::NoPacket:      result = decodeEmptyTo(mAvailable, options.decreaseElapsedBy(produced));                                                    break;
         case RtpBuffer::FetchResult::Status::RegularPacket: result = decodePacketTo(mAvailable, options.decreaseElapsedBy(produced), fr.mPacket);   updateDecodeIntervalStatistics();   break;
         default:
@@ -921,6 +1027,8 @@ AudioReceiver::DecodeResult AudioReceiver::getAudioTo(Audio::DataWindow& output,
 
     mProducedAudio += produced;
     // ICELogDebug(<< "Requested " << options.mElapsed << ", produced " << produced << ", remains " << mAvailable.getTimeLength(fmt) << ", packets " << getRtpBuffer().getCount());
+
+    logReceiveHeartbeat();
     return result;
 }
 
