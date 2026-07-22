@@ -99,6 +99,11 @@ class AndroidOutputDevice: public OutputDevice, public oboe::AudioStreamCallback
         bool mInShutdown = false;
         bool mActive = false;
 
+        // Adaptive buffer sizing + device-side diagnostics (Step 0 / #5).
+        int32_t mBurstFrames = 0;       // frames per burst, latched at open()
+        int32_t mXRunLast = 0;          // last observed cumulative XRun count
+        float   mHeartbeatLast = 0.0f;  // now_ms() of last device heartbeat log
+
         // Statistics
         float mRequestedFrames = 0.0, mStartTime = 0.0, mEndTime = 0.0;
     };

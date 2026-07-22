@@ -4,6 +4,7 @@
 #include <mutex>
 #include <iostream>
 #include <stdexcept>
+#include <algorithm>
 
 #include "../helper/HL_String.h"
 #include "../helper/HL_Time.h"
@@ -141,6 +142,9 @@ AndroidOutputDevice::AndroidOutputDevice(int devId)
 AndroidOutputDevice::~AndroidOutputDevice()
 {
   ICELogDebug(<< "Deleting AndroidOutputDevice.");
+  // Mark shutdown before closing so a disconnect callback racing with teardown
+  // does not resurrect the stream via onErrorAfterClose()'s restart.
+  mInShutdown = true;
   close();
 }
 
@@ -151,6 +155,7 @@ bool AndroidOutputDevice::open()
   if (mActive)
     return true;
 
+  mInShutdown = false;
   mRequestedFrames = 0;
   mStartTime = 0.0;
   mEndTime = 0.0;
@@ -161,6 +166,10 @@ bool AndroidOutputDevice::open()
   builder.setSharingMode(oboe::SharingMode::Exclusive);
   builder.setFormat(oboe::AudioFormat::I16);
   builder.setChannelCount(oboe::ChannelCount::Mono);
+  // Route through the platform voice-call path: correct device selection/volume
+  // and platform voice tuning for a softphone.
+  builder.setUsage(oboe::Usage::VoiceCommunication);
+  builder.setContentType(oboe::ContentType::Speech);
   // builder.setDataCallback(this);
   builder.setCallback(this);
   //builder.setErrorCallback(this)
@@ -170,7 +179,7 @@ bool AndroidOutputDevice::open()
     return false;
 
   mDeviceRate = mPlayingStream->getSampleRate();
-  ICELogInfo(<< "Input Opened with rate " << mDeviceRate);
+  ICELogInfo(<< "Output opened with rate " << mDeviceRate);
   mActive = true;
 
   rescode = mPlayingStream->requestStart();
@@ -178,7 +187,18 @@ bool AndroidOutputDevice::open()
   {
       close();
       mActive = false;
+      return mActive;
   }
+
+  // Latch the burst size and start from a two-burst buffer. onAudioReady() grows
+  // this on XRuns (up to a cap) so we keep low latency when the device can sustain
+  // it and trade a little latency for glitch-free playback when it can't.
+  mBurstFrames = mPlayingStream->getFramesPerBurst();
+  mXRunLast = 0;
+  mHeartbeatLast = 0.0f;
+  if (mBurstFrames > 0)
+    mPlayingStream->setBufferSizeInFrames(mBurstFrames * 2);
+
   return mActive;
 }
 
@@ -232,14 +252,50 @@ oboe::DataCallbackResult AndroidOutputDevice::onAudioReady(oboe::AudioStream *au
   }
   mRequestedFrames += numFrames;
 
+  // Adaptive buffer sizing: on new XRuns (device-side underruns, i.e. we missed a
+  // callback deadline), grow the buffer one burst at a time up to a cap. Both calls
+  // are documented as safe from within the data callback.
+  auto xrun = audioStream->getXRunCount();
+  if (xrun && xrun.value() > mXRunLast)
+  {
+    mXRunLast = xrun.value();
+    if (mBurstFrames > 0)
+    {
+      int32_t cap = mBurstFrames * 8;
+      int32_t cur = audioStream->getBufferSizeInFrames();
+      int32_t next = std::min(cur + mBurstFrames, cap);
+      if (next > cur)
+        audioStream->setBufferSizeInFrames(next);
+    }
+  }
+
+  // Device-side heartbeat (Step 0): surfaces XRuns/buffer growth so device glitches
+  // can be told apart from network/jitter impairments.
+  float t = now_ms();
+  if (mHeartbeatLast == 0.0f)
+    mHeartbeatLast = t;
+  else if (t - mHeartbeatLast >= 5000.0f)
+  {
+    ICELogInfo(<< "[spk-heartbeat] xruns=" << mXRunLast
+               << " bufFrames=" << audioStream->getBufferSizeInFrames()
+               << " burst=" << mBurstFrames
+               << " rate=" << mDeviceRate);
+    mHeartbeatLast = t;
+  }
+
   return oboe::DataCallbackResult::Continue;
 }
 
-// TODO - special case https://github.com/google/oboe/blob/master/docs/notes/disconnect.md
+// Disconnect recovery: on a route change (headset/BT plug/unplug) AAudio tears the
+// stream down and calls this on its own thread after the stream is closed. Rebuild
+// on the new default route so audio doesn't silently die mid-call.
+// See https://github.com/google/oboe/blob/master/docs/notes/disconnect.md
 void AndroidOutputDevice::onErrorAfterClose(oboe::AudioStream *stream, oboe::Result result) {
-  if (result == oboe::Result::ErrorDisconnected) {
-    // LOGI("Restarting AudioStream after disconnect");
-    // soundEngine.restart(); // please check oboe samples for soundEngine.restart(); call
+  if (result == oboe::Result::ErrorDisconnected && !mInShutdown) {
+    ICELogInfo(<< "Output stream disconnected; restarting on the new route");
+    // close() and open() each take mMutex internally; this callback holds none.
+    close();
+    open();
   }
 }
 #endif // TARGET_ANDROID
